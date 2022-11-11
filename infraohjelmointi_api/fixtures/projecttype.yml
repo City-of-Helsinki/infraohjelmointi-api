@@ -1,0 +1,28 @@
+- model: infraohjelmointi_api.projecttype
+  pk: c9f597cb-773f-41ac-ab85-5286ad4ee4fd
+  fields:
+    value: PROJECT_COMPLEX
+- model: infraohjelmointi_api.projecttype
+  pk: 30f21f20-7e3a-4bb1-94f9-447338115588
+  fields:
+    value: STREET
+- model: infraohjelmointi_api.projecttype
+  pk: ae994909-e135-4a24-977e-a39e9f8e783a
+  fields:
+    value: TRAFFIC
+- model: infraohjelmointi_api.projecttype
+  pk: 9552cb8a-61fe-4f0e-8fac-caa3d9be8658
+  fields:
+    value: SPORTS
+- model: infraohjelmointi_api.projecttype
+  pk: 4b9642a5-6b81-40e4-8f35-05bc5cec211c
+  fields:
+    value: OMASTADI
+- model: infraohjelmointi_api.projecttype
+  pk: 2aa6795f-9eea-42a0-9aa1-21972655448e
+  fields:
+    value: PROJEXT_AREA
+- model: infraohjelmointi_api.projecttype
+  pk: 021ceac0-e770-42d6-83ae-5b7f516e6995
+  fields:
+    value: PARK_OR_SKILL_STRUCTURE
