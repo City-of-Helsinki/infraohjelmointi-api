@@ -16,4 +16,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # we mimic that here with nobody and group zero
 USER nobody:0
 
-ENTRYPOINT ["gunicorn"]
+ENTRYPOINT ["gunicorn","--reload"]

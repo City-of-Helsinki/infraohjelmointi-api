@@ -9,3 +9,4 @@ tzdata
 dj_database_url
 django-environ
 pyyaml
+inotify                                       #dependency for using --reload arg with gunicorn for hotreload
