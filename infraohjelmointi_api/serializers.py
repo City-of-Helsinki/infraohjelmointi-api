@@ -2,16 +2,10 @@ from infraohjelmointi_api.models import ProjectType, Project
 from rest_framework import serializers
 
 
-class ProjectSerializer(serializers.HyperlinkedModelSerializer):
-    options = serializers.HyperlinkedRelatedField(
-        view_name='projecttype-detail',
-        lookup_field='type',
-        many=True,
-        read_only=True)
-
+class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ['id', 'name', 'HKRprojectID', 'type', 'created_date', 'updated_date', 'options']
+        fields = ['id', 'name', 'HKRprojectID', 'type', 'created_date', 'updated_date']
 
         lookup_field = 'type'
         extra_kwargs = {
@@ -19,7 +13,7 @@ class ProjectSerializer(serializers.HyperlinkedModelSerializer):
         }
 
 
-class ProjectTypeSerializer(serializers.HyperlinkedModelSerializer):
+class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
         fields = ['id', 'value']
