@@ -1,4 +1,4 @@
-from infraohjelmointi_api.models import ProjectType, Project
+from .models import ProjectType, Project
 from rest_framework import serializers
 
 
