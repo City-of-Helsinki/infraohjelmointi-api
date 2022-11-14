@@ -25,7 +25,8 @@ env = environ.Env(
     DEBUG=(bool, False),
     DJANGO_SECRET_KEY=(str, "django-insecure-p&ef_@=(24(r_(+-+goh5ye22o+xfl_b6n2+g%kt%qu*-)!t(h"),
     ALLOWED_HOSTS=(list, ["*"]),
-    DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db")
+    DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
+    DJANGO_ADMIN_LANGUAGE=(str, "fi")
 )
 
 if path.exists(".env"):
@@ -108,7 +109,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = "fi"
+LANGUAGE_CODE = env("DJANGO_ADMIN_LANGUAGE")
 
 TIME_ZONE = "Europe/Helsinki"
 
