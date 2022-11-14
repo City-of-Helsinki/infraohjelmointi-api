@@ -25,15 +25,6 @@ Then you can run docker image with:
 
 - Done!
 
-## Setting up local development environment with pip
-
-Install packages
-
-```
-pip install -r requirements.txt
-```
-
-
 ## Managing project packages
 
 - We use `pip` to manage python packages we need
