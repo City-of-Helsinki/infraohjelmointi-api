@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets
-from infraohjelmointi_api.serialazers import ProjectSerializer, ProjectTypeSerializer
+from infraohjelmointi_api.serializers import ProjectSerializer, ProjectTypeSerializer
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
