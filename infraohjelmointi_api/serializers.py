@@ -5,7 +5,7 @@ from rest_framework import serializers
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ['id', 'name', 'HKRprojectID', 'type', 'created_date', 'updated_date']
+        fields = '__all__'
 
         lookup_field = 'type'
         extra_kwargs = {
@@ -16,4 +16,4 @@ class ProjectSerializer(serializers.ModelSerializer):
 class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
-        fields = ['id', 'value']
+        fields = '__all__'

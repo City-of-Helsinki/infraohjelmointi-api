@@ -21,8 +21,8 @@ from rest_framework import routers
 from infraohjelmointi_api import views
 
 router = routers.DefaultRouter()
-router.register(r'projects', views.ProjectViewSet)
-router.register(r'project-types', views.ProjectTypeViewSet)
+router.register(r'projects', views.ProjectViewSet,basename='projects')
+router.register(r'project-types', views.ProjectTypeViewSet,basename='projectTypes')
 
 urlpatterns = [
     path('', include(router.urls)),

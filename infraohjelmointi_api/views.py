@@ -1,23 +1,23 @@
-from django.contrib.auth.models import User, Group
+
 from rest_framework import viewsets
 from infraohjelmointi_api.serializers import ProjectSerializer, ProjectTypeSerializer
 
+class BaseViewSet(viewsets.ModelViewSet):
 
-class ProjectViewSet(viewsets.ModelViewSet):
+    def get_queryset(self):
+        return self.serializer_class.Meta.model.objects.all()
+
+class ProjectViewSet(BaseViewSet):
   """
   API endpoint that allows projects to be viewed or edited.
   """
   permission_classes = []
-
-  queryset = User.objects.all()
   serializer_class = ProjectSerializer
 
 
-class ProjectTypeViewSet(viewsets.ModelViewSet):
+class ProjectTypeViewSet(BaseViewSet):
   """
   API endpoint that allows project types to be viewed or edited.
   """
   permission_classes = []
-
-  queryset = Group.objects.all()
   serializer_class = ProjectTypeSerializer
