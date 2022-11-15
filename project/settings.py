@@ -32,7 +32,7 @@ env = environ.Env(
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
-    STATIC_URL=(str, "/static/"),
+    STATIC_URL=(str, "/static/"),,
 )
 
 if path.exists(".env"):
@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     # disable Django’s static file handling during development so that whitenoise can take over
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "infraohjelmointi_api",
 ]
@@ -68,6 +69,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "corsheaders.middleware.CorsMiddleware"
 ]
 
 ROOT_URLCONF = "project.urls"
