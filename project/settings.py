@@ -31,6 +31,8 @@ env = environ.Env(
     DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
+    STATIC_ROOT=(str, BASE_DIR / "static"),
+    STATIC_URL=(str, "/static/"),
 )
 
 if path.exists(".env"):
@@ -129,10 +131,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "static"
-
-STATICFILES_DIRS = []
+STATIC_URL = env("STATIC_URL")
+STATIC_ROOT = env("STATIC_ROOT")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
