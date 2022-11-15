@@ -1,4 +1,4 @@
-django==4.1.3                                 # web framework itself
+django==4.1.3                                  # web framework itself
 djangorestframework                           # creating rest APIs
 gunicorn                                      # application server
 psycopg2-binary                               # postgres database adapter
@@ -7,6 +7,6 @@ django-cors-headers
 django_db_logger
 tzdata
 dj_database_url
-django-environ
-pyyaml
-inotify                                       #dependency for using --reload arg with gunicorn for hotreload
+django-environ                                # environment variables utility
+pyyaml                                        # yml parser
+whitenoise                                    # enabling Django to serve its own static files
