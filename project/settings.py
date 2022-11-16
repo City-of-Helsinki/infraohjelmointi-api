@@ -30,6 +30,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ["*"]),
     DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
+    ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
 )
 
 if path.exists(".env"):
@@ -67,7 +68,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "project.urls"
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:4000"]
+CORS_ALLOWED_ORIGINS = env("ALLOWED_CORS_ORIGINS")
 
 TEMPLATES = [
     {
