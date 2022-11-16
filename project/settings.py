@@ -32,7 +32,8 @@ env = environ.Env(
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
-    STATIC_URL=(str, "/static/"),,
+    STATIC_URL=(str, "/static/"),
+    ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
 )
 
 if path.exists(".env"):
