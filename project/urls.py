@@ -21,10 +21,11 @@ from rest_framework import routers
 from infraohjelmointi_api import views
 
 router = routers.DefaultRouter()
-router.register(r'projects', views.ProjectViewSet,basename='projects')
-router.register(r'project-types', views.ProjectTypeViewSet,basename='projectTypes')
+router.register(r"projects", views.ProjectViewSet, basename="projects")
+router.register(r"project-types", views.ProjectTypeViewSet, basename="projectTypes")
+router.register(r"projects-mock", views.MockProjectViewSet, basename="projectsMock")
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('admin/', admin.site.urls),
+    path("", include(router.urls)),
+    path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
