@@ -38,7 +38,7 @@ class ProjectSet(models.Model):
 class ProjectArea(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     areaName = models.CharField(max_length=200, blank=False, null=False)
-    Location = models.CharField(max_length=200, blank=True, null=True)
+    location = models.CharField(max_length=200, blank=True, null=True)
 
 
 class BudgetItem(models.Model):
@@ -140,7 +140,7 @@ class Project(models.Model):
     # AlustavaKuluvaVuosiPlus9
     # AlustavaKuluvaVuosiPlus10
 
-    Delays = models.CharField(max_length=200, blank=False, null=False)
+    delays = models.CharField(max_length=200, blank=False, null=False)
 
     created_date = models.DateTimeField(auto_now_add=True, blank=True)
     updated_date = models.DateTimeField(auto_now=True, blank=True)
