@@ -8,10 +8,171 @@ class ProjectType(models.Model):
     value = models.CharField(max_length=200)
 
 
-class Project(models.Model):
+class Person(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
-    HKRprojectID = models.CharField(max_length=200, blank=True, null=True)
-    type = models.ForeignKey(ProjectType, on_delete=models.DO_NOTHING)
+
+
+class ProjectSet(models.Model):
+    class ProjectPhaseChoices(models.TextChoices):
+        FIRST_PHASE = "FP", ("First")
+        SECOND_PHASE = "SP", ("Second")
+        THIRD_PHASE = "TP", ("Third")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, blank=True, null=True)
+    pwProjectId = models.UUIDField(blank=True, null=True)
+    description = models.TextField(max_length=500, blank=True, null=True)
+    # sapProjectNumberList to be acquired using method field
+    # sapNetworkNumberList to be acquired using method field
+    responsiblePerson = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
+    projectPhase = models.CharField(
+        max_length=2,
+        choices=ProjectPhaseChoices.choices,
+        default=ProjectPhaseChoices.FIRST_PHASE,
+    )
+    programmed = models.BooleanField(default=False)
+    # finances = models.TextField(max_length=500, blank=True, null=True)
+
+
+class ProjectArea(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    areaName = models.CharField(max_length=200, blank=False, null=False)
+    Location = models.CharField(max_length=200, blank=True, null=True)
+
+
+class BudgetItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    budgetMain = models.IntegerField(blank=True, null=True)
+    budgetPlan = models.IntegerField(blank=True, null=True)
+    site = models.CharField(max_length=200, blank=True, null=True)
+    siteName = models.CharField(max_length=200, blank=True, null=True)
+    district = models.CharField(max_length=200, blank=True, null=True)
+    need = models.DecimalField(max_digits=6, decimal_places=2)
+    # one field left from budget item
+
+
+class Project(models.Model):
+    class ProjectPhaseChoices(models.TextChoices):
+        FIRST_PHASE = "FP", ("First")
+        SECOND_PHASE = "SP", ("Second")
+        THIRD_PHASE = "TP", ("Third")
+
+    class PriorityChoices(models.TextChoices):
+        LOW = "L", ("Low")
+        MEDIUM = "M", ("Medium")
+        HIGH = "H", ("High")
+
+    class ProjectTypeChoices(models.TextChoices):
+        ProjectComplex = "PROJECTCOMPLEX", ("Hankekokonaisuus")
+        Street = "STREET", ("Katu")
+        Traffic = "TRAFFIC", ("Liikenne")
+        Sports = "SPORTS", ("Liikunta")
+        Omastadi = "OMASTADI", ("Omastadi")
+        ProjectArea = "PROJECTAREA", ("Projektialue")
+        Park = "PARK", ("Puisto tai taitorakenne")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    siteId = models.ForeignKey(BudgetItem, on_delete=models.DO_NOTHING)
+    pwProjectId = models.UUIDField(blank=True, null=True)
+    sapProjectNumber = models.UUIDField(blank=True, null=True)
+    sapNetworkNumber = models.UUIDField(blank=True, null=True)
+    projectSet = models.ForeignKey(ProjectSet, on_delete=models.DO_NOTHING)
+    projectArea = models.ForeignKey(ProjectArea, on_delete=models.DO_NOTHING)
+    type = models.CharField(max_length=15, choices=ProjectTypeChoices.choices)
+    name = models.CharField(max_length=200, blank=False)
+    description = models.TextField(max_length=500, blank=True, null=True)
+    personPlanning = models.ForeignKey(
+        Person, related_name="planning", on_delete=models.DO_NOTHING
+    )
+    personProgramming = models.ForeignKey(
+        Person, related_name="programming", on_delete=models.DO_NOTHING
+    )
+    personConstruction = models.ForeignKey(
+        Person, related_name="construction", on_delete=models.DO_NOTHING
+    )
+    projectPhase = models.CharField(
+        max_length=2,
+        choices=ProjectPhaseChoices.choices,
+        default=ProjectPhaseChoices.FIRST_PHASE,
+    )
+    programmed = models.BooleanField(default=False)
+    constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
+    estPlanningStartYear = models.IntegerField(blank=True, null=True)
+    estDesignEndYear = models.IntegerField(blank=True, null=True)
+    estDesignStartDate = models.DateTimeField(blank=True)
+    estDesignEndDate = models.DateTimeField(blank=True)
+    contractPrepStartDate = models.DateTimeField(blank=True)
+    contractPrepEndDate = models.DateTimeField(blank=True)
+    warrantyStartDate = models.DateTimeField(blank=True)
+    warrantyExpireDate = models.DateTimeField(blank=True)
+    perfAmount = models.IntegerField(blank=True, null=True)
+    unitCost = models.DecimalField(max_digits=6, decimal_places=2)
+    costForecast = models.DecimalField(max_digits=6, decimal_places=2)
+    neighborhood = models.CharField(max_length=200, blank=False, null=False)
+    comittedCost = models.DecimalField(max_digits=6, decimal_places=2)
+    tiedCurrYear = models.DecimalField(max_digits=6, decimal_places=2)
+    realizedCost = models.DecimalField(max_digits=6, decimal_places=2)
+    spentCost = models.DecimalField(max_digits=6, decimal_places=2)
+    riskAssess = models.CharField(max_length=200, blank=False, null=False)
+    priority = models.CharField(
+        max_length=2,
+        choices=PriorityChoices.choices,
+        default=PriorityChoices.LOW,
+    )
+    locked = models.BooleanField(default=False)
+    comments = models.CharField(max_length=200, blank=False, null=False)
+
+    # commented fields left out due to translation confusions
+    # Hankkeen lisätyöt (sapista)
+    # TaEnnuste1KuluvaVuosi
+    # TaEnnuste2KuluvaVuosi
+    # TaEnnuste3KuluvaVuosi
+    # TaEnnuste4KuluvaVuosi
+    # TaeKuluvaVuosiPlus1
+    # TaeKuluvaVuosiPlus2
+    # AlustavaKuluvaVuosiPlus3
+    # AlustavaKuluvaVuosiPlus4
+    # AlustavaKuluvaVuosiPlus5
+    # AlustavaKuluvaVuosiPlus6
+    # AlustavaKuluvaVuosiPlus7
+    # AlustavaKuluvaVuosiPlus8
+    # AlustavaKuluvaVuosiPlus9
+    # AlustavaKuluvaVuosiPlus10
+
+    Delays = models.CharField(max_length=200, blank=False, null=False)
+
     created_date = models.DateTimeField(auto_now_add=True, blank=True)
     updated_date = models.DateTimeField(auto_now=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["id", "pwProjectId", "sapProjectNumber", "sapNetworkNumber"],
+                name="Unique together Project Ids",
+            )
+        ]
+
+
+class Task(models.Model):
+    class TaskStatusChoices(models.TextChoices):
+        ACTIVE = "A", ("Active")
+        PAST = "P", ("Past")
+        UPCOMING = "U", ("Upcoming")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    projectId = models.ForeignKey(Project, on_delete=models.DO_NOTHING)
+    pwProjectId = models.UUIDField(blank=True, null=True)
+    taskType = models.CharField(max_length=50, blank=False, null=False)
+    status = models.CharField(
+        max_length=2,
+        choices=TaskStatusChoices.choices,
+        default=TaskStatusChoices.UPCOMING,
+    )
+    startDate = models.DateTimeField(auto_now=True, blank=True)
+    endDate = models.DateTimeField(auto_now=True, blank=True)
+    person = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
+    realizedCost = models.DecimalField(max_digits=6, decimal_places=2)
+    plannedCost = models.DecimalField(max_digits=6, decimal_places=2)
+    # TaskAccomplishment
+    riskAssessment = models.CharField(max_length=200, blank=False, null=False)
