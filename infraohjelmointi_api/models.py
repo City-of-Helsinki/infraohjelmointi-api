@@ -18,9 +18,18 @@ class Person(models.Model):
 
 class ProjectSet(models.Model):
     class ProjectPhaseChoices(models.TextChoices):
-        FIRST_PHASE = "FP", ("First")
-        SECOND_PHASE = "SP", ("Second")
-        THIRD_PHASE = "TP", ("Third")
+        PROPOSAL = "PROP", ("Hanke-ehdotus")
+        DESIGN = "DESG", ("Yleissuunnittelu")
+        PROGRAMMING = "PROG", ("Ohjelmointi")
+        DRAFT_INITIATION = "DRAI", (
+            "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
+        )
+        DRAFT_APPROVAL = "DRAA", ("Katu-/puistosuunnitelmaehdotus ja hyväksyminen")
+        CONSTRUCTION_PLAN = "CONP", ("Rakennussuunnitelma")
+        CONSTRUCTION_WAIT = "CONW", ("Odottaa rakentamista")
+        CONSTRUCTION = "CONS", ("Rakentaminen")
+        WARRANTY_PERIOD = "WARP", ("Takuuaika")
+        COMPLETED = "COMP", ("Valmis / ylläpidossa")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=True, null=True)
@@ -30,9 +39,9 @@ class ProjectSet(models.Model):
     # sapNetworkNumberList to be acquired using method field
     responsiblePerson = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
     projectPhase = models.CharField(
-        max_length=2,
+        max_length=4,
         choices=ProjectPhaseChoices.choices,
-        default=ProjectPhaseChoices.FIRST_PHASE,
+        default=ProjectPhaseChoices.PROPOSAL,
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
@@ -56,6 +65,7 @@ class BudgetItem(models.Model):
 
 
 class Project(models.Model):
+    # PROJECT URL AS A FIELD TO SHARE
     class ProjectPhaseChoices(models.TextChoices):
         PROPOSAL = "PROP", ("Hanke-ehdotus")
         DESIGN = "DESG", ("Yleissuunnittelu")
@@ -104,7 +114,7 @@ class Project(models.Model):
         Person, related_name="construction", on_delete=models.DO_NOTHING
     )
     projectPhase = models.CharField(
-        max_length=2,
+        max_length=4,
         choices=ProjectPhaseChoices.choices,
         default=ProjectPhaseChoices.PROPOSAL,
     )
