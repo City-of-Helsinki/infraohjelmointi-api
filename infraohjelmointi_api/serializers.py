@@ -29,9 +29,18 @@ class PersonSerializer(serializers.ModelSerializer):
 
 
 class ProjectSetSerializer(serializers.ModelSerializer):
+    sapProjects = serializers.SerializerMethodField()
+    sapNetworks = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectSet
         fields = "__all__"
+
+    def get_sapProjects(self, obj):
+        return obj.sapProjects()
+
+    def get_sapNetworks(self, obj):
+        return obj.sapNetworks()
 
 
 class ProjectAreaSerializer(serializers.ModelSerializer):
