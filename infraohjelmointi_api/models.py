@@ -53,12 +53,24 @@ class ProjectSet(models.Model):
     # finances = models.TextField(max_length=500, blank=True, null=True)
     def sapProjects(self):
         return [
-            sapProject for sapProject in list(Project.objects.filter(projectSet=self))
+            sapProject
+            for sapProject in list(
+                Project.objects.filter(projectSet=self).values_list(
+                    "sapProject", flat=True
+                )
+            )
+            if sapProject is not None
         ]
 
     def sapNetworks(self):
         return [
-            sapNetwork for sapNetwork in list(Project.objects.filter(projectSet=self))
+            sapNetwork
+            for sapNetwork in list(
+                Project.objects.filter(projectSet=self).values_list(
+                    "sapNetwork", flat=True
+                )
+            )
+            if sapNetwork is not None
         ]
 
 
