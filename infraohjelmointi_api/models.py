@@ -18,18 +18,20 @@ class Person(models.Model):
 
 class ProjectSet(models.Model):
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "PROP", ("Hanke-ehdotus")
-        DESIGN = "DESG", ("Yleissuunnittelu")
-        PROGRAMMING = "PROG", ("Ohjelmointi")
-        DRAFT_INITIATION = "DRAI", (
+        PROPOSAL = "PROPOSAL", ("Hanke-ehdotus")
+        DESIGN = "DESIGN", ("Yleissuunnittelu")
+        PROGRAMMING = "PROGRAMMING", ("Ohjelmointi")
+        DRAFT_INITIATION = "DRAFT_INITIATION", (
             "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
         )
-        DRAFT_APPROVAL = "DRAA", ("Katu-/puistosuunnitelmaehdotus ja hyväksyminen")
-        CONSTRUCTION_PLAN = "CONP", ("Rakennussuunnitelma")
-        CONSTRUCTION_WAIT = "CONW", ("Odottaa rakentamista")
-        CONSTRUCTION = "CONS", ("Rakentaminen")
-        WARRANTY_PERIOD = "WARP", ("Takuuaika")
-        COMPLETED = "COMP", ("Valmis / ylläpidossa")
+        DRAFT_APPROVAL = "DRAFT_APPROVAL", (
+            "Katu-/puistosuunnitelmaehdotus ja hyväksyminen"
+        )
+        CONSTRUCTION_PLAN = "CONSTRUCTION_PLAN", ("Rakennussuunnitelma")
+        CONSTRUCTION_WAIT = "CONSTRUCTION_WAIT", ("Odottaa rakentamista")
+        CONSTRUCTION = "CONSTRUCTION", ("Rakentaminen")
+        WARRANTY_PERIOD = "WARRANTY_PERIOD", ("Takuuaika")
+        COMPLETED = "COMPLETED", ("Valmis / ylläpidossa")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=True, null=True)
@@ -39,7 +41,7 @@ class ProjectSet(models.Model):
     # sapNetworkNumberList to be acquired using method field
     responsiblePerson = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
     projectPhase = models.CharField(
-        max_length=4,
+        max_length=17,
         choices=ProjectPhaseChoices.choices,
         default=ProjectPhaseChoices.PROPOSAL,
     )
@@ -67,18 +69,20 @@ class BudgetItem(models.Model):
 class Project(models.Model):
     # PROJECT URL AS A FIELD TO SHARE
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "PROP", ("Hanke-ehdotus")
-        DESIGN = "DESG", ("Yleissuunnittelu")
-        PROGRAMMING = "PROG", ("Ohjelmointi")
-        DRAFT_INITIATION = "DRAI", (
+        PROPOSAL = "PROPOSAL", ("Hanke-ehdotus")
+        DESIGN = "DESIGN", ("Yleissuunnittelu")
+        PROGRAMMING = "PROGRAMMING", ("Ohjelmointi")
+        DRAFT_INITIATION = "DRAFT_INITIATION", (
             "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
         )
-        DRAFT_APPROVAL = "DRAA", ("Katu-/puistosuunnitelmaehdotus ja hyväksyminen")
-        CONSTRUCTION_PLAN = "CONP", ("Rakennussuunnitelma")
-        CONSTRUCTION_WAIT = "CONW", ("Odottaa rakentamista")
-        CONSTRUCTION = "CONS", ("Rakentaminen")
-        WARRANTY_PERIOD = "WARP", ("Takuuaika")
-        COMPLETED = "COMP", ("Valmis / ylläpidossa")
+        DRAFT_APPROVAL = "DRAFT_APPROVAL", (
+            "Katu-/puistosuunnitelmaehdotus ja hyväksyminen"
+        )
+        CONSTRUCTION_PLAN = "CONSTRUCTION_PLAN", ("Rakennussuunnitelma")
+        CONSTRUCTION_WAIT = "CONSTRUCTION_WAIT", ("Odottaa rakentamista")
+        CONSTRUCTION = "CONSTRUCTION", ("Rakentaminen")
+        WARRANTY_PERIOD = "WARRANTY_PERIOD", ("Takuuaika")
+        COMPLETED = "COMPLETED", ("Valmis / ylläpidossa")
 
     class PriorityChoices(models.TextChoices):
         LOW = "L", ("Low")
@@ -120,7 +124,7 @@ class Project(models.Model):
         Person, related_name="construction", on_delete=models.DO_NOTHING, null=True
     )
     projectPhase = models.CharField(
-        max_length=4,
+        max_length=17,
         choices=ProjectPhaseChoices.choices,
         default=ProjectPhaseChoices.PROPOSAL,
     )
