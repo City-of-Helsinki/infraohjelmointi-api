@@ -73,6 +73,17 @@ class ProjectSet(models.Model):
             if sapNetwork is not None
         ]
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "id",
+                    "pwProjectId",
+                ],
+                name="Unique together Project Ids",
+            )
+        ]
+
 
 class ProjectArea(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -133,7 +144,7 @@ class Project(models.Model):
     projectSet = models.ForeignKey(
         ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    projectArea = models.ForeignKey(
+    Area = models.ForeignKey(
         ProjectArea, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     type = models.CharField(max_length=15, choices=ProjectTypeChoices.choices)
