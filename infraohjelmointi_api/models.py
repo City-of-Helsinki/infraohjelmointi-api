@@ -128,7 +128,7 @@ class Project(models.Model):
         choices=ProjectPhaseChoices.choices,
         default=ProjectPhaseChoices.PROPOSAL,
     )
-    favPersons = models.ManyToManyField(Person, related_name="favourite")
+    favPersons = models.ManyToManyField(Person, related_name="favourite", null=True)
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
     estPlanningStartYear = models.IntegerField(blank=True, null=True)
