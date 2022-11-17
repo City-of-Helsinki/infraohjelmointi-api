@@ -27,6 +27,7 @@ router.register(r"projects-mock", views.MockProjectViewSet, basename="projectsMo
 router.register(r"persons", views.PersonViewSet, basename="persons")
 router.register(r"project-sets", views.ProjectSetViewSet, basename="projectSets")
 router.register(r"project-areas", views.ProjectAreaViewSet, basename="personsAreas")
+router.register(r"budgets", views.BudgetItemViewSet, basename="BudgetItems")
 
 
 urlpatterns = [

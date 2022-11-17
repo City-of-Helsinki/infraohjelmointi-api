@@ -5,6 +5,7 @@ from .serializers import (
     PersonSerializer,
     ProjectSetSerializer,
     ProjectAreaSerializer,
+    BudgetItemSerializer,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -73,3 +74,12 @@ class ProjectAreaViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectAreaSerializer
+
+
+class BudgetItemViewSet(BaseViewSet):
+    """
+    API endpoint that allows project areas to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = BudgetItemSerializer
