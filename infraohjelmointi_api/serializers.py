@@ -1,4 +1,4 @@
-from .models import ProjectType, Project, Person
+from .models import ProjectType, Project, Person, ProjectSet
 from rest_framework import serializers
 
 
@@ -25,4 +25,10 @@ class ProjectTypeSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
+        fields = "__all__"
+
+
+class ProjectSetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectSet
         fields = "__all__"

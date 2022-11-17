@@ -1,5 +1,10 @@
 from rest_framework import viewsets
-from .serializers import ProjectSerializer, ProjectTypeSerializer, PersonSerializer
+from .serializers import (
+    ProjectSerializer,
+    ProjectTypeSerializer,
+    PersonSerializer,
+    ProjectSetSerializer,
+)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
@@ -49,3 +54,12 @@ class PersonViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = PersonSerializer
+
+
+class ProjectSetViewSet(BaseViewSet):
+    """
+    API endpoint that allows project types to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectSetSerializer
