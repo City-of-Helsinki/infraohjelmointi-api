@@ -62,7 +62,7 @@ class BudgetItem(models.Model):
     site = models.CharField(max_length=200, blank=True, null=True)
     siteName = models.CharField(max_length=200, blank=True, null=True)
     district = models.CharField(max_length=200, blank=True, null=True)
-    need = models.DecimalField(max_digits=6, decimal_places=2)
+    need = models.DecimalField(max_digits=20, decimal_places=2)
     # one field left from budget item
 
 
@@ -140,26 +140,26 @@ class Project(models.Model):
     warrantyStartDate = models.DateTimeField(blank=True, null=True)
     warrantyExpireDate = models.DateTimeField(blank=True, null=True)
     perfAmount = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     unitCost = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     costForecast = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     neighborhood = models.CharField(max_length=200, blank=True, null=True)
     comittedCost = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     tiedCurrYear = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     realizedCost = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     spentCost = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, blank=True, null=True
     )
     riskAssess = models.CharField(max_length=200, blank=True, null=True)
     priority = models.CharField(
@@ -221,7 +221,7 @@ class Task(models.Model):
     startDate = models.DateTimeField(auto_now=True, blank=True)
     endDate = models.DateTimeField(auto_now=True, blank=True)
     person = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
-    realizedCost = models.DecimalField(max_digits=6, decimal_places=2)
-    plannedCost = models.DecimalField(max_digits=6, decimal_places=2)
+    realizedCost = models.DecimalField(max_digits=20, decimal_places=2)
+    plannedCost = models.DecimalField(max_digits=20, decimal_places=2)
     # TaskAccomplishment
     riskAssess = models.CharField(max_length=200, blank=False, null=False)
