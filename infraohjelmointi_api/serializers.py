@@ -1,4 +1,12 @@
-from .models import ProjectType, Project, Person, ProjectSet, ProjectArea, BudgetItem
+from .models import (
+    ProjectType,
+    Project,
+    Person,
+    ProjectSet,
+    ProjectArea,
+    BudgetItem,
+    Task,
+)
 from rest_framework import serializers
 
 
@@ -52,4 +60,10 @@ class ProjectAreaSerializer(serializers.ModelSerializer):
 class BudgetItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetItem
+        fields = "__all__"
+
+
+class TaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Task
         fields = "__all__"
