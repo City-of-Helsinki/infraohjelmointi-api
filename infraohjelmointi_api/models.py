@@ -51,6 +51,8 @@ class ProjectSet(models.Model):
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
+    # def sapProjectNumbers(self):
+    #     return Project.objects.filter(projectSet=self)
 
 
 class ProjectArea(models.Model):
@@ -107,8 +109,8 @@ class Project(models.Model):
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     pwProjectId = models.UUIDField(blank=True, null=True)
-    sapProjectNumber = models.UUIDField(blank=True, null=True)
-    sapNetworkNumber = models.UUIDField(blank=True, null=True)
+    sapProject = models.UUIDField(blank=True, null=True)
+    sapNetwork = models.UUIDField(blank=True, null=True)
     projectSet = models.ForeignKey(
         ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True
     )
