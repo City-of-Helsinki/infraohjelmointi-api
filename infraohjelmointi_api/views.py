@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from .serializers import ProjectSerializer, ProjectTypeSerializer
+from .serializers import ProjectSerializer, ProjectTypeSerializer, PersonSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
@@ -40,3 +40,12 @@ class MockProjectViewSet(viewsets.ViewSet):
     def list(self, request):
         queryset = self.mock_data
         return Response(queryset)
+
+
+class PersonViewSet(BaseViewSet):
+    """
+    API endpoint that allows project types to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = PersonSerializer
