@@ -42,7 +42,7 @@ class ProjectSet(models.Model):
     # sapProjectNumberList to be acquired using method field
     # sapNetworkNumberList to be acquired using method field
     responsiblePerson = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
-    projectPhase = models.CharField(
+    phase = models.CharField(
         max_length=17,
         choices=ProjectPhaseChoices.choices,
         default="PROPOSAL",
@@ -125,7 +125,7 @@ class Project(models.Model):
     personConstruction = models.ForeignKey(
         Person, related_name="construction", on_delete=models.DO_NOTHING, null=True
     )
-    projectPhase = models.CharField(
+    phase = models.CharField(
         max_length=17,
         choices=ProjectPhaseChoices.choices,
         default="PROPOSAL",
