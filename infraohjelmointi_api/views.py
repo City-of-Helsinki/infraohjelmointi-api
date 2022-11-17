@@ -4,6 +4,7 @@ from .serializers import (
     ProjectTypeSerializer,
     PersonSerializer,
     ProjectSetSerializer,
+    ProjectAreaSerializer,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -49,7 +50,7 @@ class MockProjectViewSet(viewsets.ViewSet):
 
 class PersonViewSet(BaseViewSet):
     """
-    API endpoint that allows project types to be viewed or edited.
+    API endpoint that allows persons to be viewed or edited.
     """
 
     permission_classes = []
@@ -58,8 +59,17 @@ class PersonViewSet(BaseViewSet):
 
 class ProjectSetViewSet(BaseViewSet):
     """
-    API endpoint that allows project types to be viewed or edited.
+    API endpoint that allows project sets to be viewed or edited.
     """
 
     permission_classes = []
     serializer_class = ProjectSetSerializer
+
+
+class ProjectAreaViewSet(BaseViewSet):
+    """
+    API endpoint that allows project areas to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectAreaSerializer
