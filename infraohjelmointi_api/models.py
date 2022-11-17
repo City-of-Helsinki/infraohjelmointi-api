@@ -80,7 +80,7 @@ class ProjectSet(models.Model):
                     "id",
                     "pwProjectId",
                 ],
-                name="Unique together Project Ids",
+                name="Unique together Constraint ProjectSet",
             )
         ]
 
@@ -144,7 +144,7 @@ class Project(models.Model):
     projectSet = models.ForeignKey(
         ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    Area = models.ForeignKey(
+    area = models.ForeignKey(
         ProjectArea, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     type = models.CharField(max_length=15, choices=ProjectTypeChoices.choices)
@@ -247,7 +247,7 @@ class Project(models.Model):
                     "sapNetwork",
                     "projectSet",
                 ],
-                name="Unique together Project Ids",
+                name="Unique together Constraint Project",
             )
         ]
 
