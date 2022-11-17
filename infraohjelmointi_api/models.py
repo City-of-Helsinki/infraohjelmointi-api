@@ -11,6 +11,9 @@ class ProjectType(models.Model):
 class Person(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
+    email = models.CharField(max_length=200)
+    title = models.CharField(max_length=200)
+    phone = models.IntegerField(max_length=12)
 
 
 class ProjectSet(models.Model):
@@ -54,9 +57,18 @@ class BudgetItem(models.Model):
 
 class Project(models.Model):
     class ProjectPhaseChoices(models.TextChoices):
-        FIRST_PHASE = "FP", ("First")
-        SECOND_PHASE = "SP", ("Second")
-        THIRD_PHASE = "TP", ("Third")
+        PROPOSAL = "PROP", ("Hanke-ehdotus")
+        DESIGN = "DESG", ("Yleissuunnittelu")
+        PROGRAMMING = "PROG", ("Ohjelmointi")
+        DRAFT_INITIATION = "DRAI", (
+            "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
+        )
+        DRAFT_APPROVAL = "DRAA", ("Katu-/puistosuunnitelmaehdotus ja hyväksyminen")
+        CONSTRUCTION_PLAN = "CONP", ("Rakennussuunnitelma")
+        CONSTRUCTION_WAIT = "CONW", ("Odottaa rakentamista")
+        CONSTRUCTION = "CONS", ("Rakentaminen")
+        WARRANTY_PERIOD = "WARP", ("Takuuaika")
+        COMPLETED = "COMP", ("Valmis / ylläpidossa")
 
     class PriorityChoices(models.TextChoices):
         LOW = "L", ("Low")
@@ -94,8 +106,9 @@ class Project(models.Model):
     projectPhase = models.CharField(
         max_length=2,
         choices=ProjectPhaseChoices.choices,
-        default=ProjectPhaseChoices.FIRST_PHASE,
+        default=ProjectPhaseChoices.PROPOSAL,
     )
+    favPersons = models.ManyToManyField(Person, related_name="favourite")
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
     estPlanningStartYear = models.IntegerField(blank=True, null=True)
@@ -145,6 +158,8 @@ class Project(models.Model):
     created_date = models.DateTimeField(auto_now_add=True, blank=True)
     updated_date = models.DateTimeField(auto_now=True, blank=True)
 
+    # Rediness % to be calculated
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -175,4 +190,4 @@ class Task(models.Model):
     realizedCost = models.DecimalField(max_digits=6, decimal_places=2)
     plannedCost = models.DecimalField(max_digits=6, decimal_places=2)
     # TaskAccomplishment
-    riskAssessment = models.CharField(max_length=200, blank=False, null=False)
+    riskAssess = models.CharField(max_length=200, blank=False, null=False)
