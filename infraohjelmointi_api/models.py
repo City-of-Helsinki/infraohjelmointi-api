@@ -39,7 +39,7 @@ class ProjectSet(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=True, null=True)
-    pwProjectId = models.UUIDField(blank=True, null=True)
+    hkrId = models.UUIDField(blank=True, null=True)
     description = models.TextField(max_length=500, blank=True, null=True)
     # sapProjectNumberList to be acquired using method field
     # sapNetworkNumberList to be acquired using method field
@@ -78,7 +78,7 @@ class ProjectSet(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "id",
-                    "pwProjectId",
+                    "hkrId",
                 ],
                 name="Unique together Constraint ProjectSet",
             )
@@ -138,7 +138,7 @@ class Project(models.Model):
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    pwProjectId = models.UUIDField(blank=True, null=True)
+    hkrId = models.UUIDField(blank=True, null=True)
     sapProject = models.UUIDField(blank=True, null=True)
     sapNetwork = models.UUIDField(blank=True, null=True)
     projectSet = models.ForeignKey(
@@ -242,7 +242,7 @@ class Project(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "id",
-                    "pwProjectId",
+                    "hkrId",
                     "sapProject",
                     "sapNetwork",
                     "projectSet",
@@ -260,7 +260,7 @@ class Task(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     projectId = models.ForeignKey(Project, on_delete=models.DO_NOTHING)
-    pwProjectId = models.UUIDField(blank=True, null=True)
+    hkrId = models.UUIDField(blank=True, null=True)
     taskType = models.CharField(max_length=50, blank=False, null=False)
     status = models.CharField(
         max_length=2,
