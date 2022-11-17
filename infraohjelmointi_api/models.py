@@ -1,3 +1,4 @@
+import random
 import uuid
 from django.db import models
 from django.utils.timezone import now
@@ -196,6 +197,11 @@ class Project(models.Model):
 
     created_date = models.DateTimeField(auto_now_add=True, blank=True)
     updated_date = models.DateTimeField(auto_now=True, blank=True)
+
+    def projectReadiness(self):
+        # some calculation based on cost and stuff
+        # returns percentage of readiness
+        return random.randint(0, 100)
 
     # Rediness % to be calculated
 
