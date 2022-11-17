@@ -213,8 +213,8 @@ class Project(models.Model):
                 fields=[
                     "id",
                     "pwProjectId",
-                    "sapProjectNumber",
-                    "sapNetworkNumber",
+                    "sapProject",
+                    "sapNetwork",
                     "projectSet",
                 ],
                 name="Unique together Project Ids",
