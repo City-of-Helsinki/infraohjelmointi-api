@@ -43,7 +43,7 @@ class ProjectSet(models.Model):
     projectPhase = models.CharField(
         max_length=17,
         choices=ProjectPhaseChoices.choices,
-        default=ProjectPhaseChoices.PROPOSAL,
+        default="PROPOSAL",
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
@@ -126,7 +126,7 @@ class Project(models.Model):
     projectPhase = models.CharField(
         max_length=17,
         choices=ProjectPhaseChoices.choices,
-        default=ProjectPhaseChoices.PROPOSAL,
+        default="PROPOSAL",
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", null=True, blank=True
