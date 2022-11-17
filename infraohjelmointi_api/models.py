@@ -14,6 +14,8 @@ class Person(models.Model):
     email = models.CharField(max_length=200)
     title = models.CharField(max_length=200)
     phone = models.CharField(max_length=14)
+    created_date = models.DateTimeField(auto_now_add=True, blank=True)
+    updated_date = models.DateTimeField(auto_now=True, blank=True)
 
 
 class ProjectSet(models.Model):
