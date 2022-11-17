@@ -10,7 +10,8 @@ class ProjectType(models.Model):
 
 class Person(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=200)
+    firstName = models.CharField(max_length=200)
+    lastName = models.CharField(max_length=200)
     email = models.CharField(max_length=200)
     title = models.CharField(max_length=200)
     phone = models.CharField(max_length=14)
