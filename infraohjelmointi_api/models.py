@@ -208,7 +208,13 @@ class Project(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["id", "pwProjectId", "sapProjectNumber", "sapNetworkNumber"],
+                fields=[
+                    "id",
+                    "pwProjectId",
+                    "sapProjectNumber",
+                    "sapNetworkNumber",
+                    "projectSet",
+                ],
                 name="Unique together Project Ids",
             )
         ]

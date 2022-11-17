@@ -12,8 +12,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         lookup_field = "type"
         extra_kwargs = {"url": {"lookup_field": "type"}}
 
-        def get_projectReadiness(self, obj):
-            return obj.projectReadiness()
+    def get_projectReadiness(self, obj):
+        return obj.projectReadiness()
 
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
