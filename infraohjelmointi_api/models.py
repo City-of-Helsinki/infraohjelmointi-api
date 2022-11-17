@@ -95,23 +95,29 @@ class Project(models.Model):
         Park = "PARK", ("Puisto tai taitorakenne")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    siteId = models.ForeignKey(BudgetItem, on_delete=models.DO_NOTHING)
+    siteId = models.ForeignKey(
+        BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     pwProjectId = models.UUIDField(blank=True, null=True)
     sapProjectNumber = models.UUIDField(blank=True, null=True)
     sapNetworkNumber = models.UUIDField(blank=True, null=True)
-    projectSet = models.ForeignKey(ProjectSet, on_delete=models.DO_NOTHING)
-    projectArea = models.ForeignKey(ProjectArea, on_delete=models.DO_NOTHING)
+    projectSet = models.ForeignKey(
+        ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    projectArea = models.ForeignKey(
+        ProjectArea, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     type = models.CharField(max_length=15, choices=ProjectTypeChoices.choices)
     name = models.CharField(max_length=200, blank=False)
     description = models.TextField(max_length=500, blank=True, null=True)
     personPlanning = models.ForeignKey(
-        Person, related_name="planning", on_delete=models.DO_NOTHING
+        Person, related_name="planning", on_delete=models.DO_NOTHING, null=True
     )
     personProgramming = models.ForeignKey(
-        Person, related_name="programming", on_delete=models.DO_NOTHING
+        Person, related_name="programming", on_delete=models.DO_NOTHING, null=True
     )
     personConstruction = models.ForeignKey(
-        Person, related_name="construction", on_delete=models.DO_NOTHING
+        Person, related_name="construction", on_delete=models.DO_NOTHING, null=True
     )
     projectPhase = models.CharField(
         max_length=4,
@@ -123,28 +129,42 @@ class Project(models.Model):
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
     estPlanningStartYear = models.IntegerField(blank=True, null=True)
     estDesignEndYear = models.IntegerField(blank=True, null=True)
-    estDesignStartDate = models.DateTimeField(blank=True)
-    estDesignEndDate = models.DateTimeField(blank=True)
-    contractPrepStartDate = models.DateTimeField(blank=True)
-    contractPrepEndDate = models.DateTimeField(blank=True)
-    warrantyStartDate = models.DateTimeField(blank=True)
-    warrantyExpireDate = models.DateTimeField(blank=True)
-    perfAmount = models.IntegerField(blank=True, null=True)
-    unitCost = models.DecimalField(max_digits=6, decimal_places=2)
-    costForecast = models.DecimalField(max_digits=6, decimal_places=2)
-    neighborhood = models.CharField(max_length=200, blank=False, null=False)
-    comittedCost = models.DecimalField(max_digits=6, decimal_places=2)
-    tiedCurrYear = models.DecimalField(max_digits=6, decimal_places=2)
-    realizedCost = models.DecimalField(max_digits=6, decimal_places=2)
-    spentCost = models.DecimalField(max_digits=6, decimal_places=2)
-    riskAssess = models.CharField(max_length=200, blank=False, null=False)
+    estDesignStartDate = models.DateTimeField(blank=True, null=True)
+    estDesignEndDate = models.DateTimeField(blank=True, null=True)
+    contractPrepStartDate = models.DateTimeField(blank=True, null=True)
+    contractPrepEndDate = models.DateTimeField(blank=True, null=True)
+    warrantyStartDate = models.DateTimeField(blank=True, null=True)
+    warrantyExpireDate = models.DateTimeField(blank=True, null=True)
+    perfAmount = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    unitCost = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    costForecast = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    neighborhood = models.CharField(max_length=200, blank=True, null=True)
+    comittedCost = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    tiedCurrYear = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    realizedCost = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    spentCost = models.DecimalField(
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
+    riskAssess = models.CharField(max_length=200, blank=True, null=True)
     priority = models.CharField(
         max_length=2,
         choices=PriorityChoices.choices,
         default=PriorityChoices.LOW,
     )
     locked = models.BooleanField(default=False)
-    comments = models.CharField(max_length=200, blank=False, null=False)
+    comments = models.CharField(max_length=200, blank=True, null=True)
 
     # commented fields left out due to translation confusions
     # Hankkeen lisätyöt (sapista)
@@ -163,7 +183,7 @@ class Project(models.Model):
     # AlustavaKuluvaVuosiPlus9
     # AlustavaKuluvaVuosiPlus10
 
-    delays = models.CharField(max_length=200, blank=False, null=False)
+    delays = models.CharField(max_length=200, blank=True, null=True)
 
     created_date = models.DateTimeField(auto_now_add=True, blank=True)
     updated_date = models.DateTimeField(auto_now=True, blank=True)
