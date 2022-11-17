@@ -7,6 +7,8 @@ from django.utils.timezone import now
 class ProjectType(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.CharField(max_length=200)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
 
 class Person(models.Model):
@@ -16,8 +18,8 @@ class Person(models.Model):
     email = models.CharField(max_length=200)
     title = models.CharField(max_length=200)
     phone = models.CharField(max_length=14)
-    created_date = models.DateTimeField(auto_now_add=True, blank=True)
-    updated_date = models.DateTimeField(auto_now=True, blank=True)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
 
 class ProjectSet(models.Model):
@@ -73,6 +75,9 @@ class ProjectSet(models.Model):
             if sapNetwork is not None
         ]
 
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -89,6 +94,8 @@ class ProjectArea(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     areaName = models.CharField(max_length=200, blank=False, null=False)
     location = models.CharField(max_length=200, blank=True, null=True)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
 
 class BudgetItem(models.Model):
@@ -99,6 +106,8 @@ class BudgetItem(models.Model):
     siteName = models.CharField(max_length=200, blank=True, null=True)
     district = models.CharField(max_length=200, blank=True, null=True)
     need = models.DecimalField(max_digits=20, decimal_places=2)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
     # one field left from budget item
 
 
@@ -227,8 +236,8 @@ class Project(models.Model):
 
     delays = models.CharField(max_length=200, blank=True, null=True)
 
-    created_date = models.DateTimeField(auto_now_add=True, blank=True)
-    updated_date = models.DateTimeField(auto_now=True, blank=True)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
     def projectReadiness(self):
         # some calculation based on cost and stuff
@@ -274,3 +283,5 @@ class Task(models.Model):
     plannedCost = models.DecimalField(max_digits=20, decimal_places=2)
     # TaskAccomplishment
     riskAssess = models.CharField(max_length=200, blank=False, null=False)
+    createdDate = models.DateTimeField(auto_now_add=True, blank=True)
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
