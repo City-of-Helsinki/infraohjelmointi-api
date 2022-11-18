@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as lazy
 
+
 class ProjectType(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.CharField(max_length=200)
@@ -24,17 +25,16 @@ class Person(models.Model):
 
 class ProjectSet(models.Model):
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "proposal", lazy('Proposal')
-        DESIGN = "design", lazy('Design')
-        PROGRAMMING = "ohjelmointi", lazy('Programming')
-        DRAFT_INITIATION = "draftInitiation", lazy('DraftInitiation')
-        DRAFT_APPROVAL = "draftApproval", lazy('DraftApproval')
-        CONSTRUCTION_PLAN = "constructionPlan", lazy('ConstructionPlan')
-        CONSTRUCTION_WAIT = "constructionWait", lazy('ConstructionWait')
-        CONSTRUCTION = "construction", lazy('Construction')
-        WARRANTY_PERIOD = "warrantyPeriod", lazy('WarrantyPeriod')
-        COMPLETED = "completed", lazy('Completed')
-
+        PROPOSAL = "proposal", lazy("Proposal")
+        DESIGN = "design", lazy("Design")
+        PROGRAMMING = "ohjelmointi", lazy("Programming")
+        DRAFT_INITIATION = "draftInitiation", lazy("DraftInitiation")
+        DRAFT_APPROVAL = "draftApproval", lazy("DraftApproval")
+        CONSTRUCTION_PLAN = "constructionPlan", lazy("ConstructionPlan")
+        CONSTRUCTION_WAIT = "constructionWait", lazy("ConstructionWait")
+        CONSTRUCTION = "construction", lazy("Construction")
+        WARRANTY_PERIOD = "warrantyPeriod", lazy("WarrantyPeriod")
+        COMPLETED = "completed", lazy("Completed")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=True, null=True)
@@ -111,30 +111,30 @@ class BudgetItem(models.Model):
 class Project(models.Model):
     # PROJECT URL AS A FIELD TO SHARE
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "proposal", lazy('Proposal')
-        DESIGN = "design", lazy('Design')
-        PROGRAMMING = "ohjelmointi", lazy('Programming')
-        DRAFT_INITIATION = "draftInitiation", lazy('DraftInitiation')
-        DRAFT_APPROVAL = "draftApproval", lazy('DraftApproval')
-        CONSTRUCTION_PLAN = "constructionPlan", lazy('ConstructionPlan')
-        CONSTRUCTION_WAIT = "constructionWait", lazy('ConstructionWait')
-        CONSTRUCTION = "construction", lazy('Construction')
-        WARRANTY_PERIOD = "warrantyPeriod", lazy('WarrantyPeriod')
-        COMPLETED = "completed", lazy('Completed')
+        PROPOSAL = "proposal", lazy("Proposal")
+        DESIGN = "design", lazy("Design")
+        PROGRAMMING = "programming", lazy("Programming")
+        DRAFT_INITIATION = "draftInitiation", lazy("DraftInitiation")
+        DRAFT_APPROVAL = "draftApproval", lazy("DraftApproval")
+        CONSTRUCTION_PLAN = "constructionPlan", lazy("ConstructionPlan")
+        CONSTRUCTION_WAIT = "constructionWait", lazy("ConstructionWait")
+        CONSTRUCTION = "construction", lazy("Construction")
+        WARRANTY_PERIOD = "warrantyPeriod", lazy("WarrantyPeriod")
+        COMPLETED = "completed", lazy("Completed")
 
     class PriorityChoices(models.TextChoices):
-        LOW = "L", ("Low")
-        MEDIUM = "M", ("Medium")
-        HIGH = "H", ("High")
+        LOW = "low", lazy("Low")
+        MEDIUM = "medium", lazy("Medium")
+        HIGH = "high", lazy("High")
 
     class ProjectTypeChoices(models.TextChoices):
-        ProjectComplex = "PROJECTCOMPLEX", ("Hankekokonaisuus")
-        Street = "STREET", ("Katu")
-        Traffic = "TRAFFIC", ("Liikenne")
-        Sports = "SPORTS", ("Liikunta")
-        Omastadi = "OMASTADI", ("Omastadi")
-        ProjectArea = "PROJECTAREA", ("Projektialue")
-        Park = "PARK", ("Puisto tai taitorakenne")
+        ProjectComplex = "projectComplex", lazy("ProjectComplex")
+        Street = "stret", lazy("Street")
+        Traffic = "traffic", lazy("Traffic")
+        Sports = "sports", lazy("Sports")
+        Omastadi = "omastadi", lazy("Omastadi")
+        ProjectArea = "projectArea", lazy("ProjectArea")
+        Park = "park", lazy("Park")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
@@ -203,7 +203,7 @@ class Project(models.Model):
     )
     riskAssess = models.CharField(max_length=200, blank=True, null=True)
     priority = models.CharField(
-        max_length=2,
+        max_length=6,
         choices=PriorityChoices.choices,
         default=PriorityChoices.LOW,
     )
@@ -256,16 +256,16 @@ class Project(models.Model):
 
 class Task(models.Model):
     class TaskStatusChoices(models.TextChoices):
-        ACTIVE = "A", ("Active")
-        PAST = "P", ("Past")
-        UPCOMING = "U", ("Upcoming")
+        ACTIVE = "acive", ("Active")
+        PAST = "past", ("Past")
+        UPCOMING = "upcoming", ("Upcoming")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     projectId = models.ForeignKey(Project, on_delete=models.DO_NOTHING)
     hkrId = models.UUIDField(blank=True, null=True)
     taskType = models.CharField(max_length=50, blank=False, null=False)
     status = models.CharField(
-        max_length=2,
+        max_length=8,
         choices=TaskStatusChoices.choices,
         default=TaskStatusChoices.UPCOMING,
     )
