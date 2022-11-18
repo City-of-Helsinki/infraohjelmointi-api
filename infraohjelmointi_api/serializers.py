@@ -10,15 +10,39 @@ from .models import (
 from rest_framework import serializers
 
 
-class ProjectSerializer(serializers.ModelSerializer):
+class ProjectSetSerializer(serializers.ModelSerializer):
+    sapProjects = serializers.SerializerMethodField()
+    sapNetworks = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSet
+        fields = "__all__"
+
+    def get_sapProjects(self, obj):
+        return obj.sapProjects()
+
+    def get_sapNetworks(self, obj):
+        return obj.sapNetworks()
+
+
+class ProjectGetSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = "__all__"
+        depth = 1
 
-        lookup_field = "type"
-        extra_kwargs = {"url": {"lookup_field": "type"}}
+    def get_projectReadiness(self, obj):
+        return obj.projectReadiness()
+
+
+class ProjectCreateSerializer(serializers.ModelSerializer):
+    projectReadiness = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = "__all__"
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
@@ -34,21 +58,6 @@ class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = "__all__"
-
-
-class ProjectSetSerializer(serializers.ModelSerializer):
-    sapProjects = serializers.SerializerMethodField()
-    sapNetworks = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ProjectSet
-        fields = "__all__"
-
-    def get_sapProjects(self, obj):
-        return obj.sapProjects()
-
-    def get_sapNetworks(self, obj):
-        return obj.sapNetworks()
 
 
 class ProjectAreaSerializer(serializers.ModelSerializer):

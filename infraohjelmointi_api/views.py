@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from .serializers import (
-    ProjectSerializer,
+    ProjectCreateSerializer,
+    ProjectGetSerializer,
     ProjectTypeSerializer,
     PersonSerializer,
     ProjectSetSerializer,
@@ -8,6 +9,7 @@ from .serializers import (
     BudgetItemSerializer,
     TaskSerializer,
 )
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
@@ -15,7 +17,7 @@ import json
 
 class BaseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
-        return self.serializer_class.Meta.model.objects.all()
+        return self.get_serializer_class().Meta.model.objects.all()
 
 
 class ProjectViewSet(BaseViewSet):
@@ -24,7 +26,13 @@ class ProjectViewSet(BaseViewSet):
     """
 
     permission_classes = []
-    serializer_class = ProjectSerializer
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ProjectGetSerializer
+        if self.action == "retrieve":
+            return ProjectGetSerializer
+        return ProjectCreateSerializer
 
 
 class ProjectTypeViewSet(BaseViewSet):
