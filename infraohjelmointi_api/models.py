@@ -2,7 +2,7 @@ import random
 import uuid
 from django.db import models
 from django.utils.timezone import now
-
+from django.utils.translation import gettext_lazy as lazy
 
 class ProjectType(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -24,20 +24,17 @@ class Person(models.Model):
 
 class ProjectSet(models.Model):
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "PROPOSAL", ("Hanke-ehdotus")
-        DESIGN = "DESIGN", ("Yleissuunnittelu")
-        PROGRAMMING = "PROGRAMMING", ("Ohjelmointi")
-        DRAFT_INITIATION = "DRAFT_INITIATION", (
-            "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
-        )
-        DRAFT_APPROVAL = "DRAFT_APPROVAL", (
-            "Katu-/puistosuunnitelmaehdotus ja hyväksyminen"
-        )
-        CONSTRUCTION_PLAN = "CONSTRUCTION_PLAN", ("Rakennussuunnitelma")
-        CONSTRUCTION_WAIT = "CONSTRUCTION_WAIT", ("Odottaa rakentamista")
-        CONSTRUCTION = "CONSTRUCTION", ("Rakentaminen")
-        WARRANTY_PERIOD = "WARRANTY_PERIOD", ("Takuuaika")
-        COMPLETED = "COMPLETED", ("Valmis / ylläpidossa")
+        PROPOSAL = "proposal", lazy('Proposal')
+        DESIGN = "design", lazy('Design')
+        PROGRAMMING = "ohjelmointi", lazy('Programming')
+        DRAFT_INITIATION = "draftInitiation", lazy('DraftInitiation')
+        DRAFT_APPROVAL = "draftApproval", lazy('DraftApproval')
+        CONSTRUCTION_PLAN = "constructionPlan", lazy('ConstructionPlan')
+        CONSTRUCTION_WAIT = "constructionWait", lazy('ConstructionWait')
+        CONSTRUCTION = "construction", lazy('Construction')
+        WARRANTY_PERIOD = "warrantyPeriod", lazy('WarrantyPeriod')
+        COMPLETED = "completed", lazy('Completed')
+
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=True, null=True)
@@ -47,9 +44,9 @@ class ProjectSet(models.Model):
     # sapNetworkNumberList to be acquired using method field
     responsiblePerson = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
     phase = models.CharField(
-        max_length=17,
+        max_length=16,
         choices=ProjectPhaseChoices.choices,
-        default="PROPOSAL",
+        default=ProjectPhaseChoices.PROPOSAL,
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
@@ -114,20 +111,16 @@ class BudgetItem(models.Model):
 class Project(models.Model):
     # PROJECT URL AS A FIELD TO SHARE
     class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "PROPOSAL", ("Hanke-ehdotus")
-        DESIGN = "DESIGN", ("Yleissuunnittelu")
-        PROGRAMMING = "PROGRAMMING", ("Ohjelmointi")
-        DRAFT_INITIATION = "DRAFT_INITIATION", (
-            "Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos"
-        )
-        DRAFT_APPROVAL = "DRAFT_APPROVAL", (
-            "Katu-/puistosuunnitelmaehdotus ja hyväksyminen"
-        )
-        CONSTRUCTION_PLAN = "CONSTRUCTION_PLAN", ("Rakennussuunnitelma")
-        CONSTRUCTION_WAIT = "CONSTRUCTION_WAIT", ("Odottaa rakentamista")
-        CONSTRUCTION = "CONSTRUCTION", ("Rakentaminen")
-        WARRANTY_PERIOD = "WARRANTY_PERIOD", ("Takuuaika")
-        COMPLETED = "COMPLETED", ("Valmis / ylläpidossa")
+        PROPOSAL = "proposal", lazy('Proposal')
+        DESIGN = "design", lazy('Design')
+        PROGRAMMING = "ohjelmointi", lazy('Programming')
+        DRAFT_INITIATION = "draftInitiation", lazy('DraftInitiation')
+        DRAFT_APPROVAL = "draftApproval", lazy('DraftApproval')
+        CONSTRUCTION_PLAN = "constructionPlan", lazy('ConstructionPlan')
+        CONSTRUCTION_WAIT = "constructionWait", lazy('ConstructionWait')
+        CONSTRUCTION = "construction", lazy('Construction')
+        WARRANTY_PERIOD = "warrantyPeriod", lazy('WarrantyPeriod')
+        COMPLETED = "completed", lazy('Completed')
 
     class PriorityChoices(models.TextChoices):
         LOW = "L", ("Low")
@@ -169,9 +162,9 @@ class Project(models.Model):
         Person, related_name="construction", on_delete=models.DO_NOTHING, null=True
     )
     phase = models.CharField(
-        max_length=17,
+        max_length=16,
         choices=ProjectPhaseChoices.choices,
-        default="PROPOSAL",
+        default=ProjectPhaseChoices.PROPOSAL,
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", null=True, blank=True
