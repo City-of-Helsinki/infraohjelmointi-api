@@ -173,12 +173,12 @@ class Project(models.Model):
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
     estPlanningStartYear = models.IntegerField(blank=True, null=True)
     estDesignEndYear = models.IntegerField(blank=True, null=True)
-    estDesignStartDate = models.DateTimeField(blank=True, null=True)
-    estDesignEndDate = models.DateTimeField(blank=True, null=True)
-    contractPrepStartDate = models.DateTimeField(blank=True, null=True)
-    contractPrepEndDate = models.DateTimeField(blank=True, null=True)
-    warrantyStartDate = models.DateTimeField(blank=True, null=True)
-    warrantyExpireDate = models.DateTimeField(blank=True, null=True)
+    estDesignStartDate = models.DateField(blank=True, null=True)
+    estDesignEndDate = models.DateField(blank=True, null=True)
+    contractPrepStartDate = models.DateField(blank=True, null=True)
+    contractPrepEndDate = models.DateField(blank=True, null=True)
+    warrantyStartDate = models.DateField(blank=True, null=True)
+    warrantyExpireDate = models.DateField(blank=True, null=True)
     perfAmount = models.DecimalField(
         max_digits=20, decimal_places=2, blank=True, null=True
     )
@@ -269,8 +269,8 @@ class Task(models.Model):
         choices=TaskStatusChoices.choices,
         default=TaskStatusChoices.UPCOMING,
     )
-    startDate = models.DateTimeField(auto_now=True, blank=True)
-    endDate = models.DateTimeField(auto_now=True, blank=True)
+    startDate = models.DateField(auto_now=True, blank=True)
+    endDate = models.DateField(auto_now=True, blank=True)
     person = models.ForeignKey(Person, on_delete=models.DO_NOTHING)
     realizedCost = models.DecimalField(max_digits=20, decimal_places=2)
     plannedCost = models.DecimalField(max_digits=20, decimal_places=2)
