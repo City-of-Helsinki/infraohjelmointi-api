@@ -149,7 +149,9 @@ class Project(models.Model):
     area = models.ForeignKey(
         ProjectArea, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    type = models.CharField(max_length=15, choices=ProjectTypeChoices.choices)
+    type = models.ForeignKey(
+        ProjectType, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     name = models.CharField(max_length=200, blank=False)
     description = models.TextField(max_length=500, blank=True, null=True)
     personPlanning = models.ForeignKey(
