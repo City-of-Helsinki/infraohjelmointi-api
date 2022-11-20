@@ -1,4 +1,9 @@
 from django.test import TestCase
+
+from infraohjelmointi_api.serializers import (
+    ProjectCreateSerializer,
+    ProjectGetSerializer,
+)
 from .models import Project
 from .models import ProjectArea
 from .models import ProjectSet
@@ -6,6 +11,8 @@ import uuid
 from .models import BudgetItem
 from .models import Person
 from .models import ProjectType
+import io
+from rest_framework.parsers import JSONParser
 
 
 class ProjectTestCase(TestCase):
@@ -77,7 +84,7 @@ class ProjectTestCase(TestCase):
             type=self.projectType,
             name="Test project 1",
             description="description of the test project",
-            personPlanning=self.person_2,
+            personPlanning="",
             personProgramming=self.person_1,
             personConstruction=self.person_3,
             phase="proposal",
@@ -108,7 +115,140 @@ class ProjectTestCase(TestCase):
         self.project.favPersons.add(self.person_1, self.person_2)
 
     def test_project_is_created(self):
+        self.assertTrue(
+            Project.objects.filter(id=self.projectId).exists(),
+            msg="Object does not exist in DB",
+        )
         project = Project.objects.get(id=self.projectId)
-        self.assertTrue(project)
-        self.assertIsInstance(project, Project)
-        self.assertEquals(project, self.project)
+        self.assertIsInstance(
+            project, Project, msg="Object retrieved from DB != typeof Project Model"
+        )
+        self.assertEqual(project, self.project, msg="Object from DB != created Object")
+
+    def test_project_foreign_keys_exists(self):
+        project = Project.objects.get(id=self.projectId)
+        self.assertEqual(
+            project.siteId.id,
+            self.budgetItem.id,
+            msg="siteId foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.projectSet.id,
+            self.projectSet.id,
+            msg="BudgetItem foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.area.id,
+            self.projectArea.id,
+            msg="ProjectArea foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.type.id,
+            self.projectType.id,
+            msg="ProjectType foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.personConstruction.id,
+            self.person_3.id,
+            msg="personConstruction foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.personPlanning.id,
+            self.person_2.id,
+            msg="personPlanning foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertEqual(
+            project.personProgramming.id,
+            self.person_1.id,
+            msg="personProgramming foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+
+    def test_project_manyTomany_relationship_exists(self):
+        project = Project.objects.get(id=self.projectId)
+        self.assertEqual(
+            project.favPersons.get(id=self.person_1.id),
+            self.person_1,
+            msg="Person with id {} does not exist in the field".format(
+                self.person_1.id
+            ),
+        )
+        self.assertEqual(
+            project.favPersons.get(id=self.person_2.id),
+            self.person_2,
+            msg="Person with id {} does not exist in the field".format(
+                self.person_2.id
+            ),
+        )
+
+    def test_GET_all_projects(self):
+        response = self.client.get("/projects/")
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            len(response.json()), 1, msg="Number of retrieved projects is != 1"
+        )
+        Project.objects.create(
+            id=uuid.uuid4(),
+            siteId=self.budgetItem,
+            hkrId=uuid.uuid4(),
+            sapProject=uuid.uuid4(),
+            sapNetwork=uuid.uuid4(),
+            projectSet=self.projectSet,
+            area=self.projectArea,
+            type=self.projectType,
+            name="Test project 2",
+            description="description of the test project 2",
+            personPlanning=self.person_2,
+            personProgramming=self.person_1,
+            personConstruction=self.person_3,
+            phase="proposal",
+            programmed=True,
+            constructionPhaseDetail="Current phase is proposal 2",
+            estPlanningStartYear=2022,
+            estDesignEndYear=2023,
+            estDesignStartDate="2022-11-20",
+            estDesignEndDate="2022-11-28",
+            contractPrepStartDate="2022-11-20",
+            contractPrepEndDate="2022-11-20",
+            warrantyStartDate="2022-11-20",
+            warrantyExpireDate="2022-11-20",
+            perfAmount=20000.00,
+            unitCost=10000.00,
+            costForecast=10000.00,
+            neighborhood="my random neigbhorhood 2",
+            comittedCost=120.0,
+            tiedCurrYear=12000.00,
+            realizedCost=20.00,
+            spentCost=20000.00,
+            riskAssess="Yes very risky test 2",
+            priority="low",
+            locked=True,
+            comments="Comments random",
+            delays="yes 1 delay because of tests",
+        )
+        response = self.client.get("/projects/")
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            len(response.json()), 2, msg="Number of retrieved projects is != 2"
+        )
+
+    def test_GET_one_project(self):
+        response = self.client.get(
+            "/projects/{}/".format(self.projectId),
+        )
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        data = response.json()
+        self.assertEqual(isinstance(data["projectSet"], dict), True)

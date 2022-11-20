@@ -50,13 +50,25 @@ class Project(models.Model):
     name = models.CharField(max_length=200, blank=False)
     description = models.TextField(max_length=500, blank=True, null=True)
     personPlanning = models.ForeignKey(
-        "Person", related_name="planning", on_delete=models.DO_NOTHING, null=True
+        "Person",
+        related_name="planning",
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
     )
     personProgramming = models.ForeignKey(
-        "Person", related_name="programming", on_delete=models.DO_NOTHING, null=True
+        "Person",
+        related_name="programming",
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
     )
     personConstruction = models.ForeignKey(
-        "Person", related_name="construction", on_delete=models.DO_NOTHING, null=True
+        "Person",
+        related_name="construction",
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
     )
     phase = models.CharField(
         max_length=16,
