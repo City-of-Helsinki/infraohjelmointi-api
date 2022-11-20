@@ -1,9 +1,4 @@
 from django.test import TestCase
-
-from infraohjelmointi_api.serializers import (
-    ProjectCreateSerializer,
-    ProjectGetSerializer,
-)
 from .models import Project
 from .models import ProjectArea
 from .models import ProjectSet
@@ -11,8 +6,6 @@ import uuid
 from .models import BudgetItem
 from .models import Person
 from .models import ProjectType
-import io
-from rest_framework.parsers import JSONParser
 
 
 class ProjectTestCase(TestCase):
