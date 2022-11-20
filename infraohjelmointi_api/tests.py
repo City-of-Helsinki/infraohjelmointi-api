@@ -84,7 +84,7 @@ class ProjectTestCase(TestCase):
             type=self.projectType,
             name="Test project 1",
             description="description of the test project",
-            personPlanning="",
+            personPlanning=self.person_2,
             personProgramming=self.person_1,
             personConstruction=self.person_3,
             phase="proposal",
@@ -250,5 +250,57 @@ class ProjectTestCase(TestCase):
             "/projects/{}/".format(self.projectId),
         )
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        data = response.json()
-        self.assertEqual(isinstance(data["projectSet"], dict), True)
+
+    def test_POST_project(self):
+        data = {
+            "hkrId": None,
+            "sapProject": "55dc9624-2cb1-4c11-b15a-c8c97466d127",
+            "sapNetwork": "55dc9624-2cb1-4c11-b15a-c8c97466d127",
+            "name": "TEST_PROECT_POST",
+            "description": "TEST_PROJECT_POST_DESCRIPTION",
+            "phase": "proposal",
+            "programmed": True,
+            "constructionPhaseDetail": None,
+            "estPlanningStartYear": None,
+            "estDesignEndYear": None,
+            "estDesignStartDate": None,
+            "estDesignEndDate": None,
+            "contractPrepStartDate": None,
+            "contractPrepEndDate": None,
+            "warrantyStartDate": None,
+            "warrantyExpireDate": None,
+            "perfAmount": None,
+            "unitCost": None,
+            "costForecast": None,
+            "neighborhood": None,
+            "comittedCost": None,
+            "tiedCurrYear": None,
+            "realizedCost": None,
+            "spentCost": None,
+            "riskAssess": None,
+            "priority": "medium",
+            "locked": False,
+            "comments": None,
+            "delays": None,
+            "siteId": None,
+            "projectSet": None,
+            "area": None,
+            "type": None,
+            "personPlanning": None,
+            "personProgramming": None,
+            "personConstruction": None,
+            "favPersons": [self.person_1.id.__str__()],
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        # deleting id, projectReadiness, createdDate and updatedDate because request body doesn't contain an id and project_readiness but the response does if new resource is created
+        res_data = response.json()
+        del res_data["id"]
+        del res_data["projectReadiness"]
+        del res_data["createdDate"]
+        del res_data["updatedDate"]
+        self.assertEqual(res_data, data, msg="Created object != POST data")
