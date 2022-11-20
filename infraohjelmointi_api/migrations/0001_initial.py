@@ -24,28 +24,52 @@ class Migration(migrations.Migration):
         Project = apps.get_model("infraohjelmointi_api", "Project")
         Project.objects.all().delete()
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ProjectType',
+            name="ProjectType",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('value', models.CharField(max_length=200)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("value", models.CharField(max_length=200)),
             ],
         ),
-        migrations.RunPython(load_project_types_from_fixture, delete_projecttypes),
+        # migrations.RunPython(load_project_types_from_fixture, delete_projecttypes),
         migrations.CreateModel(
-            name='Project',
+            name="Project",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=200)),
-                ('HKRprojectID', models.CharField(blank=True, max_length=200, null=True)),
-                ('created_date', models.DateTimeField(verbose_name='date created')),
-                ('updated_date', models.DateTimeField(verbose_name='date updated')),
-                ('type', models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.projecttype')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=200)),
+                (
+                    "HKRprojectID",
+                    models.CharField(blank=True, max_length=200, null=True),
+                ),
+                ("created_date", models.DateTimeField(verbose_name="date created")),
+                ("updated_date", models.DateTimeField(verbose_name="date updated")),
+                (
+                    "type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        to="infraohjelmointi_api.projecttype",
+                    ),
+                ),
             ],
         ),
-        migrations.RunPython(load_projects_from_fixture, delete_projects),
+        # migrations.RunPython(load_projects_from_fixture, delete_projects),
     ]
