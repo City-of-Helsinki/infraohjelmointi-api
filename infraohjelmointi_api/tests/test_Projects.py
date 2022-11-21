@@ -1,11 +1,11 @@
 from django.test import TestCase
-from .models import Project
-from .models import ProjectArea
-from .models import ProjectSet
+from ..models import Project
+from ..models import ProjectArea
+from ..models import ProjectSet
 import uuid
-from .models import BudgetItem
-from .models import Person
-from .models import ProjectType
+from ..models import BudgetItem
+from ..models import Person
+from ..models import ProjectType
 
 
 class ProjectTestCase(TestCase):
@@ -302,4 +302,24 @@ class ProjectTestCase(TestCase):
             Project.objects.filter(id=new_createdId).exists(),
             True,
             msg="Project created using POST request does not exist in DB",
+        )
+
+    def test_PATCH_project(self):
+        data = {
+            "name": "Test Project 1 patched",
+            "favPersons": [self.person_1.id.__str__(), self.person_3.id.__str__()],
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(self.projectId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["name"], data["name"], msg="Data not updated in the DB"
+        )
+        self.assertEqual(
+            response.json()["favPersons"],
+            data["favPersons"],
+            msg="Data not updated in the DB",
         )

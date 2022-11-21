@@ -6,26 +6,29 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0010_rename_name_person_firstname_person_lastname'),
+        ("infraohjelmointi_api", "0010_rename_name_person_firstname_person_lastname"),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='project',
-            name='Unique together Project Ids',
+            model_name="project",
+            name="Unique together Project Ids",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='sapNetworkNumber',
-            new_name='sapNetwork',
+            model_name="project",
+            old_name="sapNetworkNumber",
+            new_name="sapNetwork",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='sapProjectNumber',
-            new_name='sapProject',
+            model_name="project",
+            old_name="sapProjectNumber",
+            new_name="sapProject",
         ),
         migrations.AddConstraint(
-            model_name='project',
-            constraint=models.UniqueConstraint(fields=('id', 'pwProjectId', 'sapProject', 'sapNetwork', 'projectSet'), name='Unique together Project Ids'),
+            model_name="project",
+            constraint=models.UniqueConstraint(
+                fields=("id", "pwProjectId", "sapProject", "sapNetwork", "projectSet"),
+                name="Unique together Project Ids",
+            ),
         ),
     ]
