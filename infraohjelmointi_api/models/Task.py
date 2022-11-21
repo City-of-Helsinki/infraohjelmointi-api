@@ -19,7 +19,9 @@ class Task(models.Model):
     )
     startDate = models.DateField(auto_now=True, blank=True)
     endDate = models.DateField(auto_now=True, blank=True)
-    person = models.ForeignKey("Person", on_delete=models.DO_NOTHING)
+    person = models.ForeignKey(
+        "Person", on_delete=models.DO_NOTHING, blank=True, null=True
+    )
     realizedCost = models.DecimalField(max_digits=20, decimal_places=2)
     plannedCost = models.DecimalField(max_digits=20, decimal_places=2)
     # TaskAccomplishment
