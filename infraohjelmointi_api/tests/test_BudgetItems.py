@@ -59,3 +59,51 @@ class BudgetItemTestCase(TestCase):
     def test_GET_one_budgetItem(self):
         response = self.client.get("/budgets/{}/".format(self.budgetItemId))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+    def test_POST_budgetItem(self):
+        data = {
+            "budgetMain": 10000,
+            "budgetPlan": 10000,
+            "site": "Helsinki",
+            "siteName": "Anankatu",
+            "district": "doe",
+            "need": 5000,
+        }
+        response = self.client.post("/budgets/", data, content_type="application/json")
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        new_createdId = response.json()["id"]
+        self.assertEqual(
+            BudgetItem.objects.filter(id=new_createdId).exists(),
+            True,
+            msg="Project created using POST request does not exist in DB",
+        )
+
+    def test_PATCH_budgetItem(self):
+        data = {"site": "Helsinki Patched", "budgetMain": 5000}
+        response = self.client.patch(
+            "/budgets/{}/".format(self.budgetItemId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["site"], data["site"], msg="Data not updated in the DB"
+        )
+        self.assertEqual(
+            response.json()["budgetMain"],
+            data["budgetMain"],
+            msg="Data not updated in the DB",
+        )
+
+    def test_DELETE_budgetItem(self):
+        response = self.client.delete("/budgets/{}/".format(self.budgetItemId))
+        self.assertEqual(
+            response.status_code,
+            204,
+            msg="Error deleting project with Id {}".format(self.budgetItemId),
+        )
+        self.assertEqual(
+            BudgetItem.objects.filter(id=self.budgetItemId).exists(),
+            False,
+            msg="Project with Id {} still exists in DB".format(self.budgetItemId),
+        )
