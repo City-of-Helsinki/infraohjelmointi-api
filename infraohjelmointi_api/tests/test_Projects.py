@@ -171,20 +171,12 @@ class ProjectTestCase(TestCase):
         )
 
     def test_project_manyTomany_relationship_exists(self):
-        project = Project.objects.get(id=self.projectId)
-        self.assertEqual(
-            project.favPersons.get(id=self.person_1.id),
-            self.person_1,
-            msg="Person with id {} does not exist in the field".format(
-                self.person_1.id
-            ),
-        )
-        self.assertEqual(
-            project.favPersons.get(id=self.person_2.id),
-            self.person_2,
-            msg="Person with id {} does not exist in the field".format(
-                self.person_2.id
-            ),
+        person_1_reverse_query = self.person_1.favourite.all().values()[0]
+        person_2_reverse_query = self.person_2.favourite.all().values()[0]
+        self.assertDictEqual(
+            person_1_reverse_query,
+            person_2_reverse_query,
+            msg="Reverse relationship from foriegn key objects do not point to the same Project",
         )
 
     def test_GET_all_projects(self):
@@ -322,4 +314,17 @@ class ProjectTestCase(TestCase):
             response.json()["favPersons"],
             data["favPersons"],
             msg="Data not updated in the DB",
+        )
+
+    def test_DELETE_project(self):
+        response = self.client.delete("/projects/{}/".format(self.projectId))
+        self.assertEqual(
+            response.status_code,
+            204,
+            msg="Error deleting project with Id {}".format(self.projectId),
+        )
+        self.assertEqual(
+            Project.objects.filter(id=self.projectId).exists(),
+            False,
+            msg="Project with Id {} still exists in DB".format(self.projectId),
         )
