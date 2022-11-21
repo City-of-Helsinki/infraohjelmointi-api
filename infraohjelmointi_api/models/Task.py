@@ -4,7 +4,7 @@ from django.db import models
 
 class Task(models.Model):
     class TaskStatusChoices(models.TextChoices):
-        ACTIVE = "acive", ("Active")
+        ACTIVE = "active", ("Active")
         PAST = "past", ("Past")
         UPCOMING = "upcoming", ("Upcoming")
 
