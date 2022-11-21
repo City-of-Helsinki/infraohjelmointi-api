@@ -119,52 +119,52 @@ class ProjectTestCase(TestCase):
         self.assertEqual(project, self.project, msg="Object from DB != created Object")
 
     def test_project_foreign_keys_exists(self):
-        project = Project.objects.get(id=self.projectId)
-        self.assertEqual(
-            project.siteId.id,
-            self.budgetItem.id,
+
+        self.assertDictEqual(
+            self.budgetItem.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
             msg="siteId foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.projectSet.id,
-            self.projectSet.id,
-            msg="BudgetItem foreign key does not exist in Project with id {}".format(
+        self.assertDictEqual(
+            self.projectSet.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectSet foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.area.id,
-            self.projectArea.id,
-            msg="ProjectArea foreign key does not exist in Project with id {}".format(
+        self.assertDictEqual(
+            self.projectArea.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectArea foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.type.id,
-            self.projectType.id,
-            msg="ProjectType foreign key does not exist in Project with id {}".format(
+        self.assertDictEqual(
+            self.projectType.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectType foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.personConstruction.id,
-            self.person_3.id,
+        self.assertDictEqual(
+            self.person_3.construction.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
             msg="personConstruction foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.personPlanning.id,
-            self.person_2.id,
+        self.assertDictEqual(
+            self.person_2.planning.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
             msg="personPlanning foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
-        self.assertEqual(
-            project.personProgramming.id,
-            self.person_1.id,
+        self.assertDictEqual(
+            self.person_1.programming.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
             msg="personProgramming foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
