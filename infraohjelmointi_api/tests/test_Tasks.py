@@ -83,6 +83,22 @@ class TaskTestCase(TestCase):
         self.assertIsInstance(task, Task, msg="Object retrieved from DB != typeof Task")
         self.assertEqual(task, self.task, msg="Object from DB != created Object")
 
+    def test_foreign_keys_exist(self):
+        self.assertDictEqual(
+            self.project.task_set.all().values()[0],
+            Task.objects.filter(id=self.TaskId).values()[0],
+            msg="Project foreign key does not exist in Task with id {}".format(
+                self.TaskId
+            ),
+        )
+        self.assertDictEqual(
+            self.person_1.task_set.all().values()[0],
+            Task.objects.filter(id=self.TaskId).values()[0],
+            msg="Person foreign key does not exist in Task with id {}".format(
+                self.TaskId
+            ),
+        )
+
     def test_GET_all_Tasks(self):
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")

@@ -1,6 +1,8 @@
 from django.test import TestCase
 from ..models import BudgetItem
 import uuid
+from rest_framework.renderers import JSONRenderer
+from infraohjelmointi_api.serializers import BudgetItemSerializer
 
 
 class BudgetItemTestCase(TestCase):
