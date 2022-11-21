@@ -34,3 +34,28 @@ class BudgetItemTestCase(TestCase):
         self.assertEqual(
             budgetItem, self.budgetItem, msg="Object from DB != created Object"
         )
+
+    def test_GET_all_budgetItems(self):
+        response = self.client.get("/budgets/")
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 1, msg="Number of returned BudgetItems != 1"
+        )
+        BudgetItem.objects.create(
+            id=uuid.uuid4(),
+            budgetMain=10000,
+            budgetPlan=10000,
+            site="Helsinki",
+            siteName="Anankatu",
+            district="doe",
+            need=5000.0,
+        )
+        response = self.client.get("/budgets/")
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 2, msg="Number of returned BudgetItems != 2"
+        )
+
+    def test_GET_one_budgetItem(self):
+        response = self.client.get("/budgets/{}/".format(self.budgetItemId))
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
