@@ -61,6 +61,18 @@ class BudgetItemTestCase(TestCase):
     def test_GET_one_budgetItem(self):
         response = self.client.get("/budgets/{}/".format(self.budgetItemId))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        # serialize the model instances
+        serializer = BudgetItemSerializer(
+            BudgetItem.objects.get(id=self.budgetItemId), many=False
+        )
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        # compare the JSON data returned to what is expected
+
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(response.content, result_expected)
 
     def test_POST_budgetItem(self):
         data = {
