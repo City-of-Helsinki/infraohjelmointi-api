@@ -282,13 +282,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201, msg="Status code != 201")
-        # deleting id, projectReadiness, createdDate and updatedDate because request body doesn't contain an id and project_readiness but the response does if new resource is created
+        # deleting id, projectReadiness because request body doesn't contain an id and project_readiness but the response does if new resource is created
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
         del res_data["projectReadiness"]
-        del res_data["createdDate"]
-        del res_data["updatedDate"]
         self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),

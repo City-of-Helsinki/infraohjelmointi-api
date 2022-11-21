@@ -10,6 +10,34 @@ from .models import (
 from rest_framework import serializers
 
 
+class PersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectType
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate"]
+
+
+class BudgetItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BudgetItem
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectAreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectArea
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate"]
+
+
 class ProjectSetSerializer(serializers.ModelSerializer):
     sapProjects = serializers.SerializerMethodField()
     sapNetworks = serializers.SerializerMethodField()
@@ -29,6 +57,12 @@ class ProjectSetSerializer(serializers.ModelSerializer):
 class ProjectGetSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
     projectSet = ProjectSetSerializer(read_only=True)
+    siteId = BudgetItemSerializer(read_only=True)
+    area = ProjectAreaSerializer(read_only=True)
+    type = ProjectTypeSerializer(read_only=True)
+    personPlanning = PersonSerializer(read_only=True)
+    personProgramming = PersonSerializer(read_only=True)
+    personConstruction = PersonSerializer(read_only=True)
 
     class Meta:
         model = Project
@@ -52,30 +86,9 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         return obj.projectReadiness()
 
 
-class ProjectTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectType
-        # fields = "__all__"
-        exclude = ["createdDate", "updatedDate"]
-
-
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        # fields = "__all__"
-        exclude = ["createdDate", "updatedDate"]
-
-
-class ProjectAreaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectArea
-        # fields = "__all__"
-        exclude = ["createdDate", "updatedDate"]
-
-
-class BudgetItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BudgetItem
         # fields = "__all__"
         exclude = ["createdDate", "updatedDate"]
 
