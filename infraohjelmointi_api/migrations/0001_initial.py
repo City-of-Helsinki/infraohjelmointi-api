@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 ("value", models.CharField(max_length=200)),
             ],
         ),
-        # migrations.RunPython(load_project_types_from_fixture, delete_projecttypes),
+        migrations.RunPython(delete_projecttypes),
         migrations.CreateModel(
             name="Project",
             fields=[
@@ -71,5 +71,5 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
-        # migrations.RunPython(load_projects_from_fixture, delete_projects),
+        migrations.RunPython(delete_projects),
     ]
