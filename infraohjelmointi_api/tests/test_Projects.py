@@ -6,6 +6,8 @@ import uuid
 from ..models import BudgetItem
 from ..models import Person
 from ..models import ProjectType
+from ..serializers import ProjectGetSerializer
+from rest_framework.renderers import JSONRenderer
 
 
 class ProjectTestCase(TestCase):
@@ -234,7 +236,18 @@ class ProjectTestCase(TestCase):
         response = self.client.get(
             "/projects/{}/".format(self.projectId),
         )
+        # serialize the model instances
+        serializer = ProjectGetSerializer(
+            Project.objects.get(id=self.projectId), many=False
+        )
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        # compare the JSON data returned to what is expected
+
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(response.content, result_expected)
 
     def test_POST_project(self):
         data = {

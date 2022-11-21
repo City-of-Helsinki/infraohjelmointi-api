@@ -143,8 +143,8 @@ class Project(models.Model):
 
     def projectReadiness(self):
         # some calculation based on cost and stuff
-        # returns percentage of readiness
-        return random.randint(0, 100)
+        # returns percentage of readiness random.randint(0, 100)
+        return 95
 
     # Rediness % to be calculated
 

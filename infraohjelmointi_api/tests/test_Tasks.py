@@ -1,6 +1,7 @@
 from django.test import TestCase
-
+from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.models import Person, Project, ProjectType
+from infraohjelmointi_api.serializers import TaskSerializer
 from ..models import Task
 import uuid
 
@@ -111,6 +112,16 @@ class TaskTestCase(TestCase):
             msg="Response doesn't match the object in DB",
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        # serialize the model instances
+        serializer = TaskSerializer(Task.objects.get(id=self.TaskId), many=False)
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        # compare the JSON data returned to what is expected
+
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(response.content, result_expected)
 
     def test_POST_Task(self):
         data = {
@@ -135,32 +146,37 @@ class TaskTestCase(TestCase):
             msg="Task created using POST request does not exist in DB",
         )
 
-    # def test_PATCH_Task(self):
-    #     data = {"site": "Helsinki Patched", "budgetMain": 5000}
-    #     response = self.client.patch(
-    #         "/budgets/{}/".format(self.TaskId),
-    #         data,
-    #         content_type="application/json",
-    #     )
-    #     self.assertEqual(response.status_code, 200)
-    #     self.assertEqual(
-    #         response.json()["site"], data["site"], msg="Data not updated in the DB"
-    #     )
-    #     self.assertEqual(
-    #         response.json()["budgetMain"],
-    #         data["budgetMain"],
-    #         msg="Data not updated in the DB",
-    #     )
+    def test_PATCH_Task(self):
+        data = {
+            "taskType": "Easy Task",
+            "status": "past",
+        }
+        response = self.client.patch(
+            "/tasks/{}/".format(self.TaskId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["taskType"],
+            data["taskType"],
+            msg="Data not updated in the DB",
+        )
+        self.assertEqual(
+            response.json()["status"],
+            data["status"],
+            msg="Data not updated in the DB",
+        )
 
-    # def test_DELETE_Task(self):
-    #     response = self.client.delete("/budgets/{}/".format(self.TaskId))
-    #     self.assertEqual(
-    #         response.status_code,
-    #         204,
-    #         msg="Error deleting project with Id {}".format(self.TaskId),
-    #     )
-    #     self.assertEqual(
-    #         Task.objects.filter(id=self.TaskId).exists(),
-    #         False,
-    #         msg="Project with Id {} still exists in DB".format(self.TaskId),
-    #     )
+    def test_DELETE_Task(self):
+        response = self.client.delete("/tasks/{}/".format(self.TaskId))
+        self.assertEqual(
+            response.status_code,
+            204,
+            msg="Error deleting task with Id {}".format(self.TaskId),
+        )
+        self.assertEqual(
+            Task.objects.filter(id=self.TaskId).exists(),
+            False,
+            msg="Task with Id {} still exists in DB".format(self.TaskId),
+        )
