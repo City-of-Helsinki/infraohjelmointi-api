@@ -41,6 +41,7 @@ class Project(models.Model):
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     hkrId = models.UUIDField(blank=True, null=True)
+    entityName = models.CharField(max_length=30, blank=True, null=True)
     sapProject = models.UUIDField(blank=True, null=True)
     sapNetwork = models.UUIDField(blank=True, null=True)
     projectSet = models.ForeignKey(
@@ -53,7 +54,7 @@ class Project(models.Model):
         ProjectType, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     name = models.CharField(max_length=200, blank=False)
-    description = models.TextField(max_length=500, blank=True, null=True)
+    description = models.TextField(max_length=40, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
         related_name="planning",
