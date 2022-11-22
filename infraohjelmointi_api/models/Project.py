@@ -134,7 +134,7 @@ class Project(models.Model):
     # AlustavaKuluvaVuosiPlus10
 
     delays = models.CharField(max_length=200, blank=True, null=True)
-
+    hashTags = models.JSONField(blank=True, null=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 

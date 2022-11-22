@@ -53,7 +53,7 @@ class ProjectTestCase(TestCase):
         self.projectSet = ProjectSet.objects.create(
             id=uuid.uuid4(),
             name="Project Set 1",
-            hkrId=uuid.uuid4(),
+            hkrId=324,
             description="This is test project Set 1",
             responsiblePerson=self.person_2,
             phase="proposal",
@@ -71,7 +71,7 @@ class ProjectTestCase(TestCase):
         self.project = Project.objects.create(
             id=self.projectId,
             siteId=self.budgetItem,
-            hkrId=uuid.uuid4(),
+            hkrId=12345,
             sapProject=uuid.uuid4(),
             sapNetwork=uuid.uuid4(),
             projectSet=self.projectSet,
@@ -107,6 +107,7 @@ class ProjectTestCase(TestCase):
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
+            hashTags=["#random", "#random2"],
         )
         self.project.favPersons.add(self.person_1, self.person_2)
 
@@ -191,7 +192,7 @@ class ProjectTestCase(TestCase):
         Project.objects.create(
             id=uuid.uuid4(),
             siteId=self.budgetItem,
-            hkrId=uuid.uuid4(),
+            hkrId=2265,
             sapProject=uuid.uuid4(),
             sapNetwork=uuid.uuid4(),
             projectSet=self.projectSet,
@@ -226,6 +227,7 @@ class ProjectTestCase(TestCase):
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
+            hashTags=[],
         )
         response = self.client.get("/projects/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
@@ -290,6 +292,7 @@ class ProjectTestCase(TestCase):
             "personProgramming": None,
             "personConstruction": None,
             "favPersons": [self.person_1.id.__str__()],
+            "hashTags": ["hash1", "hash2"],
         }
         response = self.client.post(
             "/projects/",
