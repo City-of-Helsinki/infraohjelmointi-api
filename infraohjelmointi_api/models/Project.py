@@ -7,6 +7,8 @@ from .ProjectArea import ProjectArea
 from .BudgetItem import BudgetItem
 from .Person import Person
 from .ProjectType import ProjectType
+from .ProjectPhase import ProjectPhase
+from .ProjectPriority import ProjectPriority
 
 
 class Project(models.Model):
@@ -67,10 +69,8 @@ class Project(models.Model):
         null=True,
         blank=True,
     )
-    phase = models.CharField(
-        max_length=16,
-        choices=ProjectPhaseChoices.choices,
-        default=ProjectPhaseChoices.PROPOSAL,
+    phase = models.ForeignKey(
+        ProjectPhase, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", null=True, blank=True
@@ -108,10 +108,8 @@ class Project(models.Model):
         max_digits=20, decimal_places=2, blank=True, null=True
     )
     riskAssess = models.CharField(max_length=200, blank=True, null=True)
-    priority = models.CharField(
-        max_length=6,
-        choices=PriorityChoices.choices,
-        default=PriorityChoices.LOW,
+    priority = models.ForeignKey(
+        ProjectPriority, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     locked = models.BooleanField(default=False)
     comments = models.CharField(max_length=200, blank=True, null=True)
