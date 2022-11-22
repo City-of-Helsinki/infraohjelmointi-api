@@ -2,9 +2,10 @@ from rest_framework import viewsets
 from .serializers import (
     ProjectCreateSerializer,
     ProjectGetSerializer,
+    ProjectSetGetSerializer,
+    ProjectSetCreateSerializer,
     ProjectTypeSerializer,
     PersonSerializer,
-    ProjectSetSerializer,
     ProjectAreaSerializer,
     BudgetItemSerializer,
     TaskSerializer,
@@ -73,7 +74,13 @@ class ProjectSetViewSet(BaseViewSet):
     """
 
     permission_classes = []
-    serializer_class = ProjectSetSerializer
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ProjectSetGetSerializer
+        if self.action == "retrieve":
+            return ProjectSetGetSerializer
+        return ProjectSetCreateSerializer
 
 
 class ProjectAreaViewSet(BaseViewSet):

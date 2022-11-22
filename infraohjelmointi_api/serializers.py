@@ -50,7 +50,7 @@ class ProjectSapNetworkSerializer(serializers.ModelSerializer):
         fields = ["sapNetwork", "id"]
 
 
-class ProjectSetSerializer(serializers.ModelSerializer):
+class ProjectSetGetSerializer(serializers.ModelSerializer):
     sapProjects = ProjectSapProjectSerializer(many=True, source="project_set")
     sapNetworks = ProjectSapNetworkSerializer(many=True, source="project_set")
 
@@ -66,9 +66,16 @@ class ProjectSetSerializer(serializers.ModelSerializer):
     #     return obj.sapNetworks()
 
 
+class ProjectSetCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectSet
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate"]
+
+
 class ProjectGetSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
-    projectSet = ProjectSetSerializer(read_only=True)
+    projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)
     area = ProjectAreaSerializer(read_only=True)
     type = ProjectTypeSerializer(read_only=True)

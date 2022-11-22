@@ -20,7 +20,9 @@ class ProjectSet(models.Model):
     name = models.CharField(max_length=200, blank=True, null=True)
     hkrId = models.UUIDField(blank=True, null=True)
     description = models.TextField(max_length=500, blank=True, null=True)
-    responsiblePerson = models.ForeignKey("Person", on_delete=models.DO_NOTHING)
+    responsiblePerson = models.ForeignKey(
+        "Person", on_delete=models.DO_NOTHING, blank=True, null=True
+    )
     phase = models.CharField(
         max_length=16,
         choices=ProjectPhaseChoices.choices,
