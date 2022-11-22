@@ -5,3 +5,5 @@ from .BudgetItem import BudgetItem
 from .ProjectType import ProjectType
 from .ProjectArea import ProjectArea
 from .Task import Task
+from .ProjectPhase import ProjectPhase
+from .ProjectPriority import ProjectPriority
