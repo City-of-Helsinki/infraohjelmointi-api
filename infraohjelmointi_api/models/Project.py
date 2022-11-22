@@ -27,15 +27,6 @@ class Project(models.Model):
         MEDIUM = "medium", lazy("Medium")
         HIGH = "high", lazy("High")
 
-    class ProjectTypeChoices(models.TextChoices):
-        ProjectComplex = "projectComplex", lazy("ProjectComplex")
-        Street = "stret", lazy("Street")
-        Traffic = "traffic", lazy("Traffic")
-        Sports = "sports", lazy("Sports")
-        Omastadi = "omastadi", lazy("Omastadi")
-        ProjectArea = "projectArea", lazy("ProjectArea")
-        Park = "park", lazy("Park")
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
