@@ -2,6 +2,11 @@ import random
 import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as lazy
+from .ProjectSet import ProjectSet
+from .ProjectArea import ProjectArea
+from .BudgetItem import BudgetItem
+from .Person import Person
+from .ProjectType import ProjectType
 
 
 class Project(models.Model):
@@ -33,38 +38,38 @@ class Project(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
-        "BudgetItem", on_delete=models.DO_NOTHING, null=True, blank=True
+        BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     hkrId = models.UUIDField(blank=True, null=True)
     sapProject = models.UUIDField(blank=True, null=True)
     sapNetwork = models.UUIDField(blank=True, null=True)
     projectSet = models.ForeignKey(
-        "ProjectSet", on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     area = models.ForeignKey(
-        "ProjectArea", on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectArea, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     type = models.ForeignKey(
-        "ProjectType", on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectType, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     name = models.CharField(max_length=200, blank=False)
     description = models.TextField(max_length=500, blank=True, null=True)
     personPlanning = models.ForeignKey(
-        "Person",
+        Person,
         related_name="planning",
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
     )
     personProgramming = models.ForeignKey(
-        "Person",
+        Person,
         related_name="programming",
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
     )
     personConstruction = models.ForeignKey(
-        "Person",
+        Person,
         related_name="construction",
         on_delete=models.DO_NOTHING,
         null=True,
@@ -76,7 +81,7 @@ class Project(models.Model):
         default=ProjectPhaseChoices.PROPOSAL,
     )
     favPersons = models.ManyToManyField(
-        "Person", related_name="favourite", null=True, blank=True
+        Person, related_name="favourite", null=True, blank=True
     )
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
