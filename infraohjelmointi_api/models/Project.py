@@ -12,22 +12,6 @@ from .ProjectPriority import ProjectPriority
 
 
 class Project(models.Model):
-    class ProjectPhaseChoices(models.TextChoices):
-        PROPOSAL = "proposal", lazy("Proposal")
-        DESIGN = "design", lazy("Design")
-        PROGRAMMING = "programming", lazy("Programming")
-        DRAFT_INITIATION = "draftInitiation", lazy("DraftInitiation")
-        DRAFT_APPROVAL = "draftApproval", lazy("DraftApproval")
-        CONSTRUCTION_PLAN = "constructionPlan", lazy("ConstructionPlan")
-        CONSTRUCTION_WAIT = "constructionWait", lazy("ConstructionWait")
-        CONSTRUCTION = "construction", lazy("Construction")
-        WARRANTY_PERIOD = "warrantyPeriod", lazy("WarrantyPeriod")
-        COMPLETED = "completed", lazy("Completed")
-
-    class PriorityChoices(models.TextChoices):
-        LOW = "low", lazy("Low")
-        MEDIUM = "medium", lazy("Medium")
-        HIGH = "high", lazy("High")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(

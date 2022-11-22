@@ -33,35 +33,35 @@ class ProjectPriorityValOnlySerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate", "id"]
 
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
 class BudgetItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetItem
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectArea
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
@@ -83,7 +83,7 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSet
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
     # def get_sapProjects(self, obj):
@@ -96,7 +96,7 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
 class ProjectSetCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectSet
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
@@ -114,8 +114,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        # fields = "__all__"
-        # depth = 1
+
         exclude = ["createdDate", "updatedDate"]
 
     def get_projectReadiness(self, obj):
@@ -127,7 +126,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
     def get_projectReadiness(self, obj):
@@ -137,12 +136,12 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
 
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        # fields = "__all__"
+
         exclude = ["createdDate", "updatedDate"]
