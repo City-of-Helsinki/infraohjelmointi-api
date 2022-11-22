@@ -31,7 +31,7 @@ class Project(models.Model):
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    hkrId = models.UUIDField(blank=True, null=True)
+    hkrId = models.IntegerField(blank=True, null=True)
     entityName = models.CharField(max_length=30, blank=True, null=True)
     sapProject = models.UUIDField(blank=True, null=True)
     sapNetwork = models.UUIDField(blank=True, null=True)

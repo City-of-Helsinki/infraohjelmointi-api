@@ -10,7 +10,7 @@ class Task(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     projectId = models.ForeignKey("Project", on_delete=models.DO_NOTHING)
-    hkrId = models.UUIDField(blank=True, null=True)
+    hkrId = models.IntegerField(blank=True, null=True)
     taskType = models.CharField(max_length=50, blank=False, null=False)
     status = models.CharField(
         max_length=8,
