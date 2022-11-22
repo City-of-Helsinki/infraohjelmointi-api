@@ -26,7 +26,7 @@ class TaskTestCase(TestCase):
 
         self.project = Project.objects.create(
             id=uuid.uuid4(),
-            hkrId=uuid.uuid4(),
+            hkrId=43210,
             sapProject=uuid.uuid4(),
             sapNetwork=uuid.uuid4(),
             type=self.projectType,
@@ -61,7 +61,7 @@ class TaskTestCase(TestCase):
         self.task = Task.objects.create(
             id=self.TaskId,
             projectId=self.project,
-            hkrId=uuid.uuid4(),
+            hkrId=12342,
             taskType="Very hard task",
             status="active",
             startDate="2022-11-20",
@@ -106,7 +106,7 @@ class TaskTestCase(TestCase):
         Task.objects.create(
             id=uuid.uuid4(),
             projectId=self.project,
-            hkrId=uuid.uuid4(),
+            hkrId=22763,
             taskType="Very hard task",
             status="active",
             startDate="2022-11-20",
@@ -143,7 +143,7 @@ class TaskTestCase(TestCase):
         data = {
             "id": self.TaskId,
             "projectId": self.project.id.__str__(),
-            "hkrId": uuid.uuid4(),
+            "hkrId": 27618,
             "taskType": "Very hard task 2",
             "status": "active",
             "startDate": "2022-11-20",
