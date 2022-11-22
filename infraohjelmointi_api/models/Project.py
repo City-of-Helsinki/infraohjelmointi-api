@@ -117,21 +117,48 @@ class Project(models.Model):
     comments = models.CharField(max_length=200, blank=True, null=True)
 
     # commented fields left out due to translation confusions
-    # Hankkeen lisätyöt (sapista)
-    # TaEnnuste1KuluvaVuosi
-    # TaEnnuste2KuluvaVuosi
-    # TaEnnuste3KuluvaVuosi
-    # TaEnnuste4KuluvaVuosi
-    # TaeKuluvaVuosiPlus1
-    # TaeKuluvaVuosiPlus2
-    # AlustavaKuluvaVuosiPlus3
-    # AlustavaKuluvaVuosiPlus4
-    # AlustavaKuluvaVuosiPlus5
-    # AlustavaKuluvaVuosiPlus6
-    # AlustavaKuluvaVuosiPlus7
-    # AlustavaKuluvaVuosiPlus8
-    # AlustavaKuluvaVuosiPlus9
-    # AlustavaKuluvaVuosiPlus10
+    budgetForecast1CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    budgetForecast2CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    budgetForecast3CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    budgetForecast4CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    budgetProposalCurrentYearPlus1 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    budgetProposalCurrentYearPlus2 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus3 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus4 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus5 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus6 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus7 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus8 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus9 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
+    preliminaryCurrentYearPlus10 = models.DecimalField(
+        max_digits=20, decimal_places=2, blank=True, null=True
+    )
 
     delays = models.CharField(max_length=200, blank=True, null=True)
     hashTags = models.JSONField(blank=True, null=True)
