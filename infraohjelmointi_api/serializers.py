@@ -6,8 +6,22 @@ from .models import (
     ProjectArea,
     BudgetItem,
     Task,
+    ProjectPhase,
+    ProjectPriority,
 )
 from rest_framework import serializers
+
+
+class ProjectPhaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectPhase
+        exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectPrioritySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectPriority
+        exclude = ["createdDate", "updatedDate"]
 
 
 class PersonSerializer(serializers.ModelSerializer):

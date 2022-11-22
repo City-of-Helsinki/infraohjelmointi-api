@@ -29,6 +29,10 @@ router.register(r"project-sets", views.ProjectSetViewSet, basename="projectSets"
 router.register(r"project-areas", views.ProjectAreaViewSet, basename="personsAreas")
 router.register(r"budgets", views.BudgetItemViewSet, basename="budgetItems")
 router.register(r"tasks", views.TaskViewSet, basename="tasks")
+router.register(
+    r"project-priority", views.ProjectPriorityViewSet, basename="projectPriorities"
+)
+router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
 
 
 urlpatterns = [

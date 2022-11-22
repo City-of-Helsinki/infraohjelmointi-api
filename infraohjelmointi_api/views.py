@@ -9,6 +9,8 @@ from .serializers import (
     ProjectAreaSerializer,
     BudgetItemSerializer,
     TaskSerializer,
+    ProjectPhaseSerializer,
+    ProjectPrioritySerializer,
 )
 from rest_framework import status
 from rest_framework.views import APIView
@@ -43,6 +45,24 @@ class ProjectTypeViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectTypeSerializer
+
+
+class ProjectPhaseViewSet(BaseViewSet):
+    """
+    API endpoint that allows project phase to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectPhaseSerializer
+
+
+class ProjectPriorityViewSet(BaseViewSet):
+    """
+    API endpoint that allows project Priority to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectPrioritySerializer
 
 
 class MockProjectViewSet(viewsets.ViewSet):
@@ -94,7 +114,7 @@ class ProjectAreaViewSet(BaseViewSet):
 
 class BudgetItemViewSet(BaseViewSet):
     """
-    API endpoint that allows project areas to be viewed or edited.
+    API endpoint that allows Budgets to be viewed or edited.
     """
 
     permission_classes = []
@@ -103,7 +123,7 @@ class BudgetItemViewSet(BaseViewSet):
 
 class TaskViewSet(BaseViewSet):
     """
-    API endpoint that allows project areas to be viewed or edited.
+    API endpoint that allows Tasks to be viewed or edited.
     """
 
     permission_classes = []
