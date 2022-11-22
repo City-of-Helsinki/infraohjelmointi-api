@@ -21,8 +21,6 @@ class ProjectSet(models.Model):
     name = models.CharField(max_length=200, blank=True, null=True)
     hkrId = models.UUIDField(blank=True, null=True)
     description = models.TextField(max_length=500, blank=True, null=True)
-    # sapProjectNumberList to be acquired using method field
-    # sapNetworkNumberList to be acquired using method field
     responsiblePerson = models.ForeignKey("Person", on_delete=models.DO_NOTHING)
     phase = models.CharField(
         max_length=16,
@@ -31,27 +29,28 @@ class ProjectSet(models.Model):
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
-    def sapProjects(self):
-        return [
-            sapProject
-            for sapProject in list(
-                Project.objects.filter(projectSet=self).values_list(
-                    "sapProject", flat=True
-                )
-            )
-            if sapProject is not None
-        ]
+    # def sapProjects(self):
+    #     print(self.project_set.all())
+    #     return [
+    #         sapProject
+    #         for sapProject in list(
+    #             Project.objects.filter(projectSet=self).values_list(
+    #                 "sapProject", flat=True
+    #             )
+    #         )
+    #         if sapProject is not None
+    #     ]
 
-    def sapNetworks(self):
-        return [
-            sapNetwork
-            for sapNetwork in list(
-                Project.objects.filter(projectSet=self).values_list(
-                    "sapNetwork", flat=True
-                )
-            )
-            if sapNetwork is not None
-        ]
+    # def sapNetworks(self):
+    #     return [
+    #         sapNetwork
+    #         for sapNetwork in list(
+    #             Project.objects.filter(projectSet=self).values_list(
+    #                 "sapNetwork", flat=True
+    #             )
+    #         )
+    #         if sapNetwork is not None
+    #     ]
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)

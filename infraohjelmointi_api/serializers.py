@@ -38,20 +38,32 @@ class ProjectAreaSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
+class ProjectSapProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ["sapProject", "id"]
+
+
+class ProjectSapNetworkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ["sapNetwork", "id"]
+
+
 class ProjectSetSerializer(serializers.ModelSerializer):
-    sapProjects = serializers.SerializerMethodField()
-    sapNetworks = serializers.SerializerMethodField()
+    sapProjects = ProjectSapProjectSerializer(many=True, source="project_set")
+    sapNetworks = ProjectSapNetworkSerializer(many=True, source="project_set")
 
     class Meta:
         model = ProjectSet
         # fields = "__all__"
         exclude = ["createdDate", "updatedDate"]
 
-    def get_sapProjects(self, obj):
-        return obj.sapProjects()
+    # def get_sapProjects(self, obj):
+    #     return obj.sapProjects()
 
-    def get_sapNetworks(self, obj):
-        return obj.sapNetworks()
+    # def get_sapNetworks(self, obj):
+    #     return obj.sapNetworks()
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
