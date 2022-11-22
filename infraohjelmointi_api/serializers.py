@@ -24,11 +24,24 @@ class ProjectPrioritySerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
+class ProjectPriorityValOnlySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectPriority
+        exclude = ["createdDate", "updatedDate", "id"]
+
+
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         # fields = "__all__"
         exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectType
+        # fields = "__all__"
+        exclude = ["createdDate", "updatedDate", "id"]
 
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
@@ -92,7 +105,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)
     area = ProjectAreaSerializer(read_only=True)
-    type = ProjectTypeSerializer(read_only=True)
+    type = ProjectTypeValOnlySerializer(read_only=True)
+    priority = ProjectPriorityValOnlySerializer(read_only=True)
+    phase = ProjectPhaseSerializer(read_only=True)
     personPlanning = PersonSerializer(read_only=True)
     personProgramming = PersonSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
