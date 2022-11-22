@@ -6,6 +6,8 @@ import uuid
 from ..models import BudgetItem
 from ..models import Person
 from ..models import ProjectType
+from ..models import ProjectPhase
+from ..models import ProjectPriority
 from ..serializers import ProjectGetSerializer
 from rest_framework.renderers import JSONRenderer
 
@@ -67,6 +69,12 @@ class ProjectTestCase(TestCase):
         self.projectType = ProjectType.objects.create(
             id=uuid.uuid4(), value="projectComplex"
         )
+        self.projectPhase = ProjectPhase.objects.create(
+            id=uuid.uuid4(), value="Proposal"
+        )
+        self.projectPriority = ProjectPriority.objects.create(
+            id=uuid.uuid4(), value="High"
+        )
 
         self.project = Project.objects.create(
             id=self.projectId,
@@ -83,7 +91,7 @@ class ProjectTestCase(TestCase):
             personPlanning=self.person_2,
             personProgramming=self.person_1,
             personConstruction=self.person_3,
-            phase="proposal",
+            phase=self.projectPhase,
             programmed=True,
             constructionPhaseDetail="Current phase is proposal",
             estPlanningStartYear=2022,
@@ -103,7 +111,7 @@ class ProjectTestCase(TestCase):
             realizedCost=20.00,
             spentCost=20000.00,
             riskAssess="Yes very risky test",
-            priority="low",
+            priority=self.projectPriority,
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
@@ -167,6 +175,20 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertDictEqual(
+            self.projectPhase.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectPhase foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.projectPriority.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectPriority foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
             self.person_3.construction.all().values()[0],
             Project.objects.filter(id=self.projectId).values()[0],
             msg="personConstruction foreign key does not exist in Project with id {}".format(
@@ -217,7 +239,7 @@ class ProjectTestCase(TestCase):
             personPlanning=self.person_2,
             personProgramming=self.person_1,
             personConstruction=self.person_3,
-            phase="proposal",
+            phase=self.projectPhase,
             programmed=True,
             constructionPhaseDetail="Current phase is proposal 2",
             estPlanningStartYear=2022,
@@ -237,7 +259,7 @@ class ProjectTestCase(TestCase):
             realizedCost=20.00,
             spentCost=20000.00,
             riskAssess="Yes very risky test 2",
-            priority="low",
+            priority=self.projectPriority,
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
@@ -287,7 +309,7 @@ class ProjectTestCase(TestCase):
             "sapNetwork": "55dc9624-2cb1-4c11-b15a-c8c97466d127",
             "name": "TEST_PROECT_POST",
             "description": "TEST_PROJECT_POST_DESCRIPTION",
-            "phase": "proposal",
+            "phase": None,
             "programmed": True,
             "entityName": "Entity for POST",
             "constructionPhaseDetail": None,
@@ -308,7 +330,7 @@ class ProjectTestCase(TestCase):
             "realizedCost": None,
             "spentCost": None,
             "riskAssess": None,
-            "priority": "medium",
+            "priority": None,
             "locked": False,
             "comments": None,
             "delays": None,
