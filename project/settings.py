@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     # disable Django’s static file handling during development so that whitenoise can take over
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
+    "simple_history",
     "corsheaders",
     "rest_framework",
     "infraohjelmointi_api",
@@ -67,6 +68,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
