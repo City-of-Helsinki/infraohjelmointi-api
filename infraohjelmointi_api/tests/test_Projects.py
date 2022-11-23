@@ -13,13 +13,23 @@ from rest_framework.renderers import JSONRenderer
 
 
 class ProjectTestCase(TestCase):
-    projectId = uuid.uuid4()
+    projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
+    projectId2 = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
+    budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
+    person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
+    person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
+    person_3_Id = uuid.UUID("b56ae8c8-f5c2-4abe-a1a6-f3a83265ff49")
+    projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
+    projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
+    projectPhaseId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
+    projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
     fixtures = []
 
     @classmethod
     def setUpTestData(self):
         self.budgetItem = BudgetItem.objects.create(
-            id=uuid.uuid4(),
+            id=self.budgetItemId,
             budgetMain=10000,
             budgetPlan=10000,
             site="Helsinki",
@@ -28,7 +38,7 @@ class ProjectTestCase(TestCase):
             need=5000.0,
         )
         self.person_1 = Person.objects.create(
-            id=uuid.uuid4(),
+            id=self.person_1_Id,
             firstName="John",
             lastName="Doe",
             email="random@random.com",
@@ -36,7 +46,7 @@ class ProjectTestCase(TestCase):
             phone="0414853275",
         )
         self.person_2 = Person.objects.create(
-            id=uuid.uuid4(),
+            id=self.person_2_Id,
             firstName="John",
             lastName="Doe 2",
             email="random@random.com",
@@ -44,7 +54,7 @@ class ProjectTestCase(TestCase):
             phone="0414853275",
         )
         self.person_3 = Person.objects.create(
-            id=uuid.uuid4(),
+            id=self.person_3_Id,
             firstName="John",
             lastName="Doe 3",
             email="random@random.com",
@@ -53,7 +63,7 @@ class ProjectTestCase(TestCase):
         )
 
         self.projectSet = ProjectSet.objects.create(
-            id=uuid.uuid4(),
+            id=self.projectSetId,
             name="Project Set 1",
             hkrId=324,
             description="This is test project Set 1",
@@ -62,18 +72,18 @@ class ProjectTestCase(TestCase):
             programmed=True,
         )
         self.projectArea = ProjectArea.objects.create(
-            id=uuid.uuid4(),
+            id=self.projectAreaId,
             areaName="Hervanta",
             location="inisnoorinkatu 60c",
         )
         self.projectType = ProjectType.objects.create(
-            id=uuid.uuid4(), value="projectComplex"
+            id=self.projectTypeId, value="projectComplex"
         )
         self.projectPhase = ProjectPhase.objects.create(
-            id=uuid.uuid4(), value="Proposal"
+            id=self.projectPhaseId, value="Proposal"
         )
         self.projectPriority = ProjectPriority.objects.create(
-            id=uuid.uuid4(), value="High"
+            id=self.projectPriorityId, value="High"
         )
 
         self.project = Project.objects.create(
@@ -226,7 +236,7 @@ class ProjectTestCase(TestCase):
             len(response.json()), 1, msg="Number of retrieved projects is != 1"
         )
         Project.objects.create(
-            id=uuid.uuid4(),
+            id=self.projectId2,
             siteId=self.budgetItem,
             hkrId=2265,
             sapProject=uuid.uuid4(),
