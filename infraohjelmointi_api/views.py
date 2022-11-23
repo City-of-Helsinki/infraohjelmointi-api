@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
+from rest_framework import status
 from rest_framework.decorators import action
 
 from django.core import serializers
@@ -162,7 +163,9 @@ class NoteViewSet(BaseViewSet):
             qs = instance.history.all().values()
             return Response(qs)
         except ValueError:
-            return Response(data={"message": "Invalid UUID"}, status=400)
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
     def history_user(self, request, pk, userId):
@@ -173,4 +176,6 @@ class NoteViewSet(BaseViewSet):
             qs = instance.history.all().filter(updatedBy_id=userId).values()
             return Response(qs)
         except ValueError:
-            return Response(data={"message": "Invalid UUID"}, status=400)
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
