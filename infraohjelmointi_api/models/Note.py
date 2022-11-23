@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
-from django.utils.timezone import now
+from .Person import Person
+from simple_history.models import HistoricalRecords
 
 
 class Note(models.Model):
@@ -9,3 +10,12 @@ class Note(models.Model):
     updatedBy = models.ForeignKey("Person", on_delete=models.DO_NOTHING, null=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
+    history = HistoricalRecords(user_model=Person)
+
+    @property
+    def _history_user(self):
+        return self.updatedBy
+
+    @_history_user.setter
+    def _history_user(self, value):
+        self.updatedBy = value

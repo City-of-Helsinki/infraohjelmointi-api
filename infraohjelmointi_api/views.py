@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import viewsets
 from .serializers import (
     ProjectCreateSerializer,
@@ -18,6 +19,9 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
+from rest_framework.decorators import action
+
+from django.core import serializers
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -142,9 +146,31 @@ class TaskViewSet(BaseViewSet):
 
 
 class NoteViewSet(BaseViewSet):
+
     """
     API endpoint that allows notes to be viewed or edited.
     """
 
     permission_classes = []
     serializer_class = NoteSerializer
+
+    @action(methods=["get"], detail=True, url_path=r"history")
+    def history(self, request, pk):
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = instance.history.all().values()
+            return Response(qs)
+        except ValueError:
+            return Response(data={"message": "Invalid UUID"}, status=400)
+
+    @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
+    def history_user(self, request, pk, userId):
+        try:
+            uuid.UUID(str(userId))
+            uuid.UUID(str(pk))
+            instance = self.get_object()
+            qs = instance.history.all().filter(updatedBy_id=userId).values()
+            return Response(qs)
+        except ValueError:
+            return Response(data={"message": "Invalid UUID"}, status=400)
