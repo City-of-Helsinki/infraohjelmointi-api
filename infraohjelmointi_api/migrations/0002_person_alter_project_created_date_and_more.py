@@ -9,41 +9,64 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0001_initial'),
+        ("infraohjelmointi_api", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Person',
+            name="Person",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('firstName', models.CharField(max_length=200)),
-                ('lastName', models.CharField(max_length=200)),
-                ('email', models.CharField(max_length=200)),
-                ('title', models.CharField(max_length=200)),
-                ('phone', models.CharField(max_length=14)),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("firstName", models.CharField(max_length=200)),
+                ("lastName", models.CharField(max_length=200)),
+                ("email", models.CharField(max_length=200)),
+                ("title", models.CharField(max_length=200)),
+                ("phone", models.CharField(max_length=14)),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
             ],
         ),
         migrations.AlterField(
-            model_name='project',
-            name='created_date',
+            model_name="project",
+            name="created_date",
             field=models.DateTimeField(blank=True, default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='project',
-            name='updated_date',
+            model_name="project",
+            name="updated_date",
             field=models.DateTimeField(blank=True, default=django.utils.timezone.now),
         ),
         migrations.CreateModel(
-            name='Note',
+            name="Note",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('content', models.TextField(blank=True, default='')),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
-                ('updatedBy', models.ForeignKey(null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.person')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("content", models.TextField(blank=True, default="")),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
+                (
+                    "updatedBy",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        to="infraohjelmointi_api.person",
+                    ),
+                ),
             ],
         ),
     ]

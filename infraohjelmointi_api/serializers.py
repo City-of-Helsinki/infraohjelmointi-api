@@ -9,6 +9,7 @@ from .models import (
     ProjectPhase,
     ProjectPriority,
     TaskStatus,
+    Note,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -140,4 +141,10 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
 
+        exclude = ["createdDate", "updatedDate"]
+
+
+class NoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Note
         exclude = ["createdDate", "updatedDate"]

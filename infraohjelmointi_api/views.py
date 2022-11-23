@@ -12,6 +12,7 @@ from .serializers import (
     ProjectPhaseSerializer,
     ProjectPrioritySerializer,
     TaskStatusSerializer,
+    NoteSerializer,
 )
 from rest_framework import status
 from rest_framework.views import APIView
@@ -138,3 +139,12 @@ class TaskViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = TaskSerializer
+
+
+class NoteViewSet(BaseViewSet):
+    """
+    API endpoint that allows notes to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = NoteSerializer
