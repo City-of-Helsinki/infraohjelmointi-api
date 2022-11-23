@@ -30,28 +30,6 @@ class ProjectSet(models.Model):
     )
     programmed = models.BooleanField(default=False)
     # finances = models.TextField(max_length=500, blank=True, null=True)
-    # def sapProjects(self):
-    #     print(self.project_set.all())
-    #     return [
-    #         sapProject
-    #         for sapProject in list(
-    #             Project.objects.filter(projectSet=self).values_list(
-    #                 "sapProject", flat=True
-    #             )
-    #         )
-    #         if sapProject is not None
-    #     ]
-
-    # def sapNetworks(self):
-    #     return [
-    #         sapNetwork
-    #         for sapNetwork in list(
-    #             Project.objects.filter(projectSet=self).values_list(
-    #                 "sapNetwork", flat=True
-    #             )
-    #         )
-    #         if sapNetwork is not None
-    #     ]
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)

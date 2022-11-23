@@ -7,16 +7,22 @@ import uuid
 
 
 class TaskTestCase(TestCase):
-    TaskId = uuid.uuid4()
+    TaskId = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
+    TaskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
+    person_1_Id = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
+    projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
+    sapNetworkId = uuid.UUID("b7a5f932-2286-4b4a-a4a5-a7a6b6039248")
+    sapProjectId = uuid.UUID("7a12962d-f23f-40d7-966b-ee5df57b567d")
+    projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
 
     @classmethod
     def setUpTestData(self):
 
         self.projectType = ProjectType.objects.create(
-            id=uuid.uuid4(), value="projectComplex"
+            id=self.projectTypeId, value="projectComplex"
         )
         self.person_1 = Person.objects.create(
-            id=uuid.uuid4(),
+            id=self.person_1_Id,
             firstName="John",
             lastName="Doe",
             email="random@random.com",
@@ -25,10 +31,10 @@ class TaskTestCase(TestCase):
         )
 
         self.project = Project.objects.create(
-            id=uuid.uuid4(),
+            id=self.projectId,
             hkrId=43210,
-            sapProject=uuid.uuid4(),
-            sapNetwork=uuid.uuid4(),
+            sapProject=self.sapProjectId,
+            sapNetwork=self.sapNetworkId,
             type=self.projectType,
             name="Test project 1",
             description="description of the test project",
@@ -81,7 +87,7 @@ class TaskTestCase(TestCase):
         )
         task = Task.objects.get(id=self.TaskId)
         self.assertIsInstance(task, Task, msg="Object retrieved from DB != typeof Task")
-        self.assertEqual(task, self.task, msg="Object from DB != created Object")
+        self.assertEqual(task.id, self.task.id, msg="Object from DB != created Object")
 
     def test_foreign_keys_exist(self):
         self.assertDictEqual(
@@ -104,7 +110,7 @@ class TaskTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(len(response.json()), 1, msg="Number of returned Tasks != 1")
         Task.objects.create(
-            id=uuid.uuid4(),
+            id=self.TaskId2,
             projectId=self.project,
             hkrId=22763,
             taskType="Very hard task",
