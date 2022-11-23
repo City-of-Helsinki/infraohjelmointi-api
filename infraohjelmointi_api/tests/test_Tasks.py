@@ -1,6 +1,6 @@
 from django.test import TestCase
 from rest_framework.renderers import JSONRenderer
-from infraohjelmointi_api.models import Person, Project, ProjectType
+from infraohjelmointi_api.models import Person, Project, ProjectType, TaskStatus
 from infraohjelmointi_api.serializers import TaskSerializer
 from ..models import Task
 import uuid
@@ -14,9 +14,13 @@ class TaskTestCase(TestCase):
     sapNetworkId = uuid.UUID("b7a5f932-2286-4b4a-a4a5-a7a6b6039248")
     sapProjectId = uuid.UUID("7a12962d-f23f-40d7-966b-ee5df57b567d")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
+    taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
 
     @classmethod
     def setUpTestData(self):
+        self.taskStatus = TaskStatus.objects.create(
+            id=self.taskStatusId, value="active"
+        )
 
         self.projectType = ProjectType.objects.create(
             id=self.projectTypeId, value="projectComplex"
@@ -69,7 +73,7 @@ class TaskTestCase(TestCase):
             projectId=self.project,
             hkrId=12342,
             taskType="Very hard task",
-            status="active",
+            status=self.taskStatus,
             startDate="2022-11-20",
             endDate="2022-11-20",
             person=self.person_1,
@@ -105,6 +109,14 @@ class TaskTestCase(TestCase):
             ),
         )
 
+        self.assertDictEqual(
+            self.taskStatus.task_set.all().values()[0],
+            Task.objects.filter(id=self.TaskId).values()[0],
+            msg="TaskStatus foreign key does not exist in Task with id {}".format(
+                self.TaskId
+            ),
+        )
+
     def test_GET_all_Tasks(self):
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
@@ -114,7 +126,7 @@ class TaskTestCase(TestCase):
             projectId=self.project,
             hkrId=22763,
             taskType="Very hard task",
-            status="active",
+            status=None,
             startDate="2022-11-20",
             endDate="2022-11-20",
             person=self.person_1,
@@ -151,7 +163,7 @@ class TaskTestCase(TestCase):
             "projectId": self.project.id.__str__(),
             "hkrId": 27618,
             "taskType": "Very hard task 2",
-            "status": "active",
+            "status": self.taskStatus.id.__str__(),
             "startDate": "2022-11-20",
             "endDate": "2022-11-20",
             "person": None,
@@ -171,7 +183,7 @@ class TaskTestCase(TestCase):
     def test_PATCH_Task(self):
         data = {
             "taskType": "Easy Task",
-            "status": "past",
+            "status": None,
         }
         response = self.client.patch(
             "/tasks/{}/".format(self.TaskId),
