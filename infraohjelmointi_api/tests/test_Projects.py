@@ -61,14 +61,16 @@ class ProjectTestCase(TestCase):
             title="Contractor",
             phone="0414853275",
         )
-
+        self.projectPhase = ProjectPhase.objects.create(
+            id=self.projectPhaseId, value="Proposal"
+        )
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
             name="Project Set 1",
             hkrId=324,
             description="This is test project Set 1",
             responsiblePerson=self.person_2,
-            phase="proposal",
+            phase=self.projectPhase,
             programmed=True,
         )
         self.projectArea = ProjectArea.objects.create(
@@ -79,9 +81,7 @@ class ProjectTestCase(TestCase):
         self.projectType = ProjectType.objects.create(
             id=self.projectTypeId, value="projectComplex"
         )
-        self.projectPhase = ProjectPhase.objects.create(
-            id=self.projectPhaseId, value="Proposal"
-        )
+
         self.projectPriority = ProjectPriority.objects.create(
             id=self.projectPriorityId, value="High"
         )
