@@ -11,6 +11,7 @@ from .serializers import (
     TaskSerializer,
     ProjectPhaseSerializer,
     ProjectPrioritySerializer,
+    TaskStatusSerializer,
 )
 from rest_framework import status
 from rest_framework.views import APIView
@@ -36,6 +37,15 @@ class ProjectViewSet(BaseViewSet):
         if self.action == "retrieve":
             return ProjectGetSerializer
         return ProjectCreateSerializer
+
+
+class TaskStatusViewSet(BaseViewSet):
+    """
+    API endpoint that allows project types to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = TaskStatusSerializer
 
 
 class ProjectTypeViewSet(BaseViewSet):

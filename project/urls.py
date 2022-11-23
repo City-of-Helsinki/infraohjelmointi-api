@@ -33,6 +33,7 @@ router.register(
     r"project-priority", views.ProjectPriorityViewSet, basename="projectPriorities"
 )
 router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
+router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
 
 
 urlpatterns = [

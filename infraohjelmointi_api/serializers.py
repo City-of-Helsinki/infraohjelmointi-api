@@ -8,14 +8,33 @@ from .models import (
     Task,
     ProjectPhase,
     ProjectPriority,
+    TaskStatus,
 )
 from rest_framework import serializers
+
+
+class TaskStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskStatus
+        exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPhase
         exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectPhaseValOnlySerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        """Convert returns only String instead of Object of value"""
+        ret = super().to_representation(instance)
+
+        return ret["value"]
+
+    class Meta:
+        model = ProjectPhase
+        exclude = ["createdDate", "updatedDate", "id"]
 
 
 class ProjectPrioritySerializer(serializers.ModelSerializer):
@@ -25,6 +44,12 @@ class ProjectPrioritySerializer(serializers.ModelSerializer):
 
 
 class ProjectPriorityValOnlySerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        """Convert returns only String instead of Object of value"""
+        ret = super().to_representation(instance)
+
+        return ret["value"]
+
     class Meta:
         model = ProjectPriority
         exclude = ["createdDate", "updatedDate", "id"]
@@ -38,6 +63,12 @@ class PersonSerializer(serializers.ModelSerializer):
 
 
 class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        """Convert returns only String instead of Object of value"""
+        ret = super().to_representation(instance)
+
+        return ret["value"]
+
     class Meta:
         model = ProjectType
 
@@ -107,7 +138,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     area = ProjectAreaSerializer(read_only=True)
     type = ProjectTypeValOnlySerializer(read_only=True)
     priority = ProjectPriorityValOnlySerializer(read_only=True)
-    phase = ProjectPhaseSerializer(read_only=True)
+    phase = ProjectPhaseValOnlySerializer(read_only=True)
     personPlanning = PersonSerializer(read_only=True)
     personProgramming = PersonSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)

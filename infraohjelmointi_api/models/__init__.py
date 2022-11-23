@@ -7,3 +7,4 @@ from .ProjectArea import ProjectArea
 from .Task import Task
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
+from .TaskStatus import TaskStatus

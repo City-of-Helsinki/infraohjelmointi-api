@@ -1,21 +1,16 @@
 import uuid
 from django.db import models
+from .TaskStatus import TaskStatus
 
 
 class Task(models.Model):
-    class TaskStatusChoices(models.TextChoices):
-        ACTIVE = "active", ("Active")
-        PAST = "past", ("Past")
-        UPCOMING = "upcoming", ("Upcoming")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     projectId = models.ForeignKey("Project", on_delete=models.DO_NOTHING)
     hkrId = models.IntegerField(blank=True, null=True)
     taskType = models.CharField(max_length=50, blank=False, null=False)
-    status = models.CharField(
-        max_length=8,
-        choices=TaskStatusChoices.choices,
-        default=TaskStatusChoices.UPCOMING,
+    status = models.ForeignKey(
+        TaskStatus, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     startDate = models.DateField(auto_now=True, blank=True)
     endDate = models.DateField(auto_now=True, blank=True)
