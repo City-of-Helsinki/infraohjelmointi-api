@@ -70,7 +70,7 @@ class ProjectAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectArea
 
-        exclude = ["createdDate", "updatedDate"]
+        exclude = ["createdDate", "updatedDate", "location"]
 
 
 class ProjectSetGetSerializer(serializers.ModelSerializer):
