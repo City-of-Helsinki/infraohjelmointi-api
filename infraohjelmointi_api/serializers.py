@@ -11,6 +11,7 @@ from .models import (
     TaskStatus,
 )
 from rest_framework import serializers
+from django.db.models import Q
 
 
 class TaskStatusSerializer(serializers.ModelSerializer):
@@ -72,21 +73,9 @@ class ProjectAreaSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
-class ProjectSapProjectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Project
-        fields = ["sapProject", "id"]
-
-
-class ProjectSapNetworkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Project
-        fields = ["sapNetwork", "id"]
-
-
 class ProjectSetGetSerializer(serializers.ModelSerializer):
-    sapProjects = ProjectSapProjectSerializer(many=True, source="project_set")
-    sapNetworks = ProjectSapNetworkSerializer(many=True, source="project_set")
+    sapProjects = serializers.SerializerMethodField()
+    sapNetworks = serializers.SerializerMethodField()
     phase = ProjectPhaseSerializer(read_only=True)
 
     class Meta:
@@ -97,8 +86,21 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
     # def get_sapProjects(self, obj):
     #     return obj.sapProjects()
 
-    # def get_sapNetworks(self, obj):
-    #     return obj.sapNetworks()
+    def get_sapNetworks(self, obj):
+        return [
+            obj["sapNetwork"]
+            for obj in obj.project_set.all()
+            .filter(~Q(sapNetwork=None))
+            .values("sapNetwork")
+        ]
+
+    def get_sapProjects(self, obj):
+        return [
+            obj["sapProject"]
+            for obj in obj.project_set.all()
+            .filter(~Q(sapNetwork=None))
+            .values("sapProject")
+        ]
 
 
 class ProjectSetCreateSerializer(serializers.ModelSerializer):
