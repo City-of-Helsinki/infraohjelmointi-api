@@ -15,6 +15,8 @@ class TaskTestCase(TestCase):
     sapProjectId = uuid.UUID("7a12962d-f23f-40d7-966b-ee5df57b567d")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
+    sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
+    sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
 
     @classmethod
     def setUpTestData(self):
@@ -37,8 +39,8 @@ class TaskTestCase(TestCase):
         self.project = Project.objects.create(
             id=self.projectId,
             hkrId=43210,
-            sapProject=[uuid.uuid4().__str__()],
-            sapNetwork=[uuid.uuid4().__str__()],
+            sapProject=self.sapProjectIds_1,
+            sapNetwork=self.sapNetworkIds_1,
             type=self.projectType,
             name="Test project 1",
             description="description of the test project",

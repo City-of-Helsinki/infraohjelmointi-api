@@ -24,6 +24,10 @@ class ProjectTestCase(TestCase):
     projectPhaseId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
+    sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
+    sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
+    sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
+    sapProjectIds_2 = [uuid.UUID("2cee5e12-eda9-499c-8a3f-f17b2b0b1a98").__str__()]
     fixtures = []
 
     @classmethod
@@ -90,8 +94,8 @@ class ProjectTestCase(TestCase):
             id=self.projectId,
             siteId=self.budgetItem,
             hkrId=12345,
-            sapProject=[uuid.uuid4().__str__()],
-            sapNetwork=[uuid.uuid4().__str__()],
+            sapProject=self.sapProjectIds_1,
+            sapNetwork=self.sapNetworkIds_1,
             projectSet=self.projectSet,
             entityName="Sample Entity Name",
             area=self.projectArea,
@@ -239,8 +243,8 @@ class ProjectTestCase(TestCase):
             id=self.projectId2,
             siteId=self.budgetItem,
             hkrId=2265,
-            sapProject=[uuid.uuid4().__str__()],
-            sapNetwork=[uuid.uuid4().__str__()],
+            sapProject=self.sapProjectIds_2,
+            sapNetwork=self.sapNetworkIds_2,
             projectSet=self.projectSet,
             area=self.projectArea,
             type=self.projectType,
