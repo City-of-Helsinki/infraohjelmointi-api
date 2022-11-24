@@ -87,6 +87,7 @@ class ProjectSapNetworkSerializer(serializers.ModelSerializer):
 class ProjectSetGetSerializer(serializers.ModelSerializer):
     sapProjects = ProjectSapProjectSerializer(many=True, source="project_set")
     sapNetworks = ProjectSapNetworkSerializer(many=True, source="project_set")
+    phase = ProjectPhaseSerializer(read_only=True)
 
     class Meta:
         model = ProjectSet
