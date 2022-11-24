@@ -33,7 +33,8 @@ def populate_Phase_Type_priority_status(apps, schema_editor):
         "constructionPlan",
         "constructionWait",
         "construction",
-        "warrantyPeriod" "completed",
+        "warrantyPeriod",
+        "completed",
     ]
     types = [
         "projectComplex",
