@@ -25,34 +25,10 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
-class ProjectPhaseValOnlySerializer(serializers.ModelSerializer):
-    def to_representation(self, instance):
-        """Convert returns only String instead of Object of value"""
-        ret = super().to_representation(instance)
-
-        return ret["value"]
-
-    class Meta:
-        model = ProjectPhase
-        exclude = ["createdDate", "updatedDate", "id"]
-
-
 class ProjectPrioritySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPriority
         exclude = ["createdDate", "updatedDate"]
-
-
-class ProjectPriorityValOnlySerializer(serializers.ModelSerializer):
-    def to_representation(self, instance):
-        """Convert returns only String instead of Object of value"""
-        ret = super().to_representation(instance)
-
-        return ret["value"]
-
-    class Meta:
-        model = ProjectPriority
-        exclude = ["createdDate", "updatedDate", "id"]
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -62,17 +38,17 @@ class PersonSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
-class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
-    def to_representation(self, instance):
-        """Convert returns only String instead of Object of value"""
-        ret = super().to_representation(instance)
+# class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
+#     def to_representation(self, instance):
+#         """Convert returns only String instead of Object of value"""
+#         ret = super().to_representation(instance)
 
-        return ret["value"]
+#         return ret["value"]
 
-    class Meta:
-        model = ProjectType
+#     class Meta:
+#         model = ProjectType
 
-        exclude = ["createdDate", "updatedDate", "id"]
+#         exclude = ["createdDate", "updatedDate", "id"]
 
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
@@ -136,9 +112,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)
     area = ProjectAreaSerializer(read_only=True)
-    type = ProjectTypeValOnlySerializer(read_only=True)
-    priority = ProjectPriorityValOnlySerializer(read_only=True)
-    phase = ProjectPhaseValOnlySerializer(read_only=True)
+    type = ProjectTypeSerializer(read_only=True)
+    priority = ProjectPrioritySerializer(read_only=True)
+    phase = ProjectPhaseSerializer(read_only=True)
     personPlanning = PersonSerializer(read_only=True)
     personProgramming = PersonSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
