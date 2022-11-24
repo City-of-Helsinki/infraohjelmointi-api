@@ -39,19 +39,6 @@ class PersonSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
-# class ProjectTypeValOnlySerializer(serializers.ModelSerializer):
-#     def to_representation(self, instance):
-#         """Convert returns only String instead of Object of value"""
-#         ret = super().to_representation(instance)
-
-#         return ret["value"]
-
-#     class Meta:
-#         model = ProjectType
-
-#         exclude = ["createdDate", "updatedDate", "id"]
-
-
 class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
