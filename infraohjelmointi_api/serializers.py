@@ -83,9 +83,6 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
 
         exclude = ["createdDate", "updatedDate"]
 
-    # def get_sapProjects(self, obj):
-    #     return obj.sapProjects()
-
     def get_sapNetworks(self, obj):
         return [
             obj["sapNetwork"]
