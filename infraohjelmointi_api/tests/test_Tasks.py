@@ -37,8 +37,8 @@ class TaskTestCase(TestCase):
         self.project = Project.objects.create(
             id=self.projectId,
             hkrId=43210,
-            sapProject=self.sapProjectId,
-            sapNetwork=self.sapNetworkId,
+            sapProject=[uuid.uuid4().__str__()],
+            sapNetwork=[uuid.uuid4().__str__()],
             type=self.projectType,
             name="Test project 1",
             description="description of the test project",
