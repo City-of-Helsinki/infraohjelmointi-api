@@ -85,18 +85,20 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
 
     def get_sapNetworks(self, obj):
         return [
-            obj["sapNetwork"]
+            network
             for obj in obj.project_set.all()
             .filter(~Q(sapNetwork=None))
             .values("sapNetwork")
+            for network in obj["sapNetwork"]
         ]
 
     def get_sapProjects(self, obj):
         return [
-            obj["sapProject"]
+            project
             for obj in obj.project_set.all()
             .filter(~Q(sapNetwork=None))
             .values("sapProject")
+            for project in obj["sapProject"]
         ]
 
 
