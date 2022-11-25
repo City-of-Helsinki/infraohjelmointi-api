@@ -79,7 +79,7 @@ class ProjectTestCase(TestCase):
         )
         self.projectArea = ProjectArea.objects.create(
             id=self.projectAreaId,
-            areaName="Hervanta",
+            value="Hervanta",
             location="inisnoorinkatu 60c",
         )
         self.projectType = ProjectType.objects.create(
