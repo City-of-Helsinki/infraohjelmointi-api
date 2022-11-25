@@ -105,6 +105,21 @@ class NoteTestCase(TestCase):
             msg="Data returned != data in DB",
         )
 
+    def test_GET_history_by_user(self):
+        response = self.client.get(
+            "/notes/{}/history/{}/".format(self.note_1_Id, self.person_1_Id)
+        )
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        serializer = NoteHistorySerializer(
+            Note.objects.get(id=self.note_1_Id).history.all(), many=True
+        )
+
+        self.assertEqual(
+            len(response.json()),
+            len(serializer.data),
+            msg="Data returned != data in DB",
+        )
+
     def test_GET_one_note(self):
         response = self.client.get("/notes/{}/".format(self.note_1_Id))
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
