@@ -73,7 +73,7 @@ def populate_area_data(apps, schema_editor):
         "ostersundom",
     ]
     for area in areaNames:
-        ProjectArea.objects.create(areaName=area, location="Helsinki")
+        ProjectArea.objects.create(value=area, location="Helsinki")
 
 
 class Migration(migrations.Migration):
