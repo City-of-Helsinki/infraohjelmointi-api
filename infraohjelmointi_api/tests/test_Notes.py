@@ -2,7 +2,7 @@ from django.test import TestCase
 import uuid
 from ..models import Person
 from ..models import Note
-from ..serializers import NoteSerializer
+from ..serializers import NoteSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
 
 
@@ -65,7 +65,7 @@ class NoteTestCase(TestCase):
             msg="Latest instance of Note doesn't contain the latest content",
         )
 
-    def testGET_all_notes(self):
+    def test_GET_all_notes(self):
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
@@ -89,6 +89,20 @@ class NoteTestCase(TestCase):
         # compare the JSON data returned to what is expected
         self.assertEqual(
             response.content, result_expected, msg="Data returned != data in DB"
+        )
+
+    def test_GET_history(self):
+        response = self.client.get("/notes/{}/history/".format(self.note_1_Id))
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+
+        serializer = NoteHistorySerializer(
+            Note.objects.get(id=self.note_1_Id).history.all(), many=True
+        )
+
+        self.assertEqual(
+            len(response.json()),
+            len(serializer.data),
+            msg="Data returned != data in DB",
         )
 
     def test_GET_one_note(self):

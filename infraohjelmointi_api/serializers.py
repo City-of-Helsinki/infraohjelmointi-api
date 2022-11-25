@@ -40,6 +40,12 @@ class PersonSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate"]
 
 
+class NoteHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Note.history.model
+        fields = "__all__"
+
+
 class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectType
