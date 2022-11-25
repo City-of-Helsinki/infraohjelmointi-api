@@ -15,8 +15,8 @@ def rename_area_data(apps, schema_editor):
         "pasila",
         "ostersundom",
     ]
-    list = ProjectArea.objects.filter(location="Helsinki")
-    for obj, area in zip(list, areaNames):
+    projectList = ProjectArea.objects.filter(location="Helsinki")
+    for obj, area in zip(projectList, areaNames):
         obj.value = area
         obj.save()
 
