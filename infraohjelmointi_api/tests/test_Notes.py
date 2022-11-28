@@ -42,7 +42,7 @@ class NoteTestCase(TestCase):
         self.assertDictEqual(
             self.person_1.note_set.all().values()[0],
             Note.objects.filter(id=self.note_1_Id).values()[0],
-            msg="siteId foreign key does not exist in Note with id {}".format(
+            msg="Person foreign key does not exist in Note with id {}".format(
                 self.note_1_Id
             ),
         )
