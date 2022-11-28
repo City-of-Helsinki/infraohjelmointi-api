@@ -42,7 +42,7 @@ class NoteTestCase(TestCase):
         self.assertDictEqual(
             self.person_1.note_set.all().values()[0],
             Note.objects.filter(id=self.note_1_Id).values()[0],
-            msg="siteId foreign key does not exist in Project with id {}".format(
+            msg="siteId foreign key does not exist in Note with id {}".format(
                 self.note_1_Id
             ),
         )
@@ -69,7 +69,7 @@ class NoteTestCase(TestCase):
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 1, msg="Number of retrieved projects is != 1"
+            len(response.json()), 1, msg="Number of retrieved Notes is != 1"
         )
         Note.objects.create(
             id=self.note_2_Id, content="Random Note 2", updatedBy=self.person_1
@@ -77,7 +77,7 @@ class NoteTestCase(TestCase):
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 2, msg="Number of retrieved projects is != 2"
+            len(response.json()), 2, msg="Number of retrieved Notes is != 2"
         )
 
         # serialize the model instances
@@ -153,7 +153,7 @@ class NoteTestCase(TestCase):
         self.assertEqual(
             Note.objects.filter(id=new_createdId).exists(),
             True,
-            msg="Project created using POST request does not exist in DB",
+            msg="Note created using POST request does not exist in DB",
         )
 
     def test_PATCH_note(self):
@@ -175,10 +175,10 @@ class NoteTestCase(TestCase):
         self.assertEqual(
             response.status_code,
             204,
-            msg="Error deleting project with Id {}".format(self.note_1_Id),
+            msg="Error deleting Note with Id {}".format(self.note_1_Id),
         )
         self.assertEqual(
             Note.objects.filter(id=self.note_1_Id).exists(),
             False,
-            msg="Project with Id {} still exists in DB".format(self.note_1_Id),
+            msg="Note with Id {} still exists in DB".format(self.note_1_Id),
         )
