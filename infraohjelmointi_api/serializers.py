@@ -40,7 +40,7 @@ class PersonSerializer(serializers.ModelSerializer):
 
 
 class NoteHistorySerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
+    class Meta:
         model = Note.history.model
         fields = "__all__"
 

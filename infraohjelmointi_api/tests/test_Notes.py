@@ -116,7 +116,10 @@ class NoteTestCase(TestCase):
             len(response.json()), 1, msg="Number of retrieved Notes is != 1"
         )
         Note.objects.create(
-            id=self.note_2_Id, content="Random Note 2", updatedBy=self.person_1
+            id=self.note_2_Id,
+            content="Random Note 2",
+            updatedBy=self.person_1,
+            project=self.project,
         )
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
