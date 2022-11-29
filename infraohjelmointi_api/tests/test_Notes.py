@@ -90,6 +90,13 @@ class NoteTestCase(TestCase):
                 self.note_1_Id
             ),
         )
+        self.assertDictEqual(
+            self.project.note_set.all().values()[0],
+            Note.objects.filter(id=self.note_1_Id).values()[0],
+            msg="Project foreign key does not exist in Note with id {}".format(
+                self.note_1_Id
+            ),
+        )
 
     def test_history_exists(self):
         note = Note.objects.get(id=self.note_1_Id)
@@ -232,13 +239,4 @@ class NoteTestCase(TestCase):
             Note.objects.filter(id=self.note_1_Id).exists(),
             False,
             msg="Note with Id {} still exists in DB".format(self.note_1_Id),
-        )
-
-    def test_foreign_key_exists(self):
-        self.assertDictEqual(
-            self.project.note_set.all().values()[0],
-            Note.objects.filter(id=self.note_1_Id).values()[0],
-            msg="Project foreign key does not exist in Note with id {}".format(
-                self.note_1_Id
-            ),
         )
