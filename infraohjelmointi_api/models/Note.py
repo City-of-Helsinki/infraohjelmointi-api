@@ -10,6 +10,7 @@ class Note(models.Model):
     updatedBy = models.ForeignKey("Person", on_delete=models.DO_NOTHING, null=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
+    project = models.ForeignKey("Project", on_delete=models.DO_NOTHING, null=True)
     history = HistoricalRecords(user_model=Person)
 
     @property
