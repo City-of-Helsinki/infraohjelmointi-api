@@ -27,6 +27,9 @@ from django.core import serializers
 
 class BaseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
+        """
+        Overriden ModelViewSet class method to get appropriate queryset using serializer class
+        """
         return self.get_serializer_class().Meta.model.objects.all()
 
 
@@ -38,6 +41,9 @@ class ProjectViewSet(BaseViewSet):
     permission_classes = []
 
     def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
         if self.action == "list":
             return ProjectGetSerializer
         if self.action == "retrieve":
@@ -112,6 +118,9 @@ class ProjectSetViewSet(BaseViewSet):
     permission_classes = []
 
     def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
         if self.action == "list":
             return ProjectSetGetSerializer
         if self.action == "retrieve":
@@ -157,6 +166,9 @@ class NoteViewSet(BaseViewSet):
 
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):
+        """
+        Custom action to get history of a specific Note
+        """
         try:
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
@@ -169,6 +181,9 @@ class NoteViewSet(BaseViewSet):
 
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
     def history_user(self, request, pk, userId):
+        """
+        Custom action to get history of a specific Note filtered by a specific User
+        """
         try:
             uuid.UUID(str(userId))
             uuid.UUID(str(pk))
