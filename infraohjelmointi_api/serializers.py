@@ -15,55 +15,49 @@ from rest_framework import serializers
 from django.db.models import Q
 
 
+class BaseMeta:
+    exclude = ["createdDate", "updatedDate"]
+
+
 class TaskStatusSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = TaskStatus
-        exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectPhase
-        exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectPrioritySerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectPriority
-        exclude = ["createdDate", "updatedDate"]
 
 
 class PersonSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = Person
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class NoteHistorySerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = Note.history.model
         fields = "__all__"
 
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectType
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class BudgetItemSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = BudgetItem
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectAreaSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectArea
-
         exclude = ["createdDate", "updatedDate", "location"]
 
 
@@ -72,10 +66,8 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
     sapNetworks = serializers.SerializerMethodField()
     phase = ProjectPhaseSerializer(read_only=True)
 
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectSet
-
-        exclude = ["createdDate", "updatedDate"]
 
     def get_sapNetworks(self, obj):
         return [
@@ -97,10 +89,8 @@ class ProjectSetGetSerializer(serializers.ModelSerializer):
 
 
 class ProjectSetCreateSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = ProjectSet
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -115,10 +105,8 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     personProgramming = PersonSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
 
-    class Meta:
+    class Meta(BaseMeta):
         model = Project
-
-        exclude = ["createdDate", "updatedDate"]
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
@@ -127,30 +115,23 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 class ProjectCreateSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta(BaseMeta):
         model = Project
-
-        exclude = ["createdDate", "updatedDate"]
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
 
 
 class PersonSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = Person
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = Task
-
-        exclude = ["createdDate", "updatedDate"]
 
 
 class NoteSerializer(serializers.ModelSerializer):
-    class Meta:
+    class Meta(BaseMeta):
         model = Note
-        exclude = ["createdDate", "updatedDate"]

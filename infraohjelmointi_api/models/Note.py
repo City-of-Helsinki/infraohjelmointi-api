@@ -7,10 +7,14 @@ from simple_history.models import HistoricalRecords
 class Note(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     content = models.TextField(blank=True, null=False, default="")
-    updatedBy = models.ForeignKey("Person", on_delete=models.DO_NOTHING, null=True)
+    updatedBy = models.ForeignKey(
+        "Person", on_delete=models.DO_NOTHING, null=False, blank=False
+    )
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
-    project = models.ForeignKey("Project", on_delete=models.DO_NOTHING, null=True)
+    project = models.ForeignKey(
+        "Project", on_delete=models.DO_NOTHING, null=False, blank=False
+    )
     history = HistoricalRecords(user_model=Person)
 
     @property
