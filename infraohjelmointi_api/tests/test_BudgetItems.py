@@ -3,12 +3,14 @@ from ..models import BudgetItem
 import uuid
 from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.serializers import BudgetItemSerializer
+from overrides import override
 
 
 class BudgetItemTestCase(TestCase):
     budgetItemId = uuid.uuid4()
 
     @classmethod
+    @override
     def setUpTestData(self):
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,

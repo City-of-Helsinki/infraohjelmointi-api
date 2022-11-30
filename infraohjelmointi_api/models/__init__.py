@@ -8,3 +8,4 @@ from .Task import Task
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
+from .Note import Note

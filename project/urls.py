@@ -35,6 +35,8 @@ router.register(
 router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
 router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
 
+router.register(r"notes", views.NoteViewSet, basename="notes")
+
 
 urlpatterns = [
     path("", include(router.urls)),

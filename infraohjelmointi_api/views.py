@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import viewsets
 from .serializers import (
     ProjectCreateSerializer,
@@ -12,15 +13,25 @@ from .serializers import (
     ProjectPhaseSerializer,
     ProjectPrioritySerializer,
     TaskStatusSerializer,
+    NoteSerializer,
 )
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
+from rest_framework import status
+from rest_framework.decorators import action
+
+from django.core import serializers
+from overrides import override
 
 
 class BaseViewSet(viewsets.ModelViewSet):
+    @override
     def get_queryset(self):
+        """
+        Overriden ModelViewSet class method to get appropriate queryset using serializer class
+        """
         return self.get_serializer_class().Meta.model.objects.all()
 
 
@@ -31,7 +42,11 @@ class ProjectViewSet(BaseViewSet):
 
     permission_classes = []
 
+    @override
     def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
         if self.action == "list":
             return ProjectGetSerializer
         if self.action == "retrieve":
@@ -105,7 +120,11 @@ class ProjectSetViewSet(BaseViewSet):
 
     permission_classes = []
 
+    @override
     def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
         if self.action == "list":
             return ProjectSetGetSerializer
         if self.action == "retrieve":
@@ -138,3 +157,44 @@ class TaskViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = TaskSerializer
+
+
+class NoteViewSet(BaseViewSet):
+
+    """
+    API endpoint that allows notes to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = NoteSerializer
+
+    @action(methods=["get"], detail=True, url_path=r"history")
+    def history(self, request, pk):
+        """
+        Custom action to get history of a specific Note
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = instance.history.all().values()
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
+    def history_user(self, request, pk, userId):
+        """
+        Custom action to get history of a specific Note filtered by a specific User
+        """
+        try:
+            uuid.UUID(str(userId))
+            uuid.UUID(str(pk))
+            instance = self.get_object()
+            qs = instance.history.all().filter(updatedBy_id=userId).values()
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )

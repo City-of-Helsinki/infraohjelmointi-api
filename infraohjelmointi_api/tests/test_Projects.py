@@ -10,6 +10,7 @@ from ..models import ProjectPhase
 from ..models import ProjectPriority
 from ..serializers import ProjectGetSerializer
 from rest_framework.renderers import JSONRenderer
+from overrides import override
 
 
 class ProjectTestCase(TestCase):
@@ -31,6 +32,7 @@ class ProjectTestCase(TestCase):
     fixtures = []
 
     @classmethod
+    @override
     def setUpTestData(self):
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,
@@ -378,12 +380,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201, msg="Status code != 201")
-        # deleting id, projectReadiness because request body doesn't contain an id and
-        # project_readiness but the response does if new resource is created
+        # deleting id because request body doesn't contain an id and
+        #  but the response does if new resource is created
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
-        del res_data["projectReadiness"]
         self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
