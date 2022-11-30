@@ -12,3 +12,4 @@ pyyaml==6.0                                   # yml parser
 whitenoise==6.2.0                             # enabling Django to serve its own static files
 coverage==6.5.0                               # for test coverage
 django-simple-history                          #To maintain history of table data
+overrides                                     # Decorators to assert function overrides

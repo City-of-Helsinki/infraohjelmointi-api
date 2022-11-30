@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "simple_history",
+    "overrides",
     "corsheaders",
     "rest_framework",
     "infraohjelmointi_api",

@@ -23,9 +23,11 @@ from rest_framework import status
 from rest_framework.decorators import action
 
 from django.core import serializers
+from overrides import override
 
 
 class BaseViewSet(viewsets.ModelViewSet):
+    @override
     def get_queryset(self):
         """
         Overriden ModelViewSet class method to get appropriate queryset using serializer class
@@ -40,6 +42,7 @@ class ProjectViewSet(BaseViewSet):
 
     permission_classes = []
 
+    @override
     def get_serializer_class(self):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
@@ -117,6 +120,7 @@ class ProjectSetViewSet(BaseViewSet):
 
     permission_classes = []
 
+    @override
     def get_serializer_class(self):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
