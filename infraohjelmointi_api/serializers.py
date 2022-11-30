@@ -13,6 +13,7 @@ from .models import (
 )
 from rest_framework import serializers
 from django.db.models import Q
+from django.forms.models import model_to_dict
 
 
 class BaseMeta:
@@ -115,6 +116,52 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 class ProjectCreateSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = Project
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["phase"] = (
+            ProjectPhaseSerializer(instance.phase).data
+            if instance.phase != None
+            else None
+        )
+        rep["area"] = (
+            ProjectAreaSerializer(instance.area).data if instance.area != None else None
+        )
+
+        rep["type"] = (
+            ProjectTypeSerializer(instance.type).data if instance.type != None else None
+        )
+        rep["priority"] = (
+            ProjectPrioritySerializer(instance.priority).data
+            if instance.priority != None
+            else None
+        )
+        rep["siteId"] = (
+            BudgetItemSerializer(instance.siteId).data
+            if instance.siteId != None
+            else None
+        )
+        rep["projectSet"] = (
+            ProjectSetCreateSerializer(instance.projectSet).data
+            if instance.projectSet != None
+            else None
+        )
+        rep["personPlanning"] = (
+            PersonSerializer(instance.personPlanning).data
+            if instance.personPlanning != None
+            else None
+        )
+        rep["personProgramming"] = (
+            PersonSerializer(instance.personProgramming).data
+            if instance.personProgramming != None
+            else None
+        )
+        rep["personConstruction"] = (
+            PersonSerializer(instance.personConstruction).data
+            if instance.personConstruction != None
+            else None
+        )
+        return rep
 
 
 class PersonSerializer(serializers.ModelSerializer):

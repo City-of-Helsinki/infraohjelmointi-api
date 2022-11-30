@@ -53,6 +53,11 @@ class ProjectViewSet(BaseViewSet):
             return ProjectGetSerializer
         return ProjectCreateSerializer
 
+    # def partial_update(self, request, pk=None):
+    #     serialized = ProjectCreateSerializer(data=request.data, partial=True)
+    #     serialized.valid()
+    #     return Response(serialized.validated_data, status=status.HTTP_202_ACCEPTED)
+
 
 class TaskStatusViewSet(BaseViewSet):
     """
