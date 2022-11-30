@@ -10,6 +10,7 @@ from ..models import ProjectPhase
 from ..models import ProjectPriority
 from ..serializers import ProjectGetSerializer
 from rest_framework.renderers import JSONRenderer
+from overrides import override
 
 
 class ProjectTestCase(TestCase):
@@ -31,6 +32,7 @@ class ProjectTestCase(TestCase):
     fixtures = []
 
     @classmethod
+    @override
     def setUpTestData(self):
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,

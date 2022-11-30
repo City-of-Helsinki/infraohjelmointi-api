@@ -4,6 +4,7 @@ from ..models import Person, Project, ProjectArea, ProjectType, ProjectPhase
 from ..models import Note
 from ..serializers import NoteSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
+from overrides import override
 
 
 class NoteTestCase(TestCase):
@@ -16,6 +17,7 @@ class NoteTestCase(TestCase):
     sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
 
     @classmethod
+    @override
     def setUpTestData(self):
 
         self.projectType = ProjectType.objects.create(

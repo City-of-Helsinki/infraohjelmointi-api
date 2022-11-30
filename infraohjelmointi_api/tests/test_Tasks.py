@@ -4,6 +4,7 @@ from infraohjelmointi_api.models import Person, Project, ProjectType, TaskStatus
 from infraohjelmointi_api.serializers import TaskSerializer
 from ..models import Task
 import uuid
+from overrides import override
 
 
 class TaskTestCase(TestCase):
@@ -19,6 +20,7 @@ class TaskTestCase(TestCase):
     sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
 
     @classmethod
+    @override
     def setUpTestData(self):
         self.taskStatus = TaskStatus.objects.create(
             id=self.taskStatusId, value="active"
