@@ -10,7 +10,7 @@ from infraohjelmointi_api.utils import DataGen
 class NoteTestCase(TestCase):
     note_1_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     note_2_Id = uuid.UUID("da4a46f1-2939-43e2-8f92-40e94417813b")
-    person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
+    personId = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
 
@@ -20,11 +20,11 @@ class NoteTestCase(TestCase):
 
         self.projectType = DataGen.mkProjectType(self.projectTypeId)
 
-        self.person_1 = DataGen.mkPerson(id=self.person_1_Id)
+        self.person = DataGen.mkPerson(id=self.personId)
         self.project = DataGen.mkProject(id=self.projectId, prType=self.projectType)
 
         self.note = DataGen.mkNote(
-            id=self.note_1_Id, updatedBy=self.person_1, project=self.project
+            id=self.note_1_Id, updatedBy=self.person, project=self.project
         )
 
     def test_note_is_created(self):
@@ -40,7 +40,7 @@ class NoteTestCase(TestCase):
 
     def test_note_foreign_key_exists(self):
         self.assertDictEqual(
-            self.person_1.note_set.all().values()[0],
+            self.person.note_set.all().values()[0],
             Note.objects.filter(id=self.note_1_Id).values()[0],
             msg="Person foreign key does not exist in Note with id {}".format(
                 self.note_1_Id
@@ -78,7 +78,7 @@ class NoteTestCase(TestCase):
         self.assertEqual(
             len(response.json()), 1, msg="Number of retrieved Notes is != 1"
         )
-        DataGen.mkNote(id=self.note_2_Id, project=self.project, updatedBy=self.person_1)
+        DataGen.mkNote(id=self.note_2_Id, project=self.project, updatedBy=self.person)
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
@@ -112,7 +112,7 @@ class NoteTestCase(TestCase):
 
     def test_GET_history_by_user(self):
         response = self.client.get(
-            "/notes/{}/history/{}/".format(self.note_1_Id, self.person_1_Id)
+            "/notes/{}/history/{}/".format(self.note_1_Id, self.personId)
         )
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         serializer = NoteHistorySerializer(
@@ -144,7 +144,7 @@ class NoteTestCase(TestCase):
     def test_POST_note(self):
         data = {
             "content": "Random Note POST",
-            "updatedBy": self.person_1_Id.__str__(),
+            "updatedBy": self.personId.__str__(),
             "project": self.projectId.__str__(),
         }
         response = self.client.post(
