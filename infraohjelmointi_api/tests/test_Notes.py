@@ -5,6 +5,7 @@ from ..models import Note
 from ..serializers import NoteSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
+from infraohjelmointi_api.utils import DataGen
 
 
 class NoteTestCase(TestCase):
@@ -20,57 +21,13 @@ class NoteTestCase(TestCase):
     @override
     def setUpTestData(self):
 
-        self.projectType = ProjectType.objects.create(
-            id=self.projectTypeId, value="projectComplex"
-        )
+        self.projectType = DataGen.mkProjectType(self.projectTypeId)
 
-        self.person_1 = Person.objects.create(
-            id=self.person_1_Id,
-            firstName="John",
-            lastName="Doe",
-            email="random@random.com",
-            title="Manager",
-            phone="0414853275",
-        )
-        self.project = Project.objects.create(
-            id=self.projectId,
-            hkrId=43210,
-            sapProject=self.sapProjectIds_1,
-            sapNetwork=self.sapNetworkIds_1,
-            type=self.projectType,
-            name="Test project 1",
-            description="description of the test project",
-            phase=None,
-            programmed=True,
-            constructionPhaseDetail="Current phase is proposal",
-            estPlanningStartYear=2022,
-            estDesignEndYear=2023,
-            estDesignStartDate="2022-11-20",
-            estDesignEndDate="2022-11-28",
-            contractPrepStartDate="2022-11-20",
-            contractPrepEndDate="2022-11-20",
-            warrantyStartDate="2022-11-20",
-            warrantyExpireDate="2022-11-20",
-            perfAmount=20000.00,
-            unitCost=10000.00,
-            costForecast=10000.00,
-            neighborhood="my random neigbhorhood",
-            comittedCost=120.0,
-            tiedCurrYear=12000.00,
-            realizedCost=20.00,
-            spentCost=20000.00,
-            riskAssess="Yes very risky test",
-            priority=None,
-            locked=True,
-            comments="Comments random",
-            delays="yes 1 delay because of tests",
-        )
+        self.person_1 = DataGen.mkPerson(id=self.person_1_Id)
+        self.project = DataGen.mkProject(id=self.projectId, prType=self.projectType)
 
-        self.note = Note.objects.create(
-            id=self.note_1_Id,
-            content="Random Note",
-            updatedBy=self.person_1,
-            project=self.project,
+        self.note = DataGen.mkNote(
+            id=self.note_1_Id, updatedBy=self.person_1, project=self.project
         )
 
     def test_note_is_created(self):
@@ -124,12 +81,7 @@ class NoteTestCase(TestCase):
         self.assertEqual(
             len(response.json()), 1, msg="Number of retrieved Notes is != 1"
         )
-        Note.objects.create(
-            id=self.note_2_Id,
-            content="Random Note 2",
-            updatedBy=self.person_1,
-            project=self.project,
-        )
+        DataGen.mkNote(id=self.note_2_Id, project=self.project, updatedBy=self.person_1)
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
