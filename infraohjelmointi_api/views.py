@@ -53,6 +53,21 @@ class ProjectViewSet(BaseViewSet):
             return ProjectGetSerializer
         return ProjectCreateSerializer
 
+    @action(methods=["get"], detail=True, url_path=r"notes")
+    def get_project_notes(self, request, pk):
+        """
+        Custom action to get Notes linked with a Project
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = NoteSerializer(instance.note_set, many=True).data
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class TaskStatusViewSet(BaseViewSet):
     """
