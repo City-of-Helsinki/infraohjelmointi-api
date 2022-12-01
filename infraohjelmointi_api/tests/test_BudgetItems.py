@@ -4,34 +4,28 @@ import uuid
 from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.serializers import BudgetItemSerializer
 from overrides import override
+from infraohjelmointi_api.utils import DataGen
 
 
 class BudgetItemTestCase(TestCase):
-    budgetItemId = uuid.uuid4()
+    budgetItemId_1 = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
+    budgetItemId_2 = uuid.UUID("8f017e08-fa4e-47ff-841f-a5c0aa669a49")
 
     @classmethod
     @override
     def setUpTestData(self):
-        self.budgetItem = BudgetItem.objects.create(
-            id=self.budgetItemId,
-            budgetMain=10000,
-            budgetPlan=10000,
-            site="Helsinki",
-            siteName="Anankatu",
-            district="doe",
-            need=5000.0,
-        )
+        self.budgetItem = DataGen.mkBudgetItem(id=self.budgetItemId_1)
 
     def test_budgetItem_is_created(self):
 
         self.assertEqual(
-            BudgetItem.objects.filter(id=self.budgetItemId).exists(),
+            BudgetItem.objects.filter(id=self.budgetItemId_1).exists(),
             True,
             msg="Created BudgetItem with Id {} does not exist in DB".format(
-                self.budgetItemId
+                self.budgetItemId_1
             ),
         )
-        budgetItem = BudgetItem.objects.get(id=self.budgetItemId)
+        budgetItem = BudgetItem.objects.get(id=self.budgetItemId_1)
         self.assertIsInstance(
             budgetItem, BudgetItem, msg="Object retrieved from DB != typeof BudgetItem"
         )
@@ -45,15 +39,7 @@ class BudgetItemTestCase(TestCase):
         self.assertEqual(
             len(response.json()), 1, msg="Number of returned BudgetItems != 1"
         )
-        BudgetItem.objects.create(
-            id=uuid.uuid4(),
-            budgetMain=10000,
-            budgetPlan=10000,
-            site="Helsinki",
-            siteName="Anankatu",
-            district="doe",
-            need=5000.0,
-        )
+        DataGen.mkBudgetItem(id=self.budgetItemId_2)
         response = self.client.get("/budgets/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(
@@ -61,11 +47,11 @@ class BudgetItemTestCase(TestCase):
         )
 
     def test_GET_one_budgetItem(self):
-        response = self.client.get("/budgets/{}/".format(self.budgetItemId))
+        response = self.client.get("/budgets/{}/".format(self.budgetItemId_1))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         # serialize the model instances
         serializer = BudgetItemSerializer(
-            BudgetItem.objects.get(id=self.budgetItemId), many=False
+            BudgetItem.objects.get(id=self.budgetItemId_1), many=False
         )
 
         # convert the serialized data to JSON
@@ -97,7 +83,7 @@ class BudgetItemTestCase(TestCase):
     def test_PATCH_budgetItem(self):
         data = {"site": "Helsinki Patched", "budgetMain": 5000}
         response = self.client.patch(
-            "/budgets/{}/".format(self.budgetItemId),
+            "/budgets/{}/".format(self.budgetItemId_1),
             data,
             content_type="application/json",
         )
@@ -112,14 +98,14 @@ class BudgetItemTestCase(TestCase):
         )
 
     def test_DELETE_budgetItem(self):
-        response = self.client.delete("/budgets/{}/".format(self.budgetItemId))
+        response = self.client.delete("/budgets/{}/".format(self.budgetItemId_1))
         self.assertEqual(
             response.status_code,
             204,
-            msg="Error deleting project with Id {}".format(self.budgetItemId),
+            msg="Error deleting project with Id {}".format(self.budgetItemId_1),
         )
         self.assertEqual(
-            BudgetItem.objects.filter(id=self.budgetItemId).exists(),
+            BudgetItem.objects.filter(id=self.budgetItemId_1).exists(),
             False,
-            msg="Project with Id {} still exists in DB".format(self.budgetItemId),
+            msg="Project with Id {} still exists in DB".format(self.budgetItemId_1),
         )
