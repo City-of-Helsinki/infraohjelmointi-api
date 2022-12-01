@@ -1,13 +1,6 @@
 from django.test import TestCase
 from ..models import Project
-from ..models import ProjectArea
-from ..models import ProjectSet
 import uuid
-from ..models import BudgetItem
-from ..models import Person
-from ..models import ProjectType
-from ..models import ProjectPhase
-from ..models import ProjectPriority
 from ..serializers import ProjectGetSerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
