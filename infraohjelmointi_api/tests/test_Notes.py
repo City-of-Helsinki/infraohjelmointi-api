@@ -1,6 +1,5 @@
 from django.test import TestCase
 import uuid
-from ..models import Person, Project, ProjectArea, ProjectType, ProjectPhase
 from ..models import Note
 from ..serializers import NoteSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer

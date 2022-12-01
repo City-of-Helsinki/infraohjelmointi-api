@@ -1,10 +1,10 @@
 from django.test import TestCase
 from rest_framework.renderers import JSONRenderer
-from infraohjelmointi_api.models import Person, Project, ProjectType, TaskStatus
 from infraohjelmointi_api.serializers import TaskSerializer
 from ..models import Task
 import uuid
 from overrides import override
+from infraohjelmointi_api.utils import DataGen
 
 
 class TaskTestCase(TestCase):
@@ -12,78 +12,23 @@ class TaskTestCase(TestCase):
     TaskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
     person_1_Id = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
     projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
-    sapNetworkId = uuid.UUID("b7a5f932-2286-4b4a-a4a5-a7a6b6039248")
-    sapProjectId = uuid.UUID("7a12962d-f23f-40d7-966b-ee5df57b567d")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
-    sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
 
     @classmethod
     @override
     def setUpTestData(self):
-        self.taskStatus = TaskStatus.objects.create(
-            id=self.taskStatusId, value="active"
-        )
+        self.taskStatus = DataGen.mkTaskStatus(id=self.TaskId)
 
-        self.projectType = ProjectType.objects.create(
-            id=self.projectTypeId, value="projectComplex"
-        )
-        self.person_1 = Person.objects.create(
-            id=self.person_1_Id,
-            firstName="John",
-            lastName="Doe",
-            email="random@random.com",
-            title="Manager",
-            phone="0414853275",
-        )
+        self.person_1 = DataGen.mkPerson(id=self.person_1_Id)
 
-        self.project = Project.objects.create(
-            id=self.projectId,
-            hkrId=43210,
-            sapProject=self.sapProjectIds_1,
-            sapNetwork=self.sapNetworkIds_1,
-            type=self.projectType,
-            name="Test project 1",
-            description="description of the test project",
-            phase=None,
-            programmed=True,
-            constructionPhaseDetail="Current phase is proposal",
-            estPlanningStartYear=2022,
-            estDesignEndYear=2023,
-            estDesignStartDate="2022-11-20",
-            estDesignEndDate="2022-11-28",
-            contractPrepStartDate="2022-11-20",
-            contractPrepEndDate="2022-11-20",
-            warrantyStartDate="2022-11-20",
-            warrantyExpireDate="2022-11-20",
-            perfAmount=20000.00,
-            unitCost=10000.00,
-            costForecast=10000.00,
-            neighborhood="my random neigbhorhood",
-            comittedCost=120.0,
-            tiedCurrYear=12000.00,
-            realizedCost=20.00,
-            spentCost=20000.00,
-            riskAssess="Yes very risky test",
-            priority=None,
-            locked=True,
-            comments="Comments random",
-            delays="yes 1 delay because of tests",
-        )
+        self.project = DataGen.mkProject(id=self.projectId)
 
-        self.task = Task.objects.create(
+        self.task = DataGen.mkTask(
             id=self.TaskId,
-            projectId=self.project,
-            hkrId=12342,
-            taskType="Very hard task",
             status=self.taskStatus,
-            startDate="2022-11-20",
-            endDate="2022-11-20",
+            projectId=self.project,
             person=self.person_1,
-            realizedCost=10000,
-            plannedCost=50000,
-            riskAssess="Very risky indeed",
         )
 
     def test_Task_is_created(self):
@@ -125,19 +70,7 @@ class TaskTestCase(TestCase):
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(len(response.json()), 1, msg="Number of returned Tasks != 1")
-        Task.objects.create(
-            id=self.TaskId2,
-            projectId=self.project,
-            hkrId=22763,
-            taskType="Very hard task",
-            status=None,
-            startDate="2022-11-20",
-            endDate="2022-11-20",
-            person=self.person_1,
-            realizedCost=10000,
-            plannedCost=50000,
-            riskAssess="Very risky indeed",
-        )
+        DataGen.mkTask(id=self.TaskId2, projectId=self.project)
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(len(response.json()), 2, msg="Number of returned Tasks != 2")
