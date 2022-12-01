@@ -3,8 +3,8 @@ import uuid
 
 
 class DataGen:
-    projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
-    projectId2 = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
+    project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
+    project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
     person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
@@ -12,15 +12,15 @@ class DataGen:
     person_4_Id = uuid.UUID("f627e782-81de-4c37-b1f7-ef4c26eeeb99")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
-    projectPhaseId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-    projectPhaseId2 = uuid.UUID("d72a6737-3739-475f-8350-da9151d33fa0")
-    projectPhaseId3 = uuid.UUID("6b2c8795-e21c-4060-b5f8-1bdead45e1ec")
+    projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectPhase_2_Id = uuid.UUID("d72a6737-3739-475f-8350-da9151d33fa0")
+    projectPhase_3_Id = uuid.UUID("6b2c8795-e21c-4060-b5f8-1bdead45e1ec")
     projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
-    sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
-    sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
-    sapProjectIds_2 = [uuid.UUID("2cee5e12-eda9-499c-8a3f-f17b2b0b1a98").__str__()]
+    sapNetworks_1_Ids = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
+    sapProjects_1_Ids = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
+    sapNetwork_2_Ids = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
+    sapProjects_2_Ids = [uuid.UUID("2cee5e12-eda9-499c-8a3f-f17b2b0b1a98").__str__()]
     noteId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskId = uuid.UUID("580f2efb-63ae-46e8-b6d0-e0e306a0e5bb")
     taskStatusId = uuid.UUID("32fd48c8-c800-47c4-af4f-2038ebeb0a0b")
@@ -73,7 +73,7 @@ class DataGen:
     @classmethod
     def mkProjectPhase(self, id=None, value="Proposal"):
         if id == None:
-            id = self.projectPhaseId
+            id = self.projectPhase_1_Id
         return ProjectPhase.objects.create(id=id, value=value)
 
     @classmethod
@@ -129,8 +129,8 @@ class DataGen:
         id=None,
         siteId=None,
         hkrId=12345,
-        sapProject=sapProjectIds_1,
-        sapNetwork=sapNetworkIds_1,
+        sapProject=sapProjects_1_Ids,
+        sapNetwork=sapNetworks_1_Ids,
         projectSet=None,
         entityName="Sample Entity",
         area=None,
@@ -182,7 +182,7 @@ class DataGen:
     ):
 
         if id == None:
-            id = self.projectId
+            id = self.project_1_Id
 
         return Project.objects.create(
             id=id,
@@ -282,7 +282,7 @@ class DataGen:
     ):
 
         if projectId == None:
-            raise ValueError("Field projectId cannot be None")
+            raise ValueError("Field project_1_Id cannot be None")
         if id == None:
             id = self.taskId
 
