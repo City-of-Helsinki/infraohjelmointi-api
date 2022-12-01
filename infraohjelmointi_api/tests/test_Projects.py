@@ -430,7 +430,7 @@ class ProjectTestCase(TestCase):
         )
 
     def test_notes_project(self):
-        note = Note.objects.create(
+        Note.objects.create(
             id=self.noteId,
             content="Test note",
             updatedBy=self.person_1,
