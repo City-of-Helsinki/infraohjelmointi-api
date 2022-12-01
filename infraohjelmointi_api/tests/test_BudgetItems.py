@@ -8,24 +8,24 @@ from infraohjelmointi_api.utils import DataGen
 
 
 class BudgetItemTestCase(TestCase):
-    budgetItemId_1 = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
-    budgetItemId_2 = uuid.UUID("8f017e08-fa4e-47ff-841f-a5c0aa669a49")
+    budgetItem_1_Id = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
+    budgetItem_2_Id = uuid.UUID("8f017e08-fa4e-47ff-841f-a5c0aa669a49")
 
     @classmethod
     @override
     def setUpTestData(self):
-        self.budgetItem = DataGen.mkBudgetItem(id=self.budgetItemId_1)
+        self.budgetItem = DataGen.mkBudgetItem(id=self.budgetItem_1_Id)
 
     def test_budgetItem_is_created(self):
 
         self.assertEqual(
-            BudgetItem.objects.filter(id=self.budgetItemId_1).exists(),
+            BudgetItem.objects.filter(id=self.budgetItem_1_Id).exists(),
             True,
             msg="Created BudgetItem with Id {} does not exist in DB".format(
-                self.budgetItemId_1
+                self.budgetItem_1_Id
             ),
         )
-        budgetItem = BudgetItem.objects.get(id=self.budgetItemId_1)
+        budgetItem = BudgetItem.objects.get(id=self.budgetItem_1_Id)
         self.assertIsInstance(
             budgetItem, BudgetItem, msg="Object retrieved from DB != typeof BudgetItem"
         )
@@ -39,7 +39,7 @@ class BudgetItemTestCase(TestCase):
         self.assertEqual(
             len(response.json()), 1, msg="Number of returned BudgetItems != 1"
         )
-        DataGen.mkBudgetItem(id=self.budgetItemId_2)
+        DataGen.mkBudgetItem(id=self.budgetItem_2_Id)
         response = self.client.get("/budgets/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(
@@ -47,11 +47,11 @@ class BudgetItemTestCase(TestCase):
         )
 
     def test_GET_one_budgetItem(self):
-        response = self.client.get("/budgets/{}/".format(self.budgetItemId_1))
+        response = self.client.get("/budgets/{}/".format(self.budgetItem_1_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         # serialize the model instances
         serializer = BudgetItemSerializer(
-            BudgetItem.objects.get(id=self.budgetItemId_1), many=False
+            BudgetItem.objects.get(id=self.budgetItem_1_Id), many=False
         )
 
         # convert the serialized data to JSON
@@ -83,7 +83,7 @@ class BudgetItemTestCase(TestCase):
     def test_PATCH_budgetItem(self):
         data = {"site": "Helsinki Patched", "budgetMain": 5000}
         response = self.client.patch(
-            "/budgets/{}/".format(self.budgetItemId_1),
+            "/budgets/{}/".format(self.budgetItem_1_Id),
             data,
             content_type="application/json",
         )
@@ -98,14 +98,14 @@ class BudgetItemTestCase(TestCase):
         )
 
     def test_DELETE_budgetItem(self):
-        response = self.client.delete("/budgets/{}/".format(self.budgetItemId_1))
+        response = self.client.delete("/budgets/{}/".format(self.budgetItem_1_Id))
         self.assertEqual(
             response.status_code,
             204,
-            msg="Error deleting project with Id {}".format(self.budgetItemId_1),
+            msg="Error deleting project with Id {}".format(self.budgetItem_1_Id),
         )
         self.assertEqual(
-            BudgetItem.objects.filter(id=self.budgetItemId_1).exists(),
+            BudgetItem.objects.filter(id=self.budgetItem_1_Id).exists(),
             False,
-            msg="Project with Id {} still exists in DB".format(self.budgetItemId_1),
+            msg="Project with Id {} still exists in DB".format(self.budgetItem_1_Id),
         )

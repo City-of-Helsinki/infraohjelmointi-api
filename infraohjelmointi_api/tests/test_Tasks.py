@@ -8,8 +8,8 @@ from infraohjelmointi_api.utils import DataGen
 
 
 class TaskTestCase(TestCase):
-    TaskId = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
-    TaskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
+    taskId = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
+    taskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
     person_1_Id = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
@@ -17,14 +17,14 @@ class TaskTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
-        self.taskStatus = DataGen.mkTaskStatus(id=self.TaskId)
+        self.taskStatus = DataGen.mkTaskStatus(id=self.taskId)
 
         self.person_1 = DataGen.mkPerson(id=self.person_1_Id)
 
         self.project = DataGen.mkProject(id=self.projectId)
 
         self.task = DataGen.mkTask(
-            id=self.TaskId,
+            id=self.taskId,
             status=self.taskStatus,
             projectId=self.project,
             person=self.person_1,
@@ -33,35 +33,35 @@ class TaskTestCase(TestCase):
     def test_Task_is_created(self):
 
         self.assertEqual(
-            Task.objects.filter(id=self.TaskId).exists(),
+            Task.objects.filter(id=self.taskId).exists(),
             True,
-            msg="Created Task with Id {} does not exist in DB".format(self.TaskId),
+            msg="Created Task with Id {} does not exist in DB".format(self.taskId),
         )
-        task = Task.objects.get(id=self.TaskId)
+        task = Task.objects.get(id=self.taskId)
         self.assertIsInstance(task, Task, msg="Object retrieved from DB != typeof Task")
         self.assertEqual(task.id, self.task.id, msg="Object from DB != created Object")
 
     def test_foreign_keys_exist(self):
         self.assertDictEqual(
             self.project.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
+            Task.objects.filter(id=self.taskId).values()[0],
             msg="Project foreign key does not exist in Task with id {}".format(
-                self.TaskId
+                self.taskId
             ),
         )
         self.assertDictEqual(
             self.person_1.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
+            Task.objects.filter(id=self.taskId).values()[0],
             msg="Person foreign key does not exist in Task with id {}".format(
-                self.TaskId
+                self.taskId
             ),
         )
 
         self.assertDictEqual(
             self.taskStatus.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
+            Task.objects.filter(id=self.taskId).values()[0],
             msg="TaskStatus foreign key does not exist in Task with id {}".format(
-                self.TaskId
+                self.taskId
             ),
         )
 
@@ -69,13 +69,13 @@ class TaskTestCase(TestCase):
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(len(response.json()), 1, msg="Number of returned Tasks != 1")
-        DataGen.mkTask(id=self.TaskId2, projectId=self.project)
+        DataGen.mkTask(id=self.taskId2, projectId=self.project)
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(len(response.json()), 2, msg="Number of returned Tasks != 2")
 
     def test_GET_one_Task(self):
-        response = self.client.get("/tasks/{}/".format(self.TaskId))
+        response = self.client.get("/tasks/{}/".format(self.taskId))
         self.assertEqual(
             response.json()["taskType"],
             self.task.taskType,
@@ -83,7 +83,7 @@ class TaskTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         # serialize the model instances
-        serializer = TaskSerializer(Task.objects.get(id=self.TaskId), many=False)
+        serializer = TaskSerializer(Task.objects.get(id=self.taskId), many=False)
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
@@ -95,7 +95,7 @@ class TaskTestCase(TestCase):
 
     def test_POST_Task(self):
         data = {
-            "id": self.TaskId,
+            "id": self.taskId,
             "projectId": self.project.id.__str__(),
             "hkrId": 27618,
             "taskType": "Very hard task 2",
@@ -122,7 +122,7 @@ class TaskTestCase(TestCase):
             "status": None,
         }
         response = self.client.patch(
-            "/tasks/{}/".format(self.TaskId),
+            "/tasks/{}/".format(self.taskId),
             data,
             content_type="application/json",
         )
@@ -139,14 +139,14 @@ class TaskTestCase(TestCase):
         )
 
     def test_DELETE_Task(self):
-        response = self.client.delete("/tasks/{}/".format(self.TaskId))
+        response = self.client.delete("/tasks/{}/".format(self.taskId))
         self.assertEqual(
             response.status_code,
             204,
-            msg="Error deleting task with Id {}".format(self.TaskId),
+            msg="Error deleting task with Id {}".format(self.taskId),
         )
         self.assertEqual(
-            Task.objects.filter(id=self.TaskId).exists(),
+            Task.objects.filter(id=self.taskId).exists(),
             False,
-            msg="Task with Id {} still exists in DB".format(self.TaskId),
+            msg="Task with Id {} still exists in DB".format(self.taskId),
         )
