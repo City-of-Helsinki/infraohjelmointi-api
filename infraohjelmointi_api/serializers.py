@@ -14,6 +14,7 @@ from .models import (
 from rest_framework import serializers
 from django.db.models import Q
 from django.forms.models import model_to_dict
+from overrides import override
 
 
 class BaseMeta:
@@ -117,6 +118,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = Project
 
+    @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["phase"] = (
