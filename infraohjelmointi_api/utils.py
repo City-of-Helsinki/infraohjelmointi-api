@@ -38,16 +38,7 @@ class DataGen:
     ):
 
         if id == None:
-            return BudgetItem.objects.create(
-                id=self.budgetItemId,
-                budgetMain=budgetMain,
-                budgetPlan=budgetPlan,
-                site=site,
-                siteName=siteName,
-                district=disctrict,
-                need=need,
-            )
-
+            id = self.budgetItemId
         return BudgetItem.objects.create(
             id=id,
             budgetMain=budgetMain,
@@ -69,14 +60,7 @@ class DataGen:
         phone="0414853277",
     ):
         if id == None:
-            return Person.objects.create(
-                id=self.person_1_Id,
-                firstName=firstName,
-                lastName=lastName,
-                email=email,
-                title=title,
-                phone=phone,
-            )
+            id = self.person_1_Id
         return Person.objects.create(
             id=id,
             firstName=firstName,
@@ -89,7 +73,7 @@ class DataGen:
     @classmethod
     def mkProjectPhase(self, id=None, value="Proposal"):
         if id == None:
-            return ProjectPhase.objects.create(id=self.projectPhaseId, value=value)
+            id = self.projectPhaseId
         return ProjectPhase.objects.create(id=id, value=value)
 
     @classmethod
@@ -103,38 +87,24 @@ class DataGen:
         phase=None,
         programmed=False,
     ):
-        projectSet = None
-        if id == None:
-            projectSet = ProjectSet.objects.create(
-                id=self.projectSetId,
-                name=name,
-                hkrId=hkrId,
-                description=description,
-                responsiblePerson=responsiblePerson,
-                phase=phase,
-                programmed=programmed,
-            )
-        else:
-            projectSet = ProjectSet.objects.create(
-                id=id,
-                name=name,
-                hkrId=hkrId,
-                description=description,
-                responsiblePerson=responsiblePerson,
-                phase=phase,
-                programmed=programmed,
-            )
 
-        return projectSet
+        if id == None:
+            id = self.projectSetId
+
+        return ProjectSet.objects.create(
+            id=id,
+            name=name,
+            hkrId=hkrId,
+            description=description,
+            responsiblePerson=responsiblePerson,
+            phase=phase,
+            programmed=programmed,
+        )
 
     @classmethod
     def mkProjectArea(self, id=None, value="honkasuo", location="Helsinki"):
         if id == None:
-            return ProjectArea.objects.create(
-                id=self.projectAreaId,
-                value=value,
-                location=location,
-            )
+            id = self.projectAreaId
         return ProjectArea.objects.create(
             id=id,
             value=value,
@@ -144,21 +114,18 @@ class DataGen:
     @classmethod
     def mkProjectType(self, id=None, value="projectComplex"):
         if id == None:
-            return ProjectType.objects.create(id=self.projectTypeId, value=value)
+            id = self.projectTypeId
         return ProjectType.objects.create(id=id, value=value)
 
     @classmethod
     def mkProjectPriority(self, id=None, value="high"):
         if id == None:
-            return ProjectPriority.objects.create(
-                id=self.projectPriorityId, value=value
-            )
+            id = self.projectPriorityId
         return ProjectPriority.objects.create(id=id, value=value)
 
     @classmethod
     def mkProject(
         self,
-        minimal=False,
         id=None,
         siteId=None,
         hkrId=12345,
@@ -213,121 +180,65 @@ class DataGen:
         preliminaryCurrentYearPlus9=None,
         preliminaryCurrentYearPlus10=None,
     ):
-        project = None
-        if id == None:
-            project = Project.objects.create(
-                id=self.projectId,
-                siteId=siteId,
-                hkrId=hkrId,
-                sapProject=sapProject,
-                sapNetwork=sapNetwork,
-                projectSet=projectSet,
-                entityName=entityName,
-                area=area,
-                type=prType,
-                name=name,
-                description=description,
-                personPlanning=personPlanning,
-                personProgramming=personProgramming,
-                personConstruction=personConstruction,
-                phase=phase,
-                programmed=programmed,
-                constructionPhaseDetail=constructionPhaseDetail,
-                estPlanningStartYear=estPlanningStartYear,
-                estDesignEndYear=estDesignEndYear,
-                estDesignStartDate=estDesignStartDate,
-                estDesignEndDate=estDesignEndDate,
-                contractPrepStartDate=contractPrepStartDate,
-                contractPrepEndDate=contractPrepEndDate,
-                warrantyStartDate=warrantyStartDate,
-                warrantyExpireDate=warrantyExpireDate,
-                perfAmount=perfAmount,
-                unitCost=unitCost,
-                costForecast=costForecast,
-                neighborhood=neighborhood,
-                comittedCost=comittedCost,
-                tiedCurrYear=tiedCurrYear,
-                realizedCost=realizedCost,
-                spentCost=spentCost,
-                riskAssess=riskAssess,
-                priority=priority,
-                locked=locked,
-                comments=comments,
-                delays=delays,
-                hashTags=hashTags,
-                budgetForecast1CurrentYear=budgetForecast1CurrentYear,
-                budgetForecast2CurrentYear=budgetForecast2CurrentYear,
-                budgetForecast3CurrentYear=budgetForecast3CurrentYear,
-                budgetForecast4CurrentYear=budgetForecast4CurrentYear,
-                budgetProposalCurrentYearPlus1=budgetProposalCurrentYearPlus1,
-                budgetProposalCurrentYearPlus2=budgetProposalCurrentYearPlus2,
-                preliminaryCurrentYearPlus3=preliminaryCurrentYearPlus3,
-                preliminaryCurrentYearPlus4=preliminaryCurrentYearPlus4,
-                preliminaryCurrentYearPlus5=preliminaryCurrentYearPlus5,
-                preliminaryCurrentYearPlus6=preliminaryCurrentYearPlus6,
-                preliminaryCurrentYearPlus7=preliminaryCurrentYearPlus7,
-                preliminaryCurrentYearPlus8=preliminaryCurrentYearPlus8,
-                preliminaryCurrentYearPlus9=preliminaryCurrentYearPlus9,
-                preliminaryCurrentYearPlus10=preliminaryCurrentYearPlus10,
-            )
-        else:
-            project = Project.objects.create(
-                id=id,
-                siteId=siteId,
-                hkrId=hkrId,
-                sapProject=sapProject,
-                sapNetwork=sapNetwork,
-                projectSet=projectSet,
-                entityName=entityName,
-                area=area,
-                type=prType,
-                name=name,
-                description=description,
-                personPlanning=personPlanning,
-                personProgramming=personProgramming,
-                personConstruction=personConstruction,
-                phase=phase,
-                programmed=programmed,
-                constructionPhaseDetail=constructionPhaseDetail,
-                estPlanningStartYear=estPlanningStartYear,
-                estDesignEndYear=estDesignEndYear,
-                estDesignStartDate=estDesignStartDate,
-                estDesignEndDate=estDesignEndDate,
-                contractPrepStartDate=contractPrepStartDate,
-                contractPrepEndDate=contractPrepEndDate,
-                warrantyStartDate=warrantyStartDate,
-                warrantyExpireDate=warrantyExpireDate,
-                perfAmount=perfAmount,
-                unitCost=unitCost,
-                costForecast=costForecast,
-                neighborhood=neighborhood,
-                comittedCost=comittedCost,
-                tiedCurrYear=tiedCurrYear,
-                realizedCost=realizedCost,
-                spentCost=spentCost,
-                riskAssess=riskAssess,
-                priority=priority,
-                locked=locked,
-                comments=comments,
-                delays=delays,
-                hashTags=hashTags,
-                budgetForecast1CurrentYear=budgetForecast1CurrentYear,
-                budgetForecast2CurrentYear=budgetForecast2CurrentYear,
-                budgetForecast3CurrentYear=budgetForecast3CurrentYear,
-                budgetForecast4CurrentYear=budgetForecast4CurrentYear,
-                budgetProposalCurrentYearPlus1=budgetProposalCurrentYearPlus1,
-                budgetProposalCurrentYearPlus2=budgetProposalCurrentYearPlus2,
-                preliminaryCurrentYearPlus3=preliminaryCurrentYearPlus3,
-                preliminaryCurrentYearPlus4=preliminaryCurrentYearPlus4,
-                preliminaryCurrentYearPlus5=preliminaryCurrentYearPlus5,
-                preliminaryCurrentYearPlus6=preliminaryCurrentYearPlus6,
-                preliminaryCurrentYearPlus7=preliminaryCurrentYearPlus7,
-                preliminaryCurrentYearPlus8=preliminaryCurrentYearPlus8,
-                preliminaryCurrentYearPlus9=preliminaryCurrentYearPlus9,
-                preliminaryCurrentYearPlus10=preliminaryCurrentYearPlus10,
-            )
 
-        return project
+        if id == None:
+            id = self.projectId
+
+        return Project.objects.create(
+            id=id,
+            siteId=siteId,
+            hkrId=hkrId,
+            sapProject=sapProject,
+            sapNetwork=sapNetwork,
+            projectSet=projectSet,
+            entityName=entityName,
+            area=area,
+            type=prType,
+            name=name,
+            description=description,
+            personPlanning=personPlanning,
+            personProgramming=personProgramming,
+            personConstruction=personConstruction,
+            phase=phase,
+            programmed=programmed,
+            constructionPhaseDetail=constructionPhaseDetail,
+            estPlanningStartYear=estPlanningStartYear,
+            estDesignEndYear=estDesignEndYear,
+            estDesignStartDate=estDesignStartDate,
+            estDesignEndDate=estDesignEndDate,
+            contractPrepStartDate=contractPrepStartDate,
+            contractPrepEndDate=contractPrepEndDate,
+            warrantyStartDate=warrantyStartDate,
+            warrantyExpireDate=warrantyExpireDate,
+            perfAmount=perfAmount,
+            unitCost=unitCost,
+            costForecast=costForecast,
+            neighborhood=neighborhood,
+            comittedCost=comittedCost,
+            tiedCurrYear=tiedCurrYear,
+            realizedCost=realizedCost,
+            spentCost=spentCost,
+            riskAssess=riskAssess,
+            priority=priority,
+            locked=locked,
+            comments=comments,
+            delays=delays,
+            hashTags=hashTags,
+            budgetForecast1CurrentYear=budgetForecast1CurrentYear,
+            budgetForecast2CurrentYear=budgetForecast2CurrentYear,
+            budgetForecast3CurrentYear=budgetForecast3CurrentYear,
+            budgetForecast4CurrentYear=budgetForecast4CurrentYear,
+            budgetProposalCurrentYearPlus1=budgetProposalCurrentYearPlus1,
+            budgetProposalCurrentYearPlus2=budgetProposalCurrentYearPlus2,
+            preliminaryCurrentYearPlus3=preliminaryCurrentYearPlus3,
+            preliminaryCurrentYearPlus4=preliminaryCurrentYearPlus4,
+            preliminaryCurrentYearPlus5=preliminaryCurrentYearPlus5,
+            preliminaryCurrentYearPlus6=preliminaryCurrentYearPlus6,
+            preliminaryCurrentYearPlus7=preliminaryCurrentYearPlus7,
+            preliminaryCurrentYearPlus8=preliminaryCurrentYearPlus8,
+            preliminaryCurrentYearPlus9=preliminaryCurrentYearPlus9,
+            preliminaryCurrentYearPlus10=preliminaryCurrentYearPlus10,
+        )
 
     @classmethod
     def mkNote(
@@ -340,12 +251,7 @@ class DataGen:
         if updatedBy == None or project == None:
             raise ValueError("Fields updatedBy and project cannot be None")
         if id == None:
-            return Note.objects.create(
-                id=self.noteId,
-                content=content,
-                updatedBy=updatedBy,
-                project=project,
-            )
+            id = self.noteId
         return Note.objects.create(
             id=id,
             content=content,
@@ -356,7 +262,7 @@ class DataGen:
     @classmethod
     def mkTaskStatus(self, id=None, value="active"):
         if id == None:
-            return TaskStatus.objects.create(id=self.taskStatusId, value=value)
+            id = self.taskStatusId
         return TaskStatus.objects.create(id=id, value=value)
 
     @classmethod
@@ -374,37 +280,22 @@ class DataGen:
         plannedCost=10000,
         riskAssess="Risky",
     ):
-        task = None
+
         if projectId == None:
             raise ValueError("Field projectId cannot be None")
         if id == None:
-            task = Task.objects.create(
-                id=self.taskId,
-                projectId=projectId,
-                hkrId=hkrId,
-                taskType=taskType,
-                status=status,
-                startDate=startDate,
-                endDate=endDate,
-                person=person,
-                realizedCost=realizedCost,
-                plannedCost=plannedCost,
-                riskAssess=riskAssess,
-            )
-        else:
+            id = self.taskId
 
-            task = Task.objects.create(
-                id=id,
-                projectId=projectId,
-                hkrId=hkrId,
-                taskType=taskType,
-                status=status,
-                startDate=startDate,
-                endDate=endDate,
-                person=person,
-                realizedCost=realizedCost,
-                plannedCost=plannedCost,
-                riskAssess=riskAssess,
-            )
-
-        return task
+        return Task.objects.create(
+            id=id,
+            projectId=projectId,
+            hkrId=hkrId,
+            taskType=taskType,
+            status=status,
+            startDate=startDate,
+            endDate=endDate,
+            person=person,
+            realizedCost=realizedCost,
+            plannedCost=plannedCost,
+            riskAssess=riskAssess,
+        )
