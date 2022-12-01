@@ -8,7 +8,10 @@ from ..models import Person
 from ..models import ProjectType
 from ..models import ProjectPhase
 from ..models import ProjectPriority
+from ..models import Note
 from ..serializers import ProjectGetSerializer
+from ..serializers import NoteSerializer
+
 from rest_framework.renderers import JSONRenderer
 from overrides import override
 
@@ -29,6 +32,7 @@ class ProjectTestCase(TestCase):
     sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
     sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
     sapProjectIds_2 = [uuid.UUID("2cee5e12-eda9-499c-8a3f-f17b2b0b1a98").__str__()]
+    noteId = uuid.UUID("2e91feba-13c1-4b4a-a3a1-ca2030bf8681")
     fixtures = []
 
     @classmethod
@@ -424,3 +428,20 @@ class ProjectTestCase(TestCase):
             False,
             msg="Project with Id {} still exists in DB".format(self.projectId),
         )
+
+    def test_notes_project(self):
+        note = Note.objects.create(
+            id=self.noteId,
+            content="Test note",
+            updatedBy=self.person_1,
+            project=self.project,
+        )
+        response = self.client.get("/projects/{}/notes/".format(self.projectId))
+        serializer = NoteSerializer(Note.objects.filter(id=self.noteId), many=True)
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        # compare the JSON data returned to what is expected
+        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(response.content, result_expected)
