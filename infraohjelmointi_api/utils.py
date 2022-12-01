@@ -3,9 +3,9 @@ import uuid
 
 
 class DataGen:
-    project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
+    projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
-    person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
+    personId = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhaseId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
@@ -52,7 +52,7 @@ class DataGen:
         phone="0414853277",
     ):
         if id == None:
-            id = self.person_1_Id
+            id = self.personId
         return Person.objects.create(
             id=id,
             firstName=firstName,
@@ -174,7 +174,7 @@ class DataGen:
     ):
 
         if id == None:
-            id = self.project_1_Id
+            id = self.projectId
 
         return Project.objects.create(
             id=id,
@@ -274,7 +274,7 @@ class DataGen:
     ):
 
         if projectId == None:
-            raise ValueError("Field project_1_Id cannot be None")
+            raise ValueError("Field projectId cannot be None")
         if id == None:
             id = self.taskId
 
