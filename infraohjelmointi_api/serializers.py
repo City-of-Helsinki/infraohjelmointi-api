@@ -13,7 +13,6 @@ from .models import (
 )
 from rest_framework import serializers
 from django.db.models import Q
-from django.forms.models import model_to_dict
 from overrides import override
 
 
