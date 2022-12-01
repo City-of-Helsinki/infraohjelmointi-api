@@ -11,7 +11,6 @@ class TaskTestCase(TestCase):
     TaskId = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     TaskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
     person_1_Id = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
-    projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
 
