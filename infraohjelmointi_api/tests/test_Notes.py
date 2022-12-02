@@ -14,7 +14,7 @@ class NoteTestCase(TestCase):
     projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectIds_1 = [uuid.UUID("e6f0805c-0b20-4248-bfae-21cf6bfe744a").__str__()]
+    sapProjectId = 23576
 
     @classmethod
     @override
@@ -35,7 +35,7 @@ class NoteTestCase(TestCase):
         self.project = Project.objects.create(
             id=self.projectId,
             hkrId=43210,
-            sapProject=self.sapProjectIds_1,
+            sapProject=self.sapProjectId,
             sapNetwork=self.sapNetworkIds_1,
             type=self.projectType,
             name="Test project 1",
