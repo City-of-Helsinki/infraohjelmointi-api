@@ -114,8 +114,13 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
+    projectReadiness = serializers.SerializerMethodField()
+
     class Meta(BaseMeta):
         model = Project
+
+    def get_projectReadiness(self, obj):
+        return obj.projectReadiness()
 
     @override
     def to_representation(self, instance):
