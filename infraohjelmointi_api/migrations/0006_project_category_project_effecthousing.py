@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0006_auto_read_excel_data'),
+        ("infraohjelmointi_api", "0005_alter_note_project_alter_note_updatedby"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='project',
-            name='category',
+            model_name="project",
+            name="category",
             field=models.CharField(blank=True, max_length=30, null=True),
         ),
         migrations.AddField(
-            model_name='project',
-            name='effectHousing',
+            model_name="project",
+            name="effectHousing",
             field=models.BooleanField(default=False),
         ),
     ]
