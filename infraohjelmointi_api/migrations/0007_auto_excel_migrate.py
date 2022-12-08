@@ -2,6 +2,7 @@
 
 from django.db import migrations
 import pandas as pd
+from functools import partial
 import numpy as np
 import os
 
@@ -420,4 +421,12 @@ class Migration(migrations.Migration):
         ),
     ]
 
-    operations = []
+    operations = [
+        migrations.RunPython(
+            partial(
+                migrateExcel,
+                budgetExcelPath="../mock_data/TALOUSARVIO 23.xlsx",
+                planExcelPath="../mock_data/TOIMINTASUUNNITELMA 23.xlsx",
+            )
+        ),
+    ]
