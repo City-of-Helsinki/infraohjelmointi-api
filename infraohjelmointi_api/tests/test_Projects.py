@@ -29,9 +29,9 @@ class ProjectTestCase(TestCase):
     projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectId = 356752
+    sapProjectId = "2814I00708"
     sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
-    sapProjectId_2 = 652453
+    sapProjectId_2 = "2814I00718"
     noteId = uuid.UUID("2e91feba-13c1-4b4a-a3a1-ca2030bf8681")
     fixtures = []
 
