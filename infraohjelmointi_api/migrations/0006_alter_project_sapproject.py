@@ -10,6 +10,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveField(
+            model_name="project",
+            name="sapProject",
+        ),
         migrations.AlterField(
             model_name="project",
             name="sapProject",
