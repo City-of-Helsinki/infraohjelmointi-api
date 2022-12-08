@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             model_name="project",
             name="sapProject",
         ),
-        migrations.AlterField(
+        migrations.AddField(
             model_name="project",
             name="sapProject",
             field=models.CharField(max_length=30, blank=True, null=True),
