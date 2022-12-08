@@ -60,9 +60,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
 
         # Read plan excel file, column header set to row 0,1
         planExcel = pd.concat(
-            pd.read_excel(
-                "TOIMINTASUUNNITELMA 23.xlsx", sheet_name=None, header=[0, 1]
-            ),
+            pd.read_excel(planExcelPath, sheet_name=None, header=[0, 1]),
             ignore_index=True,
         )
         # making sure all sheets have data in same format
