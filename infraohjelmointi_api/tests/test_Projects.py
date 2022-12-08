@@ -325,7 +325,7 @@ class ProjectTestCase(TestCase):
     def test_POST_project(self):
         data = {
             "hkrId": None,
-            "sapProject": 45672,
+            "sapProject": "2814I00708",
             "sapNetwork": ["55dc9624-2cb1-4c11-b15a-c8c97466d127"],
             "name": "TEST_PROECT_POST",
             "description": "TEST_PROJECT_POST_DESCRIPTION",
