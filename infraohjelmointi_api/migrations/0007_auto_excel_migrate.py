@@ -41,6 +41,9 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
         # Removing rows without project name
         budgetExcel = budgetExcel[budgetExcel[budgetExcel.columns[0]].notna()]
 
+        # Replacing all NaN values in financial columns with 0.0
+        budgetExcel.update(budgetExcel[budgetExcel.columns[3:14]].fillna(0.0))
+
         # Replace NaN and other arbitrary values with python None
         budgetExcel.iloc[:, 2] = budgetExcel.iloc[:, 2].replace({np.nan: False})
         budgetExcel = budgetExcel.replace({np.nan: None, "?": None})
