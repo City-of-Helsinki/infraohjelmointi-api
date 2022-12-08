@@ -19,7 +19,7 @@ class Project(models.Model):
     )
     hkrId = models.IntegerField(blank=True, null=True)
     entityName = models.CharField(max_length=30, blank=True, null=True)
-    sapProject = models.JSONField(blank=True, null=True)
+    sapProject = models.CharField(max_length=30, blank=True, null=True)
     sapNetwork = models.JSONField(blank=True, null=True)
     projectSet = models.ForeignKey(
         ProjectSet, on_delete=models.DO_NOTHING, null=True, blank=True

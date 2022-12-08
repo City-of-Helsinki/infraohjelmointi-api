@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0006_alter_project_sapproject'),
+        ("infraohjelmointi_api", "0005_alter_note_project_alter_note_updatedby"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='project',
-            name='sapProject',
-            field=models.PositiveBigIntegerField(blank=True, null=True),
+            model_name="project",
+            name="sapProject",
+            field=models.CharField(max_length=30, blank=True, null=True),
         ),
     ]
