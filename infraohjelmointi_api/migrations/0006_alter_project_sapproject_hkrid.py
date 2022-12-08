@@ -19,4 +19,9 @@ class Migration(migrations.Migration):
             name="sapProject",
             field=models.CharField(max_length=100, blank=True, null=True),
         ),
+        migrations.AlterField(
+            model_name="project",
+            name="hkrId",
+            field=models.PositiveBigIntegerField(blank=True, null=True),
+        ),
     ]
