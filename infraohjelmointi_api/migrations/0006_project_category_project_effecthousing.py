@@ -20,4 +20,13 @@ class Migration(migrations.Migration):
             name="effectHousing",
             field=models.BooleanField(default=False),
         ),
+        migrations.RemoveField(
+            model_name="project",
+            name="sapProject",
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="sapProject",
+            field=models.CharField(max_length=30, blank=True, null=True),
+        ),
     ]
