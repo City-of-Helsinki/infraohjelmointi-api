@@ -11,7 +11,6 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
 
     Project = apps.get_model("infraohjelmointi_api", "Project")
     Person = apps.get_model("infraohjelmointi_api", "Person")
-    Note = apps.get_model("infraohjelmointi_api", "Note")
 
     if os.path.isfile(budgetExcelPath) and os.path.isfile(planExcelPath):
 
