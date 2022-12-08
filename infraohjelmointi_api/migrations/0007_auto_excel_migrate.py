@@ -38,7 +38,11 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             | budgetExcel[budgetExcel.columns[2]].notna()
             | budgetExcel[budgetExcel.columns[14]].notna()
         ]
+        # Removing rows without project name
+        budgetExcel = budgetExcel[budgetExcel[budgetExcel.columns[0]].notna()]
+
         # Replace NaN and other arbitrary values with python None
+        budgetExcel.iloc[:, 2] = budgetExcel.iloc[:, 2].replace({np.nan: False})
         budgetExcel = budgetExcel.replace({np.nan: None, "?": None})
 
         # Commented out script for data shift according to year
@@ -118,6 +122,8 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             | planExcel[planExcel.columns[4]].notna()
             | planExcel[planExcel.columns[7]].notna()
         ]
+        # Removing rows without project name
+        planExcel = planExcel[planExcel[planExcel.columns[0]].notna()]
         # Strip spaces and capitalize
         planExcel.iloc[:, 3] = planExcel.iloc[:, 3].str.strip().str.capitalize()
         planExcel.iloc[:, 4] = planExcel.iloc[:, 4].str.strip().str.capitalize()
@@ -290,7 +296,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
                 )
 
             if personPlanning:
-                personPlan = Person.objects.get_or_create(
+                personPlan, _ = Person.objects.get_or_create(
                     firstName=personPlanning,
                     lastName="blank",
                     title="Area Manager",
@@ -407,6 +413,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
                     )
 
     else:
+
         raise Exception("Wrong path for excel files")
 
 
@@ -423,8 +430,8 @@ class Migration(migrations.Migration):
         migrations.RunPython(
             partial(
                 migrateExcel,
-                budgetExcelPath="../mock_data/TALOUSARVIO 23.xlsx",
-                planExcelPath="../mock_data/TOIMINTASUUNNITELMA 23.xlsx",
+                budgetExcelPath="/app/infraohjelmointi_api/mock_data/budget23.xlsx",
+                planExcelPath="/app/infraohjelmointi_api/mock_data/plan23.xlsx",
             )
         ),
     ]
