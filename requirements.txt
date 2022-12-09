@@ -14,4 +14,3 @@ coverage==6.5.0                               # for test coverage
 django-simple-history                          #To maintain history of table data
 overrides                                     # Decorators to assert function overrides
 openpyxl                                      # dependency for reading excel files through pandas
-pandas                                        # Reading excel data for migration
