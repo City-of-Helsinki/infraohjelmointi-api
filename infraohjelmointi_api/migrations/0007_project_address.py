@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0006_alter_project_sapproject'),
+        ("infraohjelmointi_api", "0006_alter_project_sapproject_hkrid"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='project',
-            name='address',
+            model_name="project",
+            name="address",
             field=models.CharField(blank=True, max_length=250, null=True),
         ),
     ]
