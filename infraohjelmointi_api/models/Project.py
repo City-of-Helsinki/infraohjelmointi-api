@@ -166,20 +166,20 @@ class Project(models.Model):
         Cleaning charfields: Stripping spaces and Capitalization
         """
 
-        self.name = " ".join(self.name.split()).capitalize()
-        self.description = " ".join(self.description.split()).capitalize()
+        self.name = " ".join(self.name.split())
+        self.description = " ".join(self.description.split())
         if self.address:
-            self.address = " ".join(self.address.split()).capitalize()
+            self.address = " ".join(self.address.split())
         if self.entityName:
-            self.entityName = " ".join(self.entityName.split()).capitalize()
+            self.entityName = " ".join(self.entityName.split())
         if self.neighborhood:
-            self.neighborhood = " ".join(self.neighborhood.split()).capitalize()
+            self.neighborhood = " ".join(self.neighborhood.split())
         if self.riskAssess:
-            self.riskAssess = " ".join(self.riskAssess.split()).capitalize()
+            self.riskAssess = " ".join(self.riskAssess.split())
         if self.comments:
-            self.comments = " ".join(self.comments.split()).capitalize()
+            self.comments = " ".join(self.comments.split())
         if self.delays:
-            self.delays = " ".join(self.delays.split()).capitalize()
+            self.delays = " ".join(self.delays.split())
 
     class Meta:
         constraints = [

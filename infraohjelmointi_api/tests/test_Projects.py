@@ -410,7 +410,9 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["name"], data["name"], msg="Data not updated in the DB"
+            response.json()["name"],
+            "".join(data["name"].strip()),
+            msg="Data not updated in the DB",
         )
         self.assertEqual(
             response.json()["favPersons"],
@@ -447,3 +449,76 @@ class ProjectTestCase(TestCase):
         # compare the JSON data returned to what is expected
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(response.content, result_expected)
+
+    def test_string_sanitization_project(self):
+        data = {
+            "name": "   test      project.  name   ",
+            "address": "  Address.    works   for me.",
+            "description": " random Description   works.  yes    ",
+            "entityName": "Entity Name",
+            "delays": "    100 delays   .",
+            "riskAssess": " risky   risky  .   Matter   this ",
+            "comments": "This comment is    random    ",
+        }
+
+        validData = {
+            "name": "test project. name",
+            "address": "Address. works for me.",
+            "description": "random Description works. yes",
+            "entityName": "Entity Name",
+            "delays": "100 delays .",
+            "riskAssess": "risky risky . Matter this",
+            "comments": "This comment is random",
+        }
+
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        # deleting id because request body doesn't contain an id and
+        #  but the response does if new resource is created
+        res_data = response.json()
+        new_createdId = res_data["id"]
+        del res_data["id"]
+        self.assertEqual(
+            res_data["name"],
+            validData["name"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["address"],
+            validData["address"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["description"],
+            validData["description"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["entityName"],
+            validData["entityName"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["delays"],
+            validData["delays"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["riskAssess"],
+            validData["riskAssess"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            res_data["comments"],
+            validData["comments"],
+            msg="Created object != POST data",
+        )
+        self.assertEqual(
+            Project.objects.filter(id=new_createdId).exists(),
+            True,
+            msg="Project created using POST request does not exist in DB",
+        )
