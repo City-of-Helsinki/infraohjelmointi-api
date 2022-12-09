@@ -107,6 +107,7 @@ class ProjectTestCase(TestCase):
             area=self.projectArea,
             type=self.projectType,
             name="Test project 1",
+            address="Insinoorinkatu 60 D",
             description="description of the test project",
             personPlanning=self.person_2,
             personProgramming=self.person_1,
@@ -236,7 +237,7 @@ class ProjectTestCase(TestCase):
         self.assertDictEqual(
             person_1_reverse_query,
             person_2_reverse_query,
-            msg="Reverse relationship from foriegn key objects do not point to the same Project",
+            msg="Reverse relationship from manyTomany key objects do not point to the same Project",
         )
 
     def test_GET_all_projects(self):
@@ -320,7 +321,11 @@ class ProjectTestCase(TestCase):
         # compare the JSON data returned to what is expected
 
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        self.assertEqual(response.content, result_expected)
+        self.assertEqual(
+            response.content,
+            result_expected,
+            msg="Project data in response != Project data in DB",
+        )
 
     def test_POST_project(self):
         data = {
@@ -328,6 +333,7 @@ class ProjectTestCase(TestCase):
             "sapProject": "2814I00708",
             "sapNetwork": ["55dc9624-2cb1-4c11-b15a-c8c97466d127"],
             "name": "TEST_PROECT_POST",
+            "address": "Herttoniemi street 123 3b",
             "description": "TEST_PROJECT_POST_DESCRIPTION",
             "phase": None,
             "programmed": True,
@@ -389,7 +395,7 @@ class ProjectTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
-        self.assertEqual(res_data, data, msg="Created object != POST data")
+        self.assertEqual(res_data, data, msg="Created object data != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
             True,
@@ -408,12 +414,14 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["name"], data["name"], msg="Data not updated in the DB"
+            response.json()["name"],
+            data["name"],
+            msg="Data: name sent through PATCH != Data: name in the DB",
         )
         self.assertEqual(
             response.json()["favPersons"],
             data["favPersons"],
-            msg="Data not updated in the DB",
+            msg="Data: favPersons sent through PATCH != Data: favPersons in the DB",
         )
 
     def test_DELETE_project(self):
@@ -444,4 +452,81 @@ class ProjectTestCase(TestCase):
 
         # compare the JSON data returned to what is expected
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        self.assertEqual(response.content, result_expected)
+        self.assertEqual(
+            response.content,
+            result_expected,
+            msg="Note data in response != Note data in DB",
+        )
+
+    def test_string_sanitization_project(self):
+        data = {
+            "name": "   test      project.  name   ",
+            "address": "  Address.    works   for me.",
+            "description": " random Description   works.  yes    ",
+            "entityName": "Entity Name",
+            "delays": "    100 delays   .",
+            "riskAssess": " risky   risky  .   Matter   this ",
+            "comments": "This comment is    random    ",
+        }
+
+        validData = {
+            "name": "test project. name",
+            "address": "Address. works for me.",
+            "description": "random Description works. yes",
+            "entityName": "Entity Name",
+            "delays": "100 delays .",
+            "riskAssess": "risky risky . Matter this",
+            "comments": "This comment is random",
+        }
+
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        # deleting id because request body doesn't contain an id and
+        #  but the response does if new resource is created
+        res_data = response.json()
+        new_createdId = res_data["id"]
+        del res_data["id"]
+        self.assertEqual(
+            res_data["name"],
+            validData["name"],
+            msg="Field: name not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["address"],
+            validData["address"],
+            msg="Field: address not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["description"],
+            validData["description"],
+            msg="Field: description not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["entityName"],
+            validData["entityName"],
+            msg="Field: entityName not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["delays"],
+            validData["delays"],
+            msg="Field: delays not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["riskAssess"],
+            validData["riskAssess"],
+            msg="Field: riskAssess not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["comments"],
+            validData["comments"],
+            msg="Field: comments not trimmed successfully",
+        )
+        self.assertEqual(
+            Project.objects.filter(id=new_createdId).exists(),
+            True,
+            msg="Project created using POST request does not exist in DB",
+        )
