@@ -237,7 +237,7 @@ class ProjectTestCase(TestCase):
         self.assertDictEqual(
             person_1_reverse_query,
             person_2_reverse_query,
-            msg="Reverse relationship from foriegn key objects do not point to the same Project",
+            msg="Reverse relationship from manyTomany key objects do not point to the same Project",
         )
 
     def test_GET_all_projects(self):
@@ -321,7 +321,11 @@ class ProjectTestCase(TestCase):
         # compare the JSON data returned to what is expected
 
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        self.assertEqual(response.content, result_expected)
+        self.assertEqual(
+            response.content,
+            result_expected,
+            msg="Project data in response != Project data in DB",
+        )
 
     def test_POST_project(self):
         data = {
@@ -391,7 +395,7 @@ class ProjectTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
-        self.assertEqual(res_data, data, msg="Created object != POST data")
+        self.assertEqual(res_data, data, msg="Created object data != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
             True,
@@ -411,13 +415,13 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["name"],
-            "".join(data["name"].strip()),
-            msg="Data not updated in the DB",
+            data["name"],
+            msg="Data: name sent through PATCH != Data: name in the DB",
         )
         self.assertEqual(
             response.json()["favPersons"],
             data["favPersons"],
-            msg="Data not updated in the DB",
+            msg="Data: favPersons sent through PATCH != Data: favPersons in the DB",
         )
 
     def test_DELETE_project(self):
@@ -448,7 +452,11 @@ class ProjectTestCase(TestCase):
 
         # compare the JSON data returned to what is expected
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        self.assertEqual(response.content, result_expected)
+        self.assertEqual(
+            response.content,
+            result_expected,
+            msg="Note data in response != Note data in DB",
+        )
 
     def test_string_sanitization_project(self):
         data = {
@@ -485,37 +493,37 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             res_data["name"],
             validData["name"],
-            msg="Created object != POST data",
+            msg="Field: name not trimmed successfully",
         )
         self.assertEqual(
             res_data["address"],
             validData["address"],
-            msg="Created object != POST data",
+            msg="Field: address not trimmed successfully",
         )
         self.assertEqual(
             res_data["description"],
             validData["description"],
-            msg="Created object != POST data",
+            msg="Field: description not trimmed successfully",
         )
         self.assertEqual(
             res_data["entityName"],
             validData["entityName"],
-            msg="Created object != POST data",
+            msg="Field: entityName not trimmed successfully",
         )
         self.assertEqual(
             res_data["delays"],
             validData["delays"],
-            msg="Created object != POST data",
+            msg="Field: delays not trimmed successfully",
         )
         self.assertEqual(
             res_data["riskAssess"],
             validData["riskAssess"],
-            msg="Created object != POST data",
+            msg="Field: riskAssess not trimmed successfully",
         )
         self.assertEqual(
             res_data["comments"],
             validData["comments"],
-            msg="Created object != POST data",
+            msg="Field: comments not trimmed successfully",
         )
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
