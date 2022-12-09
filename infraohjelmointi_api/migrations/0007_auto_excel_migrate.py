@@ -124,11 +124,42 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             | planExcel[planExcel.columns[4]].notna()
             | planExcel[planExcel.columns[7]].notna()
         ]
+
         # Removing rows without project name
         planExcel = planExcel[planExcel[planExcel.columns[0]].notna()]
-        # Strip spaces and capitalize
-        planExcel.iloc[:, 3] = planExcel.iloc[:, 3].str.strip().str.capitalize()
-        planExcel.iloc[:, 4] = planExcel.iloc[:, 4].str.strip().str.capitalize()
+
+        # stripping name fields
+        planExcel.iloc[:, 3] = planExcel.iloc[:, 3].str.strip()
+        planExcel.iloc[:, 4] = planExcel.iloc[:, 4].str.strip()
+
+        # Dividing name fields into first and last name
+        planExcel[["Area person firstName", "Area person lastName"]] = (
+            planExcel[planExcel.columns[3]]
+            .loc[planExcel[planExcel.columns[3]].str.split().str.len() == 2]
+            .str.split(expand=True)
+        )
+        planExcel[planExcel.columns[8]].fillna(
+            planExcel[planExcel.columns[3]], inplace=True
+        )
+
+        planExcel[["Manager person firstName", "Manager person lastName"]] = (
+            planExcel[planExcel.columns[4]]
+            .loc[planExcel[planExcel.columns[4]].str.split().str.len() == 2]
+            .str.split(expand=True)
+        )
+        planExcel[planExcel.columns[10]].fillna(
+            planExcel[planExcel.columns[4]], inplace=True
+        )
+        # Stripping again and capitalizing names
+        planExcel.iloc[:, 9] = planExcel.iloc[:, 9].str.strip().str.capitalize()
+        planExcel.iloc[:, 8] = planExcel.iloc[:, 8].str.strip().str.capitalize()
+
+        # Dropping unused name columns that were divided above
+        planExcel = planExcel.drop(
+            planExcel.columns[[3, 4]],
+            axis=1,
+        )
+
         # Replace NaN and other arbitrary values with python None
         planExcel = planExcel.replace({np.nan: None, "?": None})
 
@@ -141,22 +172,22 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             budgetExcel_Ids,
             planExcel,
             left_on=[budgetExcel_Ids.columns[15]],
-            right_on=[planExcel.columns[7]],
+            right_on=[planExcel.columns[5]],
             how="inner",
         )
         # Fixing data discrepancy between similar columns
-        merged_Plan_Budget.iloc[:, 4] = merged_Plan_Budget.iloc[:, 21]
+        merged_Plan_Budget.iloc[:, 4] = merged_Plan_Budget.iloc[:, 19]
         merged_Plan_Budget.iloc[:, 0] = merged_Plan_Budget.iloc[:, 16]
-        merged_Plan_Budget.iloc[:, 14] = merged_Plan_Budget.iloc[:, 22]
+        merged_Plan_Budget.iloc[:, 14] = merged_Plan_Budget.iloc[:, 20]
         # Dropping duplicated columns
         merged_Plan_Budget = merged_Plan_Budget.drop(
-            merged_Plan_Budget.columns[[22, 21, 16]],
+            merged_Plan_Budget.columns[[19, 16, 20]],
             axis=1,
         )
         # Getting projects which exist in budget data but not in plan data
         notMerged_Budget = budgetExcel_Ids[
             ~budgetExcel_Ids[budgetExcel_Ids.columns[15]].isin(
-                planExcel[planExcel.columns[7]]
+                planExcel[planExcel.columns[5]]
             )
         ]
         # Merging the data filtered above with the data which was not used during merger
@@ -164,7 +195,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
 
         # Getting projects which exist in plan data but not in budget data
         notMerged_Plan = planExcel[
-            ~planExcel[planExcel.columns[7]].isin(
+            ~planExcel[planExcel.columns[5]].isin(
                 budgetExcel_Ids[budgetExcel_Ids.columns[15]]
             )
         ]
@@ -201,6 +232,8 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
                 notMerged_Plan.iloc[:, 5],
                 notMerged_Plan.iloc[:, 6],
                 notMerged_Plan.iloc[:, 7],
+                notMerged_Plan.iloc[:, 8],
+                notMerged_Plan.iloc[:, 9],
             )
         ]
         merged_Plan_Budget_data = [
@@ -226,6 +259,8 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
                 merged_Plan_Budget.iloc[:, 17],
                 merged_Plan_Budget.iloc[:, 18],
                 merged_Plan_Budget.iloc[:, 19],
+                merged_Plan_Budget.iloc[:, 20],
+                merged_Plan_Budget.iloc[:, 21],
             )
         ]
         johnDoe = Person.objects.create(
@@ -278,32 +313,34 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             name,
             sapProject,
             sapNetwork,
-            personConstruction,
-            personPlanning,
             costForecast,
             note_content,
             hkrId,
+            personConFirstName,
+            personConLastName,
+            personPlanFirstName,
+            personPlanLastName,
             description,
         ) in notMerged_Plan_data:
             personCon = None
             personPlan = None
 
-            if personConstruction:
+            if personConFirstName:
                 personCon, _ = Person.objects.get_or_create(
-                    firstName=personConstruction,
-                    lastName="blank",
-                    title="Area Manager",
+                    firstName=personConFirstName,
+                    lastName=personConLastName if personConLastName else "blank",
+                    title="Not Assigned",
                     phone="000000",
-                    email="blank@blank.com",
+                    email="placeholder@blank.com",
                 )
 
-            if personPlanning:
+            if personPlanFirstName:
                 personPlan, _ = Person.objects.get_or_create(
-                    firstName=personPlanning,
-                    lastName="blank",
-                    title="Area Manager",
+                    firstName=personPlanFirstName,
+                    lastName=personPlanLastName if personPlanLastName else "blank",
+                    title="Not Assigned",
                     phone="000000",
-                    email="blank@blank.com",
+                    email="placeholder@blank.com",
                 )
 
             project = Project.objects.create(
@@ -318,12 +355,12 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             )
 
             if note_content:
-                if personPlanning:
+                if personPlanFirstName:
                     project.note_set.create(
                         content=note_content,
                         updatedBy=personPlan,
                     )
-                elif personConstruction:
+                elif personConFirstName:
                     project.note_set.create(
                         content=note_content,
                         updatedBy=personCon,
@@ -352,29 +389,31 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             hkrId,
             sapProject,
             sapNetwork,
-            personConstruction,
-            personPlanning,
+            personConFirstName,
+            personConLastName,
+            personPlanFirstName,
+            personPlanLastName,
             description,
         ) in merged_Plan_Budget_data:
             personCon = None
             personPlan = None
 
-            if personConstruction:
+            if personConFirstName:
                 personCon, _ = Person.objects.get_or_create(
-                    firstName=personConstruction,
-                    lastName="blank",
-                    title="Area Manager",
+                    firstName=personConFirstName,
+                    lastName=personConLastName if personConLastName else "blank",
+                    title="Not Assigned",
                     phone="000000",
-                    email="blank@blank.com",
+                    email="placeholder@blank.com",
                 )
 
-            if personPlanning:
+            if personPlanFirstName:
                 personPlan, _ = Person.objects.get_or_create(
-                    firstName=personPlanning,
-                    lastName="blank",
-                    title="Area Manager",
+                    firstName=personPlanFirstName,
+                    lastName=personPlanLastName if personPlanLastName else "blank",
+                    title="Not Assigned",
                     phone="000000",
-                    email="blank@blank.com",
+                    email="placeholder@blank.com",
                 )
             project = Project.objects.create(
                 name=name,
@@ -398,12 +437,12 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             )
 
             if note_content:
-                if personPlanning:
+                if personPlanFirstName:
                     project.note_set.create(
                         content=note_content,
                         updatedBy=personPlan,
                     )
-                elif personConstruction:
+                elif personConFirstName:
                     project.note_set.create(
                         content=note_content,
                         updatedBy=personCon,
