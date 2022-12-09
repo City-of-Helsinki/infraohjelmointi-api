@@ -9,6 +9,7 @@ from .Person import Person
 from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
+from overrides import override
 
 
 class Project(models.Model):
@@ -153,7 +154,32 @@ class Project(models.Model):
         # returns percentage of readiness random.randint(0, 100)
         return 95
 
-    # Rediness % to be calculated
+    @override
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super(Project, self).save(*args, **kwargs)
+
+    @override
+    def clean(self):
+        """
+        Custom validation
+        Cleaning charfields: Stripping spaces and Capitalization
+        """
+
+        self.name = " ".join(self.name.split()).capitalize()
+        self.description = " ".join(self.description.split()).capitalize()
+        if self.address:
+            self.address = " ".join(self.address.split()).capitalize()
+        if self.entityName:
+            self.entityName = " ".join(self.entityName.split()).capitalize()
+        if self.neighborhood:
+            self.neighborhood = " ".join(self.neighborhood.split()).capitalize()
+        if self.riskAssess:
+            self.riskAssess = " ".join(self.riskAssess.split()).capitalize()
+        if self.comments:
+            self.comments = " ".join(self.comments.split()).capitalize()
+        if self.delays:
+            self.delays = " ".join(self.delays.split()).capitalize()
 
     class Meta:
         constraints = [
