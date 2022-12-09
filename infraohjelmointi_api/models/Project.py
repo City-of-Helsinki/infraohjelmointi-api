@@ -163,7 +163,7 @@ class Project(models.Model):
     def clean(self):
         """
         Custom validation
-        Cleaning charfields: Stripping spaces and Capitalization
+        Cleaning charfields: Stripping leading, trailing and excess in between spaces.
         """
 
         self.name = " ".join(self.name.split())
