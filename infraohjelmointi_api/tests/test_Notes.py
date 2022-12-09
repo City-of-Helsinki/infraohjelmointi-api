@@ -14,7 +14,7 @@ class NoteTestCase(TestCase):
     projectTypeId = uuid.UUID("61ddbe61-e013-4bee-abf7-853d389f2b90")
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectId = 23576
+    sapProjectId = "2814I00708"
 
     @classmethod
     @override

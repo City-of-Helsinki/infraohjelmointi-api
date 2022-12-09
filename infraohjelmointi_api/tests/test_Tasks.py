@@ -17,7 +17,7 @@ class TaskTestCase(TestCase):
     projectId = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     taskStatusId = uuid.UUID("f2f17b71-2d9a-4ddc-ba88-948a172c7bde")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
-    sapProjectId = 34675
+    sapProjectId = "2814I00708"
 
     @classmethod
     @override
