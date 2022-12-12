@@ -5,6 +5,7 @@ import pandas as pd
 from functools import partial
 import numpy as np
 import os
+import re
 
 
 def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
@@ -128,7 +129,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
         # Removing rows without project name
         planExcel = planExcel[planExcel[planExcel.columns[0]].notna()]
 
-        # stripping name fields
+        # stripping spaces name fields
         planExcel.iloc[:, 4] = planExcel.iloc[:, 4].str.strip()
 
         # Dividing name fields into first and last name
@@ -140,9 +141,17 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
         planExcel[planExcel.columns[8]].fillna(
             planExcel[planExcel.columns[4]], inplace=True
         )
-        # Stripping again and capitalizing names
-        planExcel.iloc[:, 9] = planExcel.iloc[:, 9].str.strip().str.capitalize()
-        planExcel.iloc[:, 8] = planExcel.iloc[:, 8].str.strip().str.capitalize()
+        # Stripping special characters and capitalizing names
+        planExcel.iloc[:, 9] = (
+            planExcel.iloc[:, 9]
+            .apply(lambda x: re.sub("\W+", "", x) if not pd.isna(x) else x)
+            .str.capitalize()
+        )
+        planExcel.iloc[:, 8] = (
+            planExcel.iloc[:, 8]
+            .apply(lambda x: re.sub("\W+", "", x) if not pd.isna(x) else x)
+            .str.capitalize()
+        )
 
         # Dropping unused name columns that were divided above
         planExcel = planExcel.drop(
