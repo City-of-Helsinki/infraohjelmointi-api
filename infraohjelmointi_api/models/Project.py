@@ -194,3 +194,4 @@ class Project(models.Model):
                 name="Unique together Constraint Project",
             )
         ]
+        ordering = ["-id"]
