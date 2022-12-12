@@ -250,9 +250,9 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             )
         ]
         johnDoe = Person.objects.create(
-            firstName="John",
-            lastName="Doe",
-            email="johndoe@random.com",
+            firstName="Matti",
+            lastName="Meikäläinen",
+            email="placeholder@blank.com",
             title="Placeholder",
             phone="041041041",
         )
@@ -310,7 +310,7 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
 
             if personPlanLastName:
                 personPlan, _ = Person.objects.get_or_create(
-                    firstName=personPlanFirstName if personPlanFirstName else None,
+                    firstName=personPlanFirstName if personPlanFirstName else "Matti",
                     lastName=personPlanLastName,
                     title="Not Assigned",
                     phone="000000",
@@ -361,12 +361,11 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             personPlanLastName,
             description,
         ) in merged_Plan_Budget_data:
-            personCon = None
             personPlan = None
 
             if personPlanLastName:
                 personPlan, _ = Person.objects.get_or_create(
-                    firstName=personPlanFirstName if personPlanFirstName else None,
+                    firstName=personPlanFirstName if personPlanFirstName else "Matti",
                     lastName=personPlanLastName,
                     title="Not Assigned",
                     phone="000000",
