@@ -245,7 +245,7 @@ class ProjectTestCase(TestCase):
         projectCount = Project.objects.all().count()
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()),
+            response.json()["count"],
             projectCount,
             msg="Number of retrieved projects is != {}".format(projectCount),
         )
@@ -306,7 +306,7 @@ class ProjectTestCase(TestCase):
         response = self.client.get("/projects/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()),
+            response.json()["count"],
             projectCount + 1,
             msg="Number of retrieved projects is != {}".format(projectCount + 1),
         )
