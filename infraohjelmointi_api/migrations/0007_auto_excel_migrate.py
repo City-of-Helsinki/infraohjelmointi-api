@@ -357,8 +357,8 @@ def migrateExcel(apps, schema_editor, budgetExcelPath=None, planExcelPath=None):
             hkrId,
             sapProject,
             sapNetwork,
-            personPlanFirstName,
             personPlanLastName,
+            personPlanFirstName,
             description,
         ) in merged_Plan_Budget_data:
             personPlan = None
