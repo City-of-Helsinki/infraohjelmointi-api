@@ -244,7 +244,9 @@ class ProjectTestCase(TestCase):
         response = self.client.get("/projects/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 1, msg="Number of retrieved projects is != 1"
+            len(response.json()["results"]),
+            1,
+            msg="Number of retrieved projects is != 1",
         )
         Project.objects.create(
             id=self.projectId2,
@@ -303,7 +305,9 @@ class ProjectTestCase(TestCase):
         response = self.client.get("/projects/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 2, msg="Number of retrieved projects is != 2"
+            len(response.json()["results"]),
+            2,
+            msg="Number of retrieved projects is != 2",
         )
 
     def test_GET_one_project(self):

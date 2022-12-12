@@ -15,6 +15,7 @@ from .serializers import (
     TaskStatusSerializer,
     NoteSerializer,
 )
+from .paginations import StandardResultsSetPagination
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -41,6 +42,7 @@ class ProjectViewSet(BaseViewSet):
     """
 
     permission_classes = []
+    pagination_class = StandardResultsSetPagination
 
     @override
     def get_serializer_class(self):
