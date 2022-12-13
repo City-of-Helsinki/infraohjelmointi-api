@@ -120,9 +120,12 @@ class NoteTestCase(TestCase):
 
     def test_GET_all_notes(self):
         response = self.client.get("/notes/")
+        noteCount = Note.objects.all().count()
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 1, msg="Number of retrieved Notes is != 1"
+            len(response.json()),
+            noteCount,
+            msg="Number of retrieved Notes is != {}".format(noteCount),
         )
         Note.objects.create(
             id=self.note_2_Id,
@@ -133,7 +136,9 @@ class NoteTestCase(TestCase):
         response = self.client.get("/notes/")
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
-            len(response.json()), 2, msg="Number of retrieved Notes is != 2"
+            len(response.json()),
+            noteCount + 1,
+            msg="Number of retrieved Notes is != {}".format(noteCount),
         )
 
         # serialize the model instances
