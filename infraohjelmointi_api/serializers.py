@@ -115,6 +115,12 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
+    estPlanningStart = serializers.DateField(
+        format="%d-%m-%Y", input_formats=["%d-%m-%Y", "iso-8601"]
+    )
+    estPlanningEnd = serializers.DateField(
+        format="%d-%m-%Y", input_formats=["%d-%m-%Y", "iso-8601"]
+    )
 
     class Meta(BaseMeta):
         model = Project
