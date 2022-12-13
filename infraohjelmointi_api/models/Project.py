@@ -18,6 +18,8 @@ class Project(models.Model):
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    category = models.CharField(max_length=30, blank=True, null=True)
+    effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)
     entityName = models.CharField(max_length=30, blank=True, null=True)
     sapProject = models.CharField(max_length=100, blank=True, null=True)
@@ -72,26 +74,26 @@ class Project(models.Model):
     warrantyStartDate = models.DateField(blank=True, null=True)
     warrantyExpireDate = models.DateField(blank=True, null=True)
     perfAmount = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     unitCost = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     costForecast = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     neighborhood = models.CharField(max_length=200, blank=True, null=True)
     comittedCost = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     tiedCurrYear = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     realizedCost = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     spentCost = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     riskAssess = models.CharField(max_length=200, blank=True, null=True)
     priority = models.ForeignKey(
@@ -102,46 +104,46 @@ class Project(models.Model):
 
     # commented fields left out due to translation confusions
     budgetForecast1CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     budgetForecast2CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     budgetForecast3CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     budgetForecast4CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     budgetProposalCurrentYearPlus1 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     budgetProposalCurrentYearPlus2 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus3 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus4 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus5 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus6 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus7 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus8 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus9 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
     preliminaryCurrentYearPlus10 = models.DecimalField(
-        max_digits=20, decimal_places=2, blank=True, null=True
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
 
     delays = models.CharField(max_length=200, blank=True, null=True)
