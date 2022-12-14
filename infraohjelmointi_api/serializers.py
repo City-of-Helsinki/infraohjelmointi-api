@@ -107,12 +107,13 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     personConstruction = PersonSerializer(read_only=True)
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
-    estDesignStartDate = serializers.DateField(format="%d.%m.%Y")
-    estDesignEndDate = serializers.DateField(format="%d.%m.%Y")
-    contractPrepStartDate = serializers.DateField(format="%d.%m.%Y")
-    contractPrepEndDate = serializers.DateField(format="%d.%m.%Y")
-    warrantyStartDate = serializers.DateField(format="%d.%m.%Y")
-    warrantyExpireDate = serializers.DateField(format="%d.%m.%Y")
+
+    estConstructionStart = serializers.DateField(format="%d.%m.%Y")
+    estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
+    presenceStart = serializers.DateField(format="%d.%m.%Y")
+    presenceEnd = serializers.DateField(format="%d.%m.%Y")
+    visibilityStart = serializers.DateField(format="%d.%m.%Y")
+    visibilityEnd = serializers.DateField(format="%d.%m.%Y")
 
     class Meta(BaseMeta):
         model = Project
@@ -135,37 +136,37 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-    estDesignStartDate = serializers.DateField(
+    estConstructionStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
         allow_null=True,
     )
-    estDesignEndDate = serializers.DateField(
+    estConstructionEnd = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
         allow_null=True,
     )
-    contractPrepStartDate = serializers.DateField(
+    presenceStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
         allow_null=True,
     )
-    contractPrepEndDate = serializers.DateField(
+    presenceEnd = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
         allow_null=True,
     )
-    warrantyStartDate = serializers.DateField(
+    visibilityStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
         allow_null=True,
     )
-    warrantyExpireDate = serializers.DateField(
+    visibilityEnd = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
