@@ -538,3 +538,135 @@ class ProjectTestCase(TestCase):
             True,
             msg="Project created using POST request does not exist in DB",
         )
+
+    def test_dateField_formatted_project(self):
+        data = {
+            "name": "Sample name",
+            "description": "Sample description",
+            "estPlanningStart": "14.01.2022",
+            "estPlanningEnd": "14.05.2022",
+            "estConstructionStart": "14.02.2022",
+            "estConstructionEnd": "14.05.2022",
+            "presenceStart": "14.02.2022",
+            "presenceEnd": "14.05.2022",
+            "visibilityStart": "14.02.2022",
+            "visibilityEnd": "14.05.2022",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        res_data = response.json()
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            data["estPlanningStart"],
+            res_data["estPlanningStart"],
+            msg="estPlanningStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["estPlanningEnd"],
+            res_data["estPlanningEnd"],
+            msg="estPlanningEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["estConstructionStart"],
+            res_data["estConstructionStart"],
+            msg="estConstructionStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["estConstructionEnd"],
+            res_data["estConstructionEnd"],
+            msg="estConstructionEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["presenceStart"],
+            res_data["presenceStart"],
+            msg="presenceStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["presenceEnd"],
+            res_data["presenceEnd"],
+            msg="presenceEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["visibilityStart"],
+            res_data["visibilityStart"],
+            msg="visibilityStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            data["visibilityEnd"],
+            res_data["visibilityEnd"],
+            msg="visibilityEnd format in POST request != format in response",
+        )
+
+        # Giving data in other format still returns data in correct format
+        data = {
+            "name": "Sample name",
+            "description": "Sample description",
+            "estPlanningStart": "2022-01-15",
+            "estPlanningEnd": "2022-05-15",
+            "estConstructionStart": "2022-02-15",
+            "estConstructionEnd": "2022-05-15",
+            "presenceStart": "2022-02-15",
+            "presenceEnd": "2022-05-15",
+            "visibilityStart": "2022-02-15",
+            "visibilityEnd": "2022-05-15",
+        }
+        formatted_data = {
+            "estPlanningStart": "15.01.2022",
+            "estPlanningEnd": "15.05.2022",
+            "estConstructionStart": "15.02.2022",
+            "estConstructionEnd": "15.05.2022",
+            "presenceStart": "15.02.2022",
+            "presenceEnd": "15.05.2022",
+            "visibilityStart": "15.02.2022",
+            "visibilityEnd": "15.05.2022",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        res_data = response.json()
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            formatted_data["estPlanningStart"],
+            res_data["estPlanningStart"],
+            msg="estPlanningStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["estPlanningEnd"],
+            res_data["estPlanningEnd"],
+            msg="estPlanningEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["estConstructionStart"],
+            res_data["estConstructionStart"],
+            msg="estConstructionStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["estConstructionEnd"],
+            res_data["estConstructionEnd"],
+            msg="estConstructionEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["presenceStart"],
+            res_data["presenceStart"],
+            msg="presenceStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["presenceEnd"],
+            res_data["presenceEnd"],
+            msg="presenceEnd format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["visibilityStart"],
+            res_data["visibilityStart"],
+            msg="visibilityStart format in POST request != format in response",
+        )
+        self.assertEqual(
+            formatted_data["visibilityEnd"],
+            res_data["visibilityEnd"],
+            msg="visibilityEnd format in POST request != format in response",
+        )
