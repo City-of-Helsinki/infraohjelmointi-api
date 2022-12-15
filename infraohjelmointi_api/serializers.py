@@ -105,6 +105,15 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     personPlanning = PersonSerializer(read_only=True)
     personProgramming = PersonSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
+    estPlanningStart = serializers.DateField(format="%d.%m.%Y")
+    estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
+
+    estConstructionStart = serializers.DateField(format="%d.%m.%Y")
+    estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
+    presenceStart = serializers.DateField(format="%d.%m.%Y")
+    presenceEnd = serializers.DateField(format="%d.%m.%Y")
+    visibilityStart = serializers.DateField(format="%d.%m.%Y")
+    visibilityEnd = serializers.DateField(format="%d.%m.%Y")
 
     class Meta(BaseMeta):
         model = Project
@@ -115,6 +124,54 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
+    estPlanningStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    estPlanningEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    estConstructionStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    estConstructionEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    presenceStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    presenceEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    visibilityStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    visibilityEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
 
     class Meta(BaseMeta):
         model = Project
