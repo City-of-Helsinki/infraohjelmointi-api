@@ -30,7 +30,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ["*"]),
     DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
-    ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000"]),
+    ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
 )

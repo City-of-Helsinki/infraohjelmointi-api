@@ -67,13 +67,13 @@ class Project(models.Model):
     constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
-    estDesignEndYear = models.IntegerField(blank=True, null=True)
-    estDesignStartDate = models.DateField(blank=True, null=True)
-    estDesignEndDate = models.DateField(blank=True, null=True)
-    contractPrepStartDate = models.DateField(blank=True, null=True)
-    contractPrepEndDate = models.DateField(blank=True, null=True)
-    warrantyStartDate = models.DateField(blank=True, null=True)
-    warrantyExpireDate = models.DateField(blank=True, null=True)
+    estConstructionStart = models.DateField(blank=True, null=True)
+    estConstructionEnd = models.DateField(blank=True, null=True)
+    presenceStart = models.DateField(blank=True, null=True)
+    presenceEnd = models.DateField(blank=True, null=True)
+    visibilityStart = models.DateField(blank=True, null=True)
+    visibilityEnd = models.DateField(blank=True, null=True)
+
     perfAmount = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
