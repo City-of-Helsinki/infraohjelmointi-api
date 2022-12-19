@@ -9,6 +9,7 @@ from .Person import Person
 from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
+from .ConPhaseDetail import ConPhaseDetail
 from overrides import override
 
 
@@ -64,7 +65,9 @@ class Project(models.Model):
         Person, related_name="favourite", null=True, blank=True
     )
     programmed = models.BooleanField(default=False)
-    constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
+    constructionPhaseDetail = models.ForeignKey(
+        ConPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
