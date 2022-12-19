@@ -11,6 +11,7 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConPhaseDetail import ConPhaseDetail
 from .ProjectCategory import ProjectCategory
+from .ProjectRisk import ProjectRisk
 from overrides import override
 
 
@@ -105,7 +106,9 @@ class Project(models.Model):
     spentCost = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
-    riskAssess = models.CharField(max_length=200, blank=True, null=True)
+    riskAssess = models.ForeignKey(
+        ProjectRisk, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     priority = models.ForeignKey(
         ProjectPriority, on_delete=models.DO_NOTHING, null=True, blank=True
     )
