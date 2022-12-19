@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             model_name="project",
             name="constructionPhaseDetail",
         ),
-        migrations.AlterField(
+        migrations.AddField(
             model_name="project",
             name="constructionPhaseDetail",
             field=models.ForeignKey(
