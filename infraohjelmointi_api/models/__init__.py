@@ -9,3 +9,4 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
+from .ConPhaseDetail import ConPhaseDetail
