@@ -14,6 +14,7 @@ from .serializers import (
     ProjectPrioritySerializer,
     TaskStatusSerializer,
     ConPhaseDetailSerializer,
+    ProjectCategorySerializer,
     NoteSerializer,
 )
 from .paginations import StandardResultsSetPagination
@@ -97,6 +98,15 @@ class ConPhaseDetailViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ConPhaseDetailSerializer
+
+
+class ProjectCategoryViewSet(BaseViewSet):
+    """
+    API endpoint that allows project cetagories to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectCategorySerializer
 
 
 class ProjectPhaseViewSet(BaseViewSet):
