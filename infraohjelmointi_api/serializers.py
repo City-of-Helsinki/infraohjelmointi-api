@@ -125,7 +125,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     personConstruction = PersonSerializer(read_only=True)
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
-
+    category = ProjectCategorySerializer(read_only=True)
+    constructionPhaseDetail = ConPhaseDetailSerializer(read_only=True)
+    riskAssess = ProjectRiskSerializer(read_only=True)
     estConstructionStart = serializers.DateField(format="%d.%m.%Y")
     estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
     presenceStart = serializers.DateField(format="%d.%m.%Y")
@@ -240,6 +242,21 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["personConstruction"] = (
             PersonSerializer(instance.personConstruction).data
             if instance.personConstruction != None
+            else None
+        )
+        rep["category"] = (
+            ProjectCategorySerializer(instance.category).data
+            if instance.category != None
+            else None
+        )
+        rep["riskAssess"] = (
+            ProjectRiskSerializer(instance.riskAssess).data
+            if instance.riskAssess != None
+            else None
+        )
+        rep["constructionPhaseDetail"] = (
+            ConPhaseDetailSerializer(instance.constructionPhaseDetail).data
+            if instance.constructionPhaseDetail != None
             else None
         )
         return rep
