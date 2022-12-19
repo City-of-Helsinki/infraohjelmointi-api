@@ -11,3 +11,4 @@ from .TaskStatus import TaskStatus
 from .Note import Note
 from .ConPhaseDetail import ConPhaseDetail
 from .ProjectCategory import ProjectCategory
+from .ProjectRisk import ProjectRisk
