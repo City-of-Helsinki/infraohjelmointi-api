@@ -21,8 +21,7 @@ class Project(models.Model):
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    category = models.CharField(max_length=30, blank=True, null=True)
-    category_temp = models.ForeignKey(
+    category = models.ForeignKey(
         ProjectCategory, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     effectHousing = models.BooleanField(default=False)
