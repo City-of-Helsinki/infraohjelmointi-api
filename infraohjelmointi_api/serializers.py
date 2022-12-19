@@ -11,6 +11,7 @@ from .models import (
     TaskStatus,
     ConPhaseDetail,
     ProjectCategory,
+    ProjectRisk,
     Note,
 )
 from rest_framework import serializers
@@ -20,6 +21,11 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectRiskSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectRisk
 
 
 class ProjectCategorySerializer(serializers.ModelSerializer):
