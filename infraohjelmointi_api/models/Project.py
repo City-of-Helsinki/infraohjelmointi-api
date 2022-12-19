@@ -80,6 +80,8 @@ class Project(models.Model):
     presenceEnd = models.DateField(blank=True, null=True)
     visibilityStart = models.DateField(blank=True, null=True)
     visibilityEnd = models.DateField(blank=True, null=True)
+    louhi = models.BooleanField(default=False)
+    gravel = models.BooleanField(default=False)
 
     perfAmount = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
