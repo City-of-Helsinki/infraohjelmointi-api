@@ -48,7 +48,7 @@ class TaskTestCase(TestCase):
             description="description of the test project",
             phase=None,
             programmed=True,
-            constructionPhaseDetail="Current phase is proposal",
+            constructionPhaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -65,11 +65,14 @@ class TaskTestCase(TestCase):
             tiedCurrYear=12000.00,
             realizedCost=20.00,
             spentCost=20000.00,
-            riskAssess="Yes very risky test",
+            riskAssess=None,
             priority=None,
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
+            category=None,
+            louhi=False,
+            gravel=False,
         )
 
         self.task = Task.objects.create(
