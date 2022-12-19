@@ -10,6 +10,7 @@ from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConPhaseDetail import ConPhaseDetail
+from .ProjectCategory import ProjectCategory
 from overrides import override
 
 
@@ -20,6 +21,9 @@ class Project(models.Model):
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     category = models.CharField(max_length=30, blank=True, null=True)
+    category_temp = models.ForeignKey(
+        ProjectCategory, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)
     entityName = models.CharField(max_length=30, blank=True, null=True)
