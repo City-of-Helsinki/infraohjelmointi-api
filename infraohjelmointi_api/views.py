@@ -15,6 +15,7 @@ from .serializers import (
     TaskStatusSerializer,
     ConPhaseDetailSerializer,
     ProjectCategorySerializer,
+    ProjectRiskSerializer,
     NoteSerializer,
 )
 from .paginations import StandardResultsSetPagination
@@ -107,6 +108,15 @@ class ProjectCategoryViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectCategorySerializer
+
+
+class ProjectRiskViewSet(BaseViewSet):
+    """
+    API endpoint that allows project risk assessments to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectRiskSerializer
 
 
 class ProjectPhaseViewSet(BaseViewSet):
