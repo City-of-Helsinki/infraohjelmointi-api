@@ -70,7 +70,7 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConPhaseDetail.objects.create(
+        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
             id=self.conPhaseDetailId, value="preConstruction"
         )
         self.person_3 = Person.objects.create(
