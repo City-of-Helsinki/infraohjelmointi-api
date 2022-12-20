@@ -86,7 +86,7 @@ class TaskTestCase(TestCase):
             person=self.person_1,
             realizedCost=10000,
             plannedCost=50000,
-            riskAssess="Very risky indeed",
+            riskAssessment="Very risky indeed",
         )
 
     def test_Task_is_created(self):
@@ -139,7 +139,7 @@ class TaskTestCase(TestCase):
             person=self.person_1,
             realizedCost=10000,
             plannedCost=50000,
-            riskAssess="Very risky indeed",
+            riskAssessment="Very risky indeed",
         )
         response = self.client.get("/tasks/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
@@ -176,7 +176,7 @@ class TaskTestCase(TestCase):
             "person": None,
             "realizedCost": 10000,
             "plannedCost": 50000,
-            "riskAssess": "Very risky indeed",
+            "riskAssessment": "Very risky indeed",
         }
         response = self.client.post("/tasks/", data, content_type="application/json")
         self.assertEqual(response.status_code, 201, msg="Status code != 201")
