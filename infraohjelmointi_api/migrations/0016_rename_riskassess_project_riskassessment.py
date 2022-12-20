@@ -6,13 +6,18 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0015_auto_alter_category_categorytemp'),
+        ("infraohjelmointi_api", "0015_auto_alter_category_categorytemp"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='project',
-            old_name='riskAssess',
-            new_name='riskAssessment',
+            model_name="project",
+            old_name="riskAssess",
+            new_name="riskAssessment",
+        ),
+        migrations.RenameField(
+            model_name="task",
+            old_name="riskAssess",
+            new_name="riskAssessment",
         ),
     ]
