@@ -35,7 +35,7 @@ router.register(
 router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
 router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
 router.register(
-    r"construction-phase", views.ConPhaseDetailViewSet, basename="conPhases"
+    r"construction-phases", views.ConPhaseDetailViewSet, basename="conPhases"
 )
 router.register(
     r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
