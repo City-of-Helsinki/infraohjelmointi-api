@@ -8,6 +8,8 @@ from ..models import Person
 from ..models import ProjectType
 from ..models import ProjectPhase
 from ..models import ProjectPriority
+from ..models import ProjectCategory
+from ..models import ConstructionPhaseDetail
 from ..models import Note
 from ..serializers import ProjectGetSerializer
 from ..serializers import NoteSerializer
@@ -33,6 +35,8 @@ class ProjectTestCase(TestCase):
     sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
     sapProjectId_2 = "2814I00718"
     noteId = uuid.UUID("2e91feba-13c1-4b4a-a3a1-ca2030bf8681")
+    projectCategoryId = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
+    conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
     fixtures = []
 
     @classmethod
@@ -46,6 +50,9 @@ class ProjectTestCase(TestCase):
             siteName="Anankatu",
             district="doe",
             need=5000.0,
+        )
+        self.projectCategory = ProjectCategory.objects.create(
+            id=self.projectCategoryId, value="K5"
         )
         self.person_1 = Person.objects.create(
             id=self.person_1_Id,
@@ -62,6 +69,9 @@ class ProjectTestCase(TestCase):
             email="random@random.com",
             title="CEO",
             phone="0414853275",
+        )
+        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
+            id=self.conPhaseDetailId, value="preConstruction"
         )
         self.person_3 = Person.objects.create(
             id=self.person_3_Id,
@@ -114,7 +124,8 @@ class ProjectTestCase(TestCase):
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
-            constructionPhaseDetail="Current phase is proposal",
+            category=self.projectCategory,
+            constructionPhaseDetail=self.conPhaseDetail,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -131,7 +142,7 @@ class ProjectTestCase(TestCase):
             tiedCurrYear=12000.00,
             realizedCost=20.00,
             spentCost=20000.00,
-            riskAssess="Yes very risky test",
+            riskAssess=None,
             priority=self.projectPriority,
             locked=True,
             comments="Comments random",
@@ -151,6 +162,8 @@ class ProjectTestCase(TestCase):
             preliminaryCurrentYearPlus8=None,
             preliminaryCurrentYearPlus9=None,
             preliminaryCurrentYearPlus10=None,
+            louhi=False,
+            gravel=False,
         )
         self.project.favPersons.add(self.person_1, self.person_2)
 
@@ -230,6 +243,20 @@ class ProjectTestCase(TestCase):
                 self.projectId
             ),
         )
+        self.assertDictEqual(
+            self.projectCategory.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectCategory foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.conPhaseDetail.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="conPhaseDetail foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
 
     def test_project_manyTomany_relationship_exists(self):
         person_1_reverse_query = self.person_1.favourite.all().values()[0]
@@ -265,7 +292,7 @@ class ProjectTestCase(TestCase):
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
-            constructionPhaseDetail="Current phase is proposal 2",
+            constructionPhaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -282,7 +309,8 @@ class ProjectTestCase(TestCase):
             tiedCurrYear=12000.00,
             realizedCost=20.00,
             spentCost=20000.00,
-            riskAssess="Yes very risky test 2",
+            riskAssess=None,
+            category=None,
             priority=self.projectPriority,
             locked=True,
             comments="Comments random",
@@ -390,6 +418,8 @@ class ProjectTestCase(TestCase):
             "preliminaryCurrentYearPlus8": None,
             "preliminaryCurrentYearPlus9": None,
             "preliminaryCurrentYearPlus10": None,
+            "louhi": False,
+            "gravel": False,
         }
         response = self.client.post(
             "/projects/",
@@ -473,7 +503,6 @@ class ProjectTestCase(TestCase):
             "description": " random Description   works.  yes    ",
             "entityName": "Entity Name",
             "delays": "    100 delays   .",
-            "riskAssess": " risky   risky  .   Matter   this ",
             "comments": "This comment is    random    ",
         }
 
@@ -483,7 +512,6 @@ class ProjectTestCase(TestCase):
             "description": "random Description works. yes",
             "entityName": "Entity Name",
             "delays": "100 delays .",
-            "riskAssess": "risky risky . Matter this",
             "comments": "This comment is random",
         }
 
@@ -522,11 +550,6 @@ class ProjectTestCase(TestCase):
             res_data["delays"],
             validData["delays"],
             msg="Field: delays not trimmed successfully",
-        )
-        self.assertEqual(
-            res_data["riskAssess"],
-            validData["riskAssess"],
-            msg="Field: riskAssess not trimmed successfully",
         )
         self.assertEqual(
             res_data["comments"],

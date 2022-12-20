@@ -9,3 +9,6 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
+from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ProjectCategory import ProjectCategory
+from .ProjectRisk import ProjectRisk
