@@ -9,7 +9,7 @@ from ..models import ProjectType
 from ..models import ProjectPhase
 from ..models import ProjectPriority
 from ..models import ProjectCategory
-from ..models import ConPhaseDetail
+from ..models import ConstructionPhaseDetail
 from ..models import Note
 from ..serializers import ProjectGetSerializer
 from ..serializers import NoteSerializer

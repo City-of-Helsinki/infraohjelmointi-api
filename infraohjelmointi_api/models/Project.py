@@ -9,7 +9,7 @@ from .Person import Person
 from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
-from .ConPhaseDetail import ConPhaseDetail
+from .ConstructionPhaseDetail import ConstructionPhaseDetail
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from overrides import override
@@ -70,7 +70,7 @@ class Project(models.Model):
     )
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.ForeignKey(
-        ConPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+        ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
