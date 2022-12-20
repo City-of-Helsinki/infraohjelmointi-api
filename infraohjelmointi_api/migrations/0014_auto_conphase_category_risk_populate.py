@@ -45,10 +45,12 @@ def migrate_existing_category_data(apps, schema_editor):
 
 
 def populate_construction_phase_detail_data(apps, schema_editor):
-    ConPhaseDetail = apps.get_model("infraohjelmointi_api", "ConstructionPhaseDetail")
+    ConstructionPhaseDetail = apps.get_model(
+        "infraohjelmointi_api", "ConstructionPhaseDetail"
+    )
     conPhases = ["preConstruction", "firstPhase", "firstPhaseComplete", "secondPhase"]
     for phase in conPhases:
-        ConPhaseDetail.objects.create(value=phase)
+        ConstructionPhaseDetail.objects.create(value=phase)
 
 
 class Migration(migrations.Migration):

@@ -97,7 +97,7 @@ class Migration(migrations.Migration):
                 blank=True,
                 null=True,
                 on_delete=django.db.models.deletion.DO_NOTHING,
-                to="infraohjelmointi_api.conphasedetail",
+                to="infraohjelmointi_api.constructionphasedetail",
             ),
         ),
         migrations.RemoveField(
