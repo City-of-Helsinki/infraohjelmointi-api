@@ -60,7 +60,7 @@ class NoteTestCase(TestCase):
             tiedCurrYear=12000.00,
             realizedCost=20.00,
             spentCost=20000.00,
-            riskAssess=None,
+            riskAssessment=None,
             priority=None,
             locked=True,
             comments="Comments random",
