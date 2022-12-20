@@ -9,6 +9,9 @@ from .Person import Person
 from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
+from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ProjectCategory import ProjectCategory
+from .ProjectRisk import ProjectRisk
 from overrides import override
 
 
@@ -18,7 +21,9 @@ class Project(models.Model):
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    category = models.CharField(max_length=30, blank=True, null=True)
+    category = models.ForeignKey(
+        ProjectCategory, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)
     entityName = models.CharField(max_length=30, blank=True, null=True)
@@ -64,7 +69,9 @@ class Project(models.Model):
         Person, related_name="favourite", null=True, blank=True
     )
     programmed = models.BooleanField(default=False)
-    constructionPhaseDetail = models.TextField(max_length=500, blank=True, null=True)
+    constructionPhaseDetail = models.ForeignKey(
+        ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
@@ -73,6 +80,8 @@ class Project(models.Model):
     presenceEnd = models.DateField(blank=True, null=True)
     visibilityStart = models.DateField(blank=True, null=True)
     visibilityEnd = models.DateField(blank=True, null=True)
+    louhi = models.BooleanField(default=False)
+    gravel = models.BooleanField(default=False)
 
     perfAmount = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
@@ -96,7 +105,9 @@ class Project(models.Model):
     spentCost = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
-    riskAssess = models.CharField(max_length=200, blank=True, null=True)
+    riskAssess = models.ForeignKey(
+        ProjectRisk, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     priority = models.ForeignKey(
         ProjectPriority, on_delete=models.DO_NOTHING, null=True, blank=True
     )
@@ -177,8 +188,6 @@ class Project(models.Model):
             self.entityName = " ".join(self.entityName.split())
         if self.neighborhood:
             self.neighborhood = " ".join(self.neighborhood.split())
-        if self.riskAssess:
-            self.riskAssess = " ".join(self.riskAssess.split())
         if self.comments:
             self.comments = " ".join(self.comments.split())
         if self.delays:
