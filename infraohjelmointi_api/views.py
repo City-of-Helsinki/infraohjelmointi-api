@@ -13,7 +13,7 @@ from .serializers import (
     ProjectPhaseSerializer,
     ProjectPrioritySerializer,
     TaskStatusSerializer,
-    ConPhaseDetailSerializer,
+    ConstructionPhaseDetailSerializer,
     ProjectCategorySerializer,
     ProjectRiskSerializer,
     NoteSerializer,
@@ -98,7 +98,7 @@ class ConPhaseDetailViewSet(BaseViewSet):
     """
 
     permission_classes = []
-    serializer_class = ConPhaseDetailSerializer
+    serializer_class = ConstructionPhaseDetailSerializer
 
 
 class ProjectCategoryViewSet(BaseViewSet):
