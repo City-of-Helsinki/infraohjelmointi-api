@@ -9,7 +9,7 @@ from .models import (
     ProjectPhase,
     ProjectPriority,
     TaskStatus,
-    ConPhaseDetail,
+    ConstructionPhaseDetail,
     ProjectCategory,
     ProjectRisk,
     Note,
@@ -33,9 +33,9 @@ class ProjectCategorySerializer(serializers.ModelSerializer):
         model = ProjectCategory
 
 
-class ConPhaseDetailSerializer(serializers.ModelSerializer):
+class ConstructionPhaseDetailSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
-        model = ConPhaseDetail
+        model = ConstructionPhaseDetail
 
 
 class TaskStatusSerializer(serializers.ModelSerializer):
@@ -126,7 +126,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
     category = ProjectCategorySerializer(read_only=True)
-    constructionPhaseDetail = ConPhaseDetailSerializer(read_only=True)
+    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
     riskAssess = ProjectRiskSerializer(read_only=True)
     estConstructionStart = serializers.DateField(format="%d.%m.%Y")
     estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
@@ -255,7 +255,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             else None
         )
         rep["constructionPhaseDetail"] = (
-            ConPhaseDetailSerializer(instance.constructionPhaseDetail).data
+            ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
             if instance.constructionPhaseDetail != None
             else None
         )
