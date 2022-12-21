@@ -13,6 +13,9 @@ from .serializers import (
     ProjectPhaseSerializer,
     ProjectPrioritySerializer,
     TaskStatusSerializer,
+    ConstructionPhaseDetailSerializer,
+    ProjectCategorySerializer,
+    ProjectRiskSerializer,
     NoteSerializer,
 )
 from .paginations import StandardResultsSetPagination
@@ -87,6 +90,33 @@ class ProjectTypeViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectTypeSerializer
+
+
+class ConPhaseDetailViewSet(BaseViewSet):
+    """
+    API endpoint that allows construction phase details to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ConstructionPhaseDetailSerializer
+
+
+class ProjectCategoryViewSet(BaseViewSet):
+    """
+    API endpoint that allows project cetagories to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectCategorySerializer
+
+
+class ProjectRiskViewSet(BaseViewSet):
+    """
+    API endpoint that allows project risk assessments to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectRiskSerializer
 
 
 class ProjectPhaseViewSet(BaseViewSet):

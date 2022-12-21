@@ -9,6 +9,9 @@ from .models import (
     ProjectPhase,
     ProjectPriority,
     TaskStatus,
+    ConstructionPhaseDetail,
+    ProjectCategory,
+    ProjectRisk,
     Note,
 )
 from rest_framework import serializers
@@ -18,6 +21,21 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectRiskSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectRisk
+
+
+class ProjectCategorySerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectCategory
+
+
+class ConstructionPhaseDetailSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ConstructionPhaseDetail
 
 
 class TaskStatusSerializer(serializers.ModelSerializer):
@@ -107,7 +125,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     personConstruction = PersonSerializer(read_only=True)
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
-
+    category = ProjectCategorySerializer(read_only=True)
+    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
+    riskAssessment = ProjectRiskSerializer(read_only=True)
     estConstructionStart = serializers.DateField(format="%d.%m.%Y")
     estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
     presenceStart = serializers.DateField(format="%d.%m.%Y")
@@ -222,6 +242,21 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["personConstruction"] = (
             PersonSerializer(instance.personConstruction).data
             if instance.personConstruction != None
+            else None
+        )
+        rep["category"] = (
+            ProjectCategorySerializer(instance.category).data
+            if instance.category != None
+            else None
+        )
+        rep["riskAssessment"] = (
+            ProjectRiskSerializer(instance.riskAssessment).data
+            if instance.riskAssessment != None
+            else None
+        )
+        rep["constructionPhaseDetail"] = (
+            ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
+            if instance.constructionPhaseDetail != None
             else None
         )
         return rep

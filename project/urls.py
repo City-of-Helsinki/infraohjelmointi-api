@@ -34,6 +34,13 @@ router.register(
 )
 router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
 router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
+router.register(
+    r"construction-phases", views.ConPhaseDetailViewSet, basename="conPhases"
+)
+router.register(
+    r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
+)
+router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")
 
 router.register(r"notes", views.NoteViewSet, basename="notes")
 
