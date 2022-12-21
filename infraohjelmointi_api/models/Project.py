@@ -12,6 +12,7 @@ from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
+from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
 
@@ -72,12 +73,18 @@ class Project(models.Model):
     constructionPhaseDetail = models.ForeignKey(
         ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    planningStartYear = models.DateField(
-        blank=True, null=True
-    )  # Has to be in format YYYY but a full date for now (Check Project serializer)
-    constructionEndYear = models.DateField(
-        blank=True, null=True
-    )  # Has to be in format YYYY but a full date for now (Check Project serializer)
+    planningStartYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
+    constructionEndYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
     workQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
 
     estPlanningStart = models.DateField(blank=True, null=True)
