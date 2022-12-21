@@ -20,6 +20,6 @@ class Task(models.Model):
     realizedCost = models.DecimalField(max_digits=20, decimal_places=2)
     plannedCost = models.DecimalField(max_digits=20, decimal_places=2)
     # TaskAccomplishment
-    riskAssess = models.CharField(max_length=200, blank=False, null=False)
+    riskAssessment = models.CharField(max_length=200, blank=False, null=False)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)

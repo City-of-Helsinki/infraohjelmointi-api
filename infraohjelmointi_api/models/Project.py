@@ -105,7 +105,7 @@ class Project(models.Model):
     spentCost = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
-    riskAssess = models.ForeignKey(
+    riskAssessment = models.ForeignKey(
         ProjectRisk, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     priority = models.ForeignKey(
