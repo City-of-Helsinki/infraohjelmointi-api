@@ -72,6 +72,12 @@ class Project(models.Model):
     constructionPhaseDetail = models.ForeignKey(
         ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    planningStartYear = models.DateField(
+        blank=True, null=True
+    )  # Has to be in format YYYY but a full date for now (Check Project serializer)
+    constructionEndYear = models.DateField(
+        blank=True, null=True
+    )  # Has to be in format YYYY but a full date for now (Check Project serializer)
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
