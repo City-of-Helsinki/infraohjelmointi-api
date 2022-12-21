@@ -87,12 +87,15 @@ class Project(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
         default=0,
     )
-    workQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
-    estPlanningCost = models.PositiveIntegerField(blank=True, null=True, default=0)
-    estConstructionCost = models.PositiveIntegerField(blank=True, null=True, default=0)
-    levelOfQuality = models.ForeignKey(
+    projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
+    projectlevelOfQuality = models.ForeignKey(
         ProjectQualityLevel, on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    projectCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
+
+    estPlanningCost = models.PositiveIntegerField(blank=True, null=True, default=0)
+    estConstructionCost = models.PositiveIntegerField(blank=True, null=True, default=0)
+
     buildPhase = models.ForeignKey(
         ProjectBuildPhase, on_delete=models.DO_NOTHING, null=True, blank=True
     )
