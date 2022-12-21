@@ -14,3 +14,4 @@ from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
 from .ProjectBuildPhase import ProjectBuildPhase
+from .PlanningPhase import PlanningPhase

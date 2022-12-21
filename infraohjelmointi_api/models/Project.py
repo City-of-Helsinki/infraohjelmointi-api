@@ -14,6 +14,7 @@ from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
 from .ProjectBuildPhase import ProjectBuildPhase
+from .PlanningPhase import PlanningPhase
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -93,7 +94,11 @@ class Project(models.Model):
     )
     projectCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
 
-    estPlanningCost = models.PositiveIntegerField(blank=True, null=True, default=0)
+    planningCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
+    planningWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
+    planningPhase = models.ForeignKey(
+        PlanningPhase, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     estConstructionCost = models.PositiveIntegerField(blank=True, null=True, default=0)
 
     buildPhase = models.ForeignKey(
