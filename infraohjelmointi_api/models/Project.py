@@ -109,6 +109,7 @@ class Project(models.Model):
     constructionWorkQuantity = models.PositiveIntegerField(
         blank=True, null=True, default=0
     )
+    budget = models.PositiveIntegerField(blank=True, null=True, default=0)
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
