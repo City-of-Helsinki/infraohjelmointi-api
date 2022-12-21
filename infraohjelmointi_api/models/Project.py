@@ -78,6 +78,8 @@ class Project(models.Model):
     constructionEndYear = models.DateField(
         blank=True, null=True
     )  # Has to be in format YYYY but a full date for now (Check Project serializer)
+    workQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
+
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
