@@ -88,6 +88,13 @@ class Project(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
         default=0,
     )
+    budgetOverrunYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
+    budgetOverrunAmount = models.PositiveIntegerField(blank=True, null=True, default=0)
     projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
     projectlevelOfQuality = models.ForeignKey(
         ProjectQualityLevel, on_delete=models.DO_NOTHING, null=True, blank=True
