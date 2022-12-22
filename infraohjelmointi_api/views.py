@@ -17,6 +17,7 @@ from .serializers import (
     ProjectCategorySerializer,
     ProjectRiskSerializer,
     NoteSerializer,
+    ConstructionPhaseSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -37,6 +38,15 @@ class BaseViewSet(viewsets.ModelViewSet):
         Overriden ModelViewSet class method to get appropriate queryset using serializer class
         """
         return self.get_serializer_class().Meta.model.objects.all()
+
+
+class ConstructionPhaseViewSet(BaseViewSet):
+    """
+    API endpoint that allows project types to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ConstructionPhaseSerializer
 
 
 class ProjectViewSet(BaseViewSet):
