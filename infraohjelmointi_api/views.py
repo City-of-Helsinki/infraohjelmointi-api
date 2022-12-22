@@ -18,6 +18,9 @@ from .serializers import (
     ProjectRiskSerializer,
     NoteSerializer,
     ConstructionPhaseSerializer,
+    BudgetGroupSerializer,
+    PlanningPhaseSerializer,
+    ProjectQualityLevelSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -40,9 +43,36 @@ class BaseViewSet(viewsets.ModelViewSet):
         return self.get_serializer_class().Meta.model.objects.all()
 
 
+class ProjectQualityLevelViewSet(BaseViewSet):
+    """
+    API endpoint that allows Project quality levels to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectQualityLevelSerializer
+
+
+class PlanningPhaseViewSet(BaseViewSet):
+    """
+    API endpoint that allows Planning phases to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = PlanningPhaseSerializer
+
+
+class BudgetGroupViewSet(BaseViewSet):
+    """
+    API endpoint that allows Budget groups to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = BudgetGroupSerializer
+
+
 class ConstructionPhaseViewSet(BaseViewSet):
     """
-    API endpoint that allows project types to be viewed or edited.
+    API endpoint that allows Construction phases to be viewed or edited.
     """
 
     permission_classes = []
@@ -102,7 +132,7 @@ class ProjectTypeViewSet(BaseViewSet):
     serializer_class = ProjectTypeSerializer
 
 
-class ConPhaseDetailViewSet(BaseViewSet):
+class ConstructionPhaseDetailViewSet(BaseViewSet):
     """
     API endpoint that allows construction phase details to be viewed or edited.
     """

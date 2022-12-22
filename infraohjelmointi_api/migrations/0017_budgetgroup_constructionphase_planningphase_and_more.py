@@ -60,7 +60,6 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("value", models.CharField(max_length=200)),
-                ("location", models.CharField(blank=True, max_length=200, null=True)),
                 ("createdDate", models.DateTimeField(auto_now_add=True)),
                 ("updatedDate", models.DateTimeField(auto_now=True)),
             ],

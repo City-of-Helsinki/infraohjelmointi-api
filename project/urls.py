@@ -36,7 +36,7 @@ router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectP
 router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
 router.register(
     r"construction-phase-details",
-    views.ConPhaseDetailViewSet,
+    views.ConstructionPhaseDetailViewSet,
     basename="constructionPhaseDetails",
 )
 router.register(
@@ -48,6 +48,22 @@ router.register(
     r"construction-phases",
     views.ConstructionPhaseViewSet,
     basename="constructionPhases",
+)
+router.register(
+    r"budget-groups",
+    views.BudgetGroupViewSet,
+    basename="budgetGroups",
+)
+router.register(
+    r"planning-phases",
+    views.PlanningPhaseViewSet,
+    basename="planningPhases",
+)
+
+router.register(
+    r"project-quality-levels",
+    views.ProjectQualityLevelViewSet,
+    basename="projectQualityLevels",
 )
 
 urlpatterns = [
