@@ -97,7 +97,7 @@ class Project(models.Model):
     )
     budgetOverrunAmount = models.PositiveIntegerField(blank=True, null=True, default=0)
     projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
-    projectlevelOfQuality = models.ForeignKey(
+    projectQualityLevel = models.ForeignKey(
         ProjectQualityLevel, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     projectCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
@@ -108,10 +108,19 @@ class Project(models.Model):
         PlanningPhase, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     budgetGroup = models.ForeignKey(
-        BudgetGroup, on_delete=models.DO_NOTHING, null=True, blank=True
+        BudgetGroup,
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
     )
     budgetGroupPercentage = models.PositiveIntegerField(
-        blank=True, null=True, default=0
+        blank=True,
+        null=True,
+        default=0,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(100),
+        ],
     )
     constructionCostForecast = models.PositiveIntegerField(
         blank=True, null=True, default=0
