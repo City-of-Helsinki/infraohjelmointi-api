@@ -73,4 +73,5 @@ class Migration(migrations.Migration):
         migrations.RunPython(populate_PlanningPhase_data),
         migrations.RunPython(populate_ConstructionPhase_data),
         migrations.RunPython(populate_BudgetGroup_data),
+        migrations.RunPython(populate_ProjectRisk_data),
     ]
