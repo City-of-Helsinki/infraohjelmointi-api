@@ -151,7 +151,7 @@ def populate_ProjectClasses_data(apps, schema_editor):
     for _class in projectClasses:
         if _class["parent"] != None:
             parent, _ = ProjectClass.objects.get_or_create(name=_class["parent"])
-        ProjectClass.objects.create(value=level)
+            parent.parentClass.create(name=_class["name"])
 
 
 class Migration(migrations.Migration):
@@ -160,4 +160,4 @@ class Migration(migrations.Migration):
         ("infraohjelmointi_api", "0019_projectclass"),
     ]
 
-    operations = []
+    operations = [migrations.RunPython(populate_ProjectClasses_data)]
