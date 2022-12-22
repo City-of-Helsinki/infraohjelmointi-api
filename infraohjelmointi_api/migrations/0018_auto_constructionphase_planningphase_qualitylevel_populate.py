@@ -52,6 +52,13 @@ def populate_BudgetGroup_data(apps, schema_editor):
         BudgetGroup.objects.create(value=group)
 
 
+def populate_ProjectRisk_data(apps, schema_editor):
+    ProjectRisk = apps.get_model("infraohjelmointi_api", "ProjectRisk")
+    ProjectRisks = ["placeholderRisk"]
+    for risk in ProjectRisks:
+        ProjectRisk.objects.create(value=risk)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
