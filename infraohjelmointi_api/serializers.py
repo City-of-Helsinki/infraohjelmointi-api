@@ -158,6 +158,10 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     presenceEnd = serializers.DateField(format="%d.%m.%Y")
     visibilityStart = serializers.DateField(format="%d.%m.%Y")
     visibilityEnd = serializers.DateField(format="%d.%m.%Y")
+    budgetGroup = BudgetGroupSerializer(read_only=True)
+    constructionPhase = ConstructionPhaseSerializer(read_only=True)
+    planningPhase = PlanningPhaseSerializer(read_only=True)
+    ProjectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
 
     class Meta(BaseMeta):
         model = Project
@@ -281,6 +285,26 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["constructionPhaseDetail"] = (
             ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
             if instance.constructionPhaseDetail != None
+            else None
+        )
+        rep["budgetGroup"] = (
+            BudgetGroupSerializer(instance.budgetGroup).data
+            if instance.budgetGroup != None
+            else None
+        )
+        rep["constructionPhase"] = (
+            ConstructionPhaseSerializer(instance.constructionPhase).data
+            if instance.constructionPhase != None
+            else None
+        )
+        rep["planningPhase"] = (
+            PlanningPhaseSerializer(instance.planningPhase).data
+            if instance.planningPhase != None
+            else None
+        )
+        rep["projectQualityLevel"] = (
+            ProjectQualityLevelSerializer(instance.projectQualityLevel).data
+            if instance.projectQualityLevel != None
             else None
         )
         return rep
