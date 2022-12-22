@@ -46,6 +46,7 @@ class ProjectTestCase(TestCase):
     budgetGroupId = uuid.UUID("43d2353b-0a16-4ff2-887f-cfe6780c46bb")
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
     fixtures = []
+    maxDiff = None
 
     @classmethod
     @override
@@ -200,6 +201,7 @@ class ProjectTestCase(TestCase):
             constructionCostForecast=20,
             constructionWorkQuantity=2,
             constructionPhase=self.constructionPhase,
+            effectHousing=False,
         )
         self.project.favPersons.add(self.person_1, self.person_2)
 
@@ -470,6 +472,8 @@ class ProjectTestCase(TestCase):
             "constructionCostForecast": None,
             "constructionWorkQuantity": None,
             "constructionPhase": None,
+            "effectHousing": False,
+            "favPersons": [],
         }
         response = self.client.post(
             "/projects/",
@@ -483,7 +487,7 @@ class ProjectTestCase(TestCase):
         new_createdId = res_data["id"]
         del res_data["id"]
         del res_data["projectReadiness"]
-        print("******\n", res_data, "\n\n", data)
+
         self.assertEqual(res_data, data, msg="Created object data != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
