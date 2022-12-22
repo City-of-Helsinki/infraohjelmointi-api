@@ -161,7 +161,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     budgetGroup = BudgetGroupSerializer(read_only=True)
     constructionPhase = ConstructionPhaseSerializer(read_only=True)
     planningPhase = PlanningPhaseSerializer(read_only=True)
-    ProjectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
+    projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
 
     class Meta(BaseMeta):
         model = Project
