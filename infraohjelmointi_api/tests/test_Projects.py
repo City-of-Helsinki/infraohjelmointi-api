@@ -295,6 +295,34 @@ class ProjectTestCase(TestCase):
                 self.projectId
             ),
         )
+        self.assertDictEqual(
+            self.budgetGroup.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="budgetGroup foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.projectQualityLevel.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectQualityLevel foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.planningPhase.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="planningPhase foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.constructionPhase.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="constructionPhase foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
 
     def test_project_manyTomany_relationship_exists(self):
         person_1_reverse_query = self.person_1.favourite.all().values()[0]
