@@ -32,11 +32,6 @@ class ProjectQualityLevelSerializer(serializers.ModelSerializer):
         model = ProjectQualityLevel
 
 
-class ProjectQualityLevelSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectQualityLevel
-
-
 class PlanningPhaseSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = PlanningPhase
