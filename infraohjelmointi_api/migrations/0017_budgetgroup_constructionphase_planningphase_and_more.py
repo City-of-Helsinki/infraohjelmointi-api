@@ -90,7 +90,15 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="project",
             name="budgetGroupPercentage",
-            field=models.PositiveIntegerField(blank=True, default=0, null=True),
+            field=models.PositiveIntegerField(
+                blank=True,
+                default=0,
+                null=True,
+                validators=[
+                    django.core.validators.MinValueValidator(0),
+                    django.core.validators.MaxValueValidator(100),
+                ],
+            ),
         ),
         migrations.AddField(
             model_name="project",
@@ -203,7 +211,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="project",
-            name="projectlevelOfQuality",
+            name="projectQualityLevel",
             field=models.ForeignKey(
                 blank=True,
                 null=True,
