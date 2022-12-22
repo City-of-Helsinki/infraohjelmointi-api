@@ -12,6 +12,10 @@ from .models import (
     ConstructionPhaseDetail,
     ProjectCategory,
     ProjectRisk,
+    ConstructionPhase,
+    BudgetGroup,
+    PlanningPhase,
+    ProjectQualityLevel,
     Note,
 )
 from rest_framework import serializers
@@ -21,6 +25,31 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectQualityLevelSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectQualityLevel
+
+
+class ProjectQualityLevelSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectQualityLevel
+
+
+class PlanningPhaseSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = PlanningPhase
+
+
+class BudgetGroupSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = BudgetGroup
+
+
+class ConstructionPhaseSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ConstructionPhase
 
 
 class ProjectRiskSerializer(serializers.ModelSerializer):
