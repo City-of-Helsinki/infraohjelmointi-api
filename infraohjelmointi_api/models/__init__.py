@@ -15,3 +15,4 @@ from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
 from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
+from .BudgetGroup import BudgetGroup

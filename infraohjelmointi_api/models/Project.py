@@ -15,6 +15,7 @@ from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
 from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
+from .BudgetGroup import BudgetGroup
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -106,7 +107,12 @@ class Project(models.Model):
     planningPhase = models.ForeignKey(
         PlanningPhase, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-
+    budgetGroup = models.ForeignKey(
+        BudgetGroup, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    budgetGroupPercentage = models.PositiveIntegerField(
+        blank=True, null=True, default=0
+    )
     constructionCostForecast = models.PositiveIntegerField(
         blank=True, null=True, default=0
     )
