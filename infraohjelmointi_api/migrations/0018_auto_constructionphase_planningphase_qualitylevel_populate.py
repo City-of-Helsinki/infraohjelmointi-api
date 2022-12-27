@@ -45,13 +45,6 @@ def populate_PlanningPhase_data(apps, schema_editor):
         PlanningPhase.objects.create(value=phase)
 
 
-def populate_BudgetGroup_data(apps, schema_editor):
-    BudgetGroup = apps.get_model("infraohjelmointi_api", "BudgetGroup")
-    BudgetGroups = ["8 03 01 01 Uudisrakennus Pohjoinen suurpiiri"]
-    for group in BudgetGroups:
-        BudgetGroup.objects.create(value=group)
-
-
 def populate_ProjectRisk_data(apps, schema_editor):
     ProjectRisk = apps.get_model("infraohjelmointi_api", "ProjectRisk")
     ProjectRisks = ["placeholderRisk"]
@@ -64,7 +57,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0017_budgetgroup_constructionphase_planningphase_and_more",
+            "0017_constructionphase_planningphase_projectqualitylevel_and_more",
         ),
     ]
 
@@ -72,6 +65,5 @@ class Migration(migrations.Migration):
         migrations.RunPython(populate_ProjectQualityLevel_data),
         migrations.RunPython(populate_PlanningPhase_data),
         migrations.RunPython(populate_ConstructionPhase_data),
-        migrations.RunPython(populate_BudgetGroup_data),
         migrations.RunPython(populate_ProjectRisk_data),
     ]

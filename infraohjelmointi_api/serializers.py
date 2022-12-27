@@ -13,7 +13,6 @@ from .models import (
     ProjectCategory,
     ProjectRisk,
     ConstructionPhase,
-    BudgetGroup,
     PlanningPhase,
     ProjectQualityLevel,
     Note,
@@ -35,11 +34,6 @@ class ProjectQualityLevelSerializer(serializers.ModelSerializer):
 class PlanningPhaseSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = PlanningPhase
-
-
-class BudgetGroupSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = BudgetGroup
 
 
 class ConstructionPhaseSerializer(serializers.ModelSerializer):
@@ -158,7 +152,6 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     presenceEnd = serializers.DateField(format="%d.%m.%Y")
     visibilityStart = serializers.DateField(format="%d.%m.%Y")
     visibilityEnd = serializers.DateField(format="%d.%m.%Y")
-    budgetGroup = BudgetGroupSerializer(read_only=True)
     constructionPhase = ConstructionPhaseSerializer(read_only=True)
     planningPhase = PlanningPhaseSerializer(read_only=True)
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
@@ -285,11 +278,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["constructionPhaseDetail"] = (
             ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
             if instance.constructionPhaseDetail != None
-            else None
-        )
-        rep["budgetGroup"] = (
-            BudgetGroupSerializer(instance.budgetGroup).data
-            if instance.budgetGroup != None
             else None
         )
         rep["constructionPhase"] = (

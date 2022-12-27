@@ -18,7 +18,6 @@ from .serializers import (
     ProjectRiskSerializer,
     NoteSerializer,
     ConstructionPhaseSerializer,
-    BudgetGroupSerializer,
     PlanningPhaseSerializer,
     ProjectQualityLevelSerializer,
 )
@@ -59,15 +58,6 @@ class PlanningPhaseViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = PlanningPhaseSerializer
-
-
-class BudgetGroupViewSet(BaseViewSet):
-    """
-    API endpoint that allows Budget groups to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = BudgetGroupSerializer
 
 
 class ConstructionPhaseViewSet(BaseViewSet):
