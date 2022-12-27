@@ -143,10 +143,6 @@ def populate_ProjectClasses_data(apps, schema_editor):
             "name": "8 08 01 ESIRAKENTAMINEN",
             "parent": "8 08 PROJEKTIALUEIDEN INFRARAKENTAMINEN, Khn käytettäväksi",
         },
-        {
-            "name": "8 08 01 ESIRAKENTAMINEN",
-            "parent": "8 08 PROJEKTIALUEIDEN INFRARAKENTAMINEN, Khn käytettäväksi",
-        },
     ]
     for _class in projectClasses:
         if _class["parent"] != None:
