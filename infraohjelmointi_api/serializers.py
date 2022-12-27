@@ -28,8 +28,13 @@ class BaseMeta:
 
 
 class ProjectClassSerializer(serializers.ModelSerializer):
+    path = serializers.SerializerMethodField()
+
     class Meta(BaseMeta):
         model = ProjectClass
+
+    def get_path(self, obj):
+        return obj.path()
 
 
 class ProjectQualityLevelSerializer(serializers.ModelSerializer):
