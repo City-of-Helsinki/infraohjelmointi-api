@@ -18,7 +18,16 @@ def get_classes_from_PW_populate(apps, schema_editor):
                 project.hkrId
             )
         )
-        print(response.json())
+        if len(response.json()["instances"]) > 0:
+            projectProperties = response.json()["instances"][0]["properties"]
+            print(
+                "\n Project Name: {}, Masterclass: {}, Class: {}, SubClass: {}".format(
+                    projectProperties["PROJECT_Kadun_tai_puiston_nimi"],
+                    projectProperties["PROJECT_Pluokka"],
+                    projectProperties["PROJECT_Luokka"],
+                    projectProperties["PROJECT_Alaluokka"],
+                )
+            )
 
 
 class Migration(migrations.Migration):
