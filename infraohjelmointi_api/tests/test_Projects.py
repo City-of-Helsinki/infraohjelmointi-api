@@ -13,7 +13,6 @@ from ..models import ConstructionPhaseDetail
 from ..models import Note
 from ..models import ProjectQualityLevel
 from ..models import PlanningPhase
-from ..models import BudgetGroup
 from ..models import ConstructionPhase
 from ..serializers import ProjectGetSerializer
 from ..serializers import NoteSerializer
@@ -43,7 +42,6 @@ class ProjectTestCase(TestCase):
     conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
     projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
     planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
-    budgetGroupId = uuid.UUID("43d2353b-0a16-4ff2-887f-cfe6780c46bb")
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
     fixtures = []
     maxDiff = None
@@ -65,9 +63,6 @@ class ProjectTestCase(TestCase):
         )
         self.constructionPhase = ConstructionPhase.objects.create(
             id=self.constructionPhaseId, value="planning"
-        )
-        self.budgetGroup = BudgetGroup.objects.create(
-            id=self.budgetGroupId, value="8 03 01 01 Uudisrakennus Pohjoinen suurpiiri"
         )
         self.planningPhase = PlanningPhase.objects.create(
             id=self.planningPhaseId, value="projectPlanning"
@@ -186,7 +181,6 @@ class ProjectTestCase(TestCase):
             louhi=False,
             gravel=False,
             budget=50,
-            budgetGroup=self.budgetGroup,
             budgetGroupPercentage=50,
             planningStartYear="2022",
             constructionEndYear="2030",
@@ -295,13 +289,7 @@ class ProjectTestCase(TestCase):
                 self.projectId
             ),
         )
-        self.assertDictEqual(
-            self.budgetGroup.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
-            msg="budgetGroup foreign key does not exist in Project with id {}".format(
-                self.projectId
-            ),
-        )
+
         self.assertDictEqual(
             self.projectQualityLevel.project_set.all().values()[0],
             Project.objects.filter(id=self.projectId).values()[0],
@@ -485,7 +473,6 @@ class ProjectTestCase(TestCase):
             "louhi": False,
             "gravel": False,
             "budget": None,
-            "budgetGroup": None,
             "budgetGroupPercentage": None,
             "planningStartYear": None,
             "constructionEndYear": None,

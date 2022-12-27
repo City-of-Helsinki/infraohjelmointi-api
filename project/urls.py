@@ -50,11 +50,6 @@ router.register(
     basename="constructionPhases",
 )
 router.register(
-    r"budget-groups",
-    views.BudgetGroupViewSet,
-    basename="budgetGroups",
-)
-router.register(
     r"planning-phases",
     views.PlanningPhaseViewSet,
     basename="planningPhases",
