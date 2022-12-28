@@ -3,15 +3,21 @@
 from django.db import migrations
 import requests
 import urllib3
+import environ
+from os import path
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
+if path.exists(".env"):
+    environ.Env().read_env(".env")
+
+env = environ.Env()
 
 
 def get_classes_from_PW_populate(apps, schema_editor):
     Project = apps.get_model("infraohjelmointi_api", "Project")
     projects = Project.objects.exclude(hkrId=None)
     session = requests.Session()
-    session.auth = ("UZAIRAHMED", "Bum8E6l8LibQRH")
+    session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
     for project in projects:
         response = session.get(
             "https://prokkis.hel.fi/ws/v2.8/repositories/Bentley.PW--HELS000601.helsinki1.hki.local~3APWHKIKOUL/PW_WSG_Dynamic/PrType_1121_HKR_Hankerek_Hanke?$filter=PROJECT_HKRHanketunnus+eq+{}".format(
