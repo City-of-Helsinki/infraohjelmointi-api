@@ -12,6 +12,9 @@ from .models import (
     ConstructionPhaseDetail,
     ProjectCategory,
     ProjectRisk,
+    ConstructionPhase,
+    PlanningPhase,
+    ProjectQualityLevel,
     Note,
 )
 from rest_framework import serializers
@@ -21,6 +24,21 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectQualityLevelSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectQualityLevel
+
+
+class PlanningPhaseSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = PlanningPhase
+
+
+class ConstructionPhaseSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ConstructionPhase
 
 
 class ProjectRiskSerializer(serializers.ModelSerializer):
@@ -134,6 +152,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     presenceEnd = serializers.DateField(format="%d.%m.%Y")
     visibilityStart = serializers.DateField(format="%d.%m.%Y")
     visibilityEnd = serializers.DateField(format="%d.%m.%Y")
+    constructionPhase = ConstructionPhaseSerializer(read_only=True)
+    planningPhase = PlanningPhaseSerializer(read_only=True)
+    projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
 
     class Meta(BaseMeta):
         model = Project
@@ -257,6 +278,21 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["constructionPhaseDetail"] = (
             ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
             if instance.constructionPhaseDetail != None
+            else None
+        )
+        rep["constructionPhase"] = (
+            ConstructionPhaseSerializer(instance.constructionPhase).data
+            if instance.constructionPhase != None
+            else None
+        )
+        rep["planningPhase"] = (
+            PlanningPhaseSerializer(instance.planningPhase).data
+            if instance.planningPhase != None
+            else None
+        )
+        rep["projectQualityLevel"] = (
+            ProjectQualityLevelSerializer(instance.projectQualityLevel).data
+            if instance.projectQualityLevel != None
             else None
         )
         return rep

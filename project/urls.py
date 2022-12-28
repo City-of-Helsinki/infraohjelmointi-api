@@ -35,15 +35,31 @@ router.register(
 router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
 router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
 router.register(
-    r"construction-phases", views.ConPhaseDetailViewSet, basename="conPhases"
+    r"construction-phase-details",
+    views.ConstructionPhaseDetailViewSet,
+    basename="constructionPhaseDetails",
 )
 router.register(
     r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
 )
 router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")
-
 router.register(r"notes", views.NoteViewSet, basename="notes")
+router.register(
+    r"construction-phases",
+    views.ConstructionPhaseViewSet,
+    basename="constructionPhases",
+)
+router.register(
+    r"planning-phases",
+    views.PlanningPhaseViewSet,
+    basename="planningPhases",
+)
 
+router.register(
+    r"project-quality-levels",
+    views.ProjectQualityLevelViewSet,
+    basename="projectQualityLevels",
+)
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -12,6 +12,10 @@ from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
+from .ProjectQualityLevel import ProjectQualityLevel
+from .ConstructionPhase import ConstructionPhase
+from .PlanningPhase import PlanningPhase
+from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
 
@@ -72,6 +76,55 @@ class Project(models.Model):
     constructionPhaseDetail = models.ForeignKey(
         ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    planningStartYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
+    constructionEndYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
+    budgetOverrunYear = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=0,
+    )
+    budgetOverrunAmount = models.PositiveIntegerField(blank=True, null=True, default=0)
+    projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
+    projectQualityLevel = models.ForeignKey(
+        ProjectQualityLevel, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    projectCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
+
+    planningCostForecast = models.PositiveIntegerField(blank=True, null=True, default=0)
+    planningWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
+    planningPhase = models.ForeignKey(
+        PlanningPhase, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    budgetGroupPercentage = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        default=0,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(100),
+        ],
+    )
+    constructionCostForecast = models.PositiveIntegerField(
+        blank=True, null=True, default=0
+    )
+    constructionPhase = models.ForeignKey(
+        ConstructionPhase, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    constructionWorkQuantity = models.PositiveIntegerField(
+        blank=True, null=True, default=0
+    )
+    budget = models.PositiveIntegerField(blank=True, null=True, default=0)
     estPlanningStart = models.DateField(blank=True, null=True)
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
