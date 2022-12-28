@@ -15,6 +15,7 @@ from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
 from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
+from .ProjectClass import ProjectClass
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -27,6 +28,9 @@ class Project(models.Model):
     )
     category = models.ForeignKey(
         ProjectCategory, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    projectClass = models.ForeignKey(
+        ProjectClass, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)
