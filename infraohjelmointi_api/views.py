@@ -17,6 +17,9 @@ from .serializers import (
     ProjectCategorySerializer,
     ProjectRiskSerializer,
     NoteSerializer,
+    ConstructionPhaseSerializer,
+    PlanningPhaseSerializer,
+    ProjectQualityLevelSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -37,6 +40,33 @@ class BaseViewSet(viewsets.ModelViewSet):
         Overriden ModelViewSet class method to get appropriate queryset using serializer class
         """
         return self.get_serializer_class().Meta.model.objects.all()
+
+
+class ProjectQualityLevelViewSet(BaseViewSet):
+    """
+    API endpoint that allows Project quality levels to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectQualityLevelSerializer
+
+
+class PlanningPhaseViewSet(BaseViewSet):
+    """
+    API endpoint that allows Planning phases to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = PlanningPhaseSerializer
+
+
+class ConstructionPhaseViewSet(BaseViewSet):
+    """
+    API endpoint that allows Construction phases to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ConstructionPhaseSerializer
 
 
 class ProjectViewSet(BaseViewSet):
@@ -92,7 +122,7 @@ class ProjectTypeViewSet(BaseViewSet):
     serializer_class = ProjectTypeSerializer
 
 
-class ConPhaseDetailViewSet(BaseViewSet):
+class ConstructionPhaseDetailViewSet(BaseViewSet):
     """
     API endpoint that allows construction phase details to be viewed or edited.
     """

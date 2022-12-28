@@ -11,6 +11,9 @@ from ..models import ProjectPriority
 from ..models import ProjectCategory
 from ..models import ConstructionPhaseDetail
 from ..models import Note
+from ..models import ProjectQualityLevel
+from ..models import PlanningPhase
+from ..models import ConstructionPhase
 from ..serializers import ProjectGetSerializer
 from ..serializers import NoteSerializer
 
@@ -37,7 +40,11 @@ class ProjectTestCase(TestCase):
     noteId = uuid.UUID("2e91feba-13c1-4b4a-a3a1-ca2030bf8681")
     projectCategoryId = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
     conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
+    projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
+    planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
+    constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
     fixtures = []
+    maxDiff = None
 
     @classmethod
     @override
@@ -53,6 +60,15 @@ class ProjectTestCase(TestCase):
         )
         self.projectCategory = ProjectCategory.objects.create(
             id=self.projectCategoryId, value="K5"
+        )
+        self.constructionPhase = ConstructionPhase.objects.create(
+            id=self.constructionPhaseId, value="planning"
+        )
+        self.planningPhase = PlanningPhase.objects.create(
+            id=self.planningPhaseId, value="projectPlanning"
+        )
+        self.projectQualityLevel = ProjectQualityLevel.objects.create(
+            id=self.projectQualityLevelId, value="A1"
         )
         self.person_1 = Person.objects.create(
             id=self.person_1_Id,
@@ -164,6 +180,22 @@ class ProjectTestCase(TestCase):
             preliminaryCurrentYearPlus10=None,
             louhi=False,
             gravel=False,
+            budget=50,
+            budgetGroupPercentage=50,
+            planningStartYear="2022",
+            constructionEndYear="2030",
+            budgetOverrunYear="2030",
+            budgetOverrunAmount=50,
+            projectWorkQuantity=2,
+            projectQualityLevel=self.projectQualityLevel,
+            projectCostForecast=20,
+            planningCostForecast=20,
+            planningWorkQuantity=2,
+            planningPhase=self.planningPhase,
+            constructionCostForecast=20,
+            constructionWorkQuantity=2,
+            constructionPhase=self.constructionPhase,
+            effectHousing=False,
         )
         self.project.favPersons.add(self.person_1, self.person_2)
 
@@ -254,6 +286,28 @@ class ProjectTestCase(TestCase):
             self.conPhaseDetail.project_set.all().values()[0],
             Project.objects.filter(id=self.projectId).values()[0],
             msg="conPhaseDetail foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+
+        self.assertDictEqual(
+            self.projectQualityLevel.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectQualityLevel foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.planningPhase.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="planningPhase foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.constructionPhase.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="constructionPhase foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
@@ -362,17 +416,23 @@ class ProjectTestCase(TestCase):
 
     def test_POST_project(self):
         data = {
-            "category": None,
-            "effectHousing": False,
-            "hkrId": None,
-            "sapProject": "2814I00708",
-            "sapNetwork": ["55dc9624-2cb1-4c11-b15a-c8c97466d127"],
-            "name": "TEST_PROECT_POST",
-            "address": "Herttoniemi street 123 3b",
-            "description": "TEST_PROJECT_POST_DESCRIPTION",
+            "siteId": None,
+            "hkrId": 12345,
+            "sapProject": None,
+            "sapNetwork": None,
+            "projectSet": None,
+            "entityName": None,
+            "area": None,
+            "type": None,
+            "name": "Test_POST_PROJECT",
+            "address": None,
+            "description": "Description of POST project",
+            "personPlanning": None,
+            "personProgramming": None,
+            "personConstruction": None,
             "phase": None,
             "programmed": True,
-            "entityName": "Entity for POST",
+            "category": None,
             "constructionPhaseDetail": None,
             "estPlanningStart": None,
             "estPlanningEnd": None,
@@ -392,18 +452,10 @@ class ProjectTestCase(TestCase):
             "spentCost": None,
             "riskAssessment": None,
             "priority": None,
-            "locked": False,
+            "locked": True,
             "comments": None,
             "delays": None,
-            "siteId": None,
-            "projectSet": None,
-            "area": None,
-            "type": None,
-            "personPlanning": None,
-            "personProgramming": None,
-            "personConstruction": None,
-            "favPersons": [self.person_1.id.__str__()],
-            "hashTags": ["hash1", "hash2"],
+            "hashTags": None,
             "budgetForecast1CurrentYear": None,
             "budgetForecast2CurrentYear": None,
             "budgetForecast3CurrentYear": None,
@@ -420,6 +472,23 @@ class ProjectTestCase(TestCase):
             "preliminaryCurrentYearPlus10": None,
             "louhi": False,
             "gravel": False,
+            "budget": None,
+            "budgetGroupPercentage": None,
+            "planningStartYear": None,
+            "constructionEndYear": None,
+            "budgetOverrunYear": None,
+            "budgetOverrunAmount": None,
+            "projectWorkQuantity": None,
+            "projectQualityLevel": None,
+            "projectCostForecast": None,
+            "planningCostForecast": None,
+            "planningWorkQuantity": None,
+            "planningPhase": None,
+            "constructionCostForecast": None,
+            "constructionWorkQuantity": None,
+            "constructionPhase": None,
+            "effectHousing": False,
+            "favPersons": [],
         }
         response = self.client.post(
             "/projects/",
@@ -433,6 +502,7 @@ class ProjectTestCase(TestCase):
         new_createdId = res_data["id"]
         del res_data["id"]
         del res_data["projectReadiness"]
+
         self.assertEqual(res_data, data, msg="Created object data != POST data")
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
