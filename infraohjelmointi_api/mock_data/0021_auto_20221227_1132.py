@@ -26,6 +26,7 @@ def get_classes_from_PW_populate(apps, schema_editor):
         )
         if len(response.json()["instances"]) > 0:
             projectProperties = response.json()["instances"][0]["properties"]
+            # Capitalize Classnames
             print(
                 "\n Project Name: {}, Masterclass: {}, Class: {}, SubClass: {}".format(
                     projectProperties["PROJECT_Kadun_tai_puiston_nimi"],

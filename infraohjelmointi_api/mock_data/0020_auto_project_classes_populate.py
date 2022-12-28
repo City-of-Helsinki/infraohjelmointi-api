@@ -5,6 +5,7 @@ from django.db import migrations
 
 def populate_ProjectClasses_data(apps, schema_editor):
     ProjectClass = apps.get_model("infraohjelmointi_api", "ProjectClass")
+    # Capitalize classnames
     projectClasses = [
         {"name": "8 01 KIINTEA OMAISUUS", "parent": None},
         {
