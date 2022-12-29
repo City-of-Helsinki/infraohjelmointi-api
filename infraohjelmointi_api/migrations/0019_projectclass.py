@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
                         to="infraohjelmointi_api.projectclass",
-                        related_name="parentClass",
+                        related_name="childClass",
                     ),
                 ),
             ],
