@@ -214,7 +214,7 @@ class NoteTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
-        del res_data["updatedDate"]
+        del res_data["createdDate"]
 
         self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
