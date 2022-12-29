@@ -322,5 +322,5 @@ class TaskSerializer(serializers.ModelSerializer):
 
 class NoteSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
-        exclude = ["createdDate"]
+        exclude = ["updatedDate"]
         model = Note
