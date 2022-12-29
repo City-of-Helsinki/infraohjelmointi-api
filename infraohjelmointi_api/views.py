@@ -1,6 +1,7 @@
 import uuid
 from rest_framework import viewsets
 from .serializers import (
+    NoteCreateSerializer,
     NoteHistorySerializer,
     ProjectCreateSerializer,
     ProjectGetSerializer,
@@ -17,7 +18,7 @@ from .serializers import (
     ConstructionPhaseDetailSerializer,
     ProjectCategorySerializer,
     ProjectRiskSerializer,
-    NoteSerializer,
+    NoteGetSerializer,
     ConstructionPhaseSerializer,
     PlanningPhaseSerializer,
     ProjectQualityLevelSerializer,
@@ -264,7 +265,17 @@ class NoteViewSet(BaseViewSet):
     """
 
     permission_classes = []
-    serializer_class = NoteSerializer
+
+    @override
+    def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
+        if self.action == "list":
+            return NoteGetSerializer
+        if self.action == "retrieve":
+            return NoteGetSerializer
+        return NoteCreateSerializer
 
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):
@@ -298,8 +309,10 @@ class NoteViewSet(BaseViewSet):
             uuid.UUID(str(userId))
             uuid.UUID(str(pk))
             instance = self.get_object()
-            qs = instance.history.all().filter(updatedBy_id=userId).values()
-            return Response(qs)
+            qs = instance.history.all().filter(updatedBy_id=userId)
+            serializer = NoteHistorySerializer(qs, many=True)
+            return Response(serializer.data)
+
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST

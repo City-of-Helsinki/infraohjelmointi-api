@@ -328,9 +328,26 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
 
 
-class NoteSerializer(serializers.ModelSerializer):
+class NoteGetSerializer(serializers.ModelSerializer):
     updatedBy = NotePersonSerializer(read_only=True)
 
     class Meta(BaseMeta):
         exclude = ["updatedDate"]
         model = Note
+
+
+class NoteCreateSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["updatedBy"] = (
+            NotePersonSerializer(instance.updatedBy).data
+            if instance.updatedBy != None
+            else None
+        )
+
+        return rep
