@@ -28,17 +28,17 @@ class Command(BaseCommand):
         parser.add_argument(
             "--destroy",
             action="store_true",
-            help="Boolean to allow deletion of all data from ProjectClass Table",
+            help="Optional argument to allow deletion of all data from ProjectClass Table",
         )
         parser.add_argument(
-            "--sync",
+            "--sync-with-pw",
             action="store_true",
-            help="Boolean to sync classes from PW to Projects table in DB",
+            help="Optional argument to sync classes from PW to Projects table in DB",
         )
         parser.add_argument(
-            "--populate",
+            "--populate-with-excel",
             action="store_true",
-            help="Boolean to read data from excel and populate the DB",
+            help="Optional argument to read data from excel and populate the DB",
         )
 
     def populateDB(self, row):
@@ -75,7 +75,7 @@ class Command(BaseCommand):
             ProjectClass.objects.all().delete()
             self.stdout.write(self.style.SUCCESS("Deleted all Classes from the DB"))
 
-        if options["populate"]:
+        if options["populate_with_excel"]:
             if os.path.isfile(excelPath):
                 try:
                     classExcel = pd.read_excel(
@@ -109,7 +109,7 @@ class Command(BaseCommand):
                         "Excel file does not exist at {}".format(excelPath)
                     )
                 )
-        if options["sync"]:
+        if options["sync_with_pw"]:
             projects = Project.objects.exclude(hkrId=None)
             session = requests.Session()
             session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
