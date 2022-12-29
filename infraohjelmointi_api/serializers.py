@@ -16,6 +16,7 @@ from .models import (
     PlanningPhase,
     ProjectClass,
     ProjectQualityLevel,
+    ProjectLocation,
     Note,
 )
 from rest_framework import serializers
@@ -25,6 +26,16 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectLocationSerializer(serializers.ModelSerializer):
+    path = serializers.SerializerMethodField()
+
+    class Meta(BaseMeta):
+        model = ProjectLocation
+
+    def get_path(self, obj):
+        return obj.path()
 
 
 class ProjectClassSerializer(serializers.ModelSerializer):
