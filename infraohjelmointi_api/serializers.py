@@ -88,7 +88,15 @@ class PersonSerializer(serializers.ModelSerializer):
         model = Person
 
 
+class NotePersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        fields = ("id", "firstName", "lastName")
+        model = Person
+
+
 class NoteHistorySerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+
     class Meta:
         model = Note.history.model
         fields = "__all__"
@@ -321,6 +329,8 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class NoteSerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+
     class Meta(BaseMeta):
         exclude = ["updatedDate"]
         model = Note

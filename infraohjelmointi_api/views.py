@@ -1,6 +1,7 @@
 import uuid
 from rest_framework import viewsets
 from .serializers import (
+    NoteHistorySerializer,
     ProjectCreateSerializer,
     ProjectGetSerializer,
     ProjectSetGetSerializer,
@@ -273,8 +274,9 @@ class NoteViewSet(BaseViewSet):
         try:
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
-            qs = instance.history.all().values()
-            return Response(qs)
+            qs = instance.history.all()
+            serializer = NoteHistorySerializer(qs, many=True)
+            return Response(serializer.data)
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
