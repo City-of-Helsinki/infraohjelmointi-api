@@ -330,13 +330,32 @@ class TaskSerializer(serializers.ModelSerializer):
 
 class NoteGetSerializer(serializers.ModelSerializer):
     updatedBy = NotePersonSerializer(read_only=True)
+    deleted = serializers.ReadOnlyField()
 
     class Meta(BaseMeta):
         exclude = ["updatedDate"]
         model = Note
 
 
+class ProjectNoteGetSerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+    deleted = serializers.ReadOnlyField()
+
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["history"] = NoteHistorySerializer(instance.history.all(), many=True).data
+
+        return rep
+
+
 class NoteCreateSerializer(serializers.ModelSerializer):
+    deleted = serializers.ReadOnlyField()
+
     class Meta(BaseMeta):
         exclude = ["updatedDate"]
         model = Note

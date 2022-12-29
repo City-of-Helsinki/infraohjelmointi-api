@@ -1,10 +1,12 @@
 import uuid
+from infraohjelmointi_api.models import Note
 from rest_framework import viewsets
 from .serializers import (
     NoteCreateSerializer,
     NoteHistorySerializer,
     ProjectCreateSerializer,
     ProjectGetSerializer,
+    ProjectNoteGetSerializer,
     ProjectSetGetSerializer,
     ProjectSetCreateSerializer,
     ProjectTypeSerializer,
@@ -118,7 +120,9 @@ class ProjectViewSet(BaseViewSet):
         try:
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
-            qs = NoteSerializer(instance.note_set, many=True).data
+            qs = ProjectNoteGetSerializer(
+                instance.note_set.exclude(deleted=True), many=True
+            ).data
             return Response(qs)
         except ValueError:
             return Response(
@@ -266,6 +270,13 @@ class NoteViewSet(BaseViewSet):
 
     permission_classes = []
 
+    # @override
+    # def get_queryset(self):
+    #     """
+    #     Overriden ModelViewSet class method to get appropriate queryset using serializer class
+    #     """
+    #     return self.get_serializer_class().Meta.model.objects.exclude(deleted=True)
+
     @override
     def get_serializer_class(self):
         """
@@ -276,6 +287,17 @@ class NoteViewSet(BaseViewSet):
         if self.action == "retrieve":
             return NoteGetSerializer
         return NoteCreateSerializer
+
+    # @override
+    # def list(self, request, *args, **kwargs):
+    #     """
+    #     Overriding list action to get only notes which have not been deleted
+    #     """
+    #     queryset = self.get_queryset()
+    #     queryset = queryset.exclude(deleted=True)
+    #     serializer = self.get_serializer_class()
+    #     serializedData = serializer(queryset, many=True)
+    #     return Response(serializedData.data)
 
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):
@@ -295,9 +317,13 @@ class NoteViewSet(BaseViewSet):
 
     @override
     def destroy(self, request, *args, **kwargs):
+        """
+        Overriding destroy action to soft delete note on DELETE request
+        """
         note = self.get_object()
         data = note.id
-        note.delete()
+        note.deleted = True
+        note.save()
         return Response({"id": data})
 
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
