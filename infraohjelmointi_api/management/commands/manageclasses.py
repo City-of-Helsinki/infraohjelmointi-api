@@ -85,22 +85,38 @@ class Command(BaseCommand):
             )
             if len(response.json()["instances"]) > 0:
                 projectProperties = response.json()["instances"][0]["properties"]
-                # Capitalize Classnames
-                if projectProperties["PROJECT_Pluokka"] != "":
-                    if (
-                        projectProperties["PROJECT_Alaluokka"] != ""
-                        and projectProperties["PROJECT_Alaluokka"]
-                        != project.projectClass_name
-                    ):
 
-                        project.projectClass = ProjectClass.objects.get(
-                            name=projectProperties["PROJECT_Alaluokka"]
+                if projectProperties["PROJECT_Pluokka"] != "":
+                    masterClass = ProjectClass.objects.get(
+                        name=projectProperties["PROJECT_Pluokka"]
+                    )
+                    if projectProperties["PROJECT_Alaluokka"] != "":
+                        _class = ProjectClass.objects.get(
+                            name=projectProperties["PROJECT_Luokka"]
                         )
-                        print(
-                            "\n  Masterclass: {}, Class: {}, SubClass: {}".format(
-                                projectProperties["PROJECT_Pluokka"],
-                                projectProperties["PROJECT_Luokka"],
-                                projectProperties["PROJECT_Alaluokka"],
+                        project.projectClass = ProjectClass.objects.get(
+                            name=projectProperties["PROJECT_Alaluokka"], parent=_class
+                        )
+                        project.save()
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "Updated projectClass to {} for Project with Id: {}".format(
+                                    projectProperties["PROJECT_Alaluokka"],
+                                    project.id,
+                                )
+                            )
+                        )
+                    elif projectProperties["PROJECT_Luokka"] != "":
+                        project.projectClass = ProjectClass.objects.get(
+                            name=projectProperties["PROJECT_Luokka"], parent=masterClass
+                        )
+                        project.save()
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "Updated projectClass to {} for Project with Id: {}".format(
+                                    projectProperties["PROJECT_Luokka"],
+                                    project.id,
+                                )
                             )
                         )
 
