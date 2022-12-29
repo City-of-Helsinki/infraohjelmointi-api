@@ -8,23 +8,45 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0020_project_projectclass'),
+        ("infraohjelmointi_api", "0020_project_projectclass"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ProjectLocation',
+            name="ProjectLocation",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=150)),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
-                ('parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='parentLocation', to='infraohjelmointi_api.projectlocation')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=150)),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
+                (
+                    "parent",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="childLocation",
+                        to="infraohjelmointi_api.projectlocation",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='project',
-            name='projectLocation',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.projectlocation'),
+            model_name="project",
+            name="projectLocation",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                to="infraohjelmointi_api.projectlocation",
+            ),
         ),
     ]
