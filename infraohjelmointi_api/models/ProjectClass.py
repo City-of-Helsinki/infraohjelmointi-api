@@ -10,7 +10,7 @@ class ProjectClass(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name="parentClass",
+        related_name="childClass",
     )
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)

@@ -54,7 +54,7 @@ class Command(BaseCommand):
                     self.style.SUCCESS("Created Master Class: {}".format(row[0]))
                 )
             if row[1] != None:
-                _class, classExists = masterClass.parentClass.get_or_create(name=row[1])
+                _class, classExists = masterClass.childClass.get_or_create(name=row[1])
                 if classExists:
                     self.stdout.write(
                         self.style.SUCCESS(
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                         )
                     )
                 if row[2] != None:
-                    _, subClassExists = _class.parentClass.get_or_create(name=row[2])
+                    _, subClassExists = _class.childClass.get_or_create(name=row[2])
                     if subClassExists:
                         self.stdout.write(
                             self.style.SUCCESS(
