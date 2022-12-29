@@ -55,7 +55,7 @@ class Command(BaseCommand):
                     self.style.SUCCESS("Created Main District: {}".format(row[0]))
                 )
             if row[1] != None:
-                district, districtExists = mainDistrict.parentLocation.get_or_create(
+                district, districtExists = mainDistrict.childLocation.get_or_create(
                     name=row[1]
                 )
                 if districtExists:
@@ -67,7 +67,7 @@ class Command(BaseCommand):
                         )
                     )
                 if row[2] != None:
-                    _, subDistrictExists = district.parentLocation.get_or_create(
+                    _, subDistrictExists = district.childLocation.get_or_create(
                         name=row[2]
                     )
                     if subDistrictExists:
