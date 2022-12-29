@@ -214,6 +214,7 @@ class NoteTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
+        del res_data["updatedDate"]
 
         self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
@@ -240,8 +241,13 @@ class NoteTestCase(TestCase):
         response = self.client.delete("/notes/{}/".format(self.note_1_Id))
         self.assertEqual(
             response.status_code,
-            204,
+            200,
             msg="Error deleting Note with Id {}".format(self.note_1_Id),
+        )
+        self.assertEqual(
+            response.json()["id"],
+            self.note_1_Id.__str__(),
+            msg="Deleted note Id was not returned in response",
         )
         self.assertEqual(
             Note.objects.filter(id=self.note_1_Id).exists(),
