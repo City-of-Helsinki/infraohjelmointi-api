@@ -16,6 +16,7 @@ class Note(models.Model):
         "Project", on_delete=models.DO_NOTHING, null=False, blank=False
     )
     history = HistoricalRecords(user_model=Person)
+    deleted = models.BooleanField(null=False, default=False)
 
     @property
     def _history_user(self):
