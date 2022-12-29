@@ -1,23 +1,24 @@
 from django.test import TestCase
-from ..models import Project
-from ..models import ProjectArea
-from ..models import ProjectSet
 import uuid
-from ..models import BudgetItem
-from ..models import Person
-from ..models import ProjectType
-from ..models import ProjectPhase
-from ..models import ProjectPriority
-from ..models import ProjectCategory
-from ..models import ConstructionPhaseDetail
-from ..models import Note
-from ..models import ProjectQualityLevel
-from ..models import PlanningPhase
-from ..models import ConstructionPhase
-from ..models import ProjectClass
-from ..models import ProjectLocation
-from ..serializers import ProjectGetSerializer
-from ..serializers import NoteSerializer
+from ..models import (
+    Project,
+    ProjectArea,
+    ProjectSet,
+    BudgetItem,
+    Person,
+    ProjectType,
+    ProjectPhase,
+    ProjectPriority,
+    ProjectCategory,
+    ConstructionPhaseDetail,
+    Note,
+    ProjectQualityLevel,
+    PlanningPhase,
+    ConstructionPhase,
+    ProjectClass,
+    ProjectLocation,
+)
+from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
 
 from rest_framework.renderers import JSONRenderer
 from overrides import override
@@ -590,7 +591,9 @@ class ProjectTestCase(TestCase):
             project=self.project,
         )
         response = self.client.get("/projects/{}/notes/".format(self.projectId))
-        serializer = NoteSerializer(Note.objects.filter(id=self.noteId), many=True)
+        serializer = ProjectNoteGetSerializer(
+            Note.objects.filter(id=self.noteId), many=True
+        )
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)

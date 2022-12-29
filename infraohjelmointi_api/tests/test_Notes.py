@@ -1,8 +1,8 @@
 from django.test import TestCase
 import uuid
-from ..models import Person, Project, ProjectArea, ProjectType, ProjectPhase
+from ..models import Person, Project, ProjectType
 from ..models import Note
-from ..serializers import NoteSerializer, NoteHistorySerializer
+from ..serializers import NoteGetSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
 
@@ -143,7 +143,7 @@ class NoteTestCase(TestCase):
         )
 
         # serialize the model instances
-        serializer = NoteSerializer(Note.objects.all(), many=True)
+        serializer = NoteGetSerializer(Note.objects.all(), many=True)
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
@@ -187,7 +187,7 @@ class NoteTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
 
         # serialize the model instances
-        serializer = NoteSerializer(Note.objects.get(id=self.note_1_Id), many=False)
+        serializer = NoteGetSerializer(Note.objects.get(id=self.note_1_Id), many=False)
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
@@ -216,7 +216,6 @@ class NoteTestCase(TestCase):
         del res_data["id"]
         del res_data["createdDate"]
 
-        self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
             Note.objects.filter(id=new_createdId).exists(),
             True,
@@ -250,7 +249,7 @@ class NoteTestCase(TestCase):
             msg="Deleted note Id was not returned in response",
         )
         self.assertEqual(
-            Note.objects.filter(id=self.note_1_Id).exists(),
-            False,
-            msg="Note with Id {} still exists in DB".format(self.note_1_Id),
+            Note.objects.get(id=self.note_1_Id).deleted,
+            True,
+            msg="Soft delete failed, deleted field != True",
         )
