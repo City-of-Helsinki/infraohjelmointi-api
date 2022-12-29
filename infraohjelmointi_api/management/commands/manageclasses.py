@@ -7,6 +7,8 @@ import urllib3
 import pandas as pd
 import environ
 import numpy as np
+from django.db import transaction
+
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 if path.exists(".env"):
@@ -41,6 +43,7 @@ class Command(BaseCommand):
             help="Optional argument to read data from excel and populate the DB",
         )
 
+    @transaction.atomic
     def populateDB(self, row):
         if row[0] != None:
             masterClass, masterExists = ProjectClass.objects.get_or_create(name=row[0])
@@ -66,6 +69,38 @@ class Command(BaseCommand):
                                 "Created Sub Class: {} with Class: {} and Master Class: {} ".format(
                                     row[2], row[1], row[0]
                                 )
+                            )
+                        )
+
+    @transaction.atomic
+    def syncPW(self):
+        projects = Project.objects.exclude(hkrId=None)
+        session = requests.Session()
+        session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
+        for project in projects:
+            response = session.get(
+                "https://prokkis.hel.fi/ws/v2.8/repositories/Bentley.PW--HELS000601.helsinki1.hki.local~3APWHKIKOUL/PW_WSG_Dynamic/PrType_1121_HKR_Hankerek_Hanke?$filter=PROJECT_HKRHanketunnus+eq+{}".format(
+                    project.hkrId
+                )
+            )
+            if len(response.json()["instances"]) > 0:
+                projectProperties = response.json()["instances"][0]["properties"]
+                # Capitalize Classnames
+                if projectProperties["PROJECT_Pluokka"] != "":
+                    if (
+                        projectProperties["PROJECT_Alaluokka"] != ""
+                        and projectProperties["PROJECT_Alaluokka"]
+                        != project.projectClass_name
+                    ):
+
+                        project.projectClass = ProjectClass.objects.get(
+                            name=projectProperties["PROJECT_Alaluokka"]
+                        )
+                        print(
+                            "\n  Masterclass: {}, Class: {}, SubClass: {}".format(
+                                projectProperties["PROJECT_Pluokka"],
+                                projectProperties["PROJECT_Luokka"],
+                                projectProperties["PROJECT_Alaluokka"],
                             )
                         )
 
@@ -110,22 +145,4 @@ class Command(BaseCommand):
                     )
                 )
         if options["sync_with_pw"]:
-            projects = Project.objects.exclude(hkrId=None)
-            session = requests.Session()
-            session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
-            for project in projects:
-                response = session.get(
-                    "https://prokkis.hel.fi/ws/v2.8/repositories/Bentley.PW--HELS000601.helsinki1.hki.local~3APWHKIKOUL/PW_WSG_Dynamic/PrType_1121_HKR_Hankerek_Hanke?$filter=PROJECT_HKRHanketunnus+eq+{}".format(
-                        project.hkrId
-                    )
-                )
-                if len(response.json()["instances"]) > 0:
-                    projectProperties = response.json()["instances"][0]["properties"]
-                    # Capitalize Classnames
-                    print(
-                        "\n  Masterclass: {}, Class: {}, SubClass: {}".format(
-                            projectProperties["PROJECT_Pluokka"],
-                            projectProperties["PROJECT_Luokka"],
-                            projectProperties["PROJECT_Alaluokka"],
-                        )
-                    )
+            self.syncPW()
