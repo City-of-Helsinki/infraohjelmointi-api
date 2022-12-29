@@ -280,6 +280,13 @@ class NoteViewSet(BaseViewSet):
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+    @override
+    def destroy(self, request, *args, **kwargs):
+        note = self.get_object()
+        data = note.id
+        note.delete()
+        return Response({"id": data})
+
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
     def history_user(self, request, pk, userId):
         """
