@@ -46,7 +46,9 @@ class Command(BaseCommand):
     @transaction.atomic
     def populateDB(self, row):
         if row[0] != None:
-            masterClass, masterExists = ProjectClass.objects.get_or_create(name=row[0])
+            masterClass, masterExists = ProjectClass.objects.get_or_create(
+                name=row[0], parent=None
+            )
             if masterExists:
                 self.stdout.write(
                     self.style.SUCCESS("Created Master Class: {}".format(row[0]))
@@ -87,38 +89,84 @@ class Command(BaseCommand):
                 projectProperties = response.json()["instances"][0]["properties"]
 
                 if projectProperties["PROJECT_Pluokka"] != "":
-                    masterClass = ProjectClass.objects.get(
-                        name=projectProperties["PROJECT_Pluokka"]
-                    )
+                    try:
+                        masterClass = ProjectClass.objects.get(
+                            name=projectProperties["PROJECT_Pluokka"]
+                        )
+                    except ProjectClass.DoesNotExist:
+                        masterClass = None
+                        self.stdout.write(
+                            self.style.ERROR(
+                                "Master Class with name: {} does not exist in local DB".format(
+                                    projectProperties["PROJECT_Pluokka"]
+                                )
+                            )
+                        )
                     if projectProperties["PROJECT_Alaluokka"] != "":
-                        _class = ProjectClass.objects.get(
-                            name=projectProperties["PROJECT_Luokka"]
-                        )
-                        project.projectClass = ProjectClass.objects.get(
-                            name=projectProperties["PROJECT_Alaluokka"], parent=_class
-                        )
-                        project.save()
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                "Updated projectClass to {} for Project with Id: {}".format(
-                                    projectProperties["PROJECT_Alaluokka"],
-                                    project.id,
+                        try:
+                            _class = ProjectClass.objects.get(
+                                name=projectProperties["PROJECT_Luokka"],
+                                parent=masterClass,
+                            )
+                        except ProjectClass.DoesNotExist:
+                            _class = None
+                            self.stdout.write(
+                                self.style.ERROR(
+                                    "Class with name: {} and Master Class: {} does not exist in local DB".format(
+                                        projectProperties["PROJECT_Luokka"],
+                                        projectProperties["PROJECT_Pluokka"],
+                                    )
                                 )
                             )
-                        )
+                        try:
+                            project.projectClass = ProjectClass.objects.get(
+                                name=projectProperties["PROJECT_Alaluokka"],
+                                parent=_class,
+                            )
+                            project.save()
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    "Updated projectClass to {} for Project with Id: {}".format(
+                                        projectProperties["PROJECT_Alaluokka"],
+                                        project.id,
+                                    )
+                                )
+                            )
+                        except ProjectClass.DoesNotExist:
+                            self.stdout.write(
+                                self.style.ERROR(
+                                    "Sub Class with name: {} and Parent Class: {} does not exist in local DB".format(
+                                        projectProperties["PROJECT_Alaluokka"],
+                                        projectProperties["PROJECT_Luokka"],
+                                    )
+                                )
+                            )
+
                     elif projectProperties["PROJECT_Luokka"] != "":
-                        project.projectClass = ProjectClass.objects.get(
-                            name=projectProperties["PROJECT_Luokka"], parent=masterClass
-                        )
-                        project.save()
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                "Updated projectClass to {} for Project with Id: {}".format(
-                                    projectProperties["PROJECT_Luokka"],
-                                    project.id,
+                        try:
+                            project.projectClass = ProjectClass.objects.get(
+                                name=projectProperties["PROJECT_Luokka"],
+                                parent=masterClass,
+                            )
+                            project.save()
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    "Updated projectClass to {} for Project with Id: {}".format(
+                                        projectProperties["PROJECT_Luokka"],
+                                        project.id,
+                                    )
                                 )
                             )
-                        )
+                        except ProjectClass.DoesNotExist:
+                            _class = None
+                            self.stdout.write(
+                                self.style.ERROR(
+                                    "Class with name: {} and Master Class: {} does not exist in local DB".format(
+                                        projectProperties["PROJECT_Luokka"],
+                                        projectProperties["PROJECT_Pluokka"],
+                                    )
+                                )
+                            )
 
     def handle(self, *args, **options):
         excelPath = options["path"]
