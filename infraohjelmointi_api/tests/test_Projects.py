@@ -14,6 +14,7 @@ from ..models import Note
 from ..models import ProjectQualityLevel
 from ..models import PlanningPhase
 from ..models import ConstructionPhase
+from ..models import ProjectClass
 from ..serializers import ProjectGetSerializer
 from ..serializers import NoteSerializer
 
@@ -43,6 +44,9 @@ class ProjectTestCase(TestCase):
     projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
     planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
+    projectClassId = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
+    projectMasterClassId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
+
     fixtures = []
     maxDiff = None
 
@@ -60,6 +64,12 @@ class ProjectTestCase(TestCase):
         )
         self.projectCategory = ProjectCategory.objects.create(
             id=self.projectCategoryId, value="K5"
+        )
+        self.projectMasterClass = ProjectClass.objects.create(
+            id=self.projectMasterClassId, name="Test Master Class", parent=None
+        )
+        self.projectClass = self.projectMasterClass.childClass.create(
+            name="Test Class", id=self.projectClassId
         )
         self.constructionPhase = ConstructionPhase.objects.create(
             id=self.constructionPhaseId, value="planning"
@@ -123,6 +133,7 @@ class ProjectTestCase(TestCase):
         )
 
         self.project = Project.objects.create(
+            projectClass=self.projectClass,
             id=self.projectId,
             siteId=self.budgetItem,
             hkrId=12345,
@@ -272,6 +283,13 @@ class ProjectTestCase(TestCase):
             self.person_1.programming.all().values()[0],
             Project.objects.filter(id=self.projectId).values()[0],
             msg="personProgramming foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
+            self.projectClass.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectClass foreign key does not exist in Project with id {}".format(
                 self.projectId
             ),
         )
@@ -489,6 +507,7 @@ class ProjectTestCase(TestCase):
             "constructionPhase": None,
             "effectHousing": False,
             "favPersons": [],
+            "projectClass": None,
         }
         response = self.client.post(
             "/projects/",
