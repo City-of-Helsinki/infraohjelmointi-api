@@ -14,6 +14,7 @@ from .models import (
     ProjectRisk,
     ConstructionPhase,
     PlanningPhase,
+    ProjectClass,
     ProjectQualityLevel,
     Note,
 )
@@ -24,6 +25,11 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectClassSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectClass
 
 
 class ProjectQualityLevelSerializer(serializers.ModelSerializer):

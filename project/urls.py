@@ -60,6 +60,11 @@ router.register(
     views.ProjectQualityLevelViewSet,
     basename="projectQualityLevels",
 )
+router.register(
+    r"project-classes",
+    views.ProjectClassViewSet,
+    basename="projectClasses",
+)
 
 urlpatterns = [
     path("", include(router.urls)),
