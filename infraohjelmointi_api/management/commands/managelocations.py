@@ -24,11 +24,11 @@ class Command(BaseCommand):
         """
         Adds the following arguments to the managelocations command
 
-        --path <path/to/excel.xlsx>
+        --file <path/to/excel.xlsx>
         --populate-with-excel
         --sync-with-pw
         """
-        ## --path argument, used to provide the path to excel file which contains location data, must give full path
+        ## --file argument, used to provide the path to excel file which contains location data, must give full path
         parser.add_argument(
             "--file",
             type=str,
@@ -62,18 +62,18 @@ class Command(BaseCommand):
         # mainDistrict ->  district -> SubDistrict
         # Each -> above tells that the next district has the previous district as parent
         if row[0] != None:
-            mainDistrict, mainExists = ProjectLocation.objects.get_or_create(
+            mainDistrict, mainCreated = ProjectLocation.objects.get_or_create(
                 name=row[0], parent=None, path=row[0]
             )
-            if mainExists:
+            if mainCreated:
                 self.stdout.write(
                     self.style.SUCCESS("Created Main District: {}".format(row[0]))
                 )
             if row[1] != None:
-                district, districtExists = mainDistrict.childLocation.get_or_create(
+                district, districtCreated = mainDistrict.childLocation.get_or_create(
                     name=row[1], path="{}/{}".format(row[0], row[1])
                 )
-                if districtExists:
+                if districtCreated:
                     self.stdout.write(
                         self.style.SUCCESS(
                             "Created District: {} with Main District: {}".format(
@@ -82,10 +82,10 @@ class Command(BaseCommand):
                         )
                     )
                 if row[2] != None:
-                    _, subDistrictExists = district.childLocation.get_or_create(
+                    _, subDistrictCreated = district.childLocation.get_or_create(
                         name=row[2], path="{}/{}/{}".format(row[0], row[1], row[2])
                     )
-                    if subDistrictExists:
+                    if subDistrictCreated:
                         self.stdout.write(
                             self.style.SUCCESS(
                                 "Created Sub District: {} with District: {} and Main District: {} ".format(
