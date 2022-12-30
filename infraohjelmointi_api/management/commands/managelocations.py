@@ -96,25 +96,44 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def syncPW(self):
+        """
+        Function used to loop through projects in local DB and fetch their location data from PW
+        @transaction.atomic decorator used so that if any error occurs, the whole
+        transaction rollsback any db changes
+        """
+
+        # Get all projects from DB with hkrId != None
         projects = Project.objects.exclude(hkrId=None)
         session = requests.Session()
         session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         for project in projects:
+            # Fetch PW data for each project, filtered by hkrId
             response = session.get(
                 "https://prokkis.hel.fi/ws/v2.8/repositories/Bentley.PW--HELS000601.helsinki1.hki.local~3APWHKIKOUL/PW_WSG_Dynamic/PrType_1121_HKR_Hankerek_Hanke?$filter=PROJECT_HKRHanketunnus+eq+{}".format(
                     project.hkrId
                 )
             )
+            # Check if the project exists on PW
             if len(response.json()["instances"]) > 0:
                 projectProperties = response.json()["instances"][0]["properties"]
 
+                # PROJECT_Suurpiirin_nimi = mainDistrict
+                # PROJECT_Kaupunginosan_nimi = district
+                # PROJECT_Osa_alue = subDistrict
+                # First mainDistrict is checked to exist on PW, if it exists, then subDistrict is checked.
+                # If subDistrict exists, that confirms that district also exists and the subDistrict is assigned to the project.
+                # If mainDistrict exists and subDistrict does not exist, then district is checked, if district exists then it is assigned to the project
+                # A project cannot be assigned only a mainDistrict hence if  mainDistrict does not exist, nothing is assigned to projectLocation
+
+                # Check if mainDistrict exists on PW
                 if projectProperties["PROJECT_Suurpiirin_nimi"] != "":
+                    # Try getting the same mainDistrict from local DB
                     try:
                         mainDistrict = ProjectLocation.objects.get(
-                            name=projectProperties["PROJECT_Suurpiirin_nimi"]
+                            name=projectProperties["PROJECT_Suurpiirin_nimi"],
+                            parent=None,
                         )
                     except ProjectLocation.DoesNotExist:
-                        mainDistrict = None
                         self.stdout.write(
                             self.style.ERROR(
                                 "Main District with name: {} does not exist in local DB".format(
@@ -122,7 +141,9 @@ class Command(BaseCommand):
                                 )
                             )
                         )
+                        continue
 
+                    # Check if SubDistrict exists after checking for mainDistrict
                     if projectProperties["PROJECT_Osa_alue"] != "":
                         try:
                             district = ProjectLocation.objects.get(
@@ -130,7 +151,6 @@ class Command(BaseCommand):
                                 parent=mainDistrict,
                             )
                         except ProjectLocation.DoesNotExist:
-                            district = None
                             self.stdout.write(
                                 self.style.ERROR(
                                     "District with name: {} and Parent: {} does not exist in local DB".format(
@@ -139,6 +159,9 @@ class Command(BaseCommand):
                                     )
                                 )
                             )
+                            continue
+
+                        # District exists and now the child subDistrict can be fetched from DB and assigned to project
                         try:
 
                             project.projectLocation = ProjectLocation.objects.get(
@@ -163,7 +186,10 @@ class Command(BaseCommand):
                                     )
                                 )
                             )
+
+                    # Check if district exists when subDistrict does not exist
                     elif projectProperties["PROJECT_Kaupunginosan_nimi"] != "":
+                        # Fetch district from local DB given mainDistrict as parent
                         try:
                             project.projectLocation = ProjectLocation.objects.get(
                                 name=projectProperties["PROJECT_Kaupunginosan_nimi"],
@@ -189,7 +215,7 @@ class Command(BaseCommand):
                             )
 
     def handle(self, *args, **options):
-        excelPath = options["path"]
+        excelPath = options["file"]
         if options["populate_with_excel"]:
             if os.path.isfile(excelPath):
                 try:
@@ -221,7 +247,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.ERROR(
-                        "Excel file does not exist in local DB at {}".format(excelPath)
+                        "Excel file path is incorrect or missing. Usage: --file path/to/file.xlsx"
                     )
                 )
         if options["sync_with_pw"]:
