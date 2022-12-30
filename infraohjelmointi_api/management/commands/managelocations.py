@@ -63,7 +63,7 @@ class Command(BaseCommand):
         # Each -> above tells that the next district has the previous district as parent
         if row[0] != None:
             mainDistrict, mainExists = ProjectLocation.objects.get_or_create(
-                name=row[0], parent=None
+                name=row[0], parent=None, path=row[0]
             )
             if mainExists:
                 self.stdout.write(
@@ -71,7 +71,7 @@ class Command(BaseCommand):
                 )
             if row[1] != None:
                 district, districtExists = mainDistrict.childLocation.get_or_create(
-                    name=row[1]
+                    name=row[1], path="{}/{}".format(row[0], row[1])
                 )
                 if districtExists:
                     self.stdout.write(
@@ -83,7 +83,7 @@ class Command(BaseCommand):
                     )
                 if row[2] != None:
                     _, subDistrictExists = district.childLocation.get_or_create(
-                        name=row[2]
+                        name=row[2], path="{}/{}/{}".format(row[0], row[1], row[2])
                     )
                     if subDistrictExists:
                         self.stdout.write(
