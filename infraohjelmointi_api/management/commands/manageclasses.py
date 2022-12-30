@@ -131,7 +131,6 @@ class Command(BaseCommand):
                             name=projectProperties["PROJECT_Pluokka"], parent=None
                         )
                     except ProjectClass.DoesNotExist:
-                        masterClass = None
                         self.stdout.write(
                             self.style.ERROR(
                                 "Master Class with name: {} does not exist in local DB".format(
@@ -149,7 +148,7 @@ class Command(BaseCommand):
                                 parent=masterClass,
                             )
                         except ProjectClass.DoesNotExist:
-                            _class = None
+
                             self.stdout.write(
                                 self.style.ERROR(
                                     "Class with name: {} and Master Class: {} does not exist in local DB".format(
@@ -183,7 +182,7 @@ class Command(BaseCommand):
                                     )
                                 )
                             )
-                            continue
+
                     # Check if Class exists when SubClass does not exist
                     elif projectProperties["PROJECT_Luokka"] != "":
                         # Fetch Class from local DB given MasterClass as parent
@@ -202,7 +201,7 @@ class Command(BaseCommand):
                                 )
                             )
                         except ProjectClass.DoesNotExist:
-                            _class = None
+
                             self.stdout.write(
                                 self.style.ERROR(
                                     "Class with name: {} and Master Class: {} does not exist in local DB".format(
@@ -211,7 +210,6 @@ class Command(BaseCommand):
                                     )
                                 )
                             )
-                            continue
 
     def handle(self, *args, **options):
         excelPath = options["file"]
