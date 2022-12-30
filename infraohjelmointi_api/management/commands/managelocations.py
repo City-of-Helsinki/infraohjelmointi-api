@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from infraohjelmointi_api.models import ProjectLocation, Project
 import requests
 import os
@@ -8,7 +8,6 @@ import pandas as pd
 import environ
 import numpy as np
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
@@ -27,11 +26,6 @@ class Command(BaseCommand):
             nargs="?",
             type=str,
             default="/app/infraohjelmointi_api/mock_data/PW_class_location.xlsx",
-        )
-        parser.add_argument(
-            "--destroy",
-            action="store_true",
-            help="Optional argument to allow deletion of all data from ProjectLocation Table",
         )
         parser.add_argument(
             "--sync-with-pw",
@@ -175,10 +169,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         excelPath = options["path"]
-        if options["destroy"]:
-            ProjectLocation.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS("Deleted all Locations from the DB"))
-
         if options["populate_with_excel"]:
             if os.path.isfile(excelPath):
                 try:
