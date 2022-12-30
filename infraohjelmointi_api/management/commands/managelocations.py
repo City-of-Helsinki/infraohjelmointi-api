@@ -108,110 +108,139 @@ class Command(BaseCommand):
         session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         for project in projects:
             # Fetch PW data for each project, filtered by hkrId
-            response = session.get(
-                env("PW_TEST_URL")
-                + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
-            )
-            # Check if the project exists on PW
-            if len(response.json()["instances"]) > 0:
-                projectProperties = response.json()["instances"][0]["properties"]
+            try:
+                response = session.get(
+                    env("PW_API_URL")
+                    + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
+                )
+                # Check if the project exists on PW
+                if response.status_code == 200:
+                    if len(response.json()["instances"]) > 0:
+                        projectProperties = response.json()["instances"][0][
+                            "properties"
+                        ]
 
-                # PROJECT_Suurpiirin_nimi = mainDistrict
-                # PROJECT_Kaupunginosan_nimi = district
-                # PROJECT_Osa_alue = subDistrict
-                # First mainDistrict is checked to exist on PW, if it exists, then subDistrict is checked.
-                # If subDistrict exists, that confirms that district also exists and the subDistrict is assigned to the project.
-                # If mainDistrict exists and subDistrict does not exist, then district is checked, if district exists then it is assigned to the project
-                # A project cannot be assigned only a mainDistrict hence if  mainDistrict does not exist, nothing is assigned to projectLocation
+                        # PROJECT_Suurpiirin_nimi = mainDistrict
+                        # PROJECT_Kaupunginosan_nimi = district
+                        # PROJECT_Osa_alue = subDistrict
+                        # First mainDistrict is checked to exist on PW, if it exists, then subDistrict is checked.
+                        # If subDistrict exists, that confirms that district also exists and the subDistrict is assigned to the project.
+                        # If mainDistrict exists and subDistrict does not exist, then district is checked, if district exists then it is assigned to the project
+                        # A project cannot be assigned only a mainDistrict hence if  mainDistrict does not exist, nothing is assigned to projectLocation
 
-                # Check if mainDistrict exists on PW
-                if projectProperties["PROJECT_Suurpiirin_nimi"] != "":
-                    # Try getting the same mainDistrict from local DB
-                    try:
-                        mainDistrict = ProjectLocation.objects.get(
-                            name=projectProperties["PROJECT_Suurpiirin_nimi"],
-                            parent=None,
-                        )
-                    except ProjectLocation.DoesNotExist:
-                        self.stdout.write(
-                            self.style.ERROR(
-                                "Main District with name: {} does not exist in local DB".format(
-                                    projectProperties["PROJECT_Suurpiirin_nimi"]
+                        # Check if mainDistrict exists on PW
+                        if projectProperties["PROJECT_Suurpiirin_nimi"] != "":
+                            # Try getting the same mainDistrict from local DB
+                            try:
+                                mainDistrict = ProjectLocation.objects.get(
+                                    name=projectProperties["PROJECT_Suurpiirin_nimi"],
+                                    parent=None,
                                 )
-                            )
-                        )
-                        continue
-
-                    # Check if SubDistrict exists after checking for mainDistrict
-                    if projectProperties["PROJECT_Osa_alue"] != "":
-                        try:
-                            district = ProjectLocation.objects.get(
-                                name=projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                parent=mainDistrict,
-                            )
-                        except ProjectLocation.DoesNotExist:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "District with name: {} and Parent: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                        projectProperties["PROJECT_Suurpiirin_nimi"],
+                            except ProjectLocation.DoesNotExist:
+                                self.stdout.write(
+                                    self.style.ERROR(
+                                        "Main District with name: {} does not exist in local DB".format(
+                                            projectProperties["PROJECT_Suurpiirin_nimi"]
+                                        )
                                     )
                                 )
-                            )
-                            continue
+                                continue
 
-                        # District exists and now the child subDistrict can be fetched from DB and assigned to project
-                        try:
+                            # Check if SubDistrict exists after checking for mainDistrict
+                            if projectProperties["PROJECT_Osa_alue"] != "":
+                                try:
+                                    district = ProjectLocation.objects.get(
+                                        name=projectProperties[
+                                            "PROJECT_Kaupunginosan_nimi"
+                                        ],
+                                        parent=mainDistrict,
+                                    )
+                                except ProjectLocation.DoesNotExist:
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "District with name: {} and Parent: {} does not exist in local DB".format(
+                                                projectProperties[
+                                                    "PROJECT_Kaupunginosan_nimi"
+                                                ],
+                                                projectProperties[
+                                                    "PROJECT_Suurpiirin_nimi"
+                                                ],
+                                            )
+                                        )
+                                    )
+                                    continue
 
-                            project.projectLocation = ProjectLocation.objects.get(
-                                name=projectProperties["PROJECT_Osa_alue"],
-                                parent=district,
-                            )
-                            project.save()
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    "Updated projectLocation to {} for Project with Id: {}".format(
-                                        projectProperties["PROJECT_Osa_alue"],
-                                        project.id,
-                                    )
-                                )
-                            )
-                        except ProjectLocation.DoesNotExist:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "Sub District with name: {} and parent: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Osa_alue"],
-                                        projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                    )
-                                )
-                            )
+                                # District exists and now the child subDistrict can be fetched from DB and assigned to project
+                                try:
 
-                    # Check if district exists when subDistrict does not exist
-                    elif projectProperties["PROJECT_Kaupunginosan_nimi"] != "":
-                        # Fetch district from local DB given mainDistrict as parent
-                        try:
-                            project.projectLocation = ProjectLocation.objects.get(
-                                name=projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                parent=mainDistrict,
-                            )
-                            project.save()
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    "Updated projectClass to {} for Project with Id: {}".format(
-                                        projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                        project.id,
+                                    project.projectLocation = (
+                                        ProjectLocation.objects.get(
+                                            name=projectProperties["PROJECT_Osa_alue"],
+                                            parent=district,
+                                        )
                                     )
-                                )
-                            )
-                        except ProjectLocation.DoesNotExist:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "District with name: {} and parent: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Kaupunginosan_nimi"],
-                                        projectProperties["PROJECT_Suurpiirin_nimi"],
+                                    project.save()
+                                    self.stdout.write(
+                                        self.style.SUCCESS(
+                                            "Updated projectLocation to {} for Project with Id: {}".format(
+                                                projectProperties["PROJECT_Osa_alue"],
+                                                project.id,
+                                            )
+                                        )
                                     )
-                                )
-                            )
+                                except ProjectLocation.DoesNotExist:
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "Sub District with name: {} and parent: {} does not exist in local DB".format(
+                                                projectProperties["PROJECT_Osa_alue"],
+                                                projectProperties[
+                                                    "PROJECT_Kaupunginosan_nimi"
+                                                ],
+                                            )
+                                        )
+                                    )
+
+                            # Check if district exists when subDistrict does not exist
+                            elif projectProperties["PROJECT_Kaupunginosan_nimi"] != "":
+                                # Fetch district from local DB given mainDistrict as parent
+                                try:
+                                    project.projectLocation = (
+                                        ProjectLocation.objects.get(
+                                            name=projectProperties[
+                                                "PROJECT_Kaupunginosan_nimi"
+                                            ],
+                                            parent=mainDistrict,
+                                        )
+                                    )
+                                    project.save()
+                                    self.stdout.write(
+                                        self.style.SUCCESS(
+                                            "Updated projectClass to {} for Project with Id: {}".format(
+                                                projectProperties[
+                                                    "PROJECT_Kaupunginosan_nimi"
+                                                ],
+                                                project.id,
+                                            )
+                                        )
+                                    )
+                                except ProjectLocation.DoesNotExist:
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "District with name: {} and parent: {} does not exist in local DB".format(
+                                                projectProperties[
+                                                    "PROJECT_Kaupunginosan_nimi"
+                                                ],
+                                                projectProperties[
+                                                    "PROJECT_Suurpiirin_nimi"
+                                                ],
+                                            )
+                                        )
+                                    )
+                else:
+                    self.stdout.write(self.style.ERROR(response.json()))
+
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(e))
 
     def handle(self, *args, **options):
         excelPath = options["file"]
