@@ -29,7 +29,7 @@ class Command(BaseCommand):
         --sync-with-pw
         """
 
-        ## --path argument, used to provide the path to excel file which contains class data, must give full path
+        ## --file argument, used to provide the path to excel file which contains class data, must give full path
         parser.add_argument(
             "--file",
             type=str,
