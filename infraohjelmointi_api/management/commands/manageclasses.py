@@ -31,10 +31,10 @@ class Command(BaseCommand):
 
         ## --path argument, used to provide the path to excel file which contains class data, must give full path
         parser.add_argument(
-            "path",
-            nargs="?",
+            "--file",
             type=str,
-            default="/app/infraohjelmointi_api/mock_data/PW_class_location.xlsx",
+            required=True,
+            help="Required argument - Give full path to the excel file containing Class data",
         )
         ## --sync-with-pw argument, used to tell the script to fetch classes for each project
         ## from PW and assign them classes as defined in PW
@@ -214,7 +214,7 @@ class Command(BaseCommand):
                             continue
 
     def handle(self, *args, **options):
-        excelPath = options["path"]
+        excelPath = options["file"]
 
         if options["populate_with_excel"]:
             if os.path.isfile(excelPath):
