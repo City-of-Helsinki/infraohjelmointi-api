@@ -110,7 +110,7 @@ class Command(BaseCommand):
             # Fetch PW data for each project, filtered by hkrId
             try:
                 response = session.get(
-                    env("PW_TEST_URL")
+                    env("PW_API_URL")
                     + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
                 )
                 if response.status_code == 200:
