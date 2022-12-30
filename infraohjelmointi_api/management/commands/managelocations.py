@@ -109,9 +109,8 @@ class Command(BaseCommand):
         for project in projects:
             # Fetch PW data for each project, filtered by hkrId
             response = session.get(
-                "https://prokkis.hel.fi/ws/v2.8/repositories/Bentley.PW--HELS000601.helsinki1.hki.local~3APWHKIKOUL/PW_WSG_Dynamic/PrType_1121_HKR_Hankerek_Hanke?$filter=PROJECT_HKRHanketunnus+eq+{}".format(
-                    project.hkrId
-                )
+                env("PW_TEST_URL")
+                + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
             )
             # Check if the project exists on PW
             if len(response.json()["instances"]) > 0:
