@@ -287,6 +287,13 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertDictEqual(
+            self.projectClass.project_set.all().values()[0],
+            Project.objects.filter(id=self.projectId).values()[0],
+            msg="projectClass foreign key does not exist in Project with id {}".format(
+                self.projectId
+            ),
+        )
+        self.assertDictEqual(
             self.projectCategory.project_set.all().values()[0],
             Project.objects.filter(id=self.projectId).values()[0],
             msg="projectCategory foreign key does not exist in Project with id {}".format(
