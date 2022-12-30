@@ -33,8 +33,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--file",
             type=str,
-            required=True,
-            help="Required argument - Give full path to the excel file containing Class data",
+            help="Argument to give full path to the excel file containing Class data, Usage: --file /folder/foler/file.xlsx",
+            default="",
         )
         ## --sync-with-pw argument, used to tell the script to fetch classes for each project
         ## from PW and assign them classes as defined in PW
@@ -247,7 +247,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.ERROR(
-                        "Excel file does not exist at {}".format(excelPath)
+                        "Excel file path is incorrect or missing. Usage: --file path/to/file.xlsx"
                     )
                 )
         if options["sync_with_pw"]:
