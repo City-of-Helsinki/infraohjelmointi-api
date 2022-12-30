@@ -29,13 +29,8 @@ class BaseMeta:
 
 
 class ProjectLocationSerializer(serializers.ModelSerializer):
-    path = serializers.SerializerMethodField()
-
     class Meta(BaseMeta):
         model = ProjectLocation
-
-    def get_path(self, obj):
-        return obj.path()
 
 
 class ProjectClassSerializer(serializers.ModelSerializer):

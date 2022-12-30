@@ -14,12 +14,4 @@ class ProjectLocation(models.Model):
     )
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
-
-    def path(self):
-        current = self
-        path = []
-        while current != None:
-            path.insert(0, current.name)
-            current = current.parent
-
-        return "/".join(path)
+    path = models.CharField(max_length=300, blank=True, null=True)

@@ -18,20 +18,32 @@ env = environ.Env()
 
 
 class Command(BaseCommand):
-    help = "Populates the DB with correct project location hierarchy"
+    help = "Populates the DB with correct project class hierarchy. Usage: python manage.py managelocations <arguments>"
 
     def add_arguments(self, parser):
+        """
+        Adds the following arguments to the managelocations command
+
+        --path <path/to/excel.xlsx>
+        --populate-with-excel
+        --sync-with-pw
+        """
+        ## --path argument, used to provide the path to excel file which contains location data, must give full path
         parser.add_argument(
-            "path",
-            nargs="?",
+            "--file",
             type=str,
-            default="/app/infraohjelmointi_api/mock_data/PW_class_location.xlsx",
+            help="Argument to give full path to the excel file containing Location data, Usage: --file /folder/foler/file.xlsx",
+            default="",
         )
+        ## --sync-with-pw argument, used to tell the script to fetch classes for each project
+        ## from PW and assign them locations as defined in PW
         parser.add_argument(
             "--sync-with-pw",
             action="store_true",
             help="Optional argument to sync locations from PW to Projects table in DB",
         )
+        ## --populate-with-excel, used to tell the script to populate local db with
+        ## location data using the path provided in the --path argument
         parser.add_argument(
             "--populate-with-excel",
             action="store_true",
@@ -40,6 +52,15 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def populateDB(self, row):
+        """
+        Function used to populate the DB by looping through each row of excel data
+        @transaction.atomic decorator used so that if any error occurs, the whole
+        transaction rollsback any db changes
+        """
+
+        # DB populated in the following order
+        # mainDistrict ->  district -> SubDistrict
+        # Each -> above tells that the next district has the previous district as parent
         if row[0] != None:
             mainDistrict, mainExists = ProjectLocation.objects.get_or_create(
                 name=row[0], parent=None
