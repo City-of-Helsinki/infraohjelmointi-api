@@ -28,11 +28,6 @@ class Command(BaseCommand):
             default="/app/infraohjelmointi_api/mock_data/PW_class_location.xlsx",
         )
         parser.add_argument(
-            "--destroy",
-            action="store_true",
-            help="Optional argument to allow deletion of all data from ProjectClass Table",
-        )
-        parser.add_argument(
             "--sync-with-pw",
             action="store_true",
             help="Optional argument to sync classes from PW to Projects table in DB",
@@ -170,9 +165,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         excelPath = options["path"]
-        if options["destroy"]:
-            ProjectClass.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS("Deleted all Classes from the DB"))
 
         if options["populate_with_excel"]:
             if os.path.isfile(excelPath):
