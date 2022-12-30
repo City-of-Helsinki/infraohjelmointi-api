@@ -361,6 +361,36 @@ class NoteCreateSerializer(serializers.ModelSerializer):
         model = Note
 
     @override
+    def create(self, validated_data):
+        note = Note(
+            content=validated_data["content"],
+            updatedBy=validated_data["updatedBy"],
+            project=validated_data["project"],
+        )
+
+        note.save_without_historical_record()
+        return note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["updatedBy"] = (
+            NotePersonSerializer(instance.updatedBy).data
+            if instance.updatedBy != None
+            else None
+        )
+
+        return rep
+
+
+class NoteUpdateSerializer(serializers.ModelSerializer):
+    deleted = serializers.ReadOnlyField()
+
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["updatedBy"] = (

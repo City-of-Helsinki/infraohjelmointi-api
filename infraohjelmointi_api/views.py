@@ -23,6 +23,7 @@ from .serializers import (
     NoteGetSerializer,
     ConstructionPhaseSerializer,
     PlanningPhaseSerializer,
+    NoteUpdateSerializer,
     ProjectQualityLevelSerializer,
     ProjectLocationSerializer,
     ProjectClassSerializer,
@@ -279,7 +280,9 @@ class NoteViewSet(BaseViewSet):
             return NoteGetSerializer
         if self.action == "retrieve":
             return NoteGetSerializer
-        return NoteCreateSerializer
+        if self.action == "create":
+            return NoteCreateSerializer
+        return NoteUpdateSerializer
 
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):

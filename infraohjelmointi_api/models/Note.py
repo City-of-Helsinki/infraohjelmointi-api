@@ -18,6 +18,14 @@ class Note(models.Model):
     history = HistoricalRecords(user_model=Person)
     deleted = models.BooleanField(null=False, default=False)
 
+    def save_without_historical_record(self, *args, **kwargs):
+        self.skip_history_when_saving = True
+        try:
+            ret = self.save(*args, **kwargs)
+        finally:
+            del self.skip_history_when_saving
+        return ret
+
     @property
     def _history_user(self):
         return self.updatedBy
