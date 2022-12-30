@@ -22,9 +22,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         """
-        Adds the following arguments to the manageclasses command
+        Add the following arguments to the manageclasses command
 
-        --path <path/to/excel.xlsx>
+        --file <path/to/excel.xlsx>
         --populate-with-excel
         --sync-with-pw
         """
