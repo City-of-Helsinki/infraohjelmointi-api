@@ -33,7 +33,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--file",
             type=str,
-            help="Argument to give full path to the excel file containing Class data, Usage: --file /folder/foler/file.xlsx",
+            help="Argument to give full path to the excel file containing Class data, Usage: --file /folder/folder/file.xlsx",
             default="",
         )
         ## --sync-with-pw argument, used to tell the script to fetch classes for each project
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             help="Optional argument to sync classes from PW to Projects table in DB",
         )
         ## --populate-with-excel, used to tell the script to populate local db with
-        ## class data using the path provided in the --path argument
+        ## class data using the path provided in the --file argument
         parser.add_argument(
             "--populate-with-excel",
             action="store_true",
@@ -62,18 +62,18 @@ class Command(BaseCommand):
         # Masterclass -> Class -> Subclass
         # Each -> above tells that the next class has the previous class as parent
         if row[0] != None:
-            masterClass, masterExists = ProjectClass.objects.get_or_create(
+            masterClass, masterCreated = ProjectClass.objects.get_or_create(
                 name=row[0], parent=None, path=row[0]
             )
-            if masterExists:
+            if masterCreated:
                 self.stdout.write(
                     self.style.SUCCESS("Created Master Class: {}".format(row[0]))
                 )
             if row[1] != None:
-                _class, classExists = masterClass.childClass.get_or_create(
+                _class, classCreated = masterClass.childClass.get_or_create(
                     name=row[1], path="{}/{}".format(row[0], row[1])
                 )
-                if classExists:
+                if classCreated:
                     self.stdout.write(
                         self.style.SUCCESS(
                             "Created Class: {} with Master Class: {}".format(
@@ -82,10 +82,10 @@ class Command(BaseCommand):
                         )
                     )
                 if row[2] != None:
-                    _, subClassExists = _class.childClass.get_or_create(
+                    _, subClassCreated = _class.childClass.get_or_create(
                         name=row[2], path="{}/{}/{}".format(row[0], row[1], row[2])
                     )
-                    if subClassExists:
+                    if subClassCreated:
                         self.stdout.write(
                             self.style.SUCCESS(
                                 "Created Sub Class: {} with Class: {} and Master Class: {} ".format(
