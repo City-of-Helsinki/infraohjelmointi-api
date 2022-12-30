@@ -108,108 +108,117 @@ class Command(BaseCommand):
         session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         for project in projects:
             # Fetch PW data for each project, filtered by hkrId
-            response = session.get(
-                env("PW_TEST_URL")
-                + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
-            )
-            # Check if the project exists on PW
-            if len(response.json()["instances"]) > 0:
-                projectProperties = response.json()["instances"][0]["properties"]
-                # PROJECT_Pluokka = MasterClas
-                # PROJECT_Luokka = Class
-                # PROJECT_Alaluokka = Subclass
-                # First MasterClass is checked to exist on PW, if it exists, then Subclass is checked.
-                # If subclass exists, that confirms that class also exists and the subclass is assigned to the project.
-                # If Masterclass exists and subclass does not exist, then Class is checked, if class exists then it is assigned to the project
-                # A project cannot be assigned only a Masterclass hence if master class does not exist, nothing is assigned to project
+            try:
+                response = session.get(
+                    env("PW_TEST_URL")
+                    + "?$filter=PROJECT_HKRHanketunnus+eq+{}".format(project.hkrId)
+                )
+                if response.status_code == 200:
+                    # Check if the project exists on PW
+                    if len(response.json()["instances"]) > 0:
+                        projectProperties = response.json()["instances"][0][
+                            "properties"
+                        ]
+                        # PROJECT_Pluokka = MasterClas
+                        # PROJECT_Luokka = Class
+                        # PROJECT_Alaluokka = Subclass
+                        # First MasterClass is checked to exist on PW, if it exists, then Subclass is checked.
+                        # If subclass exists, that confirms that class also exists and the subclass is assigned to the project.
+                        # If Masterclass exists and subclass does not exist, then Class is checked, if class exists then it is assigned to the project
+                        # A project cannot be assigned only a Masterclass hence if master class does not exist, nothing is assigned to project
 
-                # Check if MasterClass exists on PW
-                if projectProperties["PROJECT_Pluokka"] != "":
-                    # Try getting the same Masterclass from local DB
-                    try:
-                        masterClass = ProjectClass.objects.get(
-                            name=projectProperties["PROJECT_Pluokka"], parent=None
-                        )
-                    except ProjectClass.DoesNotExist:
-                        self.stdout.write(
-                            self.style.ERROR(
-                                "Master Class with name: {} does not exist in local DB".format(
-                                    projectProperties["PROJECT_Pluokka"]
+                        # Check if MasterClass exists on PW
+                        if projectProperties["PROJECT_Pluokka"] != "":
+                            # Try getting the same Masterclass from local DB
+                            try:
+                                masterClass = ProjectClass.objects.get(
+                                    name=projectProperties["PROJECT_Pluokka"],
+                                    parent=None,
                                 )
-                            )
-                        )
-                        continue
-                    # Check if SubClass exists after checking for Masterclass
-                    if projectProperties["PROJECT_Alaluokka"] != "":
-                        # Subclass exists so class should exists in local DB to move forward
-                        try:
-                            _class = ProjectClass.objects.get(
-                                name=projectProperties["PROJECT_Luokka"],
-                                parent=masterClass,
-                            )
-                        except ProjectClass.DoesNotExist:
+                            except ProjectClass.DoesNotExist:
+                                self.stdout.write(
+                                    self.style.ERROR(
+                                        "Master Class with name: {} does not exist in local DB".format(
+                                            projectProperties["PROJECT_Pluokka"]
+                                        )
+                                    )
+                                )
+                                continue
+                            # Check if SubClass exists after checking for Masterclass
+                            if projectProperties["PROJECT_Alaluokka"] != "":
+                                # Subclass exists so class should exists in local DB to move forward
+                                try:
+                                    _class = ProjectClass.objects.get(
+                                        name=projectProperties["PROJECT_Luokka"],
+                                        parent=masterClass,
+                                    )
+                                except ProjectClass.DoesNotExist:
 
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "Class with name: {} and Master Class: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Luokka"],
-                                        projectProperties["PROJECT_Pluokka"],
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "Class with name: {} and Master Class: {} does not exist in local DB".format(
+                                                projectProperties["PROJECT_Luokka"],
+                                                projectProperties["PROJECT_Pluokka"],
+                                            )
+                                        )
                                     )
-                                )
-                            )
-                            continue
-                        # Class exists and now the child subclass can be fetched from DB and assigned to project
-                        try:
-                            project.projectClass = ProjectClass.objects.get(
-                                name=projectProperties["PROJECT_Alaluokka"],
-                                parent=_class,
-                            )
-                            project.save()
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    "Updated projectClass to {} for Project with Id: {}".format(
-                                        projectProperties["PROJECT_Alaluokka"],
-                                        project.id,
+                                    continue
+                                # Class exists and now the child subclass can be fetched from DB and assigned to project
+                                try:
+                                    project.projectClass = ProjectClass.objects.get(
+                                        name=projectProperties["PROJECT_Alaluokka"],
+                                        parent=_class,
                                     )
-                                )
-                            )
-                        except ProjectClass.DoesNotExist:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "Sub Class with name: {} and Parent Class: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Alaluokka"],
-                                        projectProperties["PROJECT_Luokka"],
+                                    project.save()
+                                    self.stdout.write(
+                                        self.style.SUCCESS(
+                                            "Updated projectClass to {} for Project with Id: {}".format(
+                                                projectProperties["PROJECT_Alaluokka"],
+                                                project.id,
+                                            )
+                                        )
                                     )
-                                )
-                            )
+                                except ProjectClass.DoesNotExist:
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "Sub Class with name: {} and Parent Class: {} does not exist in local DB".format(
+                                                projectProperties["PROJECT_Alaluokka"],
+                                                projectProperties["PROJECT_Luokka"],
+                                            )
+                                        )
+                                    )
 
-                    # Check if Class exists when SubClass does not exist
-                    elif projectProperties["PROJECT_Luokka"] != "":
-                        # Fetch Class from local DB given MasterClass as parent
-                        try:
-                            project.projectClass = ProjectClass.objects.get(
-                                name=projectProperties["PROJECT_Luokka"],
-                                parent=masterClass,
-                            )
-                            project.save()
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    "Updated projectClass to {} for Project with Id: {}".format(
-                                        projectProperties["PROJECT_Luokka"],
-                                        project.id,
+                            # Check if Class exists when SubClass does not exist
+                            elif projectProperties["PROJECT_Luokka"] != "":
+                                # Fetch Class from local DB given MasterClass as parent
+                                try:
+                                    project.projectClass = ProjectClass.objects.get(
+                                        name=projectProperties["PROJECT_Luokka"],
+                                        parent=masterClass,
                                     )
-                                )
-                            )
-                        except ProjectClass.DoesNotExist:
+                                    project.save()
+                                    self.stdout.write(
+                                        self.style.SUCCESS(
+                                            "Updated projectClass to {} for Project with Id: {}".format(
+                                                projectProperties["PROJECT_Luokka"],
+                                                project.id,
+                                            )
+                                        )
+                                    )
+                                except ProjectClass.DoesNotExist:
 
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    "Class with name: {} and Master Class: {} does not exist in local DB".format(
-                                        projectProperties["PROJECT_Luokka"],
-                                        projectProperties["PROJECT_Pluokka"],
+                                    self.stdout.write(
+                                        self.style.ERROR(
+                                            "Class with name: {} and Master Class: {} does not exist in local DB".format(
+                                                projectProperties["PROJECT_Luokka"],
+                                                projectProperties["PROJECT_Pluokka"],
+                                            )
+                                        )
                                     )
-                                )
-                            )
+                else:
+                    self.stdout.write(self.style.ERROR(response.json()))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(e))
 
     def handle(self, *args, **options):
         excelPath = options["file"]
