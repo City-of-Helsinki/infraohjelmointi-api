@@ -425,13 +425,13 @@ class Migration(migrations.Migration):
             "0009_alter_project_options_project_category_and_more",
         ),
     ]
-
+    # NO NEED TO RUN THIS ONE BECAUSE THERE IS A COMMAND TO RUN DATA FROM EXCEL
     operations = [
-        migrations.RunPython(
-            partial(
-                migrateExcel,
-                budgetExcelPath="/app/infraohjelmointi_api/mock_data/budget23.xlsx",
-                planExcelPath="/app/infraohjelmointi_api/mock_data/plan23.xlsx",
-            )
-        ),
+        # migrations.RunPython(
+        #     partial(
+        #         migrateExcel,
+        #         budgetExcelPath="/app/infraohjelmointi_api/mock_data/budget23.xlsx",
+        #         planExcelPath="/app/infraohjelmointi_api/mock_data/plan23.xlsx",
+        #     )
+        # ),
     ]
