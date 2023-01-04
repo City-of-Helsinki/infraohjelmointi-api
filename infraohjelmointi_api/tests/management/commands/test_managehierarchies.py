@@ -235,7 +235,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
             call_command(
                 "managehierarchies",
                 "--populate-with-excel",
-                file="/tmp/notexisting.xsls",
+                file="notexisting.xsls",
                 stdout=out,
             )
 
@@ -256,7 +256,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
             call_command(
                 "managehierarchies",
                 "--populate-with-excel",
-                file="/tmp/notexisting.xsls",
+                file="notexisting.xsls",
             )
             # only Master Class, Class, and Subclass should remain in DB
             projectClasses = ProjectClass.objects.all()
@@ -277,7 +277,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
             call_command(
                 "managehierarchies",
                 "--populate-with-excel",
-                file="/tmp/notexisting.xsls",
+                file="notexisting.xsls",
                 stdout=out,
             )
             projectClasses = ProjectClass.objects.all()
@@ -303,7 +303,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
             call_command(
                 "managehierarchies",
                 "--populate-with-excel",
-                file="/tmp/notexisting.xsls",
+                file="notexisting.xsls",
                 stdout=out,
             )
             projectClasses = ProjectClass.objects.all()
@@ -342,7 +342,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
             call_command(
                 "managehierarchies",
                 "--populate-with-excel",
-                file="/tmp/notexisting.xsls",
+                file="notexisting.xsls",
                 stdout=out,
             )
             projectClasses = ProjectClass.objects.all()
