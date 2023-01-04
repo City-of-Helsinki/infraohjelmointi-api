@@ -2,6 +2,8 @@ import random
 import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as lazy
+
+from .ProjectLocation import ProjectLocation
 from .ProjectSet import ProjectSet
 from .ProjectArea import ProjectArea
 from .BudgetItem import BudgetItem
@@ -31,6 +33,9 @@ class Project(models.Model):
     )
     projectClass = models.ForeignKey(
         ProjectClass, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    projectLocation = models.ForeignKey(
+        ProjectLocation, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)

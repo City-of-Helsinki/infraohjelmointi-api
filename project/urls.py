@@ -65,6 +65,11 @@ router.register(
     views.ProjectClassViewSet,
     basename="projectClasses",
 )
+router.register(
+    r"project-locations",
+    views.ProjectLocationViewSet,
+    basename="projectLocations",
+)
 
 urlpatterns = [
     path("", include(router.urls)),
