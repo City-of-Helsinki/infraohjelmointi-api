@@ -1,8 +1,12 @@
 import uuid
+from infraohjelmointi_api.models import Note
 from rest_framework import viewsets
 from .serializers import (
+    NoteCreateSerializer,
+    NoteHistorySerializer,
     ProjectCreateSerializer,
     ProjectGetSerializer,
+    ProjectNoteGetSerializer,
     ProjectSetGetSerializer,
     ProjectSetCreateSerializer,
     ProjectTypeSerializer,
@@ -16,9 +20,10 @@ from .serializers import (
     ConstructionPhaseDetailSerializer,
     ProjectCategorySerializer,
     ProjectRiskSerializer,
-    NoteSerializer,
+    NoteGetSerializer,
     ConstructionPhaseSerializer,
     PlanningPhaseSerializer,
+    NoteUpdateSerializer,
     ProjectQualityLevelSerializer,
     ProjectLocationSerializer,
     ProjectClassSerializer,
@@ -116,7 +121,9 @@ class ProjectViewSet(BaseViewSet):
         try:
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
-            qs = NoteSerializer(instance.note_set, many=True).data
+            qs = ProjectNoteGetSerializer(
+                instance.note_set.exclude(deleted=True), many=True
+            ).data
             return Response(qs)
         except ValueError:
             return Response(
@@ -263,7 +270,19 @@ class NoteViewSet(BaseViewSet):
     """
 
     permission_classes = []
-    serializer_class = NoteSerializer
+
+    @override
+    def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
+        if self.action == "list":
+            return NoteGetSerializer
+        if self.action == "retrieve":
+            return NoteGetSerializer
+        if self.action == "create":
+            return NoteCreateSerializer
+        return NoteUpdateSerializer
 
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):
@@ -273,12 +292,24 @@ class NoteViewSet(BaseViewSet):
         try:
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
-            qs = instance.history.all().values()
-            return Response(qs)
+            qs = instance.history.all()
+            serializer = NoteHistorySerializer(qs, many=True)
+            return Response(serializer.data)
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @override
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriding destroy action to soft delete note on DELETE request
+        """
+        note = self.get_object()
+        data = note.id
+        note.deleted = True
+        note.save()
+        return Response({"id": data})
 
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
     def history_user(self, request, pk, userId):
@@ -289,8 +320,10 @@ class NoteViewSet(BaseViewSet):
             uuid.UUID(str(userId))
             uuid.UUID(str(pk))
             instance = self.get_object()
-            qs = instance.history.all().filter(updatedBy_id=userId).values()
-            return Response(qs)
+            qs = instance.history.all().filter(updatedBy_id=userId)
+            serializer = NoteHistorySerializer(qs, many=True)
+            return Response(serializer.data)
+
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
