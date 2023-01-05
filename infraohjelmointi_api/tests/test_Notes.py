@@ -114,9 +114,9 @@ class NoteTestCase(TestCase):
             msg="Last Note instance in history doesn't contain the old content",
         )
         self.assertEqual(
-            note.history.most_recent().content,
-            new_content,
-            msg="Latest instance of Note doesn't contain the latest content",
+            note.history.latest().content,
+            old_content,
+            msg="Latest Note instance in history doesn't contain the latest content",
         )
 
     def test_GET_all_notes(self):
