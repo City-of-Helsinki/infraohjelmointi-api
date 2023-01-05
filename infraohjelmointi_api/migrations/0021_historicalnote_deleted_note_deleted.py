@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0018_auto_constructionphase_planningphase_qualitylevel_populate'),
+        ("infraohjelmointi_api", "0020_projectlocation_project_projectlocation"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='historicalnote',
-            name='deleted',
+            model_name="historicalnote",
+            name="deleted",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='note',
-            name='deleted',
+            model_name="note",
+            name="deleted",
             field=models.BooleanField(default=False),
         ),
     ]
