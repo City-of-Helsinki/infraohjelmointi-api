@@ -88,7 +88,15 @@ class PersonSerializer(serializers.ModelSerializer):
         model = Person
 
 
+class NotePersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        fields = ("id", "firstName", "lastName")
+        model = Person
+
+
 class NoteHistorySerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+
     class Meta:
         model = Note.history.model
         fields = "__all__"
@@ -320,6 +328,75 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
 
 
-class NoteSerializer(serializers.ModelSerializer):
+class NoteGetSerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+    deleted = serializers.ReadOnlyField()
+
     class Meta(BaseMeta):
+        exclude = ["updatedDate"]
         model = Note
+
+
+class ProjectNoteGetSerializer(serializers.ModelSerializer):
+    updatedBy = NotePersonSerializer(read_only=True)
+    deleted = serializers.ReadOnlyField()
+
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["history"] = NoteHistorySerializer(instance.history.all(), many=True).data
+
+        return rep
+
+
+class NoteCreateSerializer(serializers.ModelSerializer):
+    deleted = serializers.ReadOnlyField()
+
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
+    def create(self, validated_data):
+        note = Note(
+            content=validated_data["content"],
+            updatedBy=validated_data["updatedBy"],
+            project=validated_data["project"],
+        )
+
+        note.save_without_historical_record()
+        return note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["updatedBy"] = (
+            NotePersonSerializer(instance.updatedBy).data
+            if instance.updatedBy != None
+            else None
+        )
+
+        return rep
+
+
+class NoteUpdateSerializer(serializers.ModelSerializer):
+    deleted = serializers.ReadOnlyField()
+
+    class Meta(BaseMeta):
+        exclude = ["updatedDate"]
+        model = Note
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["updatedBy"] = (
+            NotePersonSerializer(instance.updatedBy).data
+            if instance.updatedBy != None
+            else None
+        )
+
+        return rep

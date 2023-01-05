@@ -1,10 +1,11 @@
 import uuid
 from django.db import models
 from .Person import Person
-from simple_history.models import HistoricalRecords
+import logging
+from .HistoricalModel import HistoricalModel
 
 
-class Note(models.Model):
+class Note(HistoricalModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     content = models.TextField(blank=True, null=False, default="")
     updatedBy = models.ForeignKey(
@@ -15,7 +16,10 @@ class Note(models.Model):
     project = models.ForeignKey(
         "Project", on_delete=models.DO_NOTHING, null=False, blank=False
     )
-    history = HistoricalRecords(user_model=Person)
+
+    deleted = models.BooleanField(null=False, default=False)
+
+    history_fields = ["content", "_history_user"]
 
     @property
     def _history_user(self):

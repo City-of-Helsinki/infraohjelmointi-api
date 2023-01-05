@@ -33,6 +33,7 @@ env = environ.Env(
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
+    LOG_LEVEL=(str, "INFO"),
 )
 
 if path.exists(".env"):
@@ -153,4 +154,29 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "console": {
+            "format": "%(asctime)s %(levelname)s %(pathname)s:%(lineno)d %(message)s",
+            "datefmt": "[%d/%b/%Y %H:%M:%S]",
+        },
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "console"},
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env("LOG_LEVEL"),
+    },
+    "loggers": {
+        "infraohjelmointi_api": {
+            "handlers": ["console"],
+            "level": env("LOG_LEVEL"),
+            "propagate": False,
+        },
+    },
 }

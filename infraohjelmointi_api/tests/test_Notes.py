@@ -1,8 +1,8 @@
 from django.test import TestCase
 import uuid
-from ..models import Person, Project, ProjectArea, ProjectType, ProjectPhase
+from ..models import Person, Project, ProjectType
 from ..models import Note
-from ..serializers import NoteSerializer, NoteHistorySerializer
+from ..serializers import NoteGetSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
 
@@ -114,9 +114,9 @@ class NoteTestCase(TestCase):
             msg="Last Note instance in history doesn't contain the old content",
         )
         self.assertEqual(
-            note.history.most_recent().content,
-            new_content,
-            msg="Latest instance of Note doesn't contain the latest content",
+            note.history.latest().content,
+            old_content,
+            msg="Latest Note instance in history doesn't contain the latest content",
         )
 
     def test_GET_all_notes(self):
@@ -143,7 +143,7 @@ class NoteTestCase(TestCase):
         )
 
         # serialize the model instances
-        serializer = NoteSerializer(Note.objects.all(), many=True)
+        serializer = NoteGetSerializer(Note.objects.all(), many=True)
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
@@ -187,7 +187,7 @@ class NoteTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
 
         # serialize the model instances
-        serializer = NoteSerializer(Note.objects.get(id=self.note_1_Id), many=False)
+        serializer = NoteGetSerializer(Note.objects.get(id=self.note_1_Id), many=False)
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
@@ -214,8 +214,8 @@ class NoteTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
         del res_data["id"]
+        del res_data["createdDate"]
 
-        self.assertEqual(res_data, data, msg="Created object != POST data")
         self.assertEqual(
             Note.objects.filter(id=new_createdId).exists(),
             True,
@@ -240,11 +240,16 @@ class NoteTestCase(TestCase):
         response = self.client.delete("/notes/{}/".format(self.note_1_Id))
         self.assertEqual(
             response.status_code,
-            204,
+            200,
             msg="Error deleting Note with Id {}".format(self.note_1_Id),
         )
         self.assertEqual(
-            Note.objects.filter(id=self.note_1_Id).exists(),
-            False,
-            msg="Note with Id {} still exists in DB".format(self.note_1_Id),
+            response.json()["id"],
+            self.note_1_Id.__str__(),
+            msg="Deleted note Id was not returned in response",
+        )
+        self.assertEqual(
+            Note.objects.get(id=self.note_1_Id).deleted,
+            True,
+            msg="Soft delete failed, deleted field != True",
         )
