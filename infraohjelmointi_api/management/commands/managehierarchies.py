@@ -214,11 +214,6 @@ class Command(BaseCommand):
             or projectProperties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
             == ""
         ):
-            print(
-                "Project '{}' in PW has no responsible zone".format(
-                    project.id,
-                )
-            )
             self.stdout.write(
                 self.style.ERROR(
                     "Project '{}' in PW has no responsible zone".format(
@@ -260,14 +255,12 @@ class Command(BaseCommand):
         session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         # load responsible zones from db
         responsibleZones = {rz.value: rz for rz in ResponsibleZone.objects.all()}
-        print(responsibleZones)
         # acceptable zones
         responsibleZonesMap = {
             "Pohjoinen": responsibleZones["north"],
             "Itä": responsibleZones["east"],
             "Länsi": responsibleZones["west"],
         }
-        print(responsibleZonesMap)
 
         pw_api_url = env("PW_API_URL")
         for project in projects:
