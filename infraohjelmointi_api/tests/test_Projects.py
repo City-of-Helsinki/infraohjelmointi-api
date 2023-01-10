@@ -527,6 +527,8 @@ class ProjectTestCase(TestCase):
             "favPersons": [],
             "projectLocation": None,
             "projectClass": None,
+            "projectProgram": None,
+            "responsibleZone": None
         }
         response = self.client.post(
             "/projects/",

@@ -18,6 +18,7 @@ from .ProjectQualityLevel import ProjectQualityLevel
 from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
 from .ProjectClass import ProjectClass
+from .ResponsibleZone import ResponsibleZone
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -219,6 +220,11 @@ class Project(models.Model):
     preliminaryCurrentYearPlus10 = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
+    responsibleZone = models.ForeignKey(
+        ResponsibleZone, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+
+    projectProgram = models.TextField(max_length=15000, blank=True, null=True)
 
     delays = models.CharField(max_length=200, blank=True, null=True)
     hashTags = models.JSONField(blank=True, null=True)

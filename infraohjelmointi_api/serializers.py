@@ -18,6 +18,7 @@ from .models import (
     ProjectQualityLevel,
     ProjectLocation,
     Note,
+    ResponsibleZone,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -118,6 +119,11 @@ class ProjectAreaSerializer(serializers.ModelSerializer):
         exclude = ["createdDate", "updatedDate", "location"]
 
 
+class ProjectResponsibleZoneSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ResponsibleZone
+
+
 class ProjectSetGetSerializer(serializers.ModelSerializer):
     sapProjects = serializers.SerializerMethodField()
     sapNetworks = serializers.SerializerMethodField()
@@ -175,6 +181,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     constructionPhase = ConstructionPhaseSerializer(read_only=True)
     planningPhase = PlanningPhaseSerializer(read_only=True)
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
+    responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
 
     class Meta(BaseMeta):
         model = Project
@@ -313,6 +320,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         rep["projectQualityLevel"] = (
             ProjectQualityLevelSerializer(instance.projectQualityLevel).data
             if instance.projectQualityLevel != None
+            else None
+        )
+        rep["responsibleZone"] = (
+            ProjectResponsibleZoneSerializer(instance.planningPhase).data
+            if instance.responsibleZone != None
             else None
         )
         return rep
