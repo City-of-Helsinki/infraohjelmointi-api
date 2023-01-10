@@ -1,5 +1,10 @@
 from django.core.management.base import BaseCommand, CommandError
-from infraohjelmointi_api.models import ProjectClass, Project, ProjectLocation
+from infraohjelmointi_api.models import (
+    ProjectClass,
+    Project,
+    ProjectLocation,
+    ResponsibleZone,
+)
 import requests
 import os
 from os import path
@@ -198,6 +203,49 @@ class Command(BaseCommand):
                     style=self.style,
                 )
 
+    def proceedWithProjectResponsibleZone(
+        self,
+        project: Project,
+        projectProperties,
+        responsibleZonesMap: dict,
+    ):
+        if (
+            not "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan" in projectProperties
+            or projectProperties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
+            == ""
+        ):
+            print(
+                "Project '{}' in PW has no responsible zone".format(
+                    project.id,
+                )
+            )
+            self.stdout.write(
+                self.style.ERROR(
+                    "Project '{}' in PW has no responsible zone".format(
+                        project.id,
+                    )
+                )
+            )
+            return
+
+        responsibleZone = projectProperties[
+            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"
+        ].capitalize()
+        if not responsibleZone in responsibleZonesMap:
+            self.stdout.write(
+                self.style.ERROR(
+                    "Uknown responsible zone '{}' receieved from ProjectWise for project '{}'".format(
+                        responsibleZone,
+                        project.id,
+                    )
+                )
+            )
+            return
+
+        mappedResponsibleZone = responsibleZonesMap[responsibleZone]
+        setattr(project, "responsibleZone", mappedResponsibleZone)
+        project.save()
+
     @transaction.atomic
     def syncPW(self):
         """
@@ -210,6 +258,16 @@ class Command(BaseCommand):
         projects = Project.objects.exclude(hkrId=None)
         session = requests.Session()
         session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
+        # load responsible zones from db
+        responsibleZones = {rz.value: rz for rz in ResponsibleZone.objects.all()}
+        print(responsibleZones)
+        # acceptable zones
+        responsibleZonesMap = {
+            "Pohjoinen": responsibleZones["north"],
+            "Itä": responsibleZones["east"],
+            "Länsi": responsibleZones["west"],
+        }
+        print(responsibleZonesMap)
 
         pw_api_url = env("PW_API_URL")
         for project in projects:
@@ -237,6 +295,12 @@ class Command(BaseCommand):
 
                 self.proceedWithProjectLocations(
                     project=project, projectProperties=projectProperties
+                )
+
+                self.proceedWithProjectResponsibleZone(
+                    project=project,
+                    projectProperties=projectProperties,
+                    responsibleZonesMap=responsibleZonesMap,
                 )
 
             except Exception as e:
