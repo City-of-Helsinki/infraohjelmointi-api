@@ -27,6 +27,7 @@ from .serializers import (
     ProjectQualityLevelSerializer,
     ProjectLocationSerializer,
     ProjectClassSerializer,
+    ProjectResponsibleZoneSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -83,6 +84,15 @@ class PlanningPhaseViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = PlanningPhaseSerializer
+
+
+class ProjectResponsibleZoneViewSet(BaseViewSet):
+    """
+    API endpoint that allows Planning responsible zones to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectResponsibleZoneSerializer
 
 
 class ConstructionPhaseViewSet(BaseViewSet):

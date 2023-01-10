@@ -71,6 +71,12 @@ router.register(
     basename="projectLocations",
 )
 
+router.register(
+    r"responsible-zones",
+    views.ProjectResponsibleZoneViewSet,
+    basename="responsibleZones",
+)
+
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),

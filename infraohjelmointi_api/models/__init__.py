@@ -17,3 +17,4 @@ from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
 from .ProjectClass import ProjectClass
 from .ProjectLocation import ProjectLocation
+from .ResponsibleZone import ResponsibleZone
