@@ -146,6 +146,10 @@ class Project(models.Model):
     louhi = models.BooleanField(default=False)
     gravel = models.BooleanField(default=False)
 
+    masterPlanAreaNumber = models.TextField(max_length=20, blank=True, null=True)
+    trafficPlanNumber = models.TextField(max_length=20, blank=True, null=True)
+    bridgeNumber = models.TextField(max_length=20, blank=True, null=True)
+
     perfAmount = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
