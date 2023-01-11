@@ -323,7 +323,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             else None
         )
         rep["responsibleZone"] = (
-            ProjectResponsibleZoneSerializer(instance.planningPhase).data
+            ProjectResponsibleZoneSerializer(instance.responsibleZone).data
             if instance.responsibleZone != None
             else None
         )
