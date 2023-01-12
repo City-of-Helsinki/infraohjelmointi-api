@@ -454,3 +454,88 @@ class ManageHierarchiesCommandTestCase(TestCase):
             project.projectLocation == None,
             "Project must not have location",
         )
+
+    @mock.patch("requests.Session")
+    def test_With_SyncWithPW_Only_CannotSetResponsibleZoneDueToUnknownValue(
+        self, session_mock
+    ):
+
+        session_mock.return_value.get.return_value = _mock_response(
+            json_data={
+                "instances": [
+                    {
+                        "properties": {
+                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "Eteläinen",
+                        }
+                    }
+                ]
+            }
+        )
+
+        call_command(
+            "managehierarchies",
+            "--sync-with-pw",
+        )
+
+        project = Project.objects.get(id=PROJECT_ID)
+        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
+        self.assertTrue(
+            project.responsibleZone == None,
+            "Project must not have responsible zone",
+        )
+
+    @mock.patch("requests.Session")
+    def test_With_SyncWithPW_Only_CannotSetResponsibleZoneDueToEmptyValue(
+        self, session_mock
+    ):
+
+        session_mock.return_value.get.return_value = _mock_response(
+            json_data={
+                "instances": [
+                    {
+                        "properties": {
+                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "",
+                        }
+                    }
+                ]
+            }
+        )
+
+        call_command(
+            "managehierarchies",
+            "--sync-with-pw",
+        )
+
+        project = Project.objects.get(id=PROJECT_ID)
+        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
+        self.assertTrue(
+            project.responsibleZone == None,
+            "Project must not have responsible zone",
+        )
+
+    @mock.patch("requests.Session")
+    def test_With_SyncWithPW_Only_SetResponsibleZone(self, session_mock):
+
+        session_mock.return_value.get.return_value = _mock_response(
+            json_data={
+                "instances": [
+                    {
+                        "properties": {
+                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "Pohjoinen",
+                        }
+                    }
+                ]
+            }
+        )
+
+        call_command(
+            "managehierarchies",
+            "--sync-with-pw",
+        )
+
+        project = Project.objects.get(id=PROJECT_ID)
+        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
+        self.assertTrue(
+            project.responsibleZone.value == "north",
+            "Project must not have responsible zone",
+        )

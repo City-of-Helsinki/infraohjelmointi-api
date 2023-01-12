@@ -528,7 +528,10 @@ class ProjectTestCase(TestCase):
             "projectLocation": None,
             "projectClass": None,
             "projectProgram": None,
-            "responsibleZone": None
+            "responsibleZone": None,
+            "bridgeNumber": None,
+            "masterPlanAreaNumber": None,
+            "trafficPlanNumber": None,
         }
         response = self.client.post(
             "/projects/",
