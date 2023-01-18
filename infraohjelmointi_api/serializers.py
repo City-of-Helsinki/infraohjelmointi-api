@@ -19,7 +19,7 @@ from .models import (
     ProjectLocation,
     Note,
     ResponsibleZone,
-    ProjectHashtag,
+    ProjectHashTag,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -32,7 +32,7 @@ class BaseMeta:
 
 class ProjectHashtagSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
-        model = ProjectHashtag
+        model = ProjectHashTag
 
 
 class ProjectLocationSerializer(serializers.ModelSerializer):
