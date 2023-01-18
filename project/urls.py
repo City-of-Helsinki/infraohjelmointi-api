@@ -77,6 +77,11 @@ router.register(
     basename="responsibleZones",
 )
 
+router.register(
+    r"project-hashtags",
+    views.ProjectHashtagViewSet,
+    basename="projectHashtags",
+)
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),
