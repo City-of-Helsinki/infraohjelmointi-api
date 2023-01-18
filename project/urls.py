@@ -80,7 +80,7 @@ router.register(
 router.register(
     r"project-hashtags",
     views.ProjectHashtagViewSet,
-    basename="projectHashtags",
+    basename="projectHashTags",
 )
 urlpatterns = [
     path("", include(router.urls)),

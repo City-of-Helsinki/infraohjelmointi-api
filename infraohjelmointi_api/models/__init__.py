@@ -18,4 +18,4 @@ from .PlanningPhase import PlanningPhase
 from .ProjectClass import ProjectClass
 from .ProjectLocation import ProjectLocation
 from .ResponsibleZone import ResponsibleZone
-from .ProjectHashtag import ProjectHashtag
+from .ProjectHashTag import ProjectHashTag

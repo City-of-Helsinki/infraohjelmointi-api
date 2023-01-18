@@ -4,8 +4,8 @@ from django.db import migrations, models
 import uuid
 
 
-def populate_ProjectHashtags_data(apps, schema_editor):
-    ProjectHashtag = apps.get_model("infraohjelmointi_api", "ProjectHashtag")
+def populate_ProjectHashTags_data(apps, schema_editor):
+    ProjectHashTag = apps.get_model("infraohjelmointi_api", "ProjectHashTag")
     projectHashtags = [
         "leikkipaikka",
         "leikkipuisto",
@@ -32,7 +32,7 @@ def populate_ProjectHashtags_data(apps, schema_editor):
         "baana",
     ]
     for hashtag in projectHashtags:
-        ProjectHashtag.objects.create(value=hashtag)
+        ProjectHashTag.objects.create(value=hashtag)
 
 
 class Migration(migrations.Migration):
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name="ProjectHashtag",
+            name="ProjectHashTag",
             fields=[
                 (
                     "id",
@@ -76,5 +76,5 @@ class Migration(migrations.Migration):
                 to="infraohjelmointi_api.projecthashtag",
             ),
         ),
-        migrations.RunPython(populate_ProjectHashtags_data),
+        migrations.RunPython(populate_ProjectHashTags_data),
     ]
