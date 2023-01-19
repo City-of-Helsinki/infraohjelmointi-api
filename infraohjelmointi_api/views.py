@@ -1,5 +1,8 @@
 import uuid
-from infraohjelmointi_api.models import Note
+from infraohjelmointi_api.models import Note, Project
+from django.db import models
+import django_filters
+
 from rest_framework import viewsets
 from .serializers import (
     NoteCreateSerializer,
@@ -40,6 +43,7 @@ from rest_framework.decorators import action
 
 from django.core import serializers
 from overrides import override
+from django_filters.rest_framework import DjangoFilterBackend
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -114,6 +118,14 @@ class ConstructionPhaseViewSet(BaseViewSet):
     serializer_class = ConstructionPhaseSerializer
 
 
+class ProjectFilter(django_filters.FilterSet):
+    sapNetwork = django_filters.CharFilter(lookup_expr="icontains")
+
+    class Meta:
+        fields = "__all__"
+        model = Project
+
+
 class ProjectViewSet(BaseViewSet):
     """
     API endpoint that allows projects to be viewed or edited.
@@ -121,6 +133,9 @@ class ProjectViewSet(BaseViewSet):
 
     permission_classes = []
     pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ProjectFilter
+    filterset_fields = "__all__"
 
     @override
     def get_serializer_class(self):
