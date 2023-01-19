@@ -1,7 +1,8 @@
 import uuid
-from infraohjelmointi_api.models import Note, Project
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
 from django.db import models
 import django_filters
+from django.db.models import Q
 
 from rest_framework import viewsets
 from .serializers import (
@@ -119,10 +120,47 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-    sapNetwork = django_filters.CharFilter(lookup_expr="icontains")
+    masterClass = django_filters.UUIDFilter(
+        field_name="projectClass", method="filter_class"
+    )
+    Class = django_filters.UUIDFilter(field_name="projectClass", method="filter_class")
+    subClass = django_filters.UUIDFilter(
+        field_name="projectClass", method="filter_class"
+    )
+
+    masterDistrict = django_filters.UUIDFilter(
+        field_name="projectLocation", method="filter_district"
+    )
+    district = django_filters.UUIDFilter(
+        field_name="projectLocation", method="filter_district"
+    )
+    subDistrict = django_filters.UUIDFilter(
+        field_name="projectLocation", method="filter_district"
+    )
+
+    def filter_class(self, queryset, name, value):
+        _class = ProjectClass.objects.get(id=value)
+        return queryset.filter(
+            Q(projectClass=_class)
+            | Q(projectClass__parent=_class)
+            | Q(projectClass__parent__parent=_class)
+        )
+
+    def filter_district(self, queryset, name, value):
+        district = ProjectLocation.objects.get(id=value)
+        return queryset.filter(
+            Q(projectLocation=district)
+            | Q(projectLocation__parent=district)
+            | Q(projectLocation__parent__parent=district)
+        )
 
     class Meta:
-        fields = "__all__"
+        fields = {
+            "hkrId": ["exact"],
+            "programmed": ["exact"],
+            "category": ["exact"],
+            "hkrId": ["exact"],
+        }
         model = Project
 
 
