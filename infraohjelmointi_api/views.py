@@ -137,9 +137,7 @@ class ProjectFilter(django_filters.FilterSet):
     subDistrict = django_filters.UUIDFilter(
         field_name="projectLocation", method="filter_district"
     )
-    subDistrict = django_filters.UUIDFilter(
-        field_name="projectLocation", method="filter_district"
-    )
+
     searchStr = django_filters.CharFilter(method="filter_search_string", label="Search")
 
     def filter_search_string(self, queryset, name, value):
