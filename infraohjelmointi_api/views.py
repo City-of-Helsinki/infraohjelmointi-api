@@ -1,5 +1,6 @@
 import uuid
 from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
+from rest_framework.exceptions import APIException
 from django.db import models
 import django_filters
 from django.db.models import Q
@@ -120,13 +121,13 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-    masterClass = django_filters.UUIDFilter(
-        field_name="projectClass", method="filter_class"
-    )
-    Class = django_filters.UUIDFilter(field_name="projectClass", method="filter_class")
-    subClass = django_filters.UUIDFilter(
-        field_name="projectClass", method="filter_class"
-    )
+    # masterClass = django_filters.UUIDFilter(
+    #     field_name="projectClass", method="filter_class"
+    # )
+    # Class = django_filters.UUIDFilter(field_name="projectClass", method="filter_class")
+    # subClass = django_filters.UUIDFilter(
+    #     field_name="projectClass", method="filter_class"
+    # )
 
     masterDistrict = django_filters.UUIDFilter(
         field_name="projectLocation", method="filter_district"
@@ -145,13 +146,13 @@ class ProjectFilter(django_filters.FilterSet):
             Q(name__icontains=value) | Q(hashTags__value__icontains=value)
         )
 
-    def filter_class(self, queryset, name, value):
-        _class = ProjectClass.objects.get(id=value)
-        return queryset.filter(
-            Q(projectClass=_class)
-            | Q(projectClass__parent=_class)
-            | Q(projectClass__parent__parent=_class)
-        )
+    # def filter_class(self, queryset, name, value):
+    #     _class = ProjectClass.objects.get(id=value)
+    #     return queryset.filter(
+    #         Q(projectClass=_class)
+    #         | Q(projectClass__parent=_class)
+    #         | Q(projectClass__parent__parent=_class)
+    #     )
 
     def filter_district(self, queryset, name, value):
         district = ProjectLocation.objects.get(id=value)
@@ -169,6 +170,12 @@ class ProjectFilter(django_filters.FilterSet):
             "hkrId": ["exact"],
         }
         model = Project
+
+
+class ServiceUnavailable(APIException):
+    status_code = 503
+    default_detail = "Service temporarily unavailable, try again later."
+    default_code = "service_unavailable"
 
 
 class ProjectViewSet(BaseViewSet):
@@ -192,6 +199,25 @@ class ProjectViewSet(BaseViewSet):
         if self.action == "retrieve":
             return ProjectGetSerializer
         return ProjectCreateSerializer
+
+    @override
+    def get_queryset(self):
+        masterClass = self.request.query_params.getlist("masterClass", [])
+        _class = self.request.query_params.getlist("class", [])
+        subClass = self.request.query_params.getlist("subClass", [])
+        classes = [*masterClass, *_class, *subClass]
+        try:
+
+            if len(classes) > 0:
+                return Project.objects.filter(
+                    Q(projectClass__in=classes)
+                    | Q(projectClass__parent__in=classes)
+                    | Q(projectClass__parent__parent__in=classes)
+                )
+
+            return super().get_queryset()
+        except Exception as e:
+            raise APIException(detail={"error": e})
 
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
