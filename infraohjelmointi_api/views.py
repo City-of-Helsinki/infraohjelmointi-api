@@ -129,15 +129,15 @@ class ProjectFilter(django_filters.FilterSet):
     #     field_name="projectClass", method="filter_class"
     # )
 
-    masterDistrict = django_filters.UUIDFilter(
-        field_name="projectLocation", method="filter_district"
-    )
-    district = django_filters.UUIDFilter(
-        field_name="projectLocation", method="filter_district"
-    )
-    subDistrict = django_filters.UUIDFilter(
-        field_name="projectLocation", method="filter_district"
-    )
+    # masterDistrict = django_filters.UUIDFilter(
+    #     field_name="projectLocation", method="filter_district"
+    # )
+    # district = django_filters.UUIDFilter(
+    #     field_name="projectLocation", method="filter_district"
+    # )
+    # subDistrict = django_filters.UUIDFilter(
+    #     field_name="projectLocation", method="filter_district"
+    # )
 
     searchStr = django_filters.CharFilter(method="filter_search_string", label="Search")
 
@@ -167,7 +167,6 @@ class ProjectFilter(django_filters.FilterSet):
             "hkrId": ["exact"],
             "programmed": ["exact"],
             "category": ["exact"],
-            "hkrId": ["exact"],
         }
         model = Project
 
@@ -202,20 +201,32 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def get_queryset(self):
+        qs = super().get_queryset()
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
         classes = [*masterClass, *_class, *subClass]
+
+        masterDistrict = self.request.query_params.getlist("masterDistrict", [])
+        district = self.request.query_params.getlist("district", [])
+        subDistrict = self.request.query_params.getlist("subDistrict", [])
+        districts = [*masterDistrict, *district, *subDistrict]
         try:
 
             if len(classes) > 0:
-                return Project.objects.filter(
+                qs = qs.filter(
                     Q(projectClass__in=classes)
                     | Q(projectClass__parent__in=classes)
                     | Q(projectClass__parent__parent__in=classes)
                 )
+            if len(districts) > 0:
+                qs = qs.filter(
+                    Q(projectLocation__in=districts)
+                    | Q(projectLocation__parent__in=districts)
+                    | Q(projectLocation__parent__parent__in=districts)
+                )
 
-            return super().get_queryset()
+            return qs
         except Exception as e:
             raise APIException(detail={"error": e})
 
