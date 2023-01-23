@@ -121,45 +121,12 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-    # masterClass = django_filters.UUIDFilter(
-    #     field_name="projectClass", method="filter_class"
-    # )
-    # Class = django_filters.UUIDFilter(field_name="projectClass", method="filter_class")
-    # subClass = django_filters.UUIDFilter(
-    #     field_name="projectClass", method="filter_class"
-    # )
-
-    # masterDistrict = django_filters.UUIDFilter(
-    #     field_name="projectLocation", method="filter_district"
-    # )
-    # district = django_filters.UUIDFilter(
-    #     field_name="projectLocation", method="filter_district"
-    # )
-    # subDistrict = django_filters.UUIDFilter(
-    #     field_name="projectLocation", method="filter_district"
-    # )
 
     searchStr = django_filters.CharFilter(method="filter_search_string", label="Search")
 
     def filter_search_string(self, queryset, name, value):
         return queryset.filter(
             Q(name__icontains=value) | Q(hashTags__value__icontains=value)
-        )
-
-    # def filter_class(self, queryset, name, value):
-    #     _class = ProjectClass.objects.get(id=value)
-    #     return queryset.filter(
-    #         Q(projectClass=_class)
-    #         | Q(projectClass__parent=_class)
-    #         | Q(projectClass__parent__parent=_class)
-    #     )
-
-    def filter_district(self, queryset, name, value):
-        district = ProjectLocation.objects.get(id=value)
-        return queryset.filter(
-            Q(projectLocation=district)
-            | Q(projectLocation__parent=district)
-            | Q(projectLocation__parent__parent=district)
         )
 
     class Meta:
