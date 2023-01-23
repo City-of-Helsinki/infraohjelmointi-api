@@ -4,8 +4,9 @@ from django.db import migrations, models
 import uuid
 
 
-def populate_ProjectHashTags_data(apps, schema_editor):
+def populateProjectHashTags(apps, schema_editor):
     ProjectHashTag = apps.get_model("infraohjelmointi_api", "ProjectHashTag")
+    # Predefined hashtags
     projectHashtags = [
         "leikkipaikka",
         "leikkipuisto",
@@ -76,5 +77,5 @@ class Migration(migrations.Migration):
                 to="infraohjelmointi_api.projecthashtag",
             ),
         ),
-        migrations.RunPython(populate_ProjectHashTags_data),
+        migrations.RunPython(populateProjectHashTags),
     ]
