@@ -28,6 +28,7 @@ from .serializers import (
     ProjectLocationSerializer,
     ProjectClassSerializer,
     ProjectResponsibleZoneSerializer,
+    ProjectHashtagSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -48,6 +49,15 @@ class BaseViewSet(viewsets.ModelViewSet):
         Overriden ModelViewSet class method to get appropriate queryset using serializer class
         """
         return self.get_serializer_class().Meta.model.objects.all()
+
+
+class ProjectHashtagViewSet(BaseViewSet):
+    """
+    API endpoint that allows Project Hashtags to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectHashtagSerializer
 
 
 class ProjectLocationViewSet(BaseViewSet):

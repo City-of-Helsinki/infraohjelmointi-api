@@ -19,6 +19,7 @@ from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
 from .ProjectClass import ProjectClass
 from .ResponsibleZone import ResponsibleZone
+from .ProjectHashTag import ProjectHashTag
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -231,7 +232,9 @@ class Project(models.Model):
     projectProgram = models.TextField(max_length=15000, blank=True, null=True)
 
     delays = models.CharField(max_length=200, blank=True, null=True)
-    hashTags = models.JSONField(blank=True, null=True)
+    hashTags = models.ManyToManyField(
+        ProjectHashTag, related_name="relatedProject", null=True, blank=True
+    )
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
