@@ -1128,12 +1128,64 @@ class ProjectTestCase(TestCase):
                 self.projectMainDistrict_3_Id, "rain"
             ),
         )
-        print(response.json())
+
         self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, \
                 with the string 'rain' appearing in either name or hashTag fields. Found: {}".format(
                 self.projectMainDistrict_3_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?mainDistrict={}&mainDistrict={}".format(
+                self.projectMainDistrict_2_Id, self.projectMainDistrict_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            4,
+            msg="Filtered result should contain 4 projects belonging to mainDistrict Id: {} or {}, directly or indirectly. Found: {}".format(
+                self.projectMainDistrict_2_Id,
+                self.projectMainDistrict_3_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?mainDistrict={}&programmed={}".format(
+                self.projectMainDistrict_3_Id, "false"
+            ),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectMainDistrict_3_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?masterClass={}&subClass={}".format(
+                self.projectMasterClass_2_Id, self.projectSubClass_2_Id
+            ),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to masterClass Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectMasterClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?programmed={}&category={}".format(
+                "true", self.projectCategory_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project with field programmed = true and category Id: {}. Found: {}".format(
+                self.projectCategory_3_Id, response.json()["count"]
             ),
         )

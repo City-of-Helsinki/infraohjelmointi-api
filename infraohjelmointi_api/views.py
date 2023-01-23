@@ -133,9 +133,10 @@ class ProjectFilter(django_filters.FilterSet):
     )
 
     def filter_search_string(self, queryset, name, value):
+
         return queryset.filter(
             Q(name__icontains=value) | Q(hashTags__value__icontains=value)
-        )
+        ).distinct()
 
     class Meta:
         fields = {
