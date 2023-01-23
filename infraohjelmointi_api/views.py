@@ -4,6 +4,7 @@ from rest_framework.exceptions import APIException
 from django.db import models
 import django_filters
 from django.db.models import Q
+from distutils.util import strtobool
 
 from rest_framework import viewsets
 from .serializers import (
@@ -123,6 +124,13 @@ class ConstructionPhaseViewSet(BaseViewSet):
 class ProjectFilter(django_filters.FilterSet):
 
     searchStr = django_filters.CharFilter(method="filter_search_string", label="Search")
+    programmed = django_filters.TypedMultipleChoiceFilter(
+        choices=(
+            ("false", "False"),
+            ("true", "True"),
+        ),
+        coerce=strtobool,
+    )
 
     def filter_search_string(self, queryset, name, value):
         return queryset.filter(
@@ -132,7 +140,6 @@ class ProjectFilter(django_filters.FilterSet):
     class Meta:
         fields = {
             "hkrId": ["exact"],
-            "programmed": ["exact"],
             "category": ["exact"],
         }
         model = Project
@@ -147,7 +154,6 @@ class ProjectViewSet(BaseViewSet):
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
-    filterset_fields = "__all__"
 
     @override
     def get_serializer_class(self):
@@ -166,26 +172,38 @@ class ProjectViewSet(BaseViewSet):
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
-        classes = [*masterClass, *_class, *subClass]
 
-        masterDistrict = self.request.query_params.getlist("masterDistrict", [])
+        mainDistrict = self.request.query_params.getlist("mainDistrict", [])
         district = self.request.query_params.getlist("district", [])
         subDistrict = self.request.query_params.getlist("subDistrict", [])
-        districts = [*masterDistrict, *district, *subDistrict]
-        try:
 
-            if len(classes) > 0:
+        try:
+            if len(masterClass) > 0:
                 qs = qs.filter(
-                    Q(projectClass__in=classes)
-                    | Q(projectClass__parent__in=classes)
-                    | Q(projectClass__parent__parent__in=classes)
+                    Q(projectClass__in=masterClass)
+                    | Q(projectClass__parent__in=masterClass)
+                    | Q(projectClass__parent__parent__in=masterClass)
                 )
-            if len(districts) > 0:
+            if len(_class) > 0:
                 qs = qs.filter(
-                    Q(projectLocation__in=districts)
-                    | Q(projectLocation__parent__in=districts)
-                    | Q(projectLocation__parent__parent__in=districts)
+                    Q(projectClass__in=_class) | Q(projectClass__parent__in=_class)
                 )
+            if len(subClass) > 0:
+                qs = qs.filter(Q(projectClass__in=subClass))
+
+            if len(mainDistrict) > 0:
+                qs = qs.filter(
+                    Q(projectLocation__in=mainDistrict)
+                    | Q(projectLocation__parent__in=mainDistrict)
+                    | Q(projectLocation__parent__parent__in=mainDistrict)
+                )
+            if len(district) > 0:
+                qs = qs.filter(
+                    Q(projectLocation__in=district)
+                    | Q(projectLocation__parent__in=district)
+                )
+            if len(subDistrict) > 0:
+                qs = qs.filter(Q(projectLocation__in=subDistrict))
 
             return qs
         except Exception as e:
