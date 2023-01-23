@@ -138,12 +138,6 @@ class ProjectFilter(django_filters.FilterSet):
         model = Project
 
 
-class ServiceUnavailable(APIException):
-    status_code = 503
-    default_detail = "Service temporarily unavailable, try again later."
-    default_code = "service_unavailable"
-
-
 class ProjectViewSet(BaseViewSet):
     """
     API endpoint that allows projects to be viewed or edited.
