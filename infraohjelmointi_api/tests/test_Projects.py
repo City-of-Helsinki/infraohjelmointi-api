@@ -17,6 +17,7 @@ from ..models import (
     ConstructionPhase,
     ProjectClass,
     ProjectLocation,
+    ProjectHashTag,
 )
 from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
 
@@ -48,7 +49,8 @@ class ProjectTestCase(TestCase):
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
     projectClassId = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
     projectMasterClassId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
-
+    projectHashTag_1_Id = uuid.UUID("e4d7b4b0-830d-4310-8b29-3c7d1e3132ba")
+    projectHashTag_2_Id = uuid.UUID("eb8635b3-4e83-45d9-a1af-6bc49bf2aeb7")
     projectMainDistrictId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectLocationId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     fixtures = []
@@ -65,6 +67,12 @@ class ProjectTestCase(TestCase):
             siteName="Anankatu",
             district="doe",
             need=5000.0,
+        )
+        self.projectHashTag_1 = ProjectHashTag.objects.create(
+            id=self.projectHashTag_1_Id, value="Hash1"
+        )
+        self.projectHashTag_2 = ProjectHashTag.objects.create(
+            id=self.projectHashTag_2_Id, value="Hash2"
         )
         self.mainDistrict = ProjectLocation.objects.create(
             id=self.projectMainDistrictId, name="Test main district", parent=None
@@ -185,7 +193,6 @@ class ProjectTestCase(TestCase):
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
-            hashTags=["#random", "#random2"],
             budgetForecast1CurrentYear=None,
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
@@ -220,6 +227,7 @@ class ProjectTestCase(TestCase):
             effectHousing=False,
         )
         self.project.favPersons.add(self.person_1, self.person_2)
+        self.project.hashTags.add(self.projectHashTag_1, self.projectHashTag_2)
 
     def test_project_is_created(self):
         self.assertTrue(
@@ -354,13 +362,28 @@ class ProjectTestCase(TestCase):
         self.assertDictEqual(
             person_1_reverse_query,
             person_2_reverse_query,
-            msg="Reverse relationship from manyTomany key objects do not point to the same Project",
+            msg="Reverse relationship from manyTomany Person keys do not point to the same Project or does not exist",
+        )
+        projectHashtag_1_reverse_query = (
+            self.projectHashTag_1.relatedProject.all().values()[0]
+        )
+        projectHashtag_2_reverse_query = (
+            self.projectHashTag_2.relatedProject.all().values()[0]
+        )
+        self.assertDictEqual(
+            projectHashtag_1_reverse_query,
+            projectHashtag_2_reverse_query,
+            msg="Reverse relationship from manyTomany HashTag keys do not point to the same Project or does not exist",
         )
 
     def test_GET_all_projects(self):
         response = self.client.get("/projects/")
         projectCount = Project.objects.all().count()
-        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.json()["count"],
             projectCount,
@@ -405,7 +428,6 @@ class ProjectTestCase(TestCase):
             locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
-            hashTags=[],
             budgetForecast1CurrentYear=None,
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
@@ -422,7 +444,11 @@ class ProjectTestCase(TestCase):
             preliminaryCurrentYearPlus10=None,
         )
         response = self.client.get("/projects/")
-        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.json()["count"],
             projectCount + 1,
@@ -443,7 +469,11 @@ class ProjectTestCase(TestCase):
 
         # compare the JSON data returned to what is expected
 
-        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.content,
             result_expected,
@@ -525,6 +555,7 @@ class ProjectTestCase(TestCase):
             "constructionPhase": None,
             "effectHousing": False,
             "favPersons": [],
+            "hashTags": [],
             "projectLocation": None,
             "projectClass": None,
             "projectProgram": None,
@@ -538,7 +569,11 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
         # deleting id and projectReadiness because request body doesn't contain an id and
         #  but the response does if new resource is created
         res_data = response.json()
@@ -604,7 +639,11 @@ class ProjectTestCase(TestCase):
         result_expected = JSONRenderer().render(serializer.data)
 
         # compare the JSON data returned to what is expected
-        self.assertEqual(response.status_code, 200, msg="Status code != 200")
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.content,
             result_expected,
@@ -635,7 +674,11 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
         # deleting id because request body doesn't contain an id and
         #  but the response does if new resource is created
         res_data = response.json()
@@ -696,7 +739,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
         res_data = response.json()
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
         self.assertEqual(
             data["estPlanningStart"],
             res_data["estPlanningStart"],
@@ -767,7 +814,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
         res_data = response.json()
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
         self.assertEqual(
             formatted_data["estPlanningStart"],
             res_data["estPlanningStart"],
