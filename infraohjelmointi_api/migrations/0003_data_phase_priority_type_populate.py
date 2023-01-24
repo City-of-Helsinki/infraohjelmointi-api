@@ -36,11 +36,14 @@ def populate_Phase_Type_priority_status(apps, schema_editor):
     types = [
         "projectComplex",
         "street",
+        "cityRenewal",
         "traffic",
         "sports",
         "omaStadi",
         "projectArea",
         "park",
+        "bigTrafficProjects",
+        "spesialtyStructures",
     ]
     statuses = ["active", "past", "upcomming"]
     priorities = ["low", "medium", "high"]
@@ -55,7 +58,7 @@ def populate_Phase_Type_priority_status(apps, schema_editor):
     for priority in priorities:
         ProjectPriority.objects.create(value=priority)
     for _type in types:
-        ProjectType.objects.create(value=_type)
+        ProjectType.objects.get_or_create(value=_type)
     for status in statuses:
         TaskStatus.objects.create(value=status)
 
