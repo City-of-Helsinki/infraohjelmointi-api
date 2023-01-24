@@ -1,7 +1,6 @@
 import uuid
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
+from infraohjelmointi_api.models import Project
 from rest_framework.exceptions import APIException
-from django.db import models
 import django_filters
 from django.db.models import Q
 from distutils.util import strtobool
