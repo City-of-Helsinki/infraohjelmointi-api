@@ -1189,3 +1189,21 @@ class ProjectTestCase(TestCase):
                 self.projectCategory_3_Id, response.json()["count"]
             ),
         )
+        response = self.client.get(
+            "/projects/?masterClass={}&masterClass={}&subClass={}&subClass={}".format(
+                self.projectMasterClass_2_Id,
+                self.projectMasterClass_3_Id,
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+            ),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} and {} each. Found: {}".format(
+                self.projectMasterClass_2_Id,
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+                response.json()["count"],
+            ),
+        )
