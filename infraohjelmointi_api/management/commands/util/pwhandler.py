@@ -243,7 +243,7 @@ def getFavPersons(person_data: str, stdout, style) -> list[Person]:
             fav_person_data.append(" ")
 
         fav_person = getProjectPerson(
-            fav_person_data[0] + " " + fav_person_data[1] + ",,,",
+            fav_person_data[1] + " " + fav_person_data[0] + ",,,",
             stdout=stdout,
             style=style,
         )
