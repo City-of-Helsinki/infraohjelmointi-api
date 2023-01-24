@@ -41,7 +41,7 @@ class Project(models.Model):
     )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)
-    entityName = models.CharField(max_length=30, blank=True, null=True)
+    entityName = models.CharField(max_length=256, blank=True, null=True)
     sapProject = models.CharField(max_length=100, blank=True, null=True)
     sapNetwork = models.JSONField(blank=True, null=True)
     projectSet = models.ForeignKey(
