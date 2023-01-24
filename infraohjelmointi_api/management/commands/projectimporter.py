@@ -70,7 +70,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        print("in handle")
 
         if (
             not options["import_from_pw"]
