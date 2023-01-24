@@ -8,6 +8,6 @@ class Person(models.Model):
     lastName = models.CharField(max_length=200)
     email = models.CharField(max_length=200)
     title = models.CharField(max_length=200)
-    phone = models.CharField(max_length=14)
+    phone = models.CharField(max_length=100)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
