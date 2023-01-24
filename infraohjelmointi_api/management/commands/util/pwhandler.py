@@ -186,13 +186,13 @@ def loadAndTransformResponsibleZones():
 
 
 def getProjectPerson(person_data: str, stdout, style) -> Person:
-    stdout.write(style.NOTICE("Handling person data: '{}'".format(person_data)))
     person_data = person_data.strip().replace(", ", ",")
+    stdout.write(style.NOTICE("Handling person data: '{}'".format(person_data)))
     if not person_data.rstrip(","):
         return None
     try:
         full_name, title, phone_nr, email = person_data.split(",")
-        last_name, first_name = re.split("(?<=.)(?=[A-Z])", full_name)
+        last_name, first_name = re.split("(?<=.)(?<!\-)(?=[A-Z])", full_name)
         person, _ = Person.objects.get_or_create(
             firstName=first_name.strip().title(), lastName=last_name.strip().title()
         )
@@ -208,19 +208,23 @@ def getProjectPerson(person_data: str, stdout, style) -> Person:
 
         return person
     except Exception as e:
-        print("e", e)
+        stdout.write(
+            style.ERROR(
+                "Error occurred while handling person data. Error: {}".format(e)
+            )
+        )
         return None
 
 
 def getFavPersons(person_data: str, stdout, style) -> list[Person]:
     person_data = person_data.strip().replace(", ", ",").rstrip(",")
-    print(person_data)
+    stdout.write(style.NOTICE("Handling fav person data: '{}'".format(person_data)))
     if not person_data:
         return None
     fav_persons = []
     # Firstname Lastname, Title, phone, email format
     if re.findall(
-        "^[a-zA-ZäöåÄÖÅ]+ [a-zA-ZäöåÄÖÅ]+,[a-zA-ZäöåÄÖÅ]+,[a-zA-ZäöåÄÖÅ0-9]+,[a-zA-ZäöåÄÖÅ@\.]+$",
+        "^[a-zA-ZäöåÄÖÅ]+ [a-zA-ZäöåÄÖÅ]+,[a-zA-ZäöåÄÖ\. ]+,[a-zA-ZäöåÄÖÅ0-9\. ]+,[a-zA-ZäöåÄÖÅ@\.]+$",
         person_data,
     ):
         fav_persons.append(
