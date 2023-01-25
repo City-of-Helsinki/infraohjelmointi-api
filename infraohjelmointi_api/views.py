@@ -122,7 +122,9 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 class ProjectFilter(django_filters.FilterSet):
 
-    searchStr = django_filters.CharFilter(method="filter_search_string", label="Search")
+    freeSearch = django_filters.CharFilter(
+        method="filter_search_string", label="Search"
+    )
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
             ("false", "False"),
