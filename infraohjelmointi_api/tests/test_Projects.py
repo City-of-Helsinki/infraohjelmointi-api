@@ -981,7 +981,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?searchStr={}".format("jira"),
+            "/projects/?freeSearch={}".format("jira"),
         )
         self.assertEqual(
             response.json()["count"],
@@ -991,7 +991,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?searchStr={}".format("park"),
+            "/projects/?freeSearch={}".format("park"),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1001,7 +1001,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?searchStr={}".format("Parking"),
+            "/projects/?freeSearch={}".format("Parking"),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1124,7 +1124,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&searchStr={}".format(
+            "/projects/?mainDistrict={}&freeSearch={}".format(
                 self.projectMainDistrict_3_Id, "rain"
             ),
         )
