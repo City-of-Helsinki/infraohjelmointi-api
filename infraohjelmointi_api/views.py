@@ -29,6 +29,7 @@ from .serializers import (
     ProjectClassSerializer,
     ProjectResponsibleZoneSerializer,
     ProjectHashtagSerializer,
+    ProjectGroupSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -53,11 +54,20 @@ class BaseViewSet(viewsets.ModelViewSet):
 
 class ProjectHashtagViewSet(BaseViewSet):
     """
-    API endpoint that allows Project Hashtags to be viewed or edited.
+    API endpoint that allows Project Groups to be viewed or edited.
     """
 
     permission_classes = []
     serializer_class = ProjectHashtagSerializer
+
+
+class ProjectGroupViewSet(BaseViewSet):
+    """
+    API endpoint that allows Project Hashtags to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectGroupSerializer
 
 
 class ProjectLocationViewSet(BaseViewSet):

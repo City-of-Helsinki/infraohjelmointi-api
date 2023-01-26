@@ -20,6 +20,7 @@ from .models import (
     Note,
     ResponsibleZone,
     ProjectHashTag,
+    ProjectGroup,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -28,6 +29,11 @@ from overrides import override
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectGroupSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectGroup
 
 
 class ProjectHashtagSerializer(serializers.ModelSerializer):
