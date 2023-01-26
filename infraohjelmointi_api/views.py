@@ -1,5 +1,5 @@
 import uuid
-from infraohjelmointi_api.models import Project
+from infraohjelmointi_api.models import Project, ProjectClass
 from rest_framework.exceptions import APIException
 import django_filters
 from django.db.models import Q
@@ -181,14 +181,36 @@ class ProjectViewSet(BaseViewSet):
 
         try:
             if len(masterClass) > 0:
+                masterClassPaths = (
+                    ProjectClass.objects.filter(id__in=masterClass)
+                    .only("path")
+                    .values_list("path", flat=True)
+                )
+
                 qs = qs.filter(
-                    Q(projectClass__in=masterClass)
-                    | Q(projectClass__parent__in=masterClass)
-                    | Q(projectClass__parent__parent__in=masterClass)
+                    Q(
+                        *[
+                            ("projectClass__path__startswith", path)
+                            for path in masterClassPaths
+                        ],
+                        _connector=Q.OR
+                    )
                 )
             if len(_class) > 0:
+                classPaths = (
+                    ProjectClass.objects.filter(id__in=_class)
+                    .only("path")
+                    .values_list("path", flat=True)
+                )
+
                 qs = qs.filter(
-                    Q(projectClass__in=_class) | Q(projectClass__parent__in=_class)
+                    Q(
+                        *[
+                            ("projectClass__path__startswith", path)
+                            for path in classPaths
+                        ],
+                        _connector=Q.OR
+                    )
                 )
             if len(subClass) > 0:
                 qs = qs.filter(Q(projectClass__in=subClass))
