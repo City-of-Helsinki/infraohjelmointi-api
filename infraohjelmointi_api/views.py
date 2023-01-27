@@ -54,7 +54,7 @@ class BaseViewSet(viewsets.ModelViewSet):
 
 class ProjectHashtagViewSet(BaseViewSet):
     """
-    API endpoint that allows Project Groups to be viewed or edited.
+    API endpoint that allows Project Hashtags to be viewed or edited.
     """
 
     permission_classes = []
@@ -63,7 +63,7 @@ class ProjectHashtagViewSet(BaseViewSet):
 
 class ProjectGroupViewSet(BaseViewSet):
     """
-    API endpoint that allows Project Hashtags to be viewed or edited.
+    API endpoint that allows Project Groups to be viewed or edited.
     """
 
     permission_classes = []
