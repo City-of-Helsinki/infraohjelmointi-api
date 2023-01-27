@@ -3,7 +3,9 @@ from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
 from rest_framework.exceptions import APIException
 import django_filters
 from django.db.models import Q
+from django.db.models.expressions import RawSQL
 from distutils.util import strtobool
+
 
 from rest_framework import viewsets
 from .serializers import (
@@ -134,7 +136,6 @@ class ProjectFilter(django_filters.FilterSet):
     )
 
     def filter_search_string(self, queryset, name, value):
-
         return queryset.filter(
             Q(name__icontains=value) | Q(hashTags__value__icontains=value)
         ).distinct()
@@ -181,40 +182,33 @@ class ProjectViewSet(BaseViewSet):
 
         try:
             if len(masterClass) > 0:
-                masterClassPaths = (
-                    ProjectClass.objects.filter(id__in=masterClass, parent=None)
-                    .only("path")
-                    .values_list("path", flat=True)
-                )
-
-                qs = qs.filter(
-                    Q(
-                        *[
-                            ("projectClass__path__startswith", path)
-                            for path in masterClassPaths
-                        ],
-                        _connector=Q.OR
-                    )
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=False,
+                    has_children=True,
+                    search_ids=masterClass,
+                    model_class=ProjectClass,
                 )
 
             if len(_class) > 0:
-                classPaths = (
-                    ProjectClass.objects.filter(id__in=_class, parent__parent=None)
-                    .only("path")
-                    .values_list("path", flat=True)
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_children=True,
+                    search_ids=_class,
+                    model_class=ProjectClass,
                 )
 
-                qs = qs.filter(
-                    Q(
-                        *[
-                            ("projectClass__path__startswith", path)
-                            for path in classPaths
-                        ],
-                        _connector=Q.OR
-                    )
-                )
             if len(subClass) > 0:
-                qs = qs.filter(Q(projectClass__in=subClass))
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_children=False,
+                    search_ids=subClass,
+                    model_class=ProjectClass,
+                )
+
+            # TODO: do same for districts
 
             if len(mainDistrict) > 0:
                 mainDistrictPaths = (
@@ -223,7 +217,7 @@ class ProjectViewSet(BaseViewSet):
                     .values_list("path", flat=True)
                 )
 
-                qs = qs.filter(
+                qs = ProjectClass.objects.filter(
                     Q(
                         *[
                             ("projectLocation__path__startswith", path)
@@ -239,7 +233,7 @@ class ProjectViewSet(BaseViewSet):
                     .values_list("path", flat=True)
                 )
 
-                qs = qs.filter(
+                qs = ProjectLocation.objects.filter(
                     Q(
                         *[
                             ("projectLocation__path__startswith", path)
@@ -249,7 +243,7 @@ class ProjectViewSet(BaseViewSet):
                     )
                 )
             if len(subDistrict) > 0:
-                qs = qs.filter(Q(projectLocation__in=subDistrict))
+                qs = ProjectLocation.objects.filter(Q(projectLocation__in=subDistrict))
 
             return qs
         except Exception as e:
@@ -271,6 +265,31 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    def _filter_projects_by_hierarchy(
+        self, qs, has_parent: bool, has_children: bool, search_ids, model_class
+    ):
+        paths = (
+            model_class.objects.filter(
+                id__in=search_ids,
+                parent__isnull=not has_parent,
+                childClass__isnull=not has_children,
+            )
+            .distinct()
+            .values_list("path", flat=True)
+        )
+
+        classIds = (
+            model_class.objects.filter(
+                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR)
+            )
+            .distinct()
+            .values_list("id", flat=True)
+            if len(paths) > 0
+            else []
+        )
+
+        return qs.filter(projectClass__in=classIds)
 
 
 class TaskStatusViewSet(BaseViewSet):
