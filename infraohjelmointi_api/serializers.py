@@ -38,13 +38,31 @@ class ProjectGroupSerializer(serializers.ModelSerializer):
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
 
+    def validate_projects(self, projectIds):
+        """
+        Check that project doesn't already belong to a group
+        """
+
+        if projectIds is not None and len(projectIds) > 0:
+            for projectId in projectIds:
+                project = get_object_or_404(Project, pk=projectId)
+                if project.projectGroup is not None:
+                    raise serializers.ValidationError(
+                        "Project with Id: {} already exists in the group with Id: {} and name: {}".format(
+                            projectId,
+                            project.projectGroup_id,
+                            project.projectGroup.name,
+                        )
+                    )
+        return projectIds
+
     class Meta(BaseMeta):
         model = ProjectGroup
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectGroup.objects.all(),
                 fields=["name", "_class", "district"],
-            )
+            ),
         ]
 
     @override
