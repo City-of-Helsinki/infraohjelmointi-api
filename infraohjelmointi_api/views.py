@@ -218,7 +218,7 @@ class ProjectViewSet(BaseViewSet):
 
             if len(mainDistrict) > 0:
                 mainDistrictPaths = (
-                    ProjectLocation.objects.filter(id__in=mainDistrict)
+                    ProjectLocation.objects.filter(id__in=mainDistrict, parent=None)
                     .only("path")
                     .values_list("path", flat=True)
                 )
@@ -234,7 +234,7 @@ class ProjectViewSet(BaseViewSet):
                 )
             if len(district) > 0:
                 districtPaths = (
-                    ProjectLocation.objects.filter(id__in=district)
+                    ProjectLocation.objects.filter(id__in=district, parent__parent=None)
                     .only("path")
                     .values_list("path", flat=True)
                 )
