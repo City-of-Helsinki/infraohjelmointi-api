@@ -69,6 +69,15 @@ class ProjectGroupViewSet(BaseViewSet):
     permission_classes = []
     serializer_class = ProjectGroupSerializer
 
+    # @override
+    # def create(self, request, *args, **kwargs):
+    #     data = request.data
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     print(self.perform_create(serializer))
+    #     print(data)
+    #     return Response(status=200)
+
 
 class ProjectLocationViewSet(BaseViewSet):
     """
