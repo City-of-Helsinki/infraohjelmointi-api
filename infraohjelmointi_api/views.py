@@ -1,5 +1,5 @@
 import uuid
-from infraohjelmointi_api.models import Project, ProjectClass
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
 from rest_framework.exceptions import APIException
 import django_filters
 from django.db.models import Q
@@ -182,7 +182,7 @@ class ProjectViewSet(BaseViewSet):
         try:
             if len(masterClass) > 0:
                 masterClassPaths = (
-                    ProjectClass.objects.filter(id__in=masterClass)
+                    ProjectClass.objects.filter(id__in=masterClass, parent=None)
                     .only("path")
                     .values_list("path", flat=True)
                 )
@@ -196,9 +196,10 @@ class ProjectViewSet(BaseViewSet):
                         _connector=Q.OR
                     )
                 )
+
             if len(_class) > 0:
                 classPaths = (
-                    ProjectClass.objects.filter(id__in=_class)
+                    ProjectClass.objects.filter(id__in=_class, parent__parent=None)
                     .only("path")
                     .values_list("path", flat=True)
                 )
@@ -216,15 +217,36 @@ class ProjectViewSet(BaseViewSet):
                 qs = qs.filter(Q(projectClass__in=subClass))
 
             if len(mainDistrict) > 0:
+                mainDistrictPaths = (
+                    ProjectLocation.objects.filter(id__in=mainDistrict)
+                    .only("path")
+                    .values_list("path", flat=True)
+                )
+
                 qs = qs.filter(
-                    Q(projectLocation__in=mainDistrict)
-                    | Q(projectLocation__parent__in=mainDistrict)
-                    | Q(projectLocation__parent__parent__in=mainDistrict)
+                    Q(
+                        *[
+                            ("projectLocation__path__startswith", path)
+                            for path in mainDistrictPaths
+                        ],
+                        _connector=Q.OR
+                    )
                 )
             if len(district) > 0:
+                districtPaths = (
+                    ProjectLocation.objects.filter(id__in=district)
+                    .only("path")
+                    .values_list("path", flat=True)
+                )
+
                 qs = qs.filter(
-                    Q(projectLocation__in=district)
-                    | Q(projectLocation__parent__in=district)
+                    Q(
+                        *[
+                            ("projectLocation__path__startswith", path)
+                            for path in districtPaths
+                        ],
+                        _connector=Q.OR
+                    )
                 )
             if len(subDistrict) > 0:
                 qs = qs.filter(Q(projectLocation__in=subDistrict))
