@@ -26,6 +26,7 @@ from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
 from django.shortcuts import get_object_or_404
+from rest_framework.validators import UniqueTogetherValidator
 
 
 class BaseMeta:
@@ -39,12 +40,18 @@ class ProjectGroupSerializer(serializers.ModelSerializer):
 
     class Meta(BaseMeta):
         model = ProjectGroup
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ProjectGroup.objects.all(),
+                fields=["name", "_class", "district"],
+            )
+        ]
 
     @override
     def create(self, validated_data):
-        projectIds = validated_data.pop("projects")
+        projectIds = validated_data.pop("projects", None)
         projectGroup = self.Meta.model.objects.create(**validated_data)
-        if len(projectIds) > 0:
+        if projectIds is not None and len(projectIds) > 0:
             for projectId in projectIds:
                 project = get_object_or_404(Project, pk=projectId)
                 project.projectGroup = projectGroup
