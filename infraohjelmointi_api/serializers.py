@@ -25,6 +25,7 @@ from .models import (
 from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
+from django.shortcuts import get_object_or_404
 
 
 class BaseMeta:
@@ -32,8 +33,24 @@ class BaseMeta:
 
 
 class ProjectGroupSerializer(serializers.ModelSerializer):
+    projects = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
+    )
+
     class Meta(BaseMeta):
         model = ProjectGroup
+
+    @override
+    def create(self, validated_data):
+        projectIds = validated_data.pop("projects")
+        projectGroup = self.Meta.model.objects.create(**validated_data)
+        if len(projectIds) > 0:
+            for projectId in projectIds:
+                project = get_object_or_404(Project, pk=projectId)
+                project.projectGroup = projectGroup
+                project.save()
+
+        return projectGroup
 
 
 class ProjectHashtagSerializer(serializers.ModelSerializer):
