@@ -42,7 +42,7 @@ class Project(models.Model):
         ProjectLocation, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     projectGroup = models.ForeignKey(
-        ProjectGroup, on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectGroup, on_delete=models.SET_NULL, null=True, blank=True
     )
     effectHousing = models.BooleanField(default=False)
     hkrId = models.PositiveBigIntegerField(blank=True, null=True)

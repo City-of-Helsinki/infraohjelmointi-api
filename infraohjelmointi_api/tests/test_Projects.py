@@ -563,6 +563,7 @@ class ProjectTestCase(TestCase):
             "bridgeNumber": None,
             "masterPlanAreaNumber": None,
             "trafficPlanNumber": None,
+            "projectGroup": None,
         }
         response = self.client.post(
             "/projects/",
