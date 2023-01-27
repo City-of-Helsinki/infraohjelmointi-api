@@ -48,7 +48,7 @@ class ProjectGroupSerializer(serializers.ModelSerializer):
                 project = get_object_or_404(Project, pk=projectId)
                 if project.projectGroup is not None:
                     raise serializers.ValidationError(
-                        "Project with Id: {} already exists in the group with Id: {} and name: {}".format(
+                        "Project with Id: {} already belongs to the group with Id: {} and name: {}".format(
                             projectId,
                             project.projectGroup_id,
                             project.projectGroup.name,
