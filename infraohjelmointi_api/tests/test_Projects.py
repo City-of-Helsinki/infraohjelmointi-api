@@ -1041,6 +1041,7 @@ class ProjectTestCase(TestCase):
         response = self.client.get(
             "/projects/?masterClass={}".format(self.projectMasterClass_2_Id),
         )
+        print(response.json(), self.projectMasterClass_2_Id)
         self.assertEqual(
             response.json()["count"],
             3,
