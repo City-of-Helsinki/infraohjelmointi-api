@@ -1,5 +1,11 @@
 import uuid
-from infraohjelmointi_api.models import Note
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
+from rest_framework.exceptions import APIException
+import django_filters
+from django.db.models import Q
+from django.db.models.expressions import RawSQL
+from distutils.util import strtobool
+
 from rest_framework import viewsets
 from .serializers import (
     NoteCreateSerializer,
@@ -40,6 +46,7 @@ from rest_framework.decorators import action
 
 from django.core import serializers
 from overrides import override
+from django_filters.rest_framework import DjangoFilterBackend
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -114,6 +121,32 @@ class ConstructionPhaseViewSet(BaseViewSet):
     serializer_class = ConstructionPhaseSerializer
 
 
+class ProjectFilter(django_filters.FilterSet):
+
+    freeSearch = django_filters.CharFilter(
+        method="filter_search_string", label="Search"
+    )
+    programmed = django_filters.TypedMultipleChoiceFilter(
+        choices=(
+            ("false", "False"),
+            ("true", "True"),
+        ),
+        coerce=strtobool,
+    )
+
+    def filter_search_string(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) | Q(hashTags__value__icontains=value)
+        ).distinct()
+
+    class Meta:
+        fields = {
+            "hkrId": ["exact"],
+            "category": ["exact"],
+        }
+        model = Project
+
+
 class ProjectViewSet(BaseViewSet):
     """
     API endpoint that allows projects to be viewed or edited.
@@ -121,6 +154,8 @@ class ProjectViewSet(BaseViewSet):
 
     permission_classes = []
     pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ProjectFilter
 
     @override
     def get_serializer_class(self):
@@ -132,6 +167,74 @@ class ProjectViewSet(BaseViewSet):
         if self.action == "retrieve":
             return ProjectGetSerializer
         return ProjectCreateSerializer
+
+    @override
+    def get_queryset(self):
+        qs = super().get_queryset()
+        masterClass = self.request.query_params.getlist("masterClass", [])
+        _class = self.request.query_params.getlist("class", [])
+        subClass = self.request.query_params.getlist("subClass", [])
+
+        mainDistrict = self.request.query_params.getlist("mainDistrict", [])
+        district = self.request.query_params.getlist("district", [])
+        subDistrict = self.request.query_params.getlist("subDistrict", [])
+
+        try:
+            if len(masterClass) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=False,
+                    has_parent_parent=False,
+                    search_ids=masterClass,
+                    model_class=ProjectClass,
+                )
+
+            if len(_class) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=False,
+                    search_ids=_class,
+                    model_class=ProjectClass,
+                )
+
+            if len(subClass) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=True,
+                    search_ids=subClass,
+                    model_class=ProjectClass,
+                )
+
+            if len(mainDistrict) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=False,
+                    has_parent_parent=False,
+                    search_ids=mainDistrict,
+                    model_class=ProjectLocation,
+                )
+            if len(district) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=False,
+                    search_ids=district,
+                    model_class=ProjectLocation,
+                )
+            if len(subDistrict) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=True,
+                    search_ids=subDistrict,
+                    model_class=ProjectLocation,
+                )
+
+            return qs
+        except Exception as e:
+            raise APIException(detail={"message": e})
 
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
@@ -149,6 +252,34 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    def _filter_projects_by_hierarchy(
+        self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
+    ):
+        paths = (
+            model_class.objects.filter(
+                id__in=search_ids,
+                parent__isnull=not has_parent,
+                parent__parent__isnull=not has_parent_parent,
+            )
+            .distinct()
+            .values_list("path", flat=True)
+        )
+
+        ids = (
+            model_class.objects.filter(
+                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR)
+            )
+            .distinct()
+            .values_list("id", flat=True)
+            if len(paths) > 0
+            else []
+        )
+
+        if model_class.__name__ == "ProjectLocation":
+            return qs.filter(projectLocation__in=ids)
+        elif model_class.__name__ == "ProjectClass":
+            return qs.filter(projectClass__in=ids)
 
 
 class TaskStatusViewSet(BaseViewSet):

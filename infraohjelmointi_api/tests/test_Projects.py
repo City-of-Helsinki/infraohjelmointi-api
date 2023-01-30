@@ -26,8 +26,12 @@ from overrides import override
 
 
 class ProjectTestCase(TestCase):
-    projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
-    projectId2 = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
+    project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
+    project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
+    project_3_Id = uuid.UUID("fdc89f56-b631-4109-a137-45b950de6b10")
+    project_4_Id = uuid.UUID("7c5b981e-286f-4065-9d9e-29d8d1714e4c")
+    project_5_Id = uuid.UUID("441d80e1-9ab1-4b35-91cc-6017ea308d87")
+    project_6_Id = uuid.UUID("90852adc-d47e-4fd9-944f-cb8d36076c21")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
     person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
@@ -42,17 +46,35 @@ class ProjectTestCase(TestCase):
     sapNetworkIds_2 = [uuid.UUID("1c97fff1-e386-4e43-adc5-131af3cd9e37").__str__()]
     sapProjectId_2 = "2814I00718"
     noteId = uuid.UUID("2e91feba-13c1-4b4a-a3a1-ca2030bf8681")
-    projectCategoryId = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
+    projectCategory_1_Id = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
+    projectCategory_2_Id = uuid.UUID("4124f82a-4d62-4f66-b021-c45c64ba750a")
+    projectCategory_3_Id = uuid.UUID("8a19b04a-15f6-448d-95d3-70fdfa2d5cba")
+
     conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
     projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
     planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
-    projectClassId = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
-    projectMasterClassId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
+    projectClass_1_Id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
+    projectClass_2_Id = uuid.UUID("c03b41d4-bb50-4bc5-ada1-496f399eb157")
+    projectSubClass_1_Id = uuid.UUID("88006f5b-339d-4859-9903-25494deebeca")
+    projectSubClass_2_Id = uuid.UUID("48e201a9-7579-42fe-9970-2c0704bd7257")
+    projectMasterClass_1_Id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
+    projectMasterClass_2_Id = uuid.UUID("073e1dee-9e77-4ddd-8d0c-ad856c51e857")
+    projectMasterClass_3_Id = uuid.UUID("a66db3fa-eb71-42dc-b618-9e4fae0db8bc")
     projectHashTag_1_Id = uuid.UUID("e4d7b4b0-830d-4310-8b29-3c7d1e3132ba")
     projectHashTag_2_Id = uuid.UUID("eb8635b3-4e83-45d9-a1af-6bc49bf2aeb7")
-    projectMainDistrictId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-    projectLocationId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
+    projectHashTag_3_Id = uuid.UUID("aba0e241-0a02-48a0-8426-e4f034c5f527")
+    projectHashTag_4_Id = uuid.UUID("5057f0e5-bdcd-4278-a433-74db4ee34b4b")
+    projectMainDistrict_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectMainDistrict_2_Id = uuid.UUID("740d6771-442b-4713-8362-8bda3958100e")
+    projectMainDistrict_3_Id = uuid.UUID("019eb15d-cfdb-45bc-b1a5-ac3844381e48")
+
+    projectDistrict_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
+    projectDistrict_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
+
+    projectSubDistrict_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
+    projectSubDistrict_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
+
     fixtures = []
     maxDiff = None
 
@@ -75,19 +97,19 @@ class ProjectTestCase(TestCase):
             id=self.projectHashTag_2_Id, value="Hash2"
         )
         self.mainDistrict = ProjectLocation.objects.create(
-            id=self.projectMainDistrictId, name="Test main district", parent=None
+            id=self.projectMainDistrict_1_Id, name="Test main district", parent=None
         )
         self.projectLocation = self.mainDistrict.childLocation.create(
-            id=self.projectLocationId, name="Test district"
+            id=self.projectDistrict_1_Id, name="Test district"
         )
         self.projectCategory = ProjectCategory.objects.create(
-            id=self.projectCategoryId, value="K5"
+            id=self.projectCategory_1_Id, value="K5"
         )
         self.projectMasterClass = ProjectClass.objects.create(
-            id=self.projectMasterClassId, name="Test Master Class", parent=None
+            id=self.projectMasterClass_1_Id, name="Test Master Class", parent=None
         )
         self.projectClass = self.projectMasterClass.childClass.create(
-            name="Test Class", id=self.projectClassId
+            name="Test Class", id=self.projectClass_1_Id
         )
         self.constructionPhase = ConstructionPhase.objects.create(
             id=self.constructionPhaseId, value="planning"
@@ -152,7 +174,7 @@ class ProjectTestCase(TestCase):
 
         self.project = Project.objects.create(
             projectClass=self.projectClass,
-            id=self.projectId,
+            id=self.project_1_Id,
             projectLocation=self.projectLocation,
             siteId=self.budgetItem,
             hkrId=12345,
@@ -231,10 +253,10 @@ class ProjectTestCase(TestCase):
 
     def test_project_is_created(self):
         self.assertTrue(
-            Project.objects.filter(id=self.projectId).exists(),
+            Project.objects.filter(id=self.project_1_Id).exists(),
             msg="Object does not exist in DB",
         )
-        project = Project.objects.get(id=self.projectId)
+        project = Project.objects.get(id=self.project_1_Id)
         self.assertIsInstance(
             project, Project, msg="Object retrieved from DB != typeof Project Model"
         )
@@ -244,115 +266,115 @@ class ProjectTestCase(TestCase):
 
         self.assertDictEqual(
             self.budgetItem.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="siteId foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectSet.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectSet foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectArea.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectArea foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectType.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectType foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectPhase.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectPhase foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectPriority.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectPriority foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.person_3.construction.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="personConstruction foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectLocation.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectLocation foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.person_2.planning.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="personPlanning foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.person_1.programming.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="personProgramming foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectClass.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectClass foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.projectCategory.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectCategory foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.conPhaseDetail.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="conPhaseDetail foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
 
         self.assertDictEqual(
             self.projectQualityLevel.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="projectQualityLevel foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.planningPhase.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="planningPhase foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
         self.assertDictEqual(
             self.constructionPhase.project_set.all().values()[0],
-            Project.objects.filter(id=self.projectId).values()[0],
+            Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="constructionPhase foreign key does not exist in Project with id {}".format(
-                self.projectId
+                self.project_1_Id
             ),
         )
 
@@ -390,7 +412,7 @@ class ProjectTestCase(TestCase):
             msg="Number of retrieved projects is != {}".format(projectCount),
         )
         Project.objects.create(
-            id=self.projectId2,
+            id=self.project_2_Id,
             siteId=self.budgetItem,
             hkrId=2265,
             sapProject=self.sapProjectId_2,
@@ -457,11 +479,11 @@ class ProjectTestCase(TestCase):
 
     def test_GET_one_project(self):
         response = self.client.get(
-            "/projects/{}/".format(self.projectId),
+            "/projects/{}/".format(self.project_1_Id),
         )
         # serialize the model instances
         serializer = ProjectGetSerializer(
-            Project.objects.get(id=self.projectId), many=False
+            Project.objects.get(id=self.project_1_Id), many=False
         )
 
         # convert the serialized data to JSON
@@ -594,7 +616,7 @@ class ProjectTestCase(TestCase):
             "favPersons": [self.person_1.id.__str__(), self.person_3.id.__str__()],
         }
         response = self.client.patch(
-            "/projects/{}/".format(self.projectId),
+            "/projects/{}/".format(self.project_1_Id),
             data,
             content_type="application/json",
         )
@@ -611,16 +633,16 @@ class ProjectTestCase(TestCase):
         )
 
     def test_DELETE_project(self):
-        response = self.client.delete("/projects/{}/".format(self.projectId))
+        response = self.client.delete("/projects/{}/".format(self.project_1_Id))
         self.assertEqual(
             response.status_code,
             204,
-            msg="Error deleting project with Id {}".format(self.projectId),
+            msg="Error deleting project with Id {}".format(self.project_1_Id),
         )
         self.assertEqual(
-            Project.objects.filter(id=self.projectId).exists(),
+            Project.objects.filter(id=self.project_1_Id).exists(),
             False,
-            msg="Project with Id {} still exists in DB".format(self.projectId),
+            msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
     def test_notes_project(self):
@@ -630,7 +652,7 @@ class ProjectTestCase(TestCase):
             updatedBy=self.person_1,
             project=self.project,
         )
-        response = self.client.get("/projects/{}/notes/".format(self.projectId))
+        response = self.client.get("/projects/{}/notes/".format(self.project_1_Id))
         serializer = ProjectNoteGetSerializer(
             Note.objects.filter(id=self.noteId), many=True
         )
@@ -858,4 +880,453 @@ class ProjectTestCase(TestCase):
             formatted_data["visibilityEnd"],
             res_data["visibilityEnd"],
             msg="visibilityEnd format in POST request != format in response",
+        )
+
+    def test_endpoint_filter_project(self):
+        mainDistrict_1 = ProjectLocation.objects.create(
+            id=self.projectMainDistrict_2_Id,
+            name="Main District 1",
+            parent=None,
+            path="Main District 1",
+        )
+        mainDistrict_2 = ProjectLocation.objects.create(
+            id=self.projectMainDistrict_3_Id,
+            name="Main District 2",
+            parent=None,
+            path="Main District 2",
+        )
+        district = mainDistrict_1.childLocation.create(
+            id=self.projectDistrict_2_Id,
+            name="District 1",
+            path="Main District 1/District 1",
+        )
+        subDistrict_1 = district.childLocation.create(
+            id=self.projectSubDistrict_1_Id,
+            name="Sub district 1",
+            path="Main District 1/District 1/Sub district 1",
+        )
+        subDistrict_2 = district.childLocation.create(
+            id=self.projectSubDistrict_2_Id,
+            name="Sub district 2",
+            path="Main District 1/District 1/Sub district 2",
+        )
+
+        category_1 = ProjectCategory.objects.create(
+            id=self.projectCategory_2_Id, value="K5"
+        )
+        category_2 = ProjectCategory.objects.create(
+            id=self.projectCategory_3_Id, value="K1"
+        )
+        masterClass_1 = ProjectClass.objects.create(
+            id=self.projectMasterClass_2_Id,
+            name="Master Class 1",
+            parent=None,
+            path="Master Class 1",
+        )
+        masterClass_2 = ProjectClass.objects.create(
+            id=self.projectMasterClass_3_Id,
+            name="Master Class 2",
+            parent=None,
+            path="Master Class 2",
+        )
+        _class = masterClass_1.childClass.create(
+            name="Test Class 1",
+            id=self.projectClass_2_Id,
+            path="Master Class 1/Test Class 1",
+        )
+        subClass_1 = _class.childClass.create(
+            id=self.projectSubClass_1_Id,
+            name="Sub class 1",
+            path="Master Class 1/Test Class 1/Sub class 1",
+        )
+        subClass_2 = _class.childClass.create(
+            id=self.projectSubClass_2_Id,
+            name="Sub class 2",
+            path="Master Class 1/Test Class 1/Sub class 2",
+        )
+        hashTag_1 = ProjectHashTag.objects.create(
+            id=self.projectHashTag_3_Id, value="Jira"
+        )
+        hashTag_2 = ProjectHashTag.objects.create(
+            id=self.projectHashTag_4_Id, value="Park"
+        )
+
+        project_1 = Project.objects.create(
+            id=self.project_3_Id,
+            hkrId=2222,
+            name="Parking Helsinki",
+            description="Random desc",
+            programmed=True,
+            category=category_1,
+            projectLocation=mainDistrict_1,
+            projectClass=subClass_1,
+        )
+        project_1.hashTags.add(hashTag_1)
+        project_2 = Project.objects.create(
+            id=self.project_4_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            category=category_2,
+            projectLocation=subDistrict_1,
+            projectClass=_class,
+        )
+        project_2.hashTags.add(hashTag_2)
+        project_3 = Project.objects.create(
+            id=self.project_5_Id,
+            hkrId=3333,
+            name="Train Train Bike",
+            description="Random desc",
+            programmed=False,
+            category=category_2,
+            projectLocation=mainDistrict_2,
+            projectClass=subClass_2,
+        )
+        project_3.hashTags.add(hashTag_1, hashTag_2)
+        Project.objects.create(
+            id=self.project_6_Id,
+            hkrId=5555,
+            name="Futurice Office",
+            description="Random desc",
+            programmed=False,
+            category=category_2,
+            projectLocation=subDistrict_2,
+            projectClass=masterClass_2,
+        )
+        response = self.client.get(
+            "/projects/?hkrId={}".format(2222),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project with hkrId: 2222. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?freeSearch={}".format("jira"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects with the string 'jira' appearing in either name field or hashTags. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?freeSearch={}".format("park"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Filtered result should contain 3 projects with the string 'park' appearing in either name field or hashTags. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?freeSearch={}".format("Parking"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 projects with the string 'Parking' appearing in either name field or hashTags. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?programmed={}".format("false"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects with field programmed = false. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?programmed={}&programmed={}".format("false", "true"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            Project.objects.all().count(),
+            msg="Filtered result should contain all projects existing in the DB",
+        )
+        response = self.client.get(
+            "/projects/?programmed={}&hkrId={}".format("false", "3333"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project with field programmed = false and hkrId = 333. Found: {}".format(
+                response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?masterClass={}".format(self.projectMasterClass_2_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Filtered result should contain 3 projects belonging to masterClass Id: {}, directly or indirectly. Found: {}".format(
+                self.projectMasterClass_2_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?subClass={}&masterClass={}".format(
+                self.projectSubClass_2_Id, self.projectMasterClass_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            0,
+            msg="Filtered result should contain 0 projects with masterClass Id: {} and subClass Id: {}. Found: {}".format(
+                self.projectMasterClass_3_Id,
+                self.projectSubClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?subClass={}".format(self.projectSubClass_1_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to subClass Id: {}. Found: {}".format(
+                self.projectSubClass_1_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?subClass={}&subClass={}".format(
+                self.projectSubClass_1_Id, self.projectSubClass_2_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain a project belonging to subClass Id: {} and another belonging to subClass Id: {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?subClass={}&category={}".format(
+                self.projectSubClass_2_Id, self.projectCategory_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain a project belonging to subClass Id: {} and category Id: {}. Found: {}".format(
+                self.projectSubClass_2_Id,
+                self.projectCategory_3_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?class={}".format(self.projectClass_2_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Filtered result should contain 3 projects belonging to class Id: {}, directly or indirectly. Found: {}".format(
+                self.projectClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?mainDistrict={}".format(self.projectMainDistrict_2_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Filtered result should contain 3 projects belonging to mainDistrict Id: {}, directly or indirectly. Found: {}".format(
+                self.projectMainDistrict_2_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?mainDistrict={}&freeSearch={}".format(
+                self.projectMainDistrict_3_Id, "rain"
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, \
+                with the string 'rain' appearing in either name or hashTag fields. Found: {}".format(
+                self.projectMainDistrict_3_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?mainDistrict={}&mainDistrict={}".format(
+                self.projectMainDistrict_2_Id, self.projectMainDistrict_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            4,
+            msg="Filtered result should contain 4 projects belonging to mainDistrict Id: {} or {}, directly or indirectly. Found: {}".format(
+                self.projectMainDistrict_2_Id,
+                self.projectMainDistrict_3_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?mainDistrict={}&programmed={}".format(
+                self.projectMainDistrict_3_Id, "false"
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectMainDistrict_3_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?masterClass={}&subClass={}".format(
+                self.projectMasterClass_2_Id, self.projectSubClass_2_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project belonging to masterClass Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectMasterClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+        response = self.client.get(
+            "/projects/?programmed={}&category={}".format(
+                "true", self.projectCategory_3_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Filtered result should contain 1 project with field programmed = true and category Id: {}. Found: {}".format(
+                self.projectCategory_3_Id, response.json()["count"]
+            ),
+        )
+        response = self.client.get(
+            "/projects/?masterClass={}&masterClass={}&subClass={}&subClass={}".format(
+                self.projectMasterClass_2_Id,
+                self.projectMasterClass_3_Id,
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} and {} each. Found: {}".format(
+                self.projectMasterClass_2_Id,
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+                response.json()["count"],
+            ),
         )
