@@ -208,42 +208,30 @@ class ProjectViewSet(BaseViewSet):
                     model_class=ProjectClass,
                 )
 
-            # TODO: do same for districts
-
             if len(mainDistrict) > 0:
-                mainDistrictPaths = (
-                    ProjectLocation.objects.filter(id__in=mainDistrict, parent=None)
-                    .only("path")
-                    .values_list("path", flat=True)
-                )
-
-                qs = ProjectClass.objects.filter(
-                    Q(
-                        *[
-                            ("projectLocation__path__startswith", path)
-                            for path in mainDistrictPaths
-                        ],
-                        _connector=Q.OR
-                    )
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=False,
+                    has_children=True,
+                    search_ids=mainDistrict,
+                    model_class=ProjectLocation,
                 )
             if len(district) > 0:
-                districtPaths = (
-                    ProjectLocation.objects.filter(id__in=district, parent__parent=None)
-                    .only("path")
-                    .values_list("path", flat=True)
-                )
-
-                qs = ProjectLocation.objects.filter(
-                    Q(
-                        *[
-                            ("projectLocation__path__startswith", path)
-                            for path in districtPaths
-                        ],
-                        _connector=Q.OR
-                    )
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_children=True,
+                    search_ids=district,
+                    model_class=ProjectLocation,
                 )
             if len(subDistrict) > 0:
-                qs = ProjectLocation.objects.filter(Q(projectLocation__in=subDistrict))
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_children=False,
+                    search_ids=subClass,
+                    model_class=ProjectLocation,
+                )
 
             return qs
         except Exception as e:
