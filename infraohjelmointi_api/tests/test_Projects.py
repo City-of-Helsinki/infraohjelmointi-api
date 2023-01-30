@@ -884,19 +884,31 @@ class ProjectTestCase(TestCase):
 
     def test_endpoint_filter_project(self):
         mainDistrict_1 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_2_Id, name="Main District 1", parent=None
+            id=self.projectMainDistrict_2_Id,
+            name="Main District 1",
+            parent=None,
+            path="Main District 1",
         )
         mainDistrict_2 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_3_Id, name="Main District 2", parent=None
+            id=self.projectMainDistrict_3_Id,
+            name="Main District 2",
+            parent=None,
+            path="Main District 2",
         )
         district = mainDistrict_1.childLocation.create(
-            id=self.projectDistrict_2_Id, name="District 1"
+            id=self.projectDistrict_2_Id,
+            name="District 1",
+            path="Main District 1/District 1",
         )
         subDistrict_1 = district.childLocation.create(
-            id=self.projectSubDistrict_1_Id, name="Sub district 1"
+            id=self.projectSubDistrict_1_Id,
+            name="Sub district 1",
+            path="Main District 1/District 1/Sub district 1",
         )
         subDistrict_2 = district.childLocation.create(
-            id=self.projectSubDistrict_2_Id, name="Sub district 2"
+            id=self.projectSubDistrict_2_Id,
+            name="Sub district 2",
+            path="Main District 1/District 1/Sub district 2",
         )
 
         category_1 = ProjectCategory.objects.create(
@@ -906,19 +918,31 @@ class ProjectTestCase(TestCase):
             id=self.projectCategory_3_Id, value="K1"
         )
         masterClass_1 = ProjectClass.objects.create(
-            id=self.projectMasterClass_2_Id, name="Master Class 1", parent=None
+            id=self.projectMasterClass_2_Id,
+            name="Master Class 1",
+            parent=None,
+            path="Master Class 1",
         )
         masterClass_2 = ProjectClass.objects.create(
-            id=self.projectMasterClass_3_Id, name="Master Class 2", parent=None
+            id=self.projectMasterClass_3_Id,
+            name="Master Class 2",
+            parent=None,
+            path="Master Class 2",
         )
         _class = masterClass_1.childClass.create(
-            name="Test Class 1", id=self.projectClass_2_Id
+            name="Test Class 1",
+            id=self.projectClass_2_Id,
+            path="Master Class 1/Test Class 1",
         )
         subClass_1 = _class.childClass.create(
-            id=self.projectSubClass_1_Id, name="Sub class 1"
+            id=self.projectSubClass_1_Id,
+            name="Sub class 1",
+            path="Master Class 1/Test Class 1/Sub class 1",
         )
         subClass_2 = _class.childClass.create(
-            id=self.projectSubClass_2_Id, name="Sub class 2"
+            id=self.projectSubClass_2_Id,
+            name="Sub class 2",
+            path="Master Class 1/Test Class 1/Sub class 2",
         )
         hashTag_1 = ProjectHashTag.objects.create(
             id=self.projectHashTag_3_Id, value="Jira"

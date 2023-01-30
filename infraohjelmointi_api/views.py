@@ -6,7 +6,6 @@ from django.db.models import Q
 from django.db.models.expressions import RawSQL
 from distutils.util import strtobool
 
-
 from rest_framework import viewsets
 from .serializers import (
     NoteCreateSerializer,
@@ -257,6 +256,7 @@ class ProjectViewSet(BaseViewSet):
     def _filter_projects_by_hierarchy(
         self, qs, has_parent: bool, has_children: bool, search_ids, model_class
     ):
+
         paths = (
             model_class.objects.filter(
                 id__in=search_ids,
@@ -267,7 +267,7 @@ class ProjectViewSet(BaseViewSet):
             .values_list("path", flat=True)
         )
 
-        classIds = (
+        ids = (
             model_class.objects.filter(
                 Q(*[("path__startswith", path) for path in paths], _connector=Q.OR)
             )
@@ -276,8 +276,10 @@ class ProjectViewSet(BaseViewSet):
             if len(paths) > 0
             else []
         )
-
-        return qs.filter(projectClass__in=classIds)
+        if isinstance(model_class, ProjectLocation):
+            return qs.filter(projectLocation__in=ids)
+        elif isinstance(model_class, ProjectClass):
+            return qs.filter(projectClass__in=ids)
 
 
 class TaskStatusViewSet(BaseViewSet):
