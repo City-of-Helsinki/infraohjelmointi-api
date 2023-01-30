@@ -55,7 +55,7 @@ class Project(models.Model):
     )
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
-    description = models.TextField(max_length=40, blank=False, null=False)
+    description = models.TextField(max_length=500, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
         related_name="planning",
