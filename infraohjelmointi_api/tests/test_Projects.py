@@ -1100,7 +1100,6 @@ class ProjectTestCase(TestCase):
         response = self.client.get(
             "/projects/?masterClass={}".format(self.projectMasterClass_2_Id),
         )
-
         self.assertEqual(
             response.status_code,
             200,
