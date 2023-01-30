@@ -229,7 +229,7 @@ class ProjectViewSet(BaseViewSet):
                     qs=qs,
                     has_parent=True,
                     has_children=False,
-                    search_ids=subClass,
+                    search_ids=subDistrict,
                     model_class=ProjectLocation,
                 )
 
