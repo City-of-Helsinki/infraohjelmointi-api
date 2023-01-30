@@ -187,7 +187,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=False,
-                    has_children=True,
+                    has_parent_parent=False,
                     search_ids=masterClass,
                     model_class=ProjectClass,
                 )
@@ -196,7 +196,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
-                    has_children=True,
+                    has_parent_parent=False,
                     search_ids=_class,
                     model_class=ProjectClass,
                 )
@@ -205,7 +205,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
-                    has_children=False,
+                    has_parent_parent=True,
                     search_ids=subClass,
                     model_class=ProjectClass,
                 )
@@ -214,7 +214,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=False,
-                    has_children=True,
+                    has_parent_parent=False,
                     search_ids=mainDistrict,
                     model_class=ProjectLocation,
                 )
@@ -222,7 +222,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
-                    has_children=True,
+                    has_parent_parent=False,
                     search_ids=district,
                     model_class=ProjectLocation,
                 )
@@ -230,7 +230,7 @@ class ProjectViewSet(BaseViewSet):
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
-                    has_children=False,
+                    has_parent_parent=True,
                     search_ids=subDistrict,
                     model_class=ProjectLocation,
                 )
@@ -257,20 +257,20 @@ class ProjectViewSet(BaseViewSet):
             )
 
     def _filter_projects_by_hierarchy(
-        self, qs, has_parent: bool, has_children: bool, search_ids, model_class
+        self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
     ):
         logger.info("searchIds: {}".format(str(search_ids)))
-        childAttribute = (
-            {"childLocation__isnull": not has_children}
-            if model_class.__name__ == "ProjectLocation"
-            else {"childClass__isnull": not has_children}
-        )
+        # childAttribute = (
+        #     {"childLocation__isnull": not has_children}
+        #     if model_class.__name__ == "ProjectLocation"
+        #     else {"childClass__isnull": not has_children}
+        # )
 
         paths = (
             model_class.objects.filter(
                 id__in=search_ids,
                 parent__isnull=not has_parent,
-                **childAttribute,
+                parent__parent__isnull=not has_parent_parent,
             )
             .distinct()
             .values_list("path", flat=True)
