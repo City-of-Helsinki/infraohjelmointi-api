@@ -5,9 +5,6 @@ import django_filters
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
 from distutils.util import strtobool
-import logging
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 from rest_framework import viewsets
 from .serializers import (
@@ -259,13 +256,6 @@ class ProjectViewSet(BaseViewSet):
     def _filter_projects_by_hierarchy(
         self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
     ):
-        logger.info("searchIds: {}".format(str(search_ids)))
-        # childAttribute = (
-        #     {"childLocation__isnull": not has_children}
-        #     if model_class.__name__ == "ProjectLocation"
-        #     else {"childClass__isnull": not has_children}
-        # )
-
         paths = (
             model_class.objects.filter(
                 id__in=search_ids,
@@ -276,7 +266,6 @@ class ProjectViewSet(BaseViewSet):
             .values_list("path", flat=True)
         )
 
-        logger.info("PATH: {}".format(str(paths)))
         ids = (
             model_class.objects.filter(
                 Q(*[("path__startswith", path) for path in paths], _connector=Q.OR)
@@ -286,7 +275,6 @@ class ProjectViewSet(BaseViewSet):
             if len(paths) > 0
             else []
         )
-        logger.info("IDS: {}".format(str(ids)))
 
         if model_class.__name__ == "ProjectLocation":
             return qs.filter(projectLocation__in=ids)
