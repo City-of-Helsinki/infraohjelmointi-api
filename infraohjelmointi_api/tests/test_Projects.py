@@ -974,6 +974,11 @@ class ProjectTestCase(TestCase):
             "/projects/?hkrId={}".format(2222),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project with hkrId: 2222. Found: {}".format(
@@ -982,6 +987,11 @@ class ProjectTestCase(TestCase):
         )
         response = self.client.get(
             "/projects/?freeSearch={}".format("jira"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -994,6 +1004,11 @@ class ProjectTestCase(TestCase):
             "/projects/?freeSearch={}".format("park"),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             3,
             msg="Filtered result should contain 3 projects with the string 'park' appearing in either name field or hashTags. Found: {}".format(
@@ -1002,6 +1017,11 @@ class ProjectTestCase(TestCase):
         )
         response = self.client.get(
             "/projects/?freeSearch={}".format("Parking"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1014,6 +1034,11 @@ class ProjectTestCase(TestCase):
             "/projects/?programmed={}".format("false"),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             2,
             msg="Filtered result should contain 2 projects with field programmed = false. Found: {}".format(
@@ -1024,12 +1049,22 @@ class ProjectTestCase(TestCase):
             "/projects/?programmed={}&programmed={}".format("false", "true"),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             Project.objects.all().count(),
             msg="Filtered result should contain all projects existing in the DB",
         )
         response = self.client.get(
             "/projects/?programmed={}&hkrId={}".format("false", "3333"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1041,7 +1076,12 @@ class ProjectTestCase(TestCase):
         response = self.client.get(
             "/projects/?masterClass={}".format(self.projectMasterClass_2_Id),
         )
-        print(response.json(), self.projectMasterClass_2_Id)
+
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.json()["count"],
             3,
@@ -1053,6 +1093,11 @@ class ProjectTestCase(TestCase):
             "/projects/?subClass={}&masterClass={}".format(
                 self.projectSubClass_2_Id, self.projectMasterClass_3_Id
             ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1067,6 +1112,11 @@ class ProjectTestCase(TestCase):
             "/projects/?subClass={}".format(self.projectSubClass_1_Id),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project belonging to subClass Id: {}. Found: {}".format(
@@ -1077,6 +1127,11 @@ class ProjectTestCase(TestCase):
             "/projects/?subClass={}&subClass={}".format(
                 self.projectSubClass_1_Id, self.projectSubClass_2_Id
             ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1094,6 +1149,11 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain a project belonging to subClass Id: {} and category Id: {}. Found: {}".format(
@@ -1104,6 +1164,11 @@ class ProjectTestCase(TestCase):
         )
         response = self.client.get(
             "/projects/?class={}".format(self.projectClass_2_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1118,6 +1183,11 @@ class ProjectTestCase(TestCase):
             "/projects/?mainDistrict={}".format(self.projectMainDistrict_2_Id),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             3,
             msg="Filtered result should contain 3 projects belonging to mainDistrict Id: {}, directly or indirectly. Found: {}".format(
@@ -1129,7 +1199,11 @@ class ProjectTestCase(TestCase):
                 self.projectMainDistrict_3_Id, "rain"
             ),
         )
-
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
         self.assertEqual(
             response.json()["count"],
             1,
@@ -1142,6 +1216,11 @@ class ProjectTestCase(TestCase):
             "/projects/?mainDistrict={}&mainDistrict={}".format(
                 self.projectMainDistrict_2_Id, self.projectMainDistrict_3_Id
             ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1158,6 +1237,11 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
@@ -1169,6 +1253,11 @@ class ProjectTestCase(TestCase):
             "/projects/?masterClass={}&subClass={}".format(
                 self.projectMasterClass_2_Id, self.projectSubClass_2_Id
             ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
@@ -1184,6 +1273,11 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project with field programmed = true and category Id: {}. Found: {}".format(
@@ -1197,6 +1291,11 @@ class ProjectTestCase(TestCase):
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
             ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
             response.json()["count"],
