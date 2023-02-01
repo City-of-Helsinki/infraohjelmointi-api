@@ -148,10 +148,6 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-
-    # freeSearch = django_filters.CharFilter(
-    #     method="filter_search_string", label="Search"
-    # )
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
             ("false", "False"),
@@ -160,15 +156,11 @@ class ProjectFilter(django_filters.FilterSet):
         coerce=strtobool,
     )
 
-    # def filter_search_string(self, queryset, name, value):
-    #     return queryset.filter(
-    #         Q(name__icontains=value) | Q(hashTags__value__icontains=value)
-    #     ).distinct()
-
     class Meta:
         fields = {
             "hkrId": ["exact"],
             "category": ["exact"],
+            "hashTags": ["exact"],
         }
         model = Project
 
