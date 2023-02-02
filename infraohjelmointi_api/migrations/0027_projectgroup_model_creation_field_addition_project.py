@@ -8,31 +8,63 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0026_alter_person_phone'),
+        ("infraohjelmointi_api", "0026_alter_person_phone"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ProjectGroup',
+            name="ProjectGroup",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=200)),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
-                ('classRelation', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.projectclass')),
-                ('districtRelation', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.projectlocation')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=200)),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
+                (
+                    "classRelation",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        to="infraohjelmointi_api.projectclass",
+                    ),
+                ),
+                (
+                    "districtRelation",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        to="infraohjelmointi_api.projectlocation",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-id'],
+                "ordering": ["-id"],
             },
         ),
         migrations.AddField(
-            model_name='project',
-            name='projectGroup',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='infraohjelmointi_api.projectgroup'),
+            model_name="project",
+            name="projectGroup",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="infraohjelmointi_api.projectgroup",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='projectgroup',
-            constraint=models.UniqueConstraint(fields=('name', 'districtRelation', 'classRelation'), name='Unique together Constraint Project Group'),
+            model_name="projectgroup",
+            constraint=models.UniqueConstraint(
+                fields=("name", "districtRelation", "classRelation"),
+                name="Unique together Constraint Project Group",
+            ),
         ),
     ]

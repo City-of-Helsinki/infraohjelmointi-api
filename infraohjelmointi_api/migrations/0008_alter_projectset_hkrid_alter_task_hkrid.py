@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0007_project_address'),
+        ("infraohjelmointi_api", "0007_project_address"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='projectset',
-            name='hkrId',
+            model_name="projectset",
+            name="hkrId",
             field=models.PositiveBigIntegerField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='task',
-            name='hkrId',
+            model_name="task",
+            name="hkrId",
             field=models.PositiveBigIntegerField(blank=True, null=True),
         ),
     ]
