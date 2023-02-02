@@ -62,7 +62,7 @@ class ProjectGroupSerializer(serializers.ModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectGroup.objects.all(),
-                fields=["name", "_class", "district"],
+                fields=["name", "classRelation", "districtRelation"],
             ),
         ]
 
