@@ -992,7 +992,7 @@ class ProjectTestCase(TestCase):
         Project.objects.create(
             id=self.project_6_Id,
             hkrId=5555,
-            name="Futurice Office",
+            name="Futurice Office Jira",
             description="Random desc",
             programmed=False,
             category=category_2,
@@ -1023,11 +1023,14 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            response.json()["count"],
-            2,
-            msg="Filtered result should contain 2 projects with the string 'jira' appearing in either name field or hashTags. Found: {}".format(
-                response.json()["count"]
-            ),
+            len(response.json()["data"]["projects"]),
+            1,
+            msg="Filtered result should contain 1 project with the string 'jira' appearing in name field",
+        )
+        self.assertEqual(
+            len(response.json()["data"]["hashtags"]),
+            1,
+            msg="Filtered result should contain 1 hashTag with the string 'jira' appearing in value field",
         )
         response = self.client.get(
             "/projects/?freeSearch={}".format("park"),
@@ -1038,11 +1041,14 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            response.json()["count"],
-            3,
-            msg="Filtered result should contain 3 projects with the string 'park' appearing in either name field or hashTags. Found: {}".format(
-                response.json()["count"]
-            ),
+            len(response.json()["data"]["hashtags"]),
+            1,
+            msg="Filtered result should contain 1 hashTag with the string 'park' appearing in value field",
+        )
+        self.assertEqual(
+            len(response.json()["data"]["projects"]),
+            1,
+            msg="Filtered result should contain 1 project with the string 'park' appearing in name field",
         )
         response = self.client.get(
             "/projects/?freeSearch={}".format("Parking"),
@@ -1053,11 +1059,14 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            response.json()["count"],
+            len(response.json()["data"]["projects"]),
             1,
-            msg="Filtered result should contain 1 projects with the string 'Parking' appearing in either name field or hashTags. Found: {}".format(
-                response.json()["count"]
-            ),
+            msg="Filtered result should contain 1 project with the string 'Parking' appearing in name field",
+        )
+        self.assertEqual(
+            len(response.json()["data"]["hashtags"]),
+            0,
+            msg="Filtered result should contain no hashtags with the string 'Parking' appearing in value field",
         )
         response = self.client.get(
             "/projects/?programmed={}".format("false"),
@@ -1223,8 +1232,8 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&freeSearch={}".format(
-                self.projectMainDistrict_3_Id, "rain"
+            "/projects/?mainDistrict={}&hashtags={}".format(
+                self.projectMainDistrict_3_Id, self.projectHashTag_3_Id
             ),
         )
         self.assertEqual(
@@ -1236,8 +1245,10 @@ class ProjectTestCase(TestCase):
             response.json()["count"],
             1,
             msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, \
-                with the string 'rain' appearing in either name or hashTag fields. Found: {}".format(
-                self.projectMainDistrict_3_Id, response.json()["count"]
+                with the hashTag: {} . Found: {}".format(
+                self.projectMainDistrict_3_Id,
+                self.projectHashTag_3_Id,
+                response.json()["count"],
             ),
         )
         response = self.client.get(
@@ -1332,6 +1343,43 @@ class ProjectTestCase(TestCase):
                 self.projectMasterClass_2_Id,
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
+                response.json()["count"],
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?hashTags={}".format(self.projectHashTag_3_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects with hashTag: {}. Found: {}".format(
+                self.projectHashTag_3_Id,
+                response.json()["count"],
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?hashTags={}&hashTags={}".format(
+                self.projectHashTag_3_Id, self.projectHashTag_4_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Filtered result should contain 3 projects with hashTag: {} and {}. Found: {}".format(
+                self.projectHashTag_3_Id,
+                self.projectHashTag_4_Id,
                 response.json()["count"],
             ),
         )
