@@ -1023,12 +1023,12 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["data"]["projects"]),
+            len(response.json()["projects"]),
             1,
             msg="Filtered result should contain 1 project with the string 'jira' appearing in name field",
         )
         self.assertEqual(
-            len(response.json()["data"]["hashtags"]),
+            len(response.json()["hashtags"]),
             1,
             msg="Filtered result should contain 1 hashTag with the string 'jira' appearing in value field",
         )
@@ -1041,12 +1041,12 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["data"]["hashtags"]),
+            len(response.json()["hashtags"]),
             1,
             msg="Filtered result should contain 1 hashTag with the string 'park' appearing in value field",
         )
         self.assertEqual(
-            len(response.json()["data"]["projects"]),
+            len(response.json()["projects"]),
             1,
             msg="Filtered result should contain 1 project with the string 'park' appearing in name field",
         )
@@ -1059,12 +1059,12 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["data"]["projects"]),
+            len(response.json()["projects"]),
             1,
             msg="Filtered result should contain 1 project with the string 'Parking' appearing in name field",
         )
         self.assertEqual(
-            len(response.json()["data"]["hashtags"]),
+            len(response.json()["hashtags"]),
             0,
             msg="Filtered result should contain no hashtags with the string 'Parking' appearing in value field",
         )
