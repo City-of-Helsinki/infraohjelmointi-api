@@ -205,10 +205,8 @@ class ProjectViewSet(BaseViewSet):
 
             return Response(
                 {
-                    "data": {
-                        "projects": projectsSerializer.data,
-                        "hashtags": hashTagsSerializer.data,
-                    }
+                    "projects": projectsSerializer.data,
+                    "hashtags": hashTagsSerializer.data,
                 }
             )
         else:
