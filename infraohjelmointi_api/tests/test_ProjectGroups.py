@@ -31,10 +31,12 @@ class projectGroupTestCase(TestCase):
             name="Test Class", id=self.projectClassId
         )
         self.mainDistrict = ProjectLocation.objects.create(
-            id=self.projectMainDistrictId, name="Test main district", parent=None
+            id=self.projectMainDistrictId,
+            name="Test main districtRelation",
+            parent=None,
         )
         self.projectLocation = self.mainDistrict.childLocation.create(
-            id=self.projectLocationId, name="Test district"
+            id=self.projectLocationId, name="Test districtRelation"
         )
 
         self.project = Project.objects.create(
@@ -45,8 +47,8 @@ class projectGroupTestCase(TestCase):
         self.projectGroup = ProjectGroup.objects.create(
             id=self.projectGroup_1_Id,
             name="Test Group",
-            district=self.projectLocation,
-            _class=self.projectClass,
+            districtRelation=self.projectLocation,
+            classRelation=self.projectClass,
         )
 
     def test_ProjectGroup_is_created(self):
@@ -110,8 +112,8 @@ class projectGroupTestCase(TestCase):
     def test_POST_ProjectGroup(self):
         data = {
             "name": "POST Group",
-            "_class": None,
-            "district": None,
+            "classRelation": None,
+            "districtRelation": None,
         }
         response = self.client.post(
             "/project-groups/", data, content_type="application/json"
@@ -127,8 +129,8 @@ class projectGroupTestCase(TestCase):
     def test_POST_ProjectGroup_with_Project(self):
         data = {
             "name": "POST Group with project",
-            "_class": None,
-            "district": None,
+            "classRelation": None,
+            "districtRelation": None,
             "projects": [self.projectId],
         }
         response = self.client.post(
