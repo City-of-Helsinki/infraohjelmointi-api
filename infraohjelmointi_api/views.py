@@ -205,7 +205,10 @@ class ProjectViewSet(BaseViewSet):
 
             return Response(
                 {
-                    "projects": projectsSerializer.data,
+                    "projects": [
+                        {"id": project["id"], "value": project["name"]}
+                        for project in projectsSerializer.data
+                    ],
                     "hashtags": hashTagsSerializer.data,
                 }
             )
