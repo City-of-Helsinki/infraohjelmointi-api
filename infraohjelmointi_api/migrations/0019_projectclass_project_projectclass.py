@@ -8,24 +8,49 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0018_auto_constructionphase_planningphase_qualitylevel_populate'),
+        (
+            "infraohjelmointi_api",
+            "0018_auto_constructionphase_planningphase_qualitylevel_populate",
+        ),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ProjectClass',
+            name="ProjectClass",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=150)),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
-                ('path', models.CharField(blank=True, max_length=300, null=True)),
-                ('parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='childClass', to='infraohjelmointi_api.projectclass')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=150)),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
+                ("path", models.CharField(blank=True, max_length=300, null=True)),
+                (
+                    "parent",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="childClass",
+                        to="infraohjelmointi_api.projectclass",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='project',
-            name='projectClass',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.projectclass'),
+            model_name="project",
+            name="projectClass",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                to="infraohjelmointi_api.projectclass",
+            ),
         ),
     ]
