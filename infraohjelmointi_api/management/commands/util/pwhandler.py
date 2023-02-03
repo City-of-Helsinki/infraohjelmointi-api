@@ -295,9 +295,9 @@ def proceedWithPWArgument(session, env, stdout, style):
 
         for project in projects:
             project_properties = project["properties"]
-            name = project_properties["PROJECT_Kohde"].strip()
+            name = " ".join(project_properties["PROJECT_Kohde"].split())
             description = (
-                project_properties["PROJECT_Hankkeen_kuvaus"]
+                " ".join(project_properties["PROJECT_Hankkeen_kuvaus"].split())
                 if project_properties["PROJECT_Hankkeen_kuvaus"]
                 else "Kuvaus puuttuu"
             )
