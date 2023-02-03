@@ -33,53 +33,28 @@ class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
 
 
-class ProjectGroupSerializer(serializers.ModelSerializer):
-    projects = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
-    )
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+    """
+    A ModelSerializer that takes an additional `fields` argument that
+    controls which fields should be displayed.
+    """
 
-    def validate_projects(self, projectIds):
-        """
-        Check that project doesn't already belong to a group
-        """
+    def __init__(self, *args, **kwargs):
+        # Don't pass the 'fields' arg up to the superclass
+        fields = kwargs.pop("fields", None)
 
-        if projectIds is not None and len(projectIds) > 0:
-            for projectId in projectIds:
-                project = get_object_or_404(Project, pk=projectId)
-                if project.projectGroup is not None:
-                    raise serializers.ValidationError(
-                        "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
-                            project.name,
-                            projectId,
-                            project.projectGroup.name,
-                            project.projectGroup_id,
-                        )
-                    )
-        return projectIds
+        # Instantiate the superclass normally
+        super().__init__(*args, **kwargs)
 
-    class Meta(BaseMeta):
-        model = ProjectGroup
-        validators = [
-            UniqueTogetherValidator(
-                queryset=ProjectGroup.objects.all(),
-                fields=["name", "classRelation", "districtRelation"],
-            ),
-        ]
-
-    @override
-    def create(self, validated_data):
-        projectIds = validated_data.pop("projects", None)
-        projectGroup = self.Meta.model.objects.create(**validated_data)
-        if projectIds is not None and len(projectIds) > 0:
-            for projectId in projectIds:
-                project = get_object_or_404(Project, pk=projectId)
-                project.projectGroup = projectGroup
-                project.save()
-
-        return projectGroup
+        if fields is not None:
+            # Drop any fields that are not specified in the `fields` argument.
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
 
 
-class ProjectGroupSerializer(serializers.ModelSerializer):
+class ProjectGroupSerializer(DynamicFieldsModelSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
