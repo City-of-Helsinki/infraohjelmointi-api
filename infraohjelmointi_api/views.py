@@ -155,6 +155,10 @@ class ProjectFilter(django_filters.FilterSet):
         ),
         coerce=strtobool,
     )
+    projectGroup = django_filters.ModelMultipleChoiceFilter(
+        field_name="projectGroup",
+        queryset=ProjectGroupSerializer.Meta.model.objects.all(),
+    )
 
     class Meta:
         fields = {
@@ -196,11 +200,17 @@ class ProjectViewSet(BaseViewSet):
             projectQs = ProjectGetSerializer.Meta.model.objects.filter(
                 name__icontains=freeSearch
             )
+            projectGroupQs = ProjectGroupSerializer.Meta.model.objects.filter(
+                name__icontains=freeSearch
+            )
             hashTagsSerializer = ProjectHashtagSerializer(
                 hashTagQs, fields=("id", "value"), many=True
             )
             projectsSerializer = ProjectGetSerializer(
                 projectQs, fields=("id", "name"), many=True
+            )
+            projectGroupsSerializer = ProjectGroupSerializer(
+                projectGroupQs, fields=("id", "name"), many=True
             )
 
             return Response(
@@ -210,6 +220,10 @@ class ProjectViewSet(BaseViewSet):
                         for project in projectsSerializer.data
                     ],
                     "hashtags": hashTagsSerializer.data,
+                    "groups": [
+                        {"id": group["id"], "value": group["name"]}
+                        for group in projectGroupsSerializer.data
+                    ],
                 }
             )
         else:
