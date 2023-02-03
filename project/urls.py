@@ -82,6 +82,11 @@ router.register(
     views.ProjectHashtagViewSet,
     basename="projectHashTags",
 )
+router.register(
+    r"project-groups",
+    views.ProjectGroupViewSet,
+    basename="projectGroups",
+)
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),

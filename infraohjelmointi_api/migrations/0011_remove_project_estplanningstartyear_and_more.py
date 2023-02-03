@@ -6,22 +6,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0010_auto_excel_migration'),
+        ("infraohjelmointi_api", "0010_auto_excel_migration"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='project',
-            name='estPlanningStartYear',
+            model_name="project",
+            name="estPlanningStartYear",
         ),
         migrations.AddField(
-            model_name='project',
-            name='estPlanningEnd',
+            model_name="project",
+            name="estPlanningEnd",
             field=models.DateField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='project',
-            name='estPlanningStart',
+            model_name="project",
+            name="estPlanningStart",
             field=models.DateField(blank=True, null=True),
         ),
     ]

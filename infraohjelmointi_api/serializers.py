@@ -20,14 +20,63 @@ from .models import (
     Note,
     ResponsibleZone,
     ProjectHashTag,
+    ProjectGroup,
 )
 from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
+from django.shortcuts import get_object_or_404
+from rest_framework.validators import UniqueTogetherValidator
 
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
+
+
+class ProjectGroupSerializer(serializers.ModelSerializer):
+    projects = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
+    )
+
+    def validate_projects(self, projectIds):
+        """
+        Check that project doesn't already belong to a group
+        """
+
+        if projectIds is not None and len(projectIds) > 0:
+            for projectId in projectIds:
+                project = get_object_or_404(Project, pk=projectId)
+                if project.projectGroup is not None:
+                    raise serializers.ValidationError(
+                        "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
+                            project.name,
+                            projectId,
+                            project.projectGroup.name,
+                            project.projectGroup_id,
+                        )
+                    )
+        return projectIds
+
+    class Meta(BaseMeta):
+        model = ProjectGroup
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ProjectGroup.objects.all(),
+                fields=["name", "classRelation", "districtRelation"],
+            ),
+        ]
+
+    @override
+    def create(self, validated_data):
+        projectIds = validated_data.pop("projects", None)
+        projectGroup = self.Meta.model.objects.create(**validated_data)
+        if projectIds is not None and len(projectIds) > 0:
+            for projectId in projectIds:
+                project = get_object_or_404(Project, pk=projectId)
+                project.projectGroup = projectGroup
+                project.save()
+
+        return projectGroup
 
 
 class ProjectHashtagSerializer(serializers.ModelSerializer):

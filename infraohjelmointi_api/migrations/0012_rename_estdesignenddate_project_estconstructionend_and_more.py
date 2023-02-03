@@ -6,42 +6,42 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0011_remove_project_estplanningstartyear_and_more'),
+        ("infraohjelmointi_api", "0011_remove_project_estplanningstartyear_and_more"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='project',
-            old_name='estDesignEndDate',
-            new_name='estConstructionEnd',
+            model_name="project",
+            old_name="estDesignEndDate",
+            new_name="estConstructionEnd",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='estDesignStartDate',
-            new_name='estConstructionStart',
+            model_name="project",
+            old_name="estDesignStartDate",
+            new_name="estConstructionStart",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='contractPrepEndDate',
-            new_name='presenceEnd',
+            model_name="project",
+            old_name="contractPrepEndDate",
+            new_name="presenceEnd",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='contractPrepStartDate',
-            new_name='presenceStart',
+            model_name="project",
+            old_name="contractPrepStartDate",
+            new_name="presenceStart",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='warrantyExpireDate',
-            new_name='visibilityEnd',
+            model_name="project",
+            old_name="warrantyExpireDate",
+            new_name="visibilityEnd",
         ),
         migrations.RenameField(
-            model_name='project',
-            old_name='warrantyStartDate',
-            new_name='visibilityStart',
+            model_name="project",
+            old_name="warrantyStartDate",
+            new_name="visibilityStart",
         ),
         migrations.RemoveField(
-            model_name='project',
-            name='estDesignEndYear',
+            model_name="project",
+            name="estDesignEndYear",
         ),
     ]
