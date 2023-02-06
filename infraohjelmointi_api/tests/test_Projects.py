@@ -173,6 +173,7 @@ class ProjectTestCase(TestCase):
         )
 
         self.project = Project.objects.create(
+            otherPersons="Other Test Person",
             projectClass=self.projectClass,
             id=self.project_1_Id,
             projectLocation=self.projectLocation,
@@ -586,6 +587,7 @@ class ProjectTestCase(TestCase):
             "masterPlanAreaNumber": None,
             "trafficPlanNumber": None,
             "projectGroup": None,
+            "otherPersons": None,
         }
         response = self.client.post(
             "/projects/",
@@ -681,6 +683,7 @@ class ProjectTestCase(TestCase):
             "entityName": "Entity Name",
             "delays": "    100 delays   .",
             "comments": "This comment is    random    ",
+            "otherPersons": " john    Doe  Person .",
         }
 
         validData = {
@@ -690,6 +693,7 @@ class ProjectTestCase(TestCase):
             "entityName": "Entity Name",
             "delays": "100 delays .",
             "comments": "This comment is random",
+            "otherPersons": "John Doe Person.",
         }
 
         response = self.client.post(
