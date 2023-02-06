@@ -18,6 +18,7 @@ from ..models import (
     ProjectClass,
     ProjectLocation,
     ProjectHashTag,
+    ProjectGroup,
 )
 from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
 
@@ -49,7 +50,6 @@ class ProjectTestCase(TestCase):
     projectCategory_1_Id = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
     projectCategory_2_Id = uuid.UUID("4124f82a-4d62-4f66-b021-c45c64ba750a")
     projectCategory_3_Id = uuid.UUID("8a19b04a-15f6-448d-95d3-70fdfa2d5cba")
-
     conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
     projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
     planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
@@ -68,12 +68,13 @@ class ProjectTestCase(TestCase):
     projectMainDistrict_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectMainDistrict_2_Id = uuid.UUID("740d6771-442b-4713-8362-8bda3958100e")
     projectMainDistrict_3_Id = uuid.UUID("019eb15d-cfdb-45bc-b1a5-ac3844381e48")
-
     projectDistrict_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectDistrict_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
-
     projectSubDistrict_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
     projectSubDistrict_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
+    projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
+    projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
+    projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
 
     fixtures = []
     maxDiff = None
@@ -81,6 +82,7 @@ class ProjectTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
+
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,
             budgetMain=10000,
@@ -888,6 +890,15 @@ class ProjectTestCase(TestCase):
         )
 
     def test_endpoint_filter_project(self):
+        projectGroup_1 = ProjectGroup.objects.create(
+            id=self.projectGroup_1_Id, name="Test Group 1 rain"
+        )
+        projectGroup_2 = ProjectGroup.objects.create(
+            id=self.projectGroup_2_Id, name="Test Group 2"
+        )
+        projectGroup_3 = ProjectGroup.objects.create(
+            id=self.projectGroup_3_Id, name="Test Group 3 park"
+        )
         mainDistrict_1 = ProjectLocation.objects.create(
             id=self.projectMainDistrict_2_Id,
             name="Main District 1",
@@ -965,6 +976,7 @@ class ProjectTestCase(TestCase):
             category=category_1,
             projectLocation=mainDistrict_1,
             projectClass=subClass_1,
+            projectGroup=projectGroup_1,
         )
         project_1.hashTags.add(hashTag_1)
         project_2 = Project.objects.create(
@@ -976,6 +988,7 @@ class ProjectTestCase(TestCase):
             category=category_2,
             projectLocation=subDistrict_1,
             projectClass=_class,
+            projectGroup=projectGroup_1,
         )
         project_2.hashTags.add(hashTag_2)
         project_3 = Project.objects.create(
@@ -987,6 +1000,7 @@ class ProjectTestCase(TestCase):
             category=category_2,
             projectLocation=mainDistrict_2,
             projectClass=subClass_2,
+            projectGroup=projectGroup_2,
         )
         project_3.hashTags.add(hashTag_1, hashTag_2)
         Project.objects.create(
@@ -998,6 +1012,7 @@ class ProjectTestCase(TestCase):
             category=category_2,
             projectLocation=subDistrict_2,
             projectClass=masterClass_2,
+            projectGroup=projectGroup_3,
         )
         response = self.client.get(
             "/projects/?hkrId={}".format(2222),
@@ -1032,6 +1047,11 @@ class ProjectTestCase(TestCase):
             1,
             msg="Filtered result should contain 1 hashTag with the string 'jira' appearing in value field",
         )
+        self.assertEqual(
+            len(response.json()["groups"]),
+            0,
+            msg="Filtered result should contain 0 groups with the string 'jira' appearing in value field",
+        )
         response = self.client.get(
             "/projects/?freeSearch={}".format("park"),
         )
@@ -1049,6 +1069,11 @@ class ProjectTestCase(TestCase):
             len(response.json()["projects"]),
             1,
             msg="Filtered result should contain 1 project with the string 'park' appearing in name field",
+        )
+        self.assertEqual(
+            len(response.json()["groups"]),
+            1,
+            msg="Filtered result should contain 1 group with the string 'park' appearing in name field",
         )
         response = self.client.get(
             "/projects/?freeSearch={}".format("Parking"),
@@ -1068,6 +1093,7 @@ class ProjectTestCase(TestCase):
             0,
             msg="Filtered result should contain no hashtags with the string 'Parking' appearing in value field",
         )
+
         response = self.client.get(
             "/projects/?programmed={}".format("false"),
         )
@@ -1380,6 +1406,30 @@ class ProjectTestCase(TestCase):
             msg="Filtered result should contain 3 projects with hashTag: {} and {}. Found: {}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
+                response.json()["count"],
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?hashTags={}&hashTags={}&group={}".format(
+                self.projectHashTag_3_Id,
+                self.projectHashTag_4_Id,
+                self.projectGroup_1_Id,
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        print(response.json())
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Filtered result should contain 2 projects with hashTag: {} or {} and group: {}. Found: {}".format(
+                self.projectHashTag_3_Id,
+                self.projectHashTag_4_Id,
+                self.projectGroup_1_Id,
                 response.json()["count"],
             ),
         )
