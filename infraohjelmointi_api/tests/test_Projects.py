@@ -1003,7 +1003,7 @@ class ProjectTestCase(TestCase):
             projectGroup=projectGroup_2,
         )
         project_3.hashTags.add(hashTag_1, hashTag_2)
-        Project.objects.create(
+        project_4 = Project.objects.create(
             id=self.project_6_Id,
             hkrId=5555,
             name="Futurice Office Jira",
@@ -1014,6 +1014,7 @@ class ProjectTestCase(TestCase):
             projectClass=masterClass_2,
             projectGroup=projectGroup_3,
         )
+
         response = self.client.get(
             "/projects/?hkrId={}".format(2222),
         )
@@ -1365,7 +1366,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             response.json()["count"],
             2,
-            msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} and {} each. Found: {}".format(
+            msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} or {} each. Found: {}".format(
                 self.projectMasterClass_2_Id,
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
@@ -1403,7 +1404,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             response.json()["count"],
             3,
-            msg="Filtered result should contain 3 projects with hashTag: {} and {}. Found: {}".format(
+            msg="Filtered result should contain 3 projects with hashTag: {} or {}. Found: {}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
                 response.json()["count"],
@@ -1411,7 +1412,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?hashTags={}&hashTags={}&group={}".format(
+            "/projects/?hashTags={}&hashTags={}&projectGroup={}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
                 self.projectGroup_1_Id,
@@ -1422,7 +1423,7 @@ class ProjectTestCase(TestCase):
             200,
             msg="Status code != 200, Error: {}".format(response.json()),
         )
-        print(response.json())
+
         self.assertEqual(
             response.json()["count"],
             2,
