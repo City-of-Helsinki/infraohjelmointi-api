@@ -148,16 +148,16 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
+    projectGroup = django_filters.ModelMultipleChoiceFilter(
+        field_name="projectGroup",
+        queryset=ProjectGroupSerializer.Meta.model.objects.all(),
+    )
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
             ("false", "False"),
             ("true", "True"),
         ),
         coerce=strtobool,
-    )
-    projectGroup = django_filters.ModelMultipleChoiceFilter(
-        field_name="projectGroup",
-        queryset=ProjectGroupSerializer.Meta.model.objects.all(),
     )
 
     class Meta:
