@@ -60,6 +60,7 @@ class Project(models.Model):
     )
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
+    otherPersons = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(max_length=500, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
@@ -272,6 +273,8 @@ class Project(models.Model):
             self.comments = " ".join(self.comments.split())
         if self.delays:
             self.delays = " ".join(self.delays.split())
+        if self.otherPersons:
+            self.otherPersons = " ".join(self.otherPersons.split())
 
     class Meta:
         constraints = [
