@@ -48,6 +48,7 @@ from rest_framework.decorators import action
 from django.core import serializers
 from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Count
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -66,6 +67,21 @@ class ProjectHashtagViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectHashtagSerializer
+
+    @override
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        popularQs = (
+            qs.annotate(usage_count=Count("relatedProject"))
+            .filter(usage_count__gt=0)
+            .order_by("-usage_count")[:15]
+        )
+
+        serializer = self.get_serializer(qs, many=True)
+        popularSerializer = self.get_serializer(popularQs, many=True)
+        return Response(
+            {"hashTags": serializer.data, "popularHashTags": popularSerializer.data}
+        )
 
 
 class ProjectGroupViewSet(BaseViewSet):
