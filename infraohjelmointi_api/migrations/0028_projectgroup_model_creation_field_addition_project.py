@@ -8,7 +8,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("infraohjelmointi_api", "0027_alter_project_description"),
+        ("infraohjelmointi_api", "0028_project_otherpersons"),
     ]
 
     operations = [
