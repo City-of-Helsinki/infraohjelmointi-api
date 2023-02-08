@@ -39,7 +39,8 @@ class ProjectTestCase(TestCase):
     person_3_Id = uuid.UUID("b56ae8c8-f5c2-4abe-a1a6-f3a83265ff49")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
-    projectPhaseId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectPhase_2_Id = uuid.UUID("562e3d4f-77ac-4b0c-a82a-4b5bff8daa74")
     projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
@@ -150,7 +151,7 @@ class ProjectTestCase(TestCase):
             phone="0414853275",
         )
         self.projectPhase = ProjectPhase.objects.create(
-            id=self.projectPhaseId, value="Proposal"
+            id=self.projectPhase_1_Id, value="Proposal"
         )
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
@@ -1373,7 +1374,6 @@ class ProjectTestCase(TestCase):
                 response.json()["count"],
             ),
         )
-
         response = self.client.get(
             "/projects/?hashTags={}".format(self.projectHashTag_3_Id),
         )
@@ -1434,3 +1434,67 @@ class ProjectTestCase(TestCase):
                 response.json()["count"],
             ),
         )
+
+
+def test_project_gets_locked(self):
+    ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
+    data = {
+        "name": "Test locking",
+        "description": "Test Description",
+        "phase": self.projectPhase_2_Id.__str__(),
+    }
+    response = self.client.post(
+        "/projects/",
+        data,
+        content_type="application/json",
+    )
+    newCreatedId = response.json()["id"]
+    self.assertEqual(
+        response.status_code,
+        201,
+        msg="Status code != 201 , Error: {}".format(response.json()),
+    )
+    self.assertEqual(
+        Project.objects.get(id=newCreatedId).locked,
+        True,
+        msg="Field locked should be set to True automatically if phase = construction",
+    )
+
+    data["phase"] = self.projectPhase_1_Id.__str__()
+    response = self.client.post(
+        "/projects/",
+        data,
+        content_type="application/json",
+    )
+    newCreatedId = response.json()["id"]
+    self.assertEqual(
+        response.status_code,
+        201,
+        msg="Status code != 200 , Error: {}".format(response.json()),
+    )
+    self.assertEqual(Project.objects.get(id=newCreatedId).locked, False)
+
+    data["phase"] = self.projectPhase_2_Id.__str__()
+    response = self.client.patch(
+        "/projects/{}/".format(newCreatedId),
+        data,
+        content_type="application/json",
+        msg="Status code != 200 , Error: {}".format(response.json()),
+    )
+    self.assertEqual(
+        Project.objects.get(id=newCreatedId).locked,
+        True,
+        msg="Field locked should be set to True automatically if phase = construction",
+    )
+
+    response = self.client.patch(
+        "/projects/{}/".format(newCreatedId),
+        {"locked": False},
+        content_type="application/json",
+        msg="Status code != 200 , Error: {}".format(response.json()),
+    )
+    self.assertEqual(
+        Project.objects.get(id=newCreatedId).locked,
+        False,
+        msg="Should be able to set locked = False even when phase = construction",
+    )
