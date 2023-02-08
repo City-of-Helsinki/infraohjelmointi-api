@@ -324,6 +324,29 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         return obj.projectReadiness()
 
     @override
+    def create(self, validated_data):
+        """
+        Overriding the create method to set the Project
+        locked field to True if the phase field is set to construction
+        """
+        newPhase = validated_data.get("phase", None)
+        if newPhase is not None and newPhase.value == "construction":
+            validated_data["locked"] = True
+
+        return super(ProjectCreateSerializer, self).create(validated_data)
+
+    @override
+    def update(self, instance, validated_data):
+        """
+        Overriding the update method to set the Project
+        locked field to True if the phase field is updated to construction
+        """
+        newPhase = validated_data.get("phase", None)
+        if newPhase is not None and newPhase.value == "construction":
+            validated_data["locked"] = True
+        return super(ProjectCreateSerializer, self).update(instance, validated_data)
+
+    @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["phase"] = (
