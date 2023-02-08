@@ -149,6 +149,40 @@ class projectGroupTestCase(TestCase):
             ProjectGroup.objects.get(id=new_createdId),
             msg="Newly created ProjectGroup not assignd to Project",
         )
+        response = self.client.post(
+            "/project-groups/", data, content_type="application/json"
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400",
+        )
+        errorMessage = response.json()["projects"][0]
+        self.assertEqual(
+            errorMessage,
+            "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
+                self.project.name,
+                self.projectId,
+                Project.objects.get(id=self.projectId).projectGroup.name,
+                Project.objects.get(id=self.projectId).projectGroup_id,
+            ),
+            msg="Project which already belongs to a group should not be assigned to another group",
+        )
+        data["projects"] = ["6e3993ab-f15d-4acf-b151-8dd641098a26"]
+        response = self.client.post(
+            "/project-groups/", data, content_type="application/json"
+        )
+        self.assertEqual(
+            response.status_code,
+            404,
+            msg="Status code != 404",
+        )
+        errorMessage = response.json()["detail"]
+        self.assertEqual(
+            errorMessage,
+            "Not found.",
+            msg="Should throw error if project is not found in DB",
+        )
 
     def test_PATCH_projectGroup(self):
         data = {
