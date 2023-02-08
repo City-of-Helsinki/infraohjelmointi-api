@@ -193,7 +193,7 @@ class ProjectViewSet(BaseViewSet):
     @override
     def list(self, request, *args, **kwargs):
         freeSearch = request.query_params.get("freeSearch", None)
-        if freeSearch:
+        if freeSearch is not None:
             hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
                 value__icontains=freeSearch
             )
