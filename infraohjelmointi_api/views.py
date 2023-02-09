@@ -1,5 +1,10 @@
 import uuid
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
+from infraohjelmointi_api.models import (
+    Project,
+    ProjectClass,
+    ProjectGroup,
+    ProjectLocation,
+)
 from rest_framework.exceptions import APIException
 import django_filters
 from django.db.models import Q
@@ -175,6 +180,8 @@ class ProjectFilter(django_filters.FilterSet):
             "hkrId": ["exact"],
             "category": ["exact"],
             "hashTags": ["exact"],
+            "phase": ["exact"],
+            "personPlanning": ["exact"],
         }
         model = Project
 
@@ -202,7 +209,14 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        response = {}
         freeSearch = request.query_params.get("freeSearch", None)
+        projectGroup = request.query_params.get("projectGroup", [])
+        _class = self.request.query_params.getlist("class", [])
+        subClass = self.request.query_params.getlist("subClass", [])
+
+        district = self.request.query_params.getlist("district", [])
+        subDistrict = self.request.query_params.getlist("subDistrict", [])
         if freeSearch is not None:
             hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
                 value__icontains=freeSearch
@@ -236,6 +250,64 @@ class ProjectViewSet(BaseViewSet):
                     ],
                 }
             )
+        elif (
+            len(projectGroup) > 0
+            or len(_class) > 0
+            or len(subClass) > 0
+            or len(district) > 0
+            or len(subDistrict) > 0
+        ):
+            # already filtered queryset
+            queryset = self.filter_queryset(self.get_queryset())
+            if len(projectGroup) > 0:
+                groups = ProjectGroup.objects.filter(
+                    id__in=queryset.values_list("projectGroup", flat=True).distinct()
+                ).select_related("classRelation")
+                response["groups"] = [
+                    {
+                        "id": group.id,
+                        "value": group.name,
+                        "path": group.classRelation.path
+                        if group.classRelation is not None
+                        else "",
+                    }
+                    for group in groups
+                ]
+            else:
+                response["groups"] = []
+            if len(_class) > 0 or len(subClass) > 0:
+                projectClasses = ProjectClass.objects.filter(
+                    id__in=queryset.values_list("projectClass", flat=True).distinct()
+                )
+                response["classes"] = [
+                    {
+                        "id": projectClass.id,
+                        "value": projectClass.name,
+                        "path": projectClass.path,
+                    }
+                    for projectClass in projectClasses
+                ]
+            else:
+                response["classes"] = []
+            if len(district) > 0 or len(subDistrict) > 0:
+                projectLocations = ProjectLocation.objects.filter(
+                    id__in=queryset.values_list("projectLocation", flat=True).distinct()
+                )
+                response["locations"] = [
+                    {
+                        "id": projectLocation.id,
+                        "value": projectLocation.name,
+                        "path": projectLocation.path,
+                    }
+                    for projectLocation in projectLocations
+                ]
+            else:
+                response["locations"] = []
+            serializer = self.get_serializer(queryset, many=True)
+            response["projects"] = serializer.data
+
+            return Response(response)
+
         else:
             # with filter
             queryset = self.filter_queryset(self.get_queryset())
