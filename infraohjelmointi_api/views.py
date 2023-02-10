@@ -42,6 +42,9 @@ from .serializers import (
     ProjectHashtagSerializer,
     ProjectGroupSerializer,
     ProjectLockSerializer,
+    ProjectGroupFilterSerializer,
+    ProjectClassFilterSerializer,
+    ProjectLocationFilterSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -263,44 +266,27 @@ class ProjectViewSet(BaseViewSet):
                 groups = ProjectGroup.objects.filter(
                     id__in=queryset.values_list("projectGroup", flat=True).distinct()
                 ).select_related("classRelation")
-                response["groups"] = [
-                    {
-                        "id": group.id,
-                        "value": group.name,
-                        "path": group.classRelation.path
-                        if group.classRelation is not None
-                        else "",
-                    }
-                    for group in groups
-                ]
+                response["groups"] = ProjectGroupFilterSerializer(
+                    groups, fields=("id", "name", "path"), many=True
+                ).data
             else:
                 response["groups"] = []
             if len(_class) > 0 or len(subClass) > 0:
                 projectClasses = ProjectClass.objects.filter(
                     id__in=queryset.values_list("projectClass", flat=True).distinct()
                 )
-                response["classes"] = [
-                    {
-                        "id": projectClass.id,
-                        "value": projectClass.name,
-                        "path": projectClass.path,
-                    }
-                    for projectClass in projectClasses
-                ]
+                response["classes"] = ProjectClassFilterSerializer(
+                    projectClasses, fields=("id", "name", "path"), many=True
+                ).data
             else:
                 response["classes"] = []
             if len(district) > 0 or len(subDistrict) > 0:
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list("projectLocation", flat=True).distinct()
                 )
-                response["locations"] = [
-                    {
-                        "id": projectLocation.id,
-                        "value": projectLocation.name,
-                        "path": projectLocation.path,
-                    }
-                    for projectLocation in projectLocations
-                ]
+                response["locations"] = ProjectLocationFilterSerializer(
+                    projectLocations, fields=("id", "name", "path"), many=True
+                ).data
             else:
                 response["locations"] = []
             serializer = self.get_serializer(queryset, many=True)
