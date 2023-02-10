@@ -45,6 +45,7 @@ from .serializers import (
     ProjectGroupFilterSerializer,
     ProjectClassFilterSerializer,
     ProjectLocationFilterSerializer,
+    ProjectFilterSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -289,7 +290,7 @@ class ProjectViewSet(BaseViewSet):
                 ).data
             else:
                 response["locations"] = []
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = ProjectFilterSerializer(queryset, many=True)
             response["projects"] = serializer.data
 
             return Response(response)

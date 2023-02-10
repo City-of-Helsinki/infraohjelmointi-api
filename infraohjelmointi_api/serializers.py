@@ -349,6 +349,60 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
         return obj.projectReadiness()
 
 
+class ProjectFilterSerializer(DynamicFieldsModelSerializer):
+    projectReadiness = serializers.SerializerMethodField()
+    projectSet = ProjectSetCreateSerializer(read_only=True)
+    siteId = BudgetItemSerializer(read_only=True)
+    area = ProjectAreaSerializer(read_only=True)
+    type = ProjectTypeSerializer(read_only=True)
+    priority = ProjectPrioritySerializer(read_only=True)
+    phase = ProjectPhaseSerializer(read_only=True)
+    personPlanning = PersonSerializer(read_only=True)
+    personProgramming = PersonSerializer(read_only=True)
+    personConstruction = PersonSerializer(read_only=True)
+    estPlanningStart = serializers.DateField(format="%d.%m.%Y")
+    estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
+    category = ProjectCategorySerializer(read_only=True)
+    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
+    riskAssessment = ProjectRiskSerializer(read_only=True)
+    estConstructionStart = serializers.DateField(format="%d.%m.%Y")
+    estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
+    presenceStart = serializers.DateField(format="%d.%m.%Y")
+    presenceEnd = serializers.DateField(format="%d.%m.%Y")
+    visibilityStart = serializers.DateField(format="%d.%m.%Y")
+    visibilityEnd = serializers.DateField(format="%d.%m.%Y")
+    constructionPhase = ConstructionPhaseSerializer(read_only=True)
+    planningPhase = PlanningPhaseSerializer(read_only=True)
+    projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
+    responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
+
+    class Meta(BaseMeta):
+        model = Project
+
+    def get_projectReadiness(self, obj):
+        return obj.projectReadiness()
+
+    def to_representation(self, instance: ProjectGroup):
+        initialRepresentation = super().to_representation(instance)
+        newRepresentation = {}
+        newRepresentation["project"] = initialRepresentation
+        newRepresentation["path"] = (
+            str(instance.projectClass.id)
+            if instance.projectClass.parent is None
+            else "{}/{}".format(
+                str(instance.projectClass.parent.id), str(instance.projectClass.id)
+            )
+            if instance.projectClass.parent.parent is None
+            and instance.projectClass.parent is not None
+            else "{}/{}/{}".format(
+                str(instance.projectClass.parent.parent.id),
+                str(instance.projectClass.parent.id),
+                str(instance.projectClass.id),
+            )
+        )
+        return newRepresentation
+
+
 class ProjectCreateSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
     estPlanningStart = serializers.DateField(
