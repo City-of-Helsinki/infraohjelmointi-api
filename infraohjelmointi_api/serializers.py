@@ -60,6 +60,75 @@ class ProjectLockSerializer(serializers.ModelSerializer):
         model = ProjectLock
 
 
+class ProjectGroupFilterSerializer(DynamicFieldsModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectGroup
+
+    def to_representation(self, instance: ProjectGroup):
+        rep = super().to_representation(instance)
+
+        rep["path"] = (
+            str(instance.classRelation.id)
+            if instance.classRelation.parent is None
+            else "{}/{}".format(
+                str(instance.classRelation.parent.id),
+                str(instance.classRelation.id),
+            )
+            if instance.classRelation.parent.parent is None
+            and instance.classRelation.parent is not None
+            else "{}/{}/{}".format(
+                str(instance.classRelation.parent.parent.id),
+                str(instance.classRelation.parent.id),
+                str(instance.classRelation.id),
+            )
+            if instance.classRelation is not None
+            else ""
+        )
+        return rep
+
+
+class ProjectClassFilterSerializer(DynamicFieldsModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectClass
+
+    def to_representation(self, instance: ProjectClass):
+        rep = super().to_representation(instance)
+
+        rep["path"] = (
+            str(instance.id)
+            if instance.parent is None
+            else "{}/{}".format(str(instance.parent.id), str(instance.id))
+            if instance.parent.parent is None and instance.parent is not None
+            else "{}/{}/{}".format(
+                str(instance.parent.parent.id),
+                str(instance.parent.id),
+                str(instance.id),
+            )
+        )
+        return rep
+
+
+class ProjectLocationFilterSerializer(DynamicFieldsModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectLocation
+
+    def to_representation(self, instance: ProjectLocation):
+        rep = super().to_representation(instance)
+
+        rep["path"] = (
+            str(instance.id)
+            if instance.parent is None
+            else "{}/{}".format(str(instance.parent.id), str(instance.id))
+            if instance.parent.parent is None and instance.parent is not None
+            else "{}/{}/{}".format(
+                str(instance.parent.parent.id),
+                str(instance.parent.id),
+                str(instance.id),
+            )
+        )
+        return rep
+
+
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
