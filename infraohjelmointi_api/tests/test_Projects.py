@@ -44,6 +44,7 @@ class ProjectTestCase(TestCase):
     person_4_Id = uuid.UUID("2b8ffec5-de77-498c-afe7-a1999a7b2c7c")
     person_5_Id = uuid.UUID("4cd7d70d-2bf2-41bd-998d-be4955cd2a72")
     person_6_Id = uuid.UUID("6af5983a-584e-4b7e-87ed-afc7fc419b2d")
+    person_4_Id = uuid.UUID("657f1685-ab79-4997-98a3-d238d60bae1e")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
@@ -986,6 +987,14 @@ class ProjectTestCase(TestCase):
         hashTag_2 = ProjectHashTag.objects.create(
             id=self.projectHashTag_4_Id, value="Park"
         )
+        personPlanning = Person.objects.create(
+            id=self.person_4_Id,
+            firstName="Person",
+            lastName="Test",
+            email="random@random.com",
+            title="Planning",
+            phone="0414853275",
+        )
 
         project_1 = Project.objects.create(
             id=self.project_3_Id,
@@ -997,6 +1006,7 @@ class ProjectTestCase(TestCase):
             projectLocation=mainDistrict_1,
             projectClass=subClass_1,
             projectGroup=projectGroup_1,
+            personPlanning=personPlanning,
         )
         project_1.hashTags.add(hashTag_1)
         project_2 = Project.objects.create(
@@ -1009,6 +1019,7 @@ class ProjectTestCase(TestCase):
             projectLocation=subDistrict_1,
             projectClass=_class,
             projectGroup=projectGroup_1,
+            personPlanning=personPlanning,
         )
         project_2.hashTags.add(hashTag_2)
         project_3 = Project.objects.create(
@@ -1033,6 +1044,7 @@ class ProjectTestCase(TestCase):
             projectLocation=subDistrict_2,
             projectClass=masterClass_2,
             projectGroup=projectGroup_3,
+            personPlanning=personPlanning,
         )
 
         response = self.client.get(
@@ -1619,6 +1631,23 @@ class ProjectTestCase(TestCase):
             1,
             msg="Filtered result should contain 1 group with id {}".format(
                 self.projectGroup_1_Id
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?personPlanning={}".format(self.person_4_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            len(response.json()["projects"]),
+            3,
+            msg="Filtered result should contain 3 projects with personPlanning {}".format(
+                self.person_4_Id
             ),
         )
 
