@@ -342,129 +342,9 @@ class ProjectViewSet(BaseViewSet):
         prYearMax = self.request.query_params.get("prYearMax", None)
 
         try:
-            currYear = datetime.date.today().year
-            yearToFieldMapping = {
-                currYear: "budgetForecast1CurrentYear__gt",
-                currYear + 1: "budgetProposalCurrentYearPlus1__gt",
-                currYear + 2: "budgetProposalCurrentYearPlus2__gt",
-                currYear + 3: "preliminaryCurrentYearPlus3__gt",
-                currYear + 4: "preliminaryCurrentYearPlus4__gt",
-                currYear + 5: "preliminaryCurrentYearPlus5__gt",
-                currYear + 6: "preliminaryCurrentYearPlus6__gt",
-                currYear + 7: "preliminaryCurrentYearPlus7__gt",
-                currYear + 8: "preliminaryCurrentYearPlus8__gt",
-                currYear + 9: "preliminaryCurrentYearPlus9__gt",
-                currYear + 10: "preliminaryCurrentYearPlus10__gt",
-            }
-            if prYearMin is not None and prYearMax is not None:
-                if not prYearMax.isnumeric() or not prYearMin.isnumeric():
-                    raise APIException(
-                        detail="Invalid value for prYearMin or prYearMax"
-                    )
-                else:
-                    prYearMin = int(prYearMin)
-                    prYearMax = int(prYearMax)
-                    if prYearMin > prYearMax:
-                        raise APIException(
-                            detail="prYearMin cannot be greater than prYearMax"
-                        )
-                    if (
-                        prYearMin in yearToFieldMapping.keys()
-                        and prYearMax in yearToFieldMapping.keys()
-                    ):
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(prYearMin, prYearMax + 1, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-                    elif prYearMin in yearToFieldMapping.keys():
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(prYearMin, currYear + 11, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-                    elif prYearMax in yearToFieldMapping.keys():
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(currYear, prYearMax + 1, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-                    else:
-                        qs = qs.none()
-
-            elif prYearMin is not None:
-                if not prYearMin.isnumeric():
-                    raise APIException(detail="Invalid value for prYearMin")
-                else:
-                    prYearMin = int(prYearMin)
-                    if prYearMin < currYear:
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(currYear, currYear + 11, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-                    elif prYearMin > currYear + 10:
-                        qs = qs.none()
-                    else:
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(prYearMin, currYear + 11, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-            elif prYearMax is not None:
-                if not prYearMax.isnumeric():
-                    raise APIException(detail="Invalid value for prYearMax")
-                else:
-                    prYearMax = int(prYearMax)
-                    if prYearMax < currYear:
-                        qs = qs.none()
-                    elif prYearMax > currYear + 10:
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(currYear, currYear + 11, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
-                    else:
-                        qs = qs.filter(
-                            Q(
-                                *[
-                                    (yearToFieldMapping[year], 0)
-                                    for year in range(currYear, prYearMax + 1, 1)
-                                ],
-                                _connector=Q.OR
-                            )
-                            & Q(programmed=True)
-                        )
+            qs = self._filter_projects_by_programming_year(
+                qs, prYearMin=prYearMin, prYearMax=prYearMax
+            )
 
             if len(masterClass) > 0:
                 qs = self._filter_projects_by_hierarchy(
@@ -566,6 +446,130 @@ class ProjectViewSet(BaseViewSet):
             return qs.filter(projectLocation__in=ids)
         elif model_class.__name__ == "ProjectClass":
             return qs.filter(projectClass__in=ids)
+
+    def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
+        currYear = datetime.date.today().year
+        yearToFieldMapping = {
+            currYear: "budgetForecast1CurrentYear__gt",
+            currYear + 1: "budgetProposalCurrentYearPlus1__gt",
+            currYear + 2: "budgetProposalCurrentYearPlus2__gt",
+            currYear + 3: "preliminaryCurrentYearPlus3__gt",
+            currYear + 4: "preliminaryCurrentYearPlus4__gt",
+            currYear + 5: "preliminaryCurrentYearPlus5__gt",
+            currYear + 6: "preliminaryCurrentYearPlus6__gt",
+            currYear + 7: "preliminaryCurrentYearPlus7__gt",
+            currYear + 8: "preliminaryCurrentYearPlus8__gt",
+            currYear + 9: "preliminaryCurrentYearPlus9__gt",
+            currYear + 10: "preliminaryCurrentYearPlus10__gt",
+        }
+        if prYearMin is not None and prYearMax is not None:
+            if not prYearMax.isnumeric() or not prYearMin.isnumeric():
+                raise APIException(detail="Invalid value for prYearMin or prYearMax")
+            else:
+                prYearMin = int(prYearMin)
+                prYearMax = int(prYearMax)
+                if prYearMin > prYearMax:
+                    raise APIException(
+                        detail="prYearMin cannot be greater than prYearMax"
+                    )
+                if (
+                    prYearMin in yearToFieldMapping.keys()
+                    and prYearMax in yearToFieldMapping.keys()
+                ):
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(prYearMin, prYearMax + 1, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+                elif prYearMin in yearToFieldMapping.keys():
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(prYearMin, currYear + 11, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+                elif prYearMax in yearToFieldMapping.keys():
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(currYear, prYearMax + 1, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+                else:
+                    qs = qs.none()
+
+        elif prYearMin is not None:
+            if not prYearMin.isnumeric():
+                raise APIException(detail="Invalid value for prYearMin")
+            else:
+                prYearMin = int(prYearMin)
+                if prYearMin < currYear:
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(currYear, currYear + 11, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+                elif prYearMin > currYear + 10:
+                    qs = qs.none()
+                else:
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(prYearMin, currYear + 11, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+        elif prYearMax is not None:
+            if not prYearMax.isnumeric():
+                raise APIException(detail="Invalid value for prYearMax")
+            else:
+                prYearMax = int(prYearMax)
+                if prYearMax < currYear:
+                    qs = qs.none()
+                elif prYearMax > currYear + 10:
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(currYear, currYear + 11, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+                else:
+                    qs = qs.filter(
+                        Q(
+                            *[
+                                (yearToFieldMapping[year], 0)
+                                for year in range(currYear, prYearMax + 1, 1)
+                            ],
+                            _connector=Q.OR
+                        )
+                        & Q(programmed=True)
+                    )
+        return qs
 
 
 class TaskStatusViewSet(BaseViewSet):
