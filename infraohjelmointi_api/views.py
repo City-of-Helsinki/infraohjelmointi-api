@@ -169,10 +169,7 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-    group = django_filters.ModelMultipleChoiceFilter(
-        field_name="projectGroup",
-        queryset=ProjectGroupSerializer.Meta.model.objects.all(),
-    )
+
     hashtag = django_filters.ModelMultipleChoiceFilter(
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
@@ -222,9 +219,11 @@ class ProjectViewSet(BaseViewSet):
         response = {}
         freeSearch = request.query_params.get("freeSearch", None)
         projectGroup = request.query_params.getlist("group", [])
+        masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
 
+        mainDistrict = self.request.query_params.getlist("mainDistrict", [])
         district = self.request.query_params.getlist("district", [])
         subDistrict = self.request.query_params.getlist("subDistrict", [])
 
@@ -271,8 +270,10 @@ class ProjectViewSet(BaseViewSet):
             )
         elif (
             len(projectGroup) > 0
+            or len(masterClass) > 0
             or len(_class) > 0
             or len(subClass) > 0
+            or len(mainDistrict) > 0
             or len(district) > 0
             or len(subDistrict) > 0
             or len(hashTags) > 0
@@ -294,7 +295,7 @@ class ProjectViewSet(BaseViewSet):
                 ).data
             else:
                 response["groups"] = []
-            if len(_class) > 0 or len(subClass) > 0:
+            if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
                 projectClasses = ProjectClass.objects.filter(
                     id__in=queryset.values_list("projectClass", flat=True).distinct()
                 )
@@ -303,7 +304,7 @@ class ProjectViewSet(BaseViewSet):
                 ).data
             else:
                 response["classes"] = []
-            if len(district) > 0 or len(subDistrict) > 0:
+            if len(mainDistrict) > 0 or len(district) > 0 or len(subDistrict) > 0:
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list("projectLocation", flat=True).distinct()
                 )
@@ -344,6 +345,7 @@ class ProjectViewSet(BaseViewSet):
         prYearMin = self.request.query_params.get("prYearMin", None)
         prYearMax = self.request.query_params.get("prYearMax", None)
         project = self.request.query_params.get("project", None)
+        projectGroups = self.request.query_params.getlist("group", [])
 
         try:
             if project is not None:
@@ -351,7 +353,8 @@ class ProjectViewSet(BaseViewSet):
             qs = self._filter_projects_by_programming_year(
                 qs, prYearMin=prYearMin, prYearMax=prYearMax
             )
-
+            if len(projectGroups) > 0:
+                qs = qs.filter(projectGroup__in=projectGroups)
             if len(masterClass) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
