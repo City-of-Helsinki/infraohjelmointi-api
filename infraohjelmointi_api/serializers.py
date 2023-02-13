@@ -68,18 +68,20 @@ class ProjectGroupFilterSerializer(DynamicFieldsModelSerializer):
         rep = super().to_representation(instance)
 
         rep["path"] = (
-            str(instance.classRelation.id)
-            if instance.classRelation.parent is None
-            else "{}/{}".format(
-                str(instance.classRelation.parent.id),
-                str(instance.classRelation.id),
-            )
-            if instance.classRelation.parent.parent is None
-            and instance.classRelation.parent is not None
-            else "{}/{}/{}".format(
-                str(instance.classRelation.parent.parent.id),
-                str(instance.classRelation.parent.id),
-                str(instance.classRelation.id),
+            (
+                str(instance.classRelation.id)
+                if instance.classRelation.parent is None
+                else "{}/{}".format(
+                    str(instance.classRelation.parent.id),
+                    str(instance.classRelation.id),
+                )
+                if instance.classRelation.parent.parent is None
+                and instance.classRelation.parent is not None
+                else "{}/{}/{}".format(
+                    str(instance.classRelation.parent.parent.id),
+                    str(instance.classRelation.parent.id),
+                    str(instance.classRelation.id),
+                )
             )
             if instance.classRelation is not None
             else ""
@@ -387,18 +389,22 @@ class ProjectFilterSerializer(DynamicFieldsModelSerializer):
         newRepresentation = {}
         newRepresentation["project"] = initialRepresentation
         newRepresentation["path"] = (
-            str(instance.projectClass.id)
-            if instance.projectClass.parent is None
-            else "{}/{}".format(
-                str(instance.projectClass.parent.id), str(instance.projectClass.id)
+            (
+                str(instance.projectClass.id)
+                if instance.projectClass.parent is None
+                else "{}/{}".format(
+                    str(instance.projectClass.parent.id), str(instance.projectClass.id)
+                )
+                if instance.projectClass.parent.parent is None
+                and instance.projectClass.parent is not None
+                else "{}/{}/{}".format(
+                    str(instance.projectClass.parent.parent.id),
+                    str(instance.projectClass.parent.id),
+                    str(instance.projectClass.id),
+                )
             )
-            if instance.projectClass.parent.parent is None
-            and instance.projectClass.parent is not None
-            else "{}/{}/{}".format(
-                str(instance.projectClass.parent.parent.id),
-                str(instance.projectClass.parent.id),
-                str(instance.projectClass.id),
-            )
+            if instance.projectClass is not None
+            else ""
         )
         return newRepresentation
 

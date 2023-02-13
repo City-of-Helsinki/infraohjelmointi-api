@@ -169,9 +169,13 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-    projectGroup = django_filters.ModelMultipleChoiceFilter(
+    group = django_filters.ModelMultipleChoiceFilter(
         field_name="projectGroup",
         queryset=ProjectGroupSerializer.Meta.model.objects.all(),
+    )
+    hashtag = django_filters.ModelMultipleChoiceFilter(
+        field_name="hashTags",
+        queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
     )
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
@@ -185,7 +189,6 @@ class ProjectFilter(django_filters.FilterSet):
         fields = {
             "hkrId": ["exact"],
             "category": ["exact"],
-            "hashTags": ["exact"],
             "phase": ["exact"],
             "personPlanning": ["exact"],
         }
@@ -217,12 +220,19 @@ class ProjectViewSet(BaseViewSet):
     def list(self, request, *args, **kwargs):
         response = {}
         freeSearch = request.query_params.get("freeSearch", None)
-        projectGroup = request.query_params.get("projectGroup", [])
+        projectGroup = request.query_params.getlist("group", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
 
         district = self.request.query_params.getlist("district", [])
         subDistrict = self.request.query_params.getlist("subDistrict", [])
+
+        hkrId = request.query_params.get("hkrId", None)
+        category = request.query_params.get("category", None)
+        hashTags = request.query_params.getlist("hashtag", [])
+        phase = request.query_params.get("phase", None)
+        personPlanning = request.query_params.get("personPlanning", None)
+        programmed = request.query_params.getlist("programmed", [])
 
         if freeSearch is not None:
             hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
@@ -263,6 +273,12 @@ class ProjectViewSet(BaseViewSet):
             or len(subClass) > 0
             or len(district) > 0
             or len(subDistrict) > 0
+            or len(hashTags) > 0
+            or len(programmed) > 0
+            or hkrId is not None
+            or category is not None
+            or phase is not None
+            or personPlanning is not None
         ):
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
