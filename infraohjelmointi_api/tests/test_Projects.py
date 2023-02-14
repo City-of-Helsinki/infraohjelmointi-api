@@ -1651,6 +1651,25 @@ class ProjectTestCase(TestCase):
             ),
         )
 
+        response = self.client.get(
+            "/projects/?project={}&project={}".format(
+                self.project_3_Id, self.project_4_Id
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            len(response.json()["projects"]),
+            2,
+            msg="Filtered result should contain 2 projects with id {} and {}".format(
+                self.project_3_Id, self.project_4_Id
+            ),
+        )
+
     # Commented out test to check if a project gets locked automatically on phase change
     # def test_project_gets_locked_on_phase_change(self):
     #     ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")

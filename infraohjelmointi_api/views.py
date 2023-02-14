@@ -233,7 +233,7 @@ class ProjectViewSet(BaseViewSet):
         phase = request.query_params.get("phase", None)
         personPlanning = request.query_params.get("personPlanning", None)
         programmed = request.query_params.getlist("programmed", [])
-        project = self.request.query_params.get("project", None)
+        projects = self.request.query_params.getlist("project", [])
 
         if freeSearch is not None:
             hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
@@ -269,7 +269,8 @@ class ProjectViewSet(BaseViewSet):
                 }
             )
         elif (
-            len(projectGroup) > 0
+            len(projects) > 0
+            or len(projectGroup) > 0
             or len(masterClass) > 0
             or len(_class) > 0
             or len(subClass) > 0
@@ -282,7 +283,6 @@ class ProjectViewSet(BaseViewSet):
             or category is not None
             or phase is not None
             or personPlanning is not None
-            or project is not None
         ):
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
@@ -344,12 +344,12 @@ class ProjectViewSet(BaseViewSet):
 
         prYearMin = self.request.query_params.get("prYearMin", None)
         prYearMax = self.request.query_params.get("prYearMax", None)
-        project = self.request.query_params.get("project", None)
+        projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
 
         try:
-            if project is not None:
-                qs = qs.filter(id=project)
+            if len(projects) > 0:
+                qs = qs.filter(id__in=projects)
             qs = self._filter_projects_by_programming_year(
                 qs, prYearMin=prYearMin, prYearMax=prYearMax
             )
