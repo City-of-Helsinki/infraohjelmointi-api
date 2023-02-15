@@ -19,6 +19,7 @@ from ..models import (
     ProjectLocation,
     ProjectHashTag,
     ProjectGroup,
+    ProjectLock,
 )
 from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
 
@@ -216,7 +217,6 @@ class ProjectTestCase(TestCase):
             spentCost=20000.00,
             riskAssessment=None,
             priority=self.projectPriority,
-            locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
             budgetForecast1CurrentYear=None,
@@ -451,7 +451,6 @@ class ProjectTestCase(TestCase):
             riskAssessment=None,
             category=None,
             priority=self.projectPriority,
-            locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
             budgetForecast1CurrentYear=None,
@@ -544,7 +543,6 @@ class ProjectTestCase(TestCase):
             "spentCost": None,
             "riskAssessment": None,
             "priority": None,
-            "locked": True,
             "comments": None,
             "delays": None,
             "hashTags": None,
@@ -1382,6 +1380,7 @@ class ProjectTestCase(TestCase):
             200,
             msg="Status code != 200, Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             response.json()["count"],
             2,
@@ -1435,66 +1434,64 @@ class ProjectTestCase(TestCase):
             ),
         )
 
+    def test_project_gets_locked(self):
+        ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
+        data = {
+            "name": "Test locking",
+            "description": "Test Description",
+            "phase": self.projectPhase_2_Id.__str__(),
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        newCreatedId = response.json()["id"]
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+        self.assertTrue(
+            ProjectLock.objects.filter(project=newCreatedId).exists(),
+            msg="ProjectLock does not contain a record for new created project with id {} when phase is set to construction".format(
+                newCreatedId
+            ),
+        )
 
-def test_project_gets_locked(self):
-    ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
-    data = {
-        "name": "Test locking",
-        "description": "Test Description",
-        "phase": self.projectPhase_2_Id.__str__(),
-    }
-    response = self.client.post(
-        "/projects/",
-        data,
-        content_type="application/json",
-    )
-    newCreatedId = response.json()["id"]
-    self.assertEqual(
-        response.status_code,
-        201,
-        msg="Status code != 201 , Error: {}".format(response.json()),
-    )
-    self.assertEqual(
-        Project.objects.get(id=newCreatedId).locked,
-        True,
-        msg="Field locked should be set to True automatically if phase = construction",
-    )
+        data["phase"] = self.projectPhase_1_Id.__str__()
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        newCreatedId = response.json()["id"]
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+        self.assertFalse(
+            ProjectLock.objects.filter(project=newCreatedId).exists(),
+            msg="ProjectLock contains a record for new created project with id {} when phase is not set to construction".format(
+                newCreatedId
+            ),
+        )
 
-    data["phase"] = self.projectPhase_1_Id.__str__()
-    response = self.client.post(
-        "/projects/",
-        data,
-        content_type="application/json",
-    )
-    newCreatedId = response.json()["id"]
-    self.assertEqual(
-        response.status_code,
-        201,
-        msg="Status code != 200 , Error: {}".format(response.json()),
-    )
-    self.assertEqual(Project.objects.get(id=newCreatedId).locked, False)
+        data["phase"] = self.projectPhase_2_Id.__str__()
+        response = self.client.patch(
+            "/projects/{}/".format(newCreatedId),
+            data,
+            content_type="application/json",
+        )
+        self.assertTrue(
+            ProjectLock.objects.filter(project=newCreatedId).exists(),
+            msg="ProjectLock does not contain a record for updated project with id {} when phase is updated to construction".format(
+                newCreatedId
+            ),
+        )
 
-    data["phase"] = self.projectPhase_2_Id.__str__()
-    response = self.client.patch(
-        "/projects/{}/".format(newCreatedId),
-        data,
-        content_type="application/json",
-        msg="Status code != 200 , Error: {}".format(response.json()),
-    )
-    self.assertEqual(
-        Project.objects.get(id=newCreatedId).locked,
-        True,
-        msg="Field locked should be set to True automatically if phase = construction",
-    )
-
-    response = self.client.patch(
-        "/projects/{}/".format(newCreatedId),
-        {"locked": False},
-        content_type="application/json",
-        msg="Status code != 200 , Error: {}".format(response.json()),
-    )
-    self.assertEqual(
-        Project.objects.get(id=newCreatedId).locked,
-        False,
-        msg="Should be able to set locked = False even when phase = construction",
-    )
+    # TODO
+    # Define test for updating certain fields when project is locked
+    # Define test for locking a project manually
+    # Define test for locking a already locked project
