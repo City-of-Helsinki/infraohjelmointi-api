@@ -75,13 +75,7 @@ class ProjectLockSerializer(serializers.ModelSerializer):
                     project.lock.get(project=project).lockType,
                 )
             )
-        print(validated_data)
-        if validated_data.get("lockedBy", None) is not None and (
-            validated_data.get("lockType", None) is None
-            or validated_data.get("lockType", None) is ""
-        ):
-            print(validated_data["lockType"])
-            validated_data["lockType"] = "person"
+
         return super(ProjectLockSerializer, self).create(validated_data)
 
 
