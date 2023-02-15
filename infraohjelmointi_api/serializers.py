@@ -81,7 +81,7 @@ class ProjectLockSerializer(serializers.ModelSerializer):
             or validated_data.get("lockType", None) is ""
         ):
             print(validated_data["lockType"])
-            validated_data["lockType"] = "status_person"
+            validated_data["lockType"] = "person"
         return super(ProjectLockSerializer, self).create(validated_data)
 
 
@@ -385,6 +385,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             projectClass = validated_data.get("projectClas", None)
             projectLocation = validated_data.get("projectLocation", None)
             siteId = validated_data.get("siteId", None)
+            realizedCost = validated_data.get("realizedCost", None)
+            budgetOverrunAmount = validated_data.get("budgetOverrunAmount", None)
             budgetForecast1CurrentYear = validated_data.get(
                 "budgetForecast1CurrentYear", None
             )
@@ -451,12 +453,14 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 or preliminaryCurrentYearPlus8 is not None
                 or preliminaryCurrentYearPlus9 is not None
                 or preliminaryCurrentYearPlus10 is not None
+                or realizedCost is not None
+                or budgetOverrunAmount is not None
             ):
                 raise serializers.ValidationError(
                     "The following fields cannot be updated when the project is locked,"
                     "'phase', 'planningStartYear', 'estPlanningStart', 'constructionEndYear',"
                     "'estConstructionEnd', 'programmed', 'projectClass', 'projectLocation',"
-                    "'siteId', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear',"
+                    "'siteId', 'realizedCost', 'budgetOverrunAmount', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear',"
                     "'budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', 'budgetProposalCurrentYearPlus1',"
                     "'budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', 'preliminaryCurrentYearPlus4',"
                     "'preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', 'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8',"
