@@ -56,4 +56,5 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
+        migrations.RunPython(lock_existing_construction_projects),
     ]
