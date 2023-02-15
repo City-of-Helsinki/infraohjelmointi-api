@@ -21,6 +21,7 @@ from .models import (
     ResponsibleZone,
     ProjectHashTag,
     ProjectGroup,
+    ProjectLockStatus,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -52,6 +53,11 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
+
+
+class ProjectLockStatusSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectLockStatus
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):

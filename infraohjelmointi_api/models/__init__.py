@@ -20,3 +20,4 @@ from .ProjectLocation import ProjectLocation
 from .ResponsibleZone import ResponsibleZone
 from .ProjectHashTag import ProjectHashTag
 from .ProjectGroup import ProjectGroup
+from .ProjectLockStatus import ProjectLockStatus
