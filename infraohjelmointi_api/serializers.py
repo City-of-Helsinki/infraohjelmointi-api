@@ -283,9 +283,19 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
     planningPhase = PlanningPhaseSerializer(read_only=True)
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
+    locked = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
+
+    def get_locked(self, obj):
+        try:
+            lockData = ProjectLockSerializer(
+                obj.lock.get(project=obj.id), many=False
+            ).data
+            return lockData
+        except:
+            return None
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
