@@ -21,7 +21,7 @@ from .models import (
     ResponsibleZone,
     ProjectHashTag,
     ProjectGroup,
-    ProjectLockStatus,
+    ProjectLock,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -55,9 +55,24 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
                 self.fields.pop(field_name)
 
 
-class ProjectLockStatusSerializer(serializers.ModelSerializer):
+class ProjectLockSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
-        model = ProjectLockStatus
+        model = ProjectLock
+
+    @override
+    def create(self, validated_data):
+        """
+        Overriding the create method to validate
+        if a project is already locked
+        """
+        project = validated_data.get("project", None)
+        if project.lock.all().count() > 0:
+            raise serializers.ValidationError(
+                "Project: {} with id: {} has an already existing lock record with id: {}".format(
+                    project.name, project.id, project.lock.get(project=project).id
+                )
+            )
+        return super(ProjectLockSerializer, self).create(validated_data)
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
@@ -332,24 +347,29 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     @override
     def create(self, validated_data):
         """
-        Overriding the create method to set the Project
-        locked field to True if the phase field is set to construction
+        Overriding the create method to populate ProjectLockStatus Table
+        with appropriate lock status based on the phase
         """
         newPhase = validated_data.get("phase", None)
+        project = super(ProjectCreateSerializer, self).create(validated_data)
         if newPhase is not None and newPhase.value == "construction":
-            validated_data["locked"] = True
+            project.lock.create(lockType="status_construction", lockedBy=None)
 
-        return super(ProjectCreateSerializer, self).create(validated_data)
+        return project
 
     @override
     def update(self, instance, validated_data):
         """
-        Overriding the update method to set the Project
-        locked field to True if the phase field is updated to construction
+        Overriding the update method to populate ProjectLockStatus Table
+        with appropriate lock status based on the phase
         """
         newPhase = validated_data.get("phase", None)
-        if newPhase is not None and newPhase.value == "construction":
-            validated_data["locked"] = True
+        if (
+            newPhase is not None
+            and newPhase.value == "construction"
+            and instance.phase.value != "construction"
+        ):
+            instance.lock.create(lockType="status_construction", lockedBy=None)
         return super(ProjectCreateSerializer, self).update(instance, validated_data)
 
     @override
