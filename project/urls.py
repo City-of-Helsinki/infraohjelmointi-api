@@ -87,6 +87,11 @@ router.register(
     views.ProjectGroupViewSet,
     basename="projectGroups",
 )
+router.register(
+    r"project-locks",
+    views.ProjectLockStatusViewSet,
+    basename="projectLockStatus",
+)
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),
