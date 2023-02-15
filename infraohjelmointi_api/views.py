@@ -36,7 +36,7 @@ from .serializers import (
     ProjectResponsibleZoneSerializer,
     ProjectHashtagSerializer,
     ProjectGroupSerializer,
-    ProjectLockStatusSerializer,
+    ProjectLockSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -61,13 +61,13 @@ class BaseViewSet(viewsets.ModelViewSet):
         return self.get_serializer_class().Meta.model.objects.all()
 
 
-class ProjectLockStatusViewSet(BaseViewSet):
+class ProjectLockViewSet(BaseViewSet):
     """
     API endpoint that allows Project Lock status to be viewed or edited.
     """
 
     permission_classes = []
-    serializer_class = ProjectLockStatusSerializer
+    serializer_class = ProjectLockSerializer
 
 
 class ProjectHashtagViewSet(BaseViewSet):
