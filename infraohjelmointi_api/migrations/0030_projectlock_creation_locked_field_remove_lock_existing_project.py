@@ -8,7 +8,7 @@ import uuid
 def lock_existing_construction_projects(apps, schema_editor):
     Project = apps.get_model("infraohjelmointi_api", "Project")
     for project in Project.objects.filter(phase__value="construction"):
-        project.lock_create(lockType="status_construction", lockedBy=None)
+        project.lock.create(lockType="status_construction", lockedBy=None)
 
 
 class Migration(migrations.Migration):
