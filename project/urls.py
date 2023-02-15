@@ -89,8 +89,8 @@ router.register(
 )
 router.register(
     r"project-locks",
-    views.ProjectLockStatusViewSet,
-    basename="projectLockStatus",
+    views.ProjectLockViewSet,
+    basename="projectLock",
 )
 urlpatterns = [
     path("", include(router.urls)),
