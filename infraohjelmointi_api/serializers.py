@@ -68,14 +68,19 @@ class ProjectLockSerializer(serializers.ModelSerializer):
         project = validated_data.get("project", None)
         if project.lock.all().count() > 0:
             raise serializers.ValidationError(
-                "Project: {} with id: {} has an already existing lock record with id: {} and typ: {}".format(
+                "Project: {} with id: {} has an already existing lock record with id: {} and lockType: {}".format(
                     project.name,
                     project.id,
                     project.lock.get(project=project).id,
                     project.lock.get(project=project).lockType,
                 )
             )
-        if validated_data.get("lockedBy", None) is not None:
+        print(validated_data)
+        if validated_data.get("lockedBy", None) is not None and (
+            validated_data.get("lockType", None) is None
+            or validated_data.get("lockType", None) is ""
+        ):
+            print(validated_data["lockType"])
             validated_data["lockType"] = "status_person"
         return super(ProjectLockSerializer, self).create(validated_data)
 
@@ -448,14 +453,14 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 or preliminaryCurrentYearPlus10 is not None
             ):
                 raise serializers.ValidationError(
-                    "The following fields cannot be updated when the project is locked, \
-                    'phase', 'planningStartYear', 'estPlanningStart', 'constructionEndYear', \
-                    'estConstructionEnd', 'programmed', 'projectClass', 'projectLocation', \
-                    'siteId', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear', \
-                    'budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', 'budgetProposalCurrentYearPlus1', \
-                    'budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', 'preliminaryCurrentYearPlus4', \
-                    'preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', 'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8', \
-                    'preliminaryCurrentYearPlus9', 'preliminaryCurrentYearPlus10'"
+                    "The following fields cannot be updated when the project is locked,"
+                    "'phase', 'planningStartYear', 'estPlanningStart', 'constructionEndYear',"
+                    "'estConstructionEnd', 'programmed', 'projectClass', 'projectLocation',"
+                    "'siteId', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear',"
+                    "'budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', 'budgetProposalCurrentYearPlus1',"
+                    "'budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', 'preliminaryCurrentYearPlus4',"
+                    "'preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', 'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8',"
+                    "'preliminaryCurrentYearPlus9', 'preliminaryCurrentYearPlus10'"
                 )
         else:
             newPhase = validated_data.get("phase", None)
