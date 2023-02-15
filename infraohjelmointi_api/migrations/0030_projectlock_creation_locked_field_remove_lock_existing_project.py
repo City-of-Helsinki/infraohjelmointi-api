@@ -18,6 +18,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveField(
+            model_name="project",
+            name="locked",
+        ),
         migrations.CreateModel(
             name="ProjectLock",
             fields=[
