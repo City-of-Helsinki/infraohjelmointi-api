@@ -348,6 +348,30 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
 
+    def validate_estPlanningStart(self, estPlanningStart):
+        project = getattr(self, "instance", None)
+        if project is not None and project.lock.all().count() > 0:
+            planningStartYear = project.planningStartYear
+            if planningStartYear is not None:
+                if estPlanningStart.year < planningStartYear:
+                    raise serializers.ValidationError(
+                        "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
+                    )
+
+        return estPlanningStart
+
+    def validate_estConstructionEnd(self, estConstructionEnd):
+        project = getattr(self, "instance", None)
+        if project is not None and project.lock.all().count() > 0:
+            constructionEndYear = project.constructionEndYear
+            if constructionEndYear is not None:
+                if estConstructionEnd.year > constructionEndYear:
+                    raise serializers.ValidationError(
+                        "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
+                    )
+
+        return estConstructionEnd
+
     @override
     def create(self, validated_data):
         """
@@ -372,9 +396,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         if instance.lock.all().count() > 0:
             phase = validated_data.get("phase", None)
             planningStartYear = validated_data.get("planningStartYear", None)
-            estPlanningStart = validated_data.get("estPlanningStart", None)
             constructionEndYear = validated_data.get("constructionEndYear", None)
-            estConstructionEnd = validated_data.get("estConstructionEnd", None)
             programmed = validated_data.get("programmed", None)
             projectClass = validated_data.get("projectClas", None)
             projectLocation = validated_data.get("projectLocation", None)
@@ -426,9 +448,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             if (
                 phase is not None
                 or planningStartYear is not None
-                or estPlanningStart is not None
                 or constructionEndYear is not None
-                or estConstructionEnd is not None
                 or programmed is not None
                 or projectClass is not None
                 or projectLocation is not None
@@ -452,8 +472,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             ):
                 raise serializers.ValidationError(
                     "The following fields cannot be updated when the project is locked,"
-                    "'phase', 'planningStartYear', 'estPlanningStart', 'constructionEndYear',"
-                    "'estConstructionEnd', 'programmed', 'projectClass', 'projectLocation',"
+                    "'phase', 'planningStartYear', 'constructionEndYear',"
+                    " 'programmed', 'projectClass', 'projectLocation',"
                     "'siteId', 'realizedCost', 'budgetOverrunAmount', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear',"
                     "'budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', 'budgetProposalCurrentYearPlus1',"
                     "'budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', 'preliminaryCurrentYearPlus4',"
