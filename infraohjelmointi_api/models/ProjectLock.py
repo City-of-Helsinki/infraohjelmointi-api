@@ -13,7 +13,7 @@ class ProjectLock(models.Model):
         blank=False,
         related_name="lock",
     )
-    lockType = models.CharField(max_length=50, blank=True, null=True)
+    lockType = models.CharField(max_length=50, blank=False, null=False)
     lockedBy = models.ForeignKey(
         Person, on_delete=models.DO_NOTHING, null=True, blank=True
     )
