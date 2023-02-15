@@ -1434,7 +1434,7 @@ class ProjectTestCase(TestCase):
             ),
         )
 
-    def test_project_gets_locked(self):
+    def test_project_gets_locked_on_phase_change(self):
         ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
         data = {
             "name": "Test locking",
