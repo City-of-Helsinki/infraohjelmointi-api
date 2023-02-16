@@ -6,12 +6,8 @@ from infraohjelmointi_api.models import Person, Project
 class ProjectLock(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.DO_NOTHING,
-        null=False,
-        blank=False,
-        related_name="lock",
+    project = models.OneToOneField(
+        Project, on_delete=models.CASCADE, related_name="lockRecord"
     )
     lockType = models.CharField(max_length=50, blank=False, null=False)
     lockedBy = models.ForeignKey(
