@@ -59,25 +59,6 @@ class ProjectLockSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectLock
 
-    @override
-    def create(self, validated_data):
-        """
-        Overriding the create method to validate
-        if a project is already locked
-        """
-        project = validated_data.get("project", None)
-        if project.lock.all().count() > 0:
-            raise serializers.ValidationError(
-                "Project: {} with id: {} has an already existing lock record with id: {} and lockType: {}".format(
-                    project.name,
-                    project.id,
-                    project.lock.get(project=project).id,
-                    project.lock.get(project=project).lockType,
-                )
-            )
-
-        return super(ProjectLockSerializer, self).create(validated_data)
-
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
     projects = serializers.ListField(
@@ -290,9 +271,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
     def get_locked(self, obj):
         try:
-            lockData = ProjectLockSerializer(
-                obj.lock.get(project=obj.id), many=False
-            ).data
+            lockData = ProjectLockSerializer(obj.lockRecord, many=False).data
             return lockData
         except:
             return None
@@ -364,7 +343,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
         """
         project = getattr(self, "instance", None)
-        if project is not None and project.lock.all().count() > 0:
+        if project is not None and hasattr(project, "lockRecord"):
             planningStartYear = project.planningStartYear
             if planningStartYear is not None:
                 if estPlanningStart.year < planningStartYear:
@@ -380,7 +359,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         request is not set to a date later than the locked field constructionEndYear on the existing Project instance
         """
         project = getattr(self, "instance", None)
-        if project is not None and project.lock.all().count() > 0:
+        if project is not None and hasattr(project, "lockRecord"):
             constructionEndYear = project.constructionEndYear
             if constructionEndYear is not None:
                 if estConstructionEnd.year > constructionEndYear:
@@ -412,12 +391,12 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         locked fields are not being updated
         """
         # Check if project is locked and any locked fields are not being updated
-        if instance.lock.all().count() > 0:
+        if hasattr(instance, "lockRecord"):
             phase = validated_data.get("phase", None)
             planningStartYear = validated_data.get("planningStartYear", None)
             constructionEndYear = validated_data.get("constructionEndYear", None)
             programmed = validated_data.get("programmed", None)
-            projectClass = validated_data.get("projectClas", None)
+            projectClass = validated_data.get("projectClass", None)
             projectLocation = validated_data.get("projectLocation", None)
             siteId = validated_data.get("siteId", None)
             realizedCost = validated_data.get("realizedCost", None)
