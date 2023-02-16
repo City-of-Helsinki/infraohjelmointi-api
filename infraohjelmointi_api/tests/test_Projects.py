@@ -36,12 +36,14 @@ class ProjectTestCase(TestCase):
     project_6_Id = uuid.UUID("90852adc-d47e-4fd9-944f-cb8d36076c21")
     project_7_Id = uuid.UUID("e98e3787-e19f-4af6-94c9-12c8e31ea040")
     project_8_Id = uuid.UUID("3d438292-a7c1-4ef2-9d28-048d580ab2fc")
+    project_9_Id = uuid.UUID("a5899694-c5b1-44af-949f-dad9bd06f1a4")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
     person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
     person_3_Id = uuid.UUID("b56ae8c8-f5c2-4abe-a1a6-f3a83265ff49")
     person_4_Id = uuid.UUID("2b8ffec5-de77-498c-afe7-a1999a7b2c7c")
     person_5_Id = uuid.UUID("4cd7d70d-2bf2-41bd-998d-be4955cd2a72")
+    person_6_Id = uuid.UUID("6af5983a-584e-4b7e-87ed-afc7fc419b2d")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
@@ -1956,4 +1958,77 @@ class ProjectTestCase(TestCase):
             response.status_code,
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+
+    def test_date_validation_on_lock(self):
+        Project.objects.create(
+            id=self.project_8_Id,
+            name="Test project fields lock",
+            description="Test description",
+            planningStartYear=2023,
+            constructionEndYear=2025,
+        )
+        Person.objects.create(
+            id=self.person_6_Id,
+            firstName="John",
+            lastName="Doe",
+            email="random@random.com",
+            title="Manager",
+            phone="0414853275",
+        )
+        data = {
+            "project": self.project_8_Id.__str__(),
+            "lockedBy": self.person_6_Id.__str__(),
+            "lockType": "byPerson",
+        }
+        response = self.client.post(
+            "/project-locks/",
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"estPlanningStart": "05.05.2020"}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_8_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            {
+                "estPlanningStart": [
+                    "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
+                ]
+            },
+            response.json(),
+        )
+
+        data = {"estConstructionEnd": "05.05.2030"}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_8_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            {
+                "estConstructionEnd": [
+                    "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
+                ]
+            },
+            response.json(),
         )
