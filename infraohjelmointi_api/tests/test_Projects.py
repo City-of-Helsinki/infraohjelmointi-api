@@ -34,10 +34,14 @@ class ProjectTestCase(TestCase):
     project_4_Id = uuid.UUID("7c5b981e-286f-4065-9d9e-29d8d1714e4c")
     project_5_Id = uuid.UUID("441d80e1-9ab1-4b35-91cc-6017ea308d87")
     project_6_Id = uuid.UUID("90852adc-d47e-4fd9-944f-cb8d36076c21")
+    project_7_Id = uuid.UUID("e98e3787-e19f-4af6-94c9-12c8e31ea040")
+    project_8_Id = uuid.UUID("3d438292-a7c1-4ef2-9d28-048d580ab2fc")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
     person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
     person_3_Id = uuid.UUID("b56ae8c8-f5c2-4abe-a1a6-f3a83265ff49")
+    person_4_Id = uuid.UUID("2b8ffec5-de77-498c-afe7-a1999a7b2c7c")
+    person_5_Id = uuid.UUID("4cd7d70d-2bf2-41bd-998d-be4955cd2a72")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
@@ -1497,7 +1501,459 @@ class ProjectTestCase(TestCase):
     #         ),
     #     )
 
-    # TODO
-    # Define test for updating certain fields when project is locked
-    # Define test for locking a project manually
-    # Define test for locking a already locked project
+    def test_project_gets_locked(self):
+        Project.objects.create(
+            id=self.project_7_Id,
+            name="Test project fields lock",
+            description="Test description",
+        )
+        Person.objects.create(
+            id=self.person_4_Id,
+            firstName="John",
+            lastName="Doe",
+            email="random@random.com",
+            title="Manager",
+            phone="0414853275",
+        )
+        data = {
+            "project": self.project_7_Id.__str__(),
+            "lockedBy": self.person_4_Id.__str__(),
+            "lockType": "byPerson",
+        }
+        response = self.client.post(
+            "/project-locks/",
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        lockedFieldsErrorMsg = (
+            "The following fields cannot be updated when the project is locked,'phase'"
+            ", 'planningStartYear', 'constructionEndYear', 'programmed', 'projectClass', 'projectLocation',"
+            "'siteId', 'realizedCost', 'budgetOverrunAmount', 'budgetForecast1CurrentYear', "
+            "'budgetForecast2CurrentYear','budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', "
+            "'budgetProposalCurrentYearPlus1','budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', "
+            "'preliminaryCurrentYearPlus4','preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', "
+            "'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8','preliminaryCurrentYearPlus9', "
+            "'preliminaryCurrentYearPlus10'"
+        )
+        data = {"phase": self.projectPhase_1_Id.__str__()}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"planningStartYear": 2023}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"constructionEndYear": 2023}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"programmed": False}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"projectClass": self.projectClass_1_Id.__str__()}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"projectLocation": self.projectDistrict_1_Id.__str__()}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"siteId": self.budgetItemId.__str__()}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"realizedCost": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetOverrunAmount": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetForecast1CurrentYear": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetForecast2CurrentYear": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetForecast3CurrentYear": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetForecast4CurrentYear": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetProposalCurrentYearPlus1": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"budgetProposalCurrentYearPlus2": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus3": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus4": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus5": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus6": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus7": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus8": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus9": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+        data = {"preliminaryCurrentYearPlus10": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            lockedFieldsErrorMsg,
+            response.json()[0],
+        )
+
+    def test_locking_project_twice(self):
+        Project.objects.create(
+            id=self.project_8_Id,
+            name="Test locking twice",
+            description="Test description",
+        )
+        Person.objects.create(
+            id=self.person_5_Id,
+            firstName="John",
+            lastName="Doe",
+            email="random@random.com",
+            title="Manager",
+            phone="0414853275",
+        )
+        data = {
+            "project": self.project_8_Id.__str__(),
+            "lockedBy": self.person_5_Id.__str__(),
+            "lockType": "byPerson",
+        }
+        response = self.client.post(
+            "/project-locks/",
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {
+            "project": self.project_8_Id.__str__(),
+            "lockedBy": self.person_5_Id.__str__(),
+            "lockType": "byPerson",
+        }
+        response = self.client.post(
+            "/project-locks/",
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
