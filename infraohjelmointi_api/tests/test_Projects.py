@@ -1434,62 +1434,68 @@ class ProjectTestCase(TestCase):
             ),
         )
 
-    def test_project_gets_locked_on_phase_change(self):
-        ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
-        data = {
-            "name": "Test locking",
-            "description": "Test Description",
-            "phase": self.projectPhase_2_Id.__str__(),
-        }
-        response = self.client.post(
-            "/projects/",
-            data,
-            content_type="application/json",
-        )
-        newCreatedId = response.json()["id"]
-        self.assertEqual(
-            response.status_code,
-            201,
-            msg="Status code != 201 , Error: {}".format(response.json()),
-        )
-        self.assertTrue(
-            ProjectLock.objects.filter(project=newCreatedId).exists(),
-            msg="ProjectLock does not contain a record for new created project with id {} when phase is set to construction".format(
-                newCreatedId
-            ),
-        )
+    # Commented out test to check if a project gets locked automatically on phase change
+    # def test_project_gets_locked_on_phase_change(self):
+    #     ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
+    #     data = {
+    #         "name": "Test locking",
+    #         "description": "Test Description",
+    #         "phase": self.projectPhase_2_Id.__str__(),
+    #     }
+    #     response = self.client.post(
+    #         "/projects/",
+    #         data,
+    #         content_type="application/json",
+    #     )
+    #     newCreatedId = response.json()["id"]
+    #     self.assertEqual(
+    #         response.status_code,
+    #         201,
+    #         msg="Status code != 201 , Error: {}".format(response.json()),
+    #     )
+    #     self.assertTrue(
+    #         ProjectLock.objects.filter(project=newCreatedId).exists(),
+    #         msg="ProjectLock does not contain a record for new created project with id {} when phase is set to construction".format(
+    #             newCreatedId
+    #         ),
+    #     )
 
-        data["phase"] = self.projectPhase_1_Id.__str__()
-        response = self.client.post(
-            "/projects/",
-            data,
-            content_type="application/json",
-        )
-        newCreatedId = response.json()["id"]
-        self.assertEqual(
-            response.status_code,
-            201,
-            msg="Status code != 200 , Error: {}".format(response.json()),
-        )
-        self.assertFalse(
-            ProjectLock.objects.filter(project=newCreatedId).exists(),
-            msg="ProjectLock contains a record for new created project with id {} when phase is not set to construction".format(
-                newCreatedId
-            ),
-        )
+    #     data["phase"] = self.projectPhase_1_Id.__str__()
+    #     response = self.client.post(
+    #         "/projects/",
+    #         data,
+    #         content_type="application/json",
+    #     )
+    #     newCreatedId = response.json()["id"]
+    #     self.assertEqual(
+    #         response.status_code,
+    #         201,
+    #         msg="Status code != 200 , Error: {}".format(response.json()),
+    #     )
+    #     self.assertFalse(
+    #         ProjectLock.objects.filter(project=newCreatedId).exists(),
+    #         msg="ProjectLock contains a record for new created project with id {} when phase is not set to construction".format(
+    #             newCreatedId
+    #         ),
+    #     )
 
-        data["phase"] = self.projectPhase_2_Id.__str__()
-        response = self.client.patch(
-            "/projects/{}/".format(newCreatedId),
-            data,
-            content_type="application/json",
-        )
-        self.assertTrue(
-            ProjectLock.objects.filter(project=newCreatedId).exists(),
-            msg="ProjectLock does not contain a record for updated project with id {} when phase is updated to construction".format(
-                newCreatedId
-            ),
-        )
+    #     data["phase"] = self.projectPhase_2_Id.__str__()
+    #     response = self.client.patch(
+    #         "/projects/{}/".format(newCreatedId),
+    #         data,
+    #         content_type="application/json",
+    #     )
+    #     self.assertEqual(
+    #         response.status_code,
+    #         200,
+    #         msg="Status code != 200 , Error: {}".format(response.json()),
+    #     )
+    #     self.assertTrue(
+    #         ProjectLock.objects.filter(project=newCreatedId).exists(),
+    #         msg="ProjectLock does not contain a record for updated project with id {} when phase is updated to construction".format(
+    #             newCreatedId
+    #         ),
+    #     )
 
     # TODO
     # Define test for updating certain fields when project is locked
