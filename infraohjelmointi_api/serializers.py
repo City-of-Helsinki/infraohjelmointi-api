@@ -345,7 +345,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         project = getattr(self, "instance", None)
         if project is not None and hasattr(project, "lockRecord"):
             planningStartYear = project.planningStartYear
-            if planningStartYear is not None:
+            if planningStartYear is not None and estPlanningStart is not None:
                 if estPlanningStart.year < planningStartYear:
                     raise serializers.ValidationError(
                         "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
@@ -361,7 +361,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         project = getattr(self, "instance", None)
         if project is not None and hasattr(project, "lockRecord"):
             constructionEndYear = project.constructionEndYear
-            if constructionEndYear is not None:
+            if constructionEndYear is not None and estConstructionEnd is not None:
                 if estConstructionEnd.year > constructionEndYear:
                     raise serializers.ValidationError(
                         "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
