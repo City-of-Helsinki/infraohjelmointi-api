@@ -148,9 +148,9 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-
-    freeSearch = django_filters.CharFilter(
-        method="filter_search_string", label="Search"
+    projectGroup = django_filters.ModelMultipleChoiceFilter(
+        field_name="projectGroup",
+        queryset=ProjectGroupSerializer.Meta.model.objects.all(),
     )
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
@@ -160,15 +160,11 @@ class ProjectFilter(django_filters.FilterSet):
         coerce=strtobool,
     )
 
-    def filter_search_string(self, queryset, name, value):
-        return queryset.filter(
-            Q(name__icontains=value) | Q(hashTags__value__icontains=value)
-        ).distinct()
-
     class Meta:
         fields = {
             "hkrId": ["exact"],
             "category": ["exact"],
+            "hashTags": ["exact"],
         }
         model = Project
 
@@ -195,7 +191,56 @@ class ProjectViewSet(BaseViewSet):
         return ProjectCreateSerializer
 
     @override
+    def list(self, request, *args, **kwargs):
+        freeSearch = request.query_params.get("freeSearch", None)
+        if freeSearch is not None:
+            hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
+                value__icontains=freeSearch
+            )
+            projectQs = ProjectGetSerializer.Meta.model.objects.filter(
+                name__icontains=freeSearch
+            )
+            projectGroupQs = ProjectGroupSerializer.Meta.model.objects.filter(
+                name__icontains=freeSearch
+            )
+            hashTagsSerializer = ProjectHashtagSerializer(
+                hashTagQs, fields=("id", "value"), many=True
+            )
+            projectsSerializer = ProjectGetSerializer(
+                projectQs, fields=("id", "name"), many=True
+            )
+            projectGroupsSerializer = ProjectGroupSerializer(
+                projectGroupQs, fields=("id", "name"), many=True
+            )
+
+            return Response(
+                {
+                    "projects": [
+                        {"id": project["id"], "value": project["name"]}
+                        for project in projectsSerializer.data
+                    ],
+                    "hashtags": hashTagsSerializer.data,
+                    "groups": [
+                        {"id": group["id"], "value": group["name"]}
+                        for group in projectGroupsSerializer.data
+                    ],
+                }
+            )
+        else:
+            # with filter
+            queryset = self.filter_queryset(self.get_queryset())
+            # pagination
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+    @override
     def get_queryset(self):
+
         qs = super().get_queryset()
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
