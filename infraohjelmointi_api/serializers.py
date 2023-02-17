@@ -33,7 +33,28 @@ class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
 
 
-class ProjectGroupSerializer(serializers.ModelSerializer):
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+    """
+    A ModelSerializer that takes an additional `fields` argument that
+    controls which fields should be displayed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Don't pass the 'fields' arg up to the superclass
+        fields = kwargs.pop("fields", None)
+
+        # Instantiate the superclass normally
+        super().__init__(*args, **kwargs)
+
+        if fields is not None:
+            # Drop any fields that are not specified in the `fields` argument.
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
+
+
+class ProjectGroupSerializer(DynamicFieldsModelSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
@@ -79,7 +100,7 @@ class ProjectGroupSerializer(serializers.ModelSerializer):
         return projectGroup
 
 
-class ProjectHashtagSerializer(serializers.ModelSerializer):
+class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
     class Meta(BaseMeta):
         model = ProjectHashTag
 
@@ -211,7 +232,7 @@ class ProjectSetCreateSerializer(serializers.ModelSerializer):
         model = ProjectSet
 
 
-class ProjectGetSerializer(serializers.ModelSerializer):
+class ProjectGetSerializer(DynamicFieldsModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
     projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)
