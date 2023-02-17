@@ -41,21 +41,10 @@ class Command(BaseCommand):
         """
         Add the following arguments to the manageclasses command
 
-        --file <path/to/excel.xlsx>
-        --populate-with-excel
+        --populate-with-excel <path/to/excel.xlsx>
         --sync-with-pw
         """
 
-        ## --file argument, used to provide the path to excel file which contains class data, must give full path
-        parser.add_argument(
-            "--file",
-            type=str,
-            help=(
-                "Argument to give full path to the excel file containing Class data. "
-                + "Usage: --file /folder/folder/file.xlsx"
-            ),
-            default="",
-        )
         ## --sync-with-pw argument, used to tell the script to fetch classes for each project
         ## from PW and assign them classes as defined in PW
         parser.add_argument(
@@ -67,8 +56,12 @@ class Command(BaseCommand):
         ## class data using the path provided in the --file argument
         parser.add_argument(
             "--populate-with-excel",
-            action="store_true",
-            help="Optional argument to read data from excel and populate the DB",
+            type=str,
+            help=(
+                "Argument to give full path to the excel file containing Class data. "
+                + "Usage: --populate-with-excel /folder/folder/file.xlsx"
+            ),
+            default="",
         )
 
     def populateDBWithExcel(self, excelPath):
@@ -300,34 +293,28 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(e))
 
     def handle(self, *args, **options):
-        if (
-            not options["file"]
-            and not options["populate_with_excel"]
-            and not options["sync_with_pw"]
-        ):
+        if not options["populate_with_excel"] and not options["sync_with_pw"]:
             self.stdout.write(
                 self.style.ERROR(
                     "No arguments given. "
-                    + "\nUsage: python manage.py manageclasses --file <path/to/excel.xlsx>"
-                    + " --populate-with-excel [--sync-with-pw]"
+                    + "\nUsage: python manage.py manageclasses --populate-with-excel <path/to/excel.xlsx>"
+                    + " [--sync-with-pw]"
                     + "\nOr just: python manage.py manageclasses --sync-with-pw"
                 )
             )
             return
 
-        excelPath = options["file"]
-
         if options["populate_with_excel"]:
-            if not os.path.isfile(excelPath):
+            if not os.path.isfile(options["populate_with_excel"]):
                 self.stdout.write(
                     self.style.ERROR(
-                        "Excel file path is incorrect or missing. Usage: --file path/to/file.xlsx"
+                        "Excel file path is incorrect or missing. Usage: --populate-with-excel path/to/file.xlsx"
                     )
                 )
                 return
 
             try:
-                self.populateDBWithExcel(excelPath=excelPath)
+                self.populateDBWithExcel(excelPath=options["populate_with_excel"])
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(e))

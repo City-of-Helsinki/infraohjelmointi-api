@@ -9,6 +9,7 @@ import environ
 
 from django.db import transaction
 from .util.budjetfilehandler import proceedWithBudjetFile
+from .util.planningfilehandler import proceedWithPlanningFile
 from .util.pwhandler import proceedWithPWArgument
 
 
@@ -87,7 +88,7 @@ class Command(BaseCommand):
             )
             return
 
-        if "import_from_pw" in options:
+        if options["import_from_pw"] == True:
             proceedWithPWArgument(
                 session=requests.Session(),
                 env=env,
@@ -96,10 +97,21 @@ class Command(BaseCommand):
             )
             return
 
-        self.proceedWithFileArgument(
-            "--import-from-budjet", "import_from_budjet", options, proceedWithBudjetFile
-        )
-        # self.proceedWithArgument("--import-from-plan", "import_from_plan", options)
+        if options["import_from_budjet"] != "":
+            self.proceedWithFileArgument(
+                "--import-from-budjet",
+                "import_from_budjet",
+                options,
+                proceedWithBudjetFile,
+            )
+
+        if options["import_from_plan"] != "":
+            self.proceedWithFileArgument(
+                "--import-from-plan",
+                "import_from_plan",
+                options,
+                proceedWithPlanningFile,
+            )
 
     @transaction.atomic
     def proceedWithFileArgument(self, argument, option, options, handler):
@@ -118,6 +130,7 @@ class Command(BaseCommand):
                 handler(options[option], self.stdout, self.style)
 
             except Exception as e:
+                e.with_traceback()
                 self.stdout.write(
                     self.style.ERROR(
                         "Error occurred while reading file {}. Error: {}".format(
