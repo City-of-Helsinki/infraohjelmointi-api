@@ -45,6 +45,7 @@ def buildHierarchyWithExcelRow(modelClass, row, stdout, style):
     # get or create class
     model, classCreated = getattr(masterModel, child).get_or_create(
         name=modelName,
+        parent=masterModel,
         path="{}/{}".format(masterModelName, modelName),
     )
     if classCreated:
@@ -69,6 +70,7 @@ def buildHierarchyWithExcelRow(modelClass, row, stdout, style):
     # get or create subclass
     _, subModelCreated = getattr(model, child).get_or_create(
         name=subModelName,
+        parent=model,
         path="{}/{}/{}".format(masterModelName, modelName, subModelName),
     )
     if subModelCreated:
