@@ -1534,16 +1534,6 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-        lockedFieldsErrorMsg = (
-            "The following fields cannot be updated when the project is locked,'phase'"
-            ", 'planningStartYear', 'constructionEndYear', 'programmed', 'projectClass', 'projectLocation',"
-            "'siteId', 'realizedCost', 'budgetOverrunAmount', 'budgetForecast1CurrentYear', "
-            "'budgetForecast2CurrentYear','budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', "
-            "'budgetProposalCurrentYearPlus1','budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', "
-            "'preliminaryCurrentYearPlus4','preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', "
-            "'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8','preliminaryCurrentYearPlus9', "
-            "'preliminaryCurrentYearPlus10'"
-        )
         data = {"phase": self.projectPhase_1_Id.__str__()}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
@@ -1556,7 +1546,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field phase cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1572,7 +1562,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field planningStartYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1588,7 +1578,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field constructionEndYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1604,7 +1594,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field programmed cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1620,7 +1610,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field projectClass cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1636,7 +1626,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field projectLocation cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1652,7 +1642,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field siteId cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1668,7 +1658,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field realizedCost cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1684,7 +1674,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetOverrunAmount cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1700,7 +1690,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetForecast1CurrentYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1716,7 +1706,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetForecast2CurrentYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1732,7 +1722,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetForecast3CurrentYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1748,7 +1738,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetForecast4CurrentYear cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1764,7 +1754,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetProposalCurrentYearPlus1 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1780,7 +1770,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field budgetProposalCurrentYearPlus2 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1796,7 +1786,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus3 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1812,7 +1802,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus4 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1828,7 +1818,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus5 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1844,7 +1834,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus6 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1860,7 +1850,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus7 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1876,7 +1866,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus8 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1892,7 +1882,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus9 cannot be modified when the project is locked",
             response.json()[0],
         )
 
@@ -1908,7 +1898,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            lockedFieldsErrorMsg,
+            "The field preliminaryCurrentYearPlus10 cannot be modified when the project is locked",
             response.json()[0],
         )
 
