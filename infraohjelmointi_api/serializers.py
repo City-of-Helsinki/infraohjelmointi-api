@@ -271,7 +271,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
     def get_locked(self, obj):
         try:
-            lockData = ProjectLockSerializer(obj.lockRecord, many=False).data
+            lockData = ProjectLockSerializer(obj.lock, many=False).data
             return lockData
         except:
             return None
@@ -343,7 +343,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
         """
         project = getattr(self, "instance", None)
-        if project is not None and hasattr(project, "lockRecord"):
+        if project is not None and hasattr(project, "lock"):
             planningStartYear = project.planningStartYear
             if planningStartYear is not None and estPlanningStart is not None:
                 if estPlanningStart.year < planningStartYear:
@@ -359,7 +359,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         request is not set to a date later than the locked field constructionEndYear on the existing Project instance
         """
         project = getattr(self, "instance", None)
-        if project is not None and hasattr(project, "lockRecord"):
+        if project is not None and hasattr(project, "lock"):
             constructionEndYear = project.constructionEndYear
             if constructionEndYear is not None and estConstructionEnd is not None:
                 if estConstructionEnd.year > constructionEndYear:
@@ -391,93 +391,40 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         locked fields are not being updated
         """
         # Check if project is locked and any locked fields are not being updated
-        if hasattr(instance, "lockRecord"):
-            phase = validated_data.get("phase", None)
-            planningStartYear = validated_data.get("planningStartYear", None)
-            constructionEndYear = validated_data.get("constructionEndYear", None)
-            programmed = validated_data.get("programmed", None)
-            projectClass = validated_data.get("projectClass", None)
-            projectLocation = validated_data.get("projectLocation", None)
-            siteId = validated_data.get("siteId", None)
-            realizedCost = validated_data.get("realizedCost", None)
-            budgetOverrunAmount = validated_data.get("budgetOverrunAmount", None)
-            budgetForecast1CurrentYear = validated_data.get(
-                "budgetForecast1CurrentYear", None
-            )
-            budgetForecast2CurrentYear = validated_data.get(
-                "budgetForecast2CurrentYear", None
-            )
-            budgetForecast3CurrentYear = validated_data.get(
-                "budgetForecast3CurrentYear", None
-            )
-            budgetForecast4CurrentYear = validated_data.get(
-                "budgetForecast4CurrentYear", None
-            )
-            budgetProposalCurrentYearPlus1 = validated_data.get(
-                "budgetProposalCurrentYearPlus1", None
-            )
-            budgetProposalCurrentYearPlus2 = validated_data.get(
-                "budgetProposalCurrentYearPlus2", None
-            )
-            preliminaryCurrentYearPlus3 = validated_data.get(
-                "preliminaryCurrentYearPlus3", None
-            )
-            preliminaryCurrentYearPlus4 = validated_data.get(
-                "preliminaryCurrentYearPlus4", None
-            )
-            preliminaryCurrentYearPlus5 = validated_data.get(
-                "preliminaryCurrentYearPlus5", None
-            )
-            preliminaryCurrentYearPlus6 = validated_data.get(
-                "preliminaryCurrentYearPlus6", None
-            )
-            preliminaryCurrentYearPlus7 = validated_data.get(
-                "preliminaryCurrentYearPlus7", None
-            )
-            preliminaryCurrentYearPlus8 = validated_data.get(
-                "preliminaryCurrentYearPlus8", None
-            )
-            preliminaryCurrentYearPlus9 = validated_data.get(
-                "preliminaryCurrentYearPlus9", None
-            )
-            preliminaryCurrentYearPlus10 = validated_data.get(
-                "preliminaryCurrentYearPlus10", None
-            )
-            if (
-                phase is not None
-                or planningStartYear is not None
-                or constructionEndYear is not None
-                or programmed is not None
-                or projectClass is not None
-                or projectLocation is not None
-                or siteId is not None
-                or budgetForecast1CurrentYear is not None
-                or budgetForecast2CurrentYear is not None
-                or budgetForecast3CurrentYear is not None
-                or budgetForecast4CurrentYear is not None
-                or budgetProposalCurrentYearPlus1 is not None
-                or budgetProposalCurrentYearPlus2 is not None
-                or preliminaryCurrentYearPlus3 is not None
-                or preliminaryCurrentYearPlus4 is not None
-                or preliminaryCurrentYearPlus5 is not None
-                or preliminaryCurrentYearPlus6 is not None
-                or preliminaryCurrentYearPlus7 is not None
-                or preliminaryCurrentYearPlus8 is not None
-                or preliminaryCurrentYearPlus9 is not None
-                or preliminaryCurrentYearPlus10 is not None
-                or realizedCost is not None
-                or budgetOverrunAmount is not None
-            ):
-                raise serializers.ValidationError(
-                    "The following fields cannot be updated when the project is locked,"
-                    "'phase', 'planningStartYear', 'constructionEndYear',"
-                    " 'programmed', 'projectClass', 'projectLocation',"
-                    "'siteId', 'realizedCost', 'budgetOverrunAmount', 'budgetForecast1CurrentYear', 'budgetForecast2CurrentYear',"
-                    "'budgetForecast3CurrentYear', 'budgetForecast4CurrentYear', 'budgetProposalCurrentYearPlus1',"
-                    "'budgetProposalCurrentYearPlus2', 'preliminaryCurrentYearPlus3', 'preliminaryCurrentYearPlus4',"
-                    "'preliminaryCurrentYearPlus5', 'preliminaryCurrentYearPlus6', 'preliminaryCurrentYearPlus7', 'preliminaryCurrentYearPlus8',"
-                    "'preliminaryCurrentYearPlus9', 'preliminaryCurrentYearPlus10'"
-                )
+        if hasattr(instance, "lock"):
+            lockedFields = [
+                "phase",
+                "planningStartYear",
+                "constructionEndYear",
+                "programmed",
+                "projectClass",
+                "projectLocation",
+                "siteId",
+                "realizedCost",
+                "budgetOverrunAmount",
+                "budgetForecast1CurrentYear",
+                "budgetForecast2CurrentYear",
+                "budgetForecast3CurrentYear",
+                "budgetForecast4CurrentYear",
+                "budgetProposalCurrentYearPlus1",
+                "budgetProposalCurrentYearPlus2",
+                "preliminaryCurrentYearPlus3",
+                "preliminaryCurrentYearPlus4",
+                "preliminaryCurrentYearPlus5",
+                "preliminaryCurrentYearPlus6",
+                "preliminaryCurrentYearPlus7",
+                "preliminaryCurrentYearPlus8",
+                "preliminaryCurrentYearPlus9",
+                "preliminaryCurrentYearPlus10",
+            ]
+            for field in lockedFields:
+                if validated_data.get(field, None) is not None:
+                    raise serializers.ValidationError(
+                        "The field {} cannot be modified when the project is locked".format(
+                            field
+                        )
+                    )
+
         # Commented out logic for automatic locking of project if phase updated to construction
         # else:
         #     newPhase = validated_data.get("phase", None)

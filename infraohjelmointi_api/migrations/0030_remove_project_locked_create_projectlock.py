@@ -8,23 +8,46 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0029_project_otherpersons'),
+        ("infraohjelmointi_api", "0029_project_otherpersons"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='project',
-            name='locked',
+            model_name="project",
+            name="locked",
         ),
         migrations.CreateModel(
-            name='ProjectLock',
+            name="ProjectLock",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('lockType', models.CharField(max_length=50)),
-                ('createdDate', models.DateTimeField(auto_now_add=True)),
-                ('updatedDate', models.DateTimeField(auto_now=True)),
-                ('lockedBy', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, to='infraohjelmointi_api.person')),
-                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='lockRecord', to='infraohjelmointi_api.project')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("lockType", models.CharField(max_length=50)),
+                ("createdDate", models.DateTimeField(auto_now_add=True)),
+                ("updatedDate", models.DateTimeField(auto_now=True)),
+                (
+                    "lockedBy",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.DO_NOTHING,
+                        to="infraohjelmointi_api.person",
+                    ),
+                ),
+                (
+                    "project",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="lock",
+                        to="infraohjelmointi_api.project",
+                    ),
+                ),
             ],
         ),
     ]
