@@ -21,6 +21,7 @@ from .models import (
     ResponsibleZone,
     ProjectHashTag,
     ProjectGroup,
+    ProjectLock,
 )
 from rest_framework import serializers
 from django.db.models import Q
@@ -52,6 +53,11 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
+
+
+class ProjectLockSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectLock
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
@@ -258,9 +264,17 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
     planningPhase = PlanningPhaseSerializer(read_only=True)
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
+    locked = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
+
+    def get_locked(self, obj):
+        try:
+            lockData = ProjectLockSerializer(obj.lock, many=False).data
+            return lockData
+        except:
+            return None
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
@@ -322,6 +336,101 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
+
+    def validate_estPlanningStart(self, estPlanningStart):
+        """
+        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+        """
+        project = getattr(self, "instance", None)
+        if project is not None and hasattr(project, "lock"):
+            planningStartYear = project.planningStartYear
+            if planningStartYear is not None and estPlanningStart is not None:
+                if estPlanningStart.year < planningStartYear:
+                    raise serializers.ValidationError(
+                        "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
+                    )
+
+        return estPlanningStart
+
+    def validate_estConstructionEnd(self, estConstructionEnd):
+        """
+        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
+        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
+        """
+        project = getattr(self, "instance", None)
+        if project is not None and hasattr(project, "lock"):
+            constructionEndYear = project.constructionEndYear
+            if constructionEndYear is not None and estConstructionEnd is not None:
+                if estConstructionEnd.year > constructionEndYear:
+                    raise serializers.ValidationError(
+                        "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
+                    )
+
+        return estConstructionEnd
+
+    # Commented out automatic locking logic when project is created with phase construction
+    # @override
+    # def create(self, validated_data):
+    #     """
+    #     Overriding the create method to populate ProjectLockStatus Table
+    #     with appropriate lock status based on the phase
+    #     """
+    #     newPhase = validated_data.get("phase", None)
+    #     project = super(ProjectCreateSerializer, self).create(validated_data)
+    #     if newPhase is not None and newPhase.value == "construction":
+    #         project.lock.create(lockType="status_construction", lockedBy=None)
+
+    #     return project
+
+    @override
+    def update(self, instance, validated_data):
+        """
+        Overriding the update method to populate ProjectLockStatus Table
+        with appropriate lock status based on the phase and validating if
+        locked fields are not being updated
+        """
+        # Check if project is locked and any locked fields are not being updated
+        if hasattr(instance, "lock"):
+            lockedFields = [
+                "phase",
+                "planningStartYear",
+                "constructionEndYear",
+                "programmed",
+                "projectClass",
+                "projectLocation",
+                "siteId",
+                "realizedCost",
+                "budgetOverrunAmount",
+                "budgetForecast1CurrentYear",
+                "budgetForecast2CurrentYear",
+                "budgetForecast3CurrentYear",
+                "budgetForecast4CurrentYear",
+                "budgetProposalCurrentYearPlus1",
+                "budgetProposalCurrentYearPlus2",
+                "preliminaryCurrentYearPlus3",
+                "preliminaryCurrentYearPlus4",
+                "preliminaryCurrentYearPlus5",
+                "preliminaryCurrentYearPlus6",
+                "preliminaryCurrentYearPlus7",
+                "preliminaryCurrentYearPlus8",
+                "preliminaryCurrentYearPlus9",
+                "preliminaryCurrentYearPlus10",
+            ]
+            for field in lockedFields:
+                if validated_data.get(field, None) is not None:
+                    raise serializers.ValidationError(
+                        "The field {} cannot be modified when the project is locked".format(
+                            field
+                        )
+                    )
+
+        # Commented out logic for automatic locking of project if phase updated to construction
+        # else:
+        #     newPhase = validated_data.get("phase", None)
+        #     if newPhase is not None and newPhase.value == "construction":
+        #         instance.lock.create(lockType="status_construction", lockedBy=None)
+        return super(ProjectCreateSerializer, self).update(instance, validated_data)
 
     @override
     def to_representation(self, instance):

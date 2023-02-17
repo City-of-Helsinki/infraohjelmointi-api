@@ -67,7 +67,6 @@ class TaskTestCase(TestCase):
             spentCost=20000.00,
             riskAssessment=None,
             priority=None,
-            locked=True,
             comments="Comments random",
             delays="yes 1 delay because of tests",
             category=None,

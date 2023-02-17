@@ -185,7 +185,6 @@ class Project(models.Model):
     priority = models.ForeignKey(
         ProjectPriority, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    locked = models.BooleanField(default=False)
     comments = models.CharField(max_length=200, blank=True, null=True)
 
     # commented fields left out due to translation confusions
