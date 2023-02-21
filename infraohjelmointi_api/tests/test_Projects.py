@@ -1340,7 +1340,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&hashtags={}".format(
+            "/projects/?mainDistrict={}&hashtag={}".format(
                 self.projectMainDistrict_3_Id, self.projectHashTag_3_Id
             ),
         )
