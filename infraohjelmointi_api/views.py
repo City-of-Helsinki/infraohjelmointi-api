@@ -236,6 +236,15 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
 
         if freeSearch is not None:
+            if freeSearch == "":
+                return Response(
+                    {
+                        "projects": [],
+                        "hashtags": [],
+                        "groups": [],
+                    }
+                )
+
             hashTagQs = ProjectHashtagSerializer.Meta.model.objects.filter(
                 value__icontains=freeSearch
             )
