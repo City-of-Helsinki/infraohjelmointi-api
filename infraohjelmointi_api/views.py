@@ -355,8 +355,15 @@ class ProjectViewSet(BaseViewSet):
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
+        inGroup = self.request.query_params.get("inGroup", None)
 
         try:
+            if inGroup is not None:
+                if inGroup in ["true", "True"]:
+                    qs = qs.filter(projectGroup__isnull=False)
+                elif inGroup in ["false", "False"]:
+                    qs = qs.filter(projectGroup__isnull=True)
+
             if len(projects) > 0:
                 qs = qs.filter(id__in=projects)
             qs = self._filter_projects_by_programming_year(
