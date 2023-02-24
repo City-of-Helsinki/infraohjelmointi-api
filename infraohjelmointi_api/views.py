@@ -234,6 +234,8 @@ class ProjectViewSet(BaseViewSet):
         personPlanning = request.query_params.get("personPlanning", None)
         programmed = request.query_params.getlist("programmed", [])
         projects = self.request.query_params.getlist("project", [])
+        inGroup = self.request.query_params.get("inGroup", None)
+        projectName = self.request.query_params.get("projectName", None)
 
         if freeSearch is not None:
             if freeSearch == "":
@@ -292,6 +294,8 @@ class ProjectViewSet(BaseViewSet):
             or category is not None
             or phase is not None
             or personPlanning is not None
+            or (inGroup is not None and inGroup in ["true", "True", "false", "False"])
+            or projectName is not None
         ):
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
@@ -356,8 +360,12 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
+        projectName = self.request.query_params.get("projectName", None)
 
         try:
+            if projectName is not None:
+                qs = qs.filter(name__icontains=projectName)
+
             if inGroup is not None:
                 if inGroup in ["true", "True"]:
                     qs = qs.filter(projectGroup__isnull=False)
