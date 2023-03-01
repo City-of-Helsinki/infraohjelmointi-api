@@ -60,6 +60,104 @@ class ProjectLockSerializer(serializers.ModelSerializer):
         model = ProjectLock
 
 
+class searchResultSerializer(serializers.Serializer):
+    name = serializers.SerializerMethodField()
+    id = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+    updatedDate = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        return obj.name
+
+    def get_id(self, obj):
+        return obj.id
+
+    def get_type(self, obj):
+        if obj._meta.model.__name__ == "ProjectLocation":
+            return "locations"
+        elif obj._meta.model.__name__ == "ProjectClass":
+            return "classes"
+        elif obj._meta.model.__name__ == "Project":
+            return "projects"
+        elif obj._meta.model.__name__ == "ProjectGroup":
+            return "groups"
+        else:
+            raise serializers.ValidationError("Unknown instance type: {}".format(obj))
+
+    def get_updatedDate(self, obj):
+        return obj.updatedDate
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+
+        if instance._meta.model.__name__ == "Project":
+            rep["hashTags"] = (
+                ProjectHashtagSerializer(instance.hashTags, many=True).data
+                if instance.hashTags is not None
+                else []
+            )
+            rep["phase"] = (
+                ProjectPhaseSerializer(instance.phase).data
+                if instance.phase is not None
+                else []
+            )
+            rep["path"] = (
+                (
+                    str(instance.projectClass.id)
+                    if instance.projectClass.parent is None
+                    else "{}/{}".format(
+                        str(instance.projectClass.parent.id),
+                        str(instance.projectClass.id),
+                    )
+                    if instance.projectClass.parent.parent is None
+                    and instance.projectClass.parent is not None
+                    else "{}/{}/{}".format(
+                        str(instance.projectClass.parent.parent.id),
+                        str(instance.projectClass.parent.id),
+                        str(instance.projectClass.id),
+                    )
+                )
+                if instance.projectClass is not None
+                else ""
+            )
+        elif instance._meta.model.__name__ in ["ProjectLocation", "ProjectClass"]:
+            rep["path"] = (
+                str(instance.id)
+                if instance.parent is None
+                else "{}/{}".format(str(instance.parent.id), str(instance.id))
+                if instance.parent.parent is None and instance.parent is not None
+                else "{}/{}/{}".format(
+                    str(instance.parent.parent.id),
+                    str(instance.parent.id),
+                    str(instance.id),
+                )
+            )
+        elif instance._meta.model.__name__ == "ProjectGroup":
+            rep["path"] = (
+                (
+                    str(instance.classRelation.id)
+                    if instance.classRelation.parent is None
+                    else "{}/{}".format(
+                        str(instance.classRelation.parent.id),
+                        str(instance.classRelation.id),
+                    )
+                    if instance.classRelation.parent.parent is None
+                    and instance.classRelation.parent is not None
+                    else "{}/{}/{}".format(
+                        str(instance.classRelation.parent.parent.id),
+                        str(instance.classRelation.parent.id),
+                        str(instance.classRelation.id),
+                    )
+                )
+                if instance.classRelation is not None
+                else ""
+            )
+        else:
+            rep["path"] = ""
+
+        return rep
+
+
 class ProjectGroupFilterSerializer(DynamicFieldsModelSerializer):
     class Meta(BaseMeta):
         model = ProjectGroup
