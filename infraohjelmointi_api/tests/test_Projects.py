@@ -44,7 +44,7 @@ class ProjectTestCase(TestCase):
     person_4_Id = uuid.UUID("2b8ffec5-de77-498c-afe7-a1999a7b2c7c")
     person_5_Id = uuid.UUID("4cd7d70d-2bf2-41bd-998d-be4955cd2a72")
     person_6_Id = uuid.UUID("6af5983a-584e-4b7e-87ed-afc7fc419b2d")
-    person_4_Id = uuid.UUID("657f1685-ab79-4997-98a3-d238d60bae1e")
+    person_7_Id = uuid.UUID("657f1685-ab79-4997-98a3-d238d60bae1e")
     projectSetId = uuid.UUID("fb093e0e-0b35-4b0e-94d7-97c91997f2d0")
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
@@ -1814,7 +1814,7 @@ class ProjectTestCase(TestCase):
             description="Test description",
         )
         Person.objects.create(
-            id=self.person_4_Id,
+            id=self.person_7_Id,
             firstName="John",
             lastName="Doe",
             email="random@random.com",
@@ -1823,7 +1823,7 @@ class ProjectTestCase(TestCase):
         )
         data = {
             "project": self.project_7_Id.__str__(),
-            "lockedBy": self.person_4_Id.__str__(),
+            "lockedBy": self.person_7_Id.__str__(),
             "lockType": "byPerson",
         }
         response = self.client.post(
