@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.db.models.expressions import RawSQL
 from distutils.util import strtobool
 import datetime
-
+from rest_framework.pagination import PageNumberPagination
 
 from rest_framework import viewsets
 from .serializers import (
@@ -300,34 +300,94 @@ class ProjectViewSet(BaseViewSet):
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
             if len(projectGroup) > 0:
+
                 groups = ProjectGroup.objects.filter(
                     id__in=queryset.values_list("projectGroup", flat=True).distinct()
                 ).select_related("classRelation")
-                response["groups"] = ProjectGroupFilterSerializer(
-                    groups, fields=("id", "name", "path"), many=True
-                ).data
+                groupPaginator = PageNumberPagination()
+                groupPaginator.page_size = 10
+                result = groupPaginator.paginate_queryset(groups, request)
+                serializer = ProjectGroupFilterSerializer(
+                    result, fields=("id", "name", "path"), many=True
+                )
+
+                response["groups"] = {
+                    "next": groupPaginator.get_next_link(),
+                    "previous": groupPaginator.get_previous_link(),
+                    "count": groupPaginator.page.paginator.count,
+                    "results": serializer.data,
+                }
+
             else:
-                response["groups"] = []
+                response["groups"] = {
+                    "next": None,
+                    "previous": None,
+                    "count": 0,
+                    "results": [],
+                }
             if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
                 projectClasses = ProjectClass.objects.filter(
                     id__in=queryset.values_list("projectClass", flat=True).distinct()
                 )
-                response["classes"] = ProjectClassFilterSerializer(
-                    projectClasses, fields=("id", "name", "path"), many=True
-                ).data
+                projectClassPaginator = PageNumberPagination()
+                projectClassPaginator.page_size = 10
+                result = projectClassPaginator.paginate_queryset(
+                    projectClasses, request
+                )
+                serializer = ProjectClassFilterSerializer(
+                    result, fields=("id", "name", "path"), many=True
+                )
+
+                response["classes"] = {
+                    "next": projectClassPaginator.get_next_link(),
+                    "previous": projectClassPaginator.get_previous_link(),
+                    "count": projectClassPaginator.page.paginator.count,
+                    "results": serializer.data,
+                }
+
             else:
-                response["classes"] = []
+                response["classes"] = {
+                    "next": None,
+                    "previous": None,
+                    "count": 0,
+                    "results": [],
+                }
             if len(mainDistrict) > 0 or len(district) > 0 or len(subDistrict) > 0:
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list("projectLocation", flat=True).distinct()
                 )
-                response["locations"] = ProjectLocationFilterSerializer(
-                    projectLocations, fields=("id", "name", "path"), many=True
-                ).data
+
+                projectLocationPaginator = PageNumberPagination()
+                projectLocationPaginator.page_size = 10
+                result = projectLocationPaginator.paginate_queryset(
+                    projectLocations, request
+                )
+                serializer = ProjectLocationFilterSerializer(
+                    result, fields=("id", "name", "path"), many=True
+                )
+                response["locations"] = {
+                    "next": projectLocationPaginator.get_next_link(),
+                    "previous": projectLocationPaginator.get_previous_link(),
+                    "count": projectLocationPaginator.page.paginator.count,
+                    "results": serializer.data,
+                }
             else:
-                response["locations"] = []
-            serializer = ProjectFilterSerializer(queryset, many=True)
-            response["projects"] = serializer.data
+                response["locations"] = {
+                    "next": None,
+                    "previous": None,
+                    "count": 0,
+                    "results": [],
+                }
+            projectPaginator = PageNumberPagination()
+            projectPaginator.page_size = 10
+            result = projectPaginator.paginate_queryset(queryset, request)
+            serializer = ProjectFilterSerializer(result, many=True)
+            response["projects"] = {
+                "next": projectPaginator.get_next_link(),
+                "previous": projectPaginator.get_previous_link(),
+                "count": projectPaginator.page.paginator.count,
+                "results": serializer.data,
+            }
 
             return Response(response)
 
