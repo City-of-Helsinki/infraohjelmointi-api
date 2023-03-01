@@ -237,6 +237,7 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
+        order = self.request.query_params.get("order", "new")
 
         if freeSearch is not None:
             if freeSearch == "":
@@ -297,12 +298,14 @@ class ProjectViewSet(BaseViewSet):
             or personPlanning is not None
             or (inGroup is not None and inGroup in ["true", "True", "false", "False"])
             or projectName is not None
+            or order is not None
         ):
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
             groups = []
             projectClasses = []
             projectLocations = []
+            combinedQuerysets = []
 
             if len(projectGroup) > 0:
                 groups = ProjectGroup.objects.filter(
@@ -317,9 +320,28 @@ class ProjectViewSet(BaseViewSet):
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list("projectLocation", flat=True).distinct()
                 )
-            combinedQuerysets = list(
-                chain(groups, projectClasses, projectLocations, queryset)
+            match order:
+                case 'new':
+                    combinedQuerysets = sorted(
+                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.updatedDate,reverse=True
             )
+                case 'old':
+                    combinedQuerysets = sorted(
+                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.updatedDate,reverse=False
+            )
+                case 'project':
+                    combinedQuerysets = list(
+                chain(queryset, projectClasses, projectLocations,groups )
+            )
+                case 'group':
+                    combinedQuerysets = list(
+                chain(groups ,queryset, projectClasses, projectLocations,)
+            )
+                case _:
+                    return Response(
+                data={"message": "Invalid order"}, status=status.HTTP_400_BAD_REQUEST
+            )
+            
             searchPaginator = PageNumberPagination()
             searchPaginator.page_size = 10
             result = searchPaginator.paginate_queryset(combinedQuerysets, request)
