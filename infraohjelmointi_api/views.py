@@ -44,10 +44,6 @@ from .serializers import (
     ProjectHashtagSerializer,
     ProjectGroupSerializer,
     ProjectLockSerializer,
-    ProjectGroupFilterSerializer,
-    ProjectClassFilterSerializer,
-    ProjectLocationFilterSerializer,
-    ProjectFilterSerializer,
     searchResultSerializer,
 )
 from .paginations import StandardResultsSetPagination
