@@ -64,7 +64,6 @@ class searchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
-    updatedDate = serializers.SerializerMethodField()
 
     def get_name(self, obj):
         return obj.name
@@ -83,9 +82,6 @@ class searchResultSerializer(serializers.Serializer):
             return "groups"
         else:
             raise serializers.ValidationError("Unknown instance type: {}".format(obj))
-
-    def get_updatedDate(self, obj):
-        return obj.updatedDate
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
