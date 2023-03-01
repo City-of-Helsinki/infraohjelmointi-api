@@ -1056,10 +1056,10 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len(response.json()["results"]),
             1,
             msg="Filtered result should contain 1 project with hkrId: 2222. Found: {}".format(
-                len(response.json()["projects"])
+                len(response.json()["results"])
             ),
         )
         response = self.client.get(
@@ -1136,10 +1136,10 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len(response.json()["results"]),
             2,
-            msg="Filtered result should contain 2 projects with field programmed = false. Found: {}".format(
-                len(response.json()["projects"])
+            msg="Filtered result should conresults with field programmed = false. Found: {}".format(
+                len(response.json()["results"])
             ),
         )
         response = self.client.get(
@@ -1151,7 +1151,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len(response.json()["results"]),
             Project.objects.all().count(),
             msg="Filtered result should contain all projects existing in the DB",
         )
@@ -1164,10 +1164,10 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len(response.json()["results"]),
             1,
             msg="Filtered result should contain 1 project with field programmed = false and hkrId = 333. Found: {}".format(
-                len(response.json()["projects"])
+                len(response.json()["results"])
             ),
         )
         response = self.client.get(
@@ -1179,16 +1179,19 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
             msg="Filtered result should contain 3 projects belonging to masterClass Id: {}, directly or indirectly. Found: {}".format(
-                self.projectMasterClass_2_Id, len(response.json()["projects"])
+                self.projectMasterClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             3,
-            msg="Filtered result should contain 3 classes with projects linked to it",
+            msg="Filtered result should contain 3 classes with projects linked to it. Found: {}".format(
+                len([x for x in response.json()["results"] if x["type"] == "classes"])
+            ),
         )
         response = self.client.get(
             "/projects/?subClass={}&masterClass={}".format(
@@ -1201,16 +1204,16 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len(response.json()["results"]),
             0,
             msg="Filtered result should contain 0 projects with masterClass Id: {} and subClass Id: {}. Found: {}".format(
                 self.projectMasterClass_3_Id,
                 self.projectSubClass_2_Id,
-                len(response.json()["projects"]),
+                len(response.json()["results"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len(response.json()["results"]),
             0,
             msg="Filtered result should contain 0 classes",
         )
@@ -1223,17 +1226,19 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain 1 project belonging to subClass Id: {}. Found: {}".format(
-                self.projectSubClass_1_Id, len(response.json()["projects"])
+                self.projectSubClass_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             1,
-            msg="Filtered result should contain 1 class with id {}".format(
-                self.projectSubClass_1_Id
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         response = self.client.get(
@@ -1247,19 +1252,21 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain a project belonging to subClass Id: {} and another belonging to subClass Id: {}. Found: {}".format(
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             2,
-            msg="Filtered result should contain 2 classes with id {} and {}".format(
-                self.projectSubClass_1_Id, self.projectSubClass_2_Id
+            msg="Filtered result should contain 2 classes with id {} and {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
 
@@ -1274,19 +1281,20 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain a project belonging to subClass Id: {} and category Id: {}. Found: {}".format(
                 self.projectSubClass_2_Id,
                 self.projectCategory_3_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             1,
-            msg="Filtered result should contain 1 class with id {}".format(
-                self.projectSubClass_2_Id
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         response = self.client.get(
@@ -1298,20 +1306,21 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
             msg="Filtered result should contain 3 projects belonging to class Id: {}, directly or indirectly. Found: {}".format(
                 self.projectClass_2_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             3,
-            msg="Filtered result should contain 3 classes with id {}, {} and {}".format(
+            msg="Filtered result should contain 3 classes with id {}, {} and {}. Found: {}".format(
                 self.projectClass_2_Id,
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
 
@@ -1324,19 +1333,23 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
             msg="Filtered result should contain 3 projects belonging to mainDistrict Id: {}, directly or indirectly. Found: {}".format(
-                self.projectMainDistrict_2_Id, len(response.json()["projects"])
+                self.projectMainDistrict_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["locations"]),
+            len([x for x in response.json()["results"] if x["type"] == "locations"]),
             3,
-            msg="Filtered result should contain 3 locations with id {}, {} and {}".format(
+            msg="Filtered result should contain 3 locations with id {}, {} and {}. Found: {}".format(
                 self.projectMainDistrict_2_Id,
                 self.projectSubDistrict_1_Id,
                 self.projectSubDistrict_2_Id,
+                len(
+                    [x for x in response.json()["results"] if x["type"] == "locations"]
+                ),
             ),
         )
         response = self.client.get(
@@ -1350,20 +1363,23 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, \
                 with the hashTag: {} . Found: {}".format(
                 self.projectMainDistrict_3_Id,
                 self.projectHashTag_3_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["locations"]),
+            len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
-            msg="Filtered result should contain 1 locations with id {}".format(
+            msg="Filtered result should contain 1 locations with id {}. Found: {}".format(
                 self.projectMainDistrict_2_Id,
+                len(
+                    [x for x in response.json()["results"] if x["type"] == "locations"]
+                ),
             ),
         )
         response = self.client.get(
@@ -1377,22 +1393,25 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             4,
             msg="Filtered result should contain 4 projects belonging to mainDistrict Id: {} or {}, directly or indirectly. Found: {}".format(
                 self.projectMainDistrict_2_Id,
                 self.projectMainDistrict_3_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["locations"]),
+            len([x for x in response.json()["results"] if x["type"] == "locations"]),
             4,
-            msg="Filtered result should contain 4 locations with id {}, {}, {} and {}".format(
+            msg="Filtered result should contain 4 locations with id {}, {}, {} and {}. Found: {}".format(
                 self.projectMainDistrict_2_Id,
                 self.projectMainDistrict_3_Id,
                 self.projectSubDistrict_1_Id,
                 self.projectSubClass_2_Id,
+                len(
+                    [x for x in response.json()["results"] if x["type"] == "locations"]
+                ),
             ),
         )
         response = self.client.get(
@@ -1406,18 +1425,21 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
                 self.projectMainDistrict_3_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["locations"]),
+            len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
-            msg="Filtered result should contain 1 location with id {}.".format(
+            msg="Filtered result should contain 1 location with id {}. Found: {}".format(
                 self.projectMainDistrict_3_Id,
+                len(
+                    [x for x in response.json()["results"] if x["type"] == "locations"]
+                ),
             ),
         )
         response = self.client.get(
@@ -1431,18 +1453,19 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain 1 project belonging to masterClass Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
                 self.projectMasterClass_2_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             1,
-            msg="Filtered result should contain 1 class with id {}".format(
-                self.projectSubClass_2_Id
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         response = self.client.get(
@@ -1456,10 +1479,11 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
             msg="Filtered result should contain 1 project with field programmed = true and category Id: {}. Found: {}".format(
-                self.projectCategory_3_Id, len(response.json()["projects"])
+                self.projectCategory_3_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         response = self.client.get(
@@ -1476,20 +1500,22 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} or {} each. Found: {}".format(
                 self.projectMasterClass_2_Id,
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             2,
-            msg="Filtered result should contain 2 classes with id {} and {}".format(
-                self.projectSubClass_1_Id, self.projectSubClass_2_Id
+            msg="Filtered result should contain 2 classes with id {} and {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         response = self.client.get(
@@ -1502,11 +1528,11 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain 2 projects with hashTag: {}. Found: {}".format(
                 self.projectHashTag_3_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
 
@@ -1521,12 +1547,12 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200, Error: {}".format(response.json()),
         )
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
             msg="Filtered result should contain 3 projects with hashTag: {} or {}. Found: {}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
 
@@ -1544,20 +1570,21 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain 2 projects with hashTag: {} or {} and group: {}. Found: {}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
                 self.projectGroup_1_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["groups"]),
+            len([x for x in response.json()["results"] if x["type"] == "groups"]),
             1,
-            msg="Filtered result should contain 1 group with id {}".format(
-                self.projectGroup_1_Id
+            msg="Filtered result should contain 1 group with id {}. Found: {}".format(
+                self.projectGroup_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
         response = self.client.get(
@@ -1573,19 +1600,21 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
             msg="Filtered result should contain 3 projects with groups: {} and {}. Found: {}".format(
                 self.projectGroup_2_Id,
                 self.projectGroup_1_Id,
-                len(response.json()["projects"]),
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["groups"]),
+            len([x for x in response.json()["results"] if x["type"] == "groups"]),
             2,
-            msg="Filtered result should contain 2 groups with id {} and {}".format(
-                self.projectGroup_1_Id, self.projectGroup_2_Id
+            msg="Filtered result should contain 2 groups with id {} and {}. Found: {}".format(
+                self.projectGroup_1_Id,
+                self.projectGroup_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
 
@@ -1604,33 +1633,39 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project with group {}, subClass {} and mainDistrict {}".format(
+            msg="Filtered result should contain 1 project with group {}, subClass {} and mainDistrict {}. Found: {}".format(
                 self.projectGroup_1_Id,
                 self.projectSubClass_1_Id,
                 self.projectMainDistrict_2_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["classes"]),
+            len([x for x in response.json()["results"] if x["type"] == "classes"]),
             1,
-            msg="Filtered result should contain 1 class with id {}".format(
-                self.projectSubClass_1_Id
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         self.assertEqual(
-            len(response.json()["locations"]),
+            len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
-            msg="Filtered result should contain 1 location with id {}".format(
-                self.projectMainDistrict_2_Id
+            msg="Filtered result should contain 1 location with id {}. Found: {}".format(
+                self.projectMainDistrict_2_Id,
+                len(
+                    [x for x in response.json()["results"] if x["type"] == "locations"]
+                ),
             ),
         )
         self.assertEqual(
-            len(response.json()["groups"]),
+            len([x for x in response.json()["results"] if x["type"] == "groups"]),
             1,
-            msg="Filtered result should contain 1 group with id {}".format(
-                self.projectGroup_1_Id
+            msg="Filtered result should contain 1 group with id {}. Found: {}".format(
+                self.projectGroup_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
 
@@ -1644,10 +1679,11 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
-            msg="Filtered result should contain 3 projects with personPlanning {}".format(
-                self.person_4_Id
+            msg="Filtered result should contain 3 projects with personPlanning {}. Found: {}".format(
+                self.person_4_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
 
@@ -1663,10 +1699,48 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            len(response.json()["projects"]),
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain 2 projects with id {} and {}".format(
                 self.project_3_Id, self.project_4_Id
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?project={}&project={}&projectName={}".format(
+                self.project_3_Id, self.project_4_Id, "park"
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
+            1,
+            msg="Filtered result should contain 1 project with id {}. Found: {}".format(
+                self.project_3_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?inGroup={}".format("false"),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            len([x for x in response.json()["results"] if x["type"] == "projects"]),
+            1,
+            msg="Filtered result should contain 1 project with id: {}. Found: {}".format(
+                self.project_1_Id,
+                len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
 
