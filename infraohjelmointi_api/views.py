@@ -319,11 +319,11 @@ class ProjectViewSet(BaseViewSet):
             match order:
                 case 'new':
                     combinedQuerysets = sorted(
-                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.updatedDate,reverse=True
+                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.createdDate,reverse=True
             )
                 case 'old':
                     combinedQuerysets = sorted(
-                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.updatedDate,reverse=False
+                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.createdDate,reverse=False
             )
                 case 'project':
                     combinedQuerysets = list(
