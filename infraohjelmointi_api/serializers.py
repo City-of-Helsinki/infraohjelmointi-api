@@ -374,13 +374,10 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
         request is not set to a date later than the locked field constructionEndYear on the existing Project instance
         """
-        allFields = self.get_initial()
-
-        projectLocation = ProjectLocation.objects.get(
-            id=allFields.get("projectLocation", None)
-        )
+        projectLocation = self.get_initial().get("projectLocation", None)
 
         if projectClass is not None and projectLocation is not None:
+            projectLocation = ProjectLocation.objects.get(id=projectLocation)
             if (
                 (
                     projectClass.name == "Eteläinen suurpiiri"
@@ -454,11 +451,9 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
         request is not set to a date later than the locked field constructionEndYear on the existing Project instance
         """
-        allFields = self.get_initial()
-
-        projectClass = ProjectClass.objects.get(id=allFields.get("projectClass", None))
-
+        projectClass = self.get_initial().get("projectClass", None)
         if projectClass is not None and projectLocation is not None:
+            projectClass = ProjectClass.objects.get(id=projectClass)
             if (
                 (
                     projectClass.name == "Eteläinen suurpiiri"
