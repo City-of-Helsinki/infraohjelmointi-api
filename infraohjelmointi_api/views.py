@@ -233,7 +233,7 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
-        order = self.request.query_params.get("order", "new")
+        order = self.request.query_params.get("order", None)
 
         if freeSearch is not None:
             if freeSearch == "":
@@ -302,6 +302,9 @@ class ProjectViewSet(BaseViewSet):
             projectClasses = []
             projectLocations = []
             combinedQuerysets = []
+
+            if order is None:
+                order='new'
 
             if len(projectGroup) > 0:
                 groups = ProjectGroup.objects.filter(
