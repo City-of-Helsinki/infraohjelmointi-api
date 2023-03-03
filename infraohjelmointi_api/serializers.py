@@ -369,6 +369,164 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
         return estConstructionEnd
 
+    def validate_projectClass(self, projectClass):
+        """
+        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
+        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
+        """
+        allFields = self.get_initial()
+
+        projectLocation = ProjectLocation.objects.get(
+            id=allFields.get("projectLocation", None)
+        )
+
+        if projectClass is not None and projectLocation is not None:
+            if (
+                (
+                    projectClass.name == "Eteläinen suurpiiri"
+                    and not projectLocation.path.startswith("Eteläinen/")
+                )
+                or (
+                    projectClass.name == "Läntinen suurpiiri"
+                    and not projectLocation.path.startswith("Läntinen/")
+                )
+                or (
+                    projectClass.name == "Keskinen suurpiiri"
+                    and not projectLocation.path.startswith("Keskinen/")
+                )
+                or (
+                    projectClass.name == "Pohjoinen suurpiiri"
+                    and not projectLocation.path.startswith("Pohjoinen/")
+                )
+                or (
+                    projectClass.name == "Koillinen suurpiiri"
+                    and not projectLocation.path.startswith("Koillinen/")
+                )
+                or (
+                    projectClass.name == "Kaakkoinen suurpiiri"
+                    and not projectLocation.path.startswith("Kaakkoinen/")
+                )
+                or (
+                    projectClass.name == "Itäinen suurpiiri"
+                    and not projectLocation.path.startswith("Itäinen/")
+                )
+                or (
+                    projectClass.name == "Östersundomin suurpiiri"
+                    and not projectLocation.path.startswith("Östersundom/")
+                )
+                or (
+                    projectClass.name
+                    in [
+                        "Katujen peruskorjaukset",
+                        "Siltojen peruskorjaus ja uusiminen",
+                        "Joukkoliikenteen kehittäminen",
+                        "Liikennejärjestelyt",
+                        "Jalankulun ja pyöräilyn väylät",
+                        "Ranta-alueiden kunnostus",
+                    ]
+                    and not projectLocation.path.startswith(
+                        (
+                            "Östersundom/",
+                            "Eteläinen/",
+                            "Itäinen/",
+                            "Kaakkoinen/",
+                            "Koillinen/",
+                            "Pohjoinen/",
+                            "Keskinen/",
+                            "Läntinen/",
+                            "Eteläinen/",
+                        )
+                    )
+                )
+            ):
+                raise serializers.ValidationError(
+                    "subClass: {} with path: {} cannot have the location: {} under it.".format(
+                        projectClass.name,
+                        projectClass.path,
+                        projectLocation.name,
+                    )
+                )
+
+        return projectClass
+
+    def validate_projectLocation(self, projectLocation):
+        """
+        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
+        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
+        """
+        allFields = self.get_initial()
+
+        projectClass = ProjectClass.objects.get(id=allFields.get("projectClass", None))
+
+        if projectClass is not None and projectLocation is not None:
+            if (
+                (
+                    projectClass.name == "Eteläinen suurpiiri"
+                    and not projectLocation.path.startswith("Eteläinen/")
+                )
+                or (
+                    projectClass.name == "Läntinen suurpiiri"
+                    and not projectLocation.path.startswith("Läntinen/")
+                )
+                or (
+                    projectClass.name == "Keskinen suurpiiri"
+                    and not projectLocation.path.startswith("Keskinen/")
+                )
+                or (
+                    projectClass.name == "Pohjoinen suurpiiri"
+                    and not projectLocation.path.startswith("Pohjoinen/")
+                )
+                or (
+                    projectClass.name == "Koillinen suurpiiri"
+                    and not projectLocation.path.startswith("Koillinen/")
+                )
+                or (
+                    projectClass.name == "Kaakkoinen suurpiiri"
+                    and not projectLocation.path.startswith("Kaakkoinen/")
+                )
+                or (
+                    projectClass.name == "Itäinen suurpiiri"
+                    and not projectLocation.path.startswith("Itäinen/")
+                )
+                or (
+                    projectClass.name == "Östersundomin suurpiiri"
+                    and not projectLocation.path.startswith("Östersundom/")
+                )
+                or (
+                    projectClass.name
+                    in [
+                        "Katujen peruskorjaukset",
+                        "Siltojen peruskorjaus ja uusiminen",
+                        "Joukkoliikenteen kehittäminen",
+                        "Liikennejärjestelyt",
+                        "Jalankulun ja pyöräilyn väylät",
+                        "Ranta-alueiden kunnostus",
+                    ]
+                    and not projectLocation.path.startswith(
+                        (
+                            "Östersundom/",
+                            "Eteläinen/",
+                            "Itäinen/",
+                            "Kaakkoinen/",
+                            "Koillinen/",
+                            "Pohjoinen/",
+                            "Keskinen/",
+                            "Läntinen/",
+                            "Eteläinen/",
+                        )
+                    )
+                )
+            ):
+                raise serializers.ValidationError(
+                    "Location: {} with path: {} cannot be under the subClass: {}".format(
+                        projectLocation.name,
+                        projectLocation.path,
+                        projectClass.name,
+                    )
+                )
+
+        return projectLocation
+
     # Commented out automatic locking logic when project is created with phase construction
     # @override
     # def create(self, validated_data):
