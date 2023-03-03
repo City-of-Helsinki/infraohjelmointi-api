@@ -95,7 +95,7 @@ class searchResultSerializer(serializers.Serializer):
             rep["phase"] = (
                 ProjectPhaseSerializer(instance.phase).data
                 if instance.phase is not None
-                else []
+                else None
             )
             rep["path"] = (
                 (
@@ -128,6 +128,8 @@ class searchResultSerializer(serializers.Serializer):
                     str(instance.id),
                 )
             )
+            rep["hashTags"] = []
+            rep["phase"] = None
         elif instance._meta.model.__name__ == "ProjectGroup":
             rep["path"] = (
                 (
@@ -148,8 +150,12 @@ class searchResultSerializer(serializers.Serializer):
                 if instance.classRelation is not None
                 else ""
             )
+            rep["hashTags"] = []
+            rep["phase"] = None
         else:
             rep["path"] = ""
+            rep["hashTags"] = []
+            rep["phase"] = None
 
         return rep
 
