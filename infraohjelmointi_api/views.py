@@ -234,6 +234,7 @@ class ProjectViewSet(BaseViewSet):
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
         order = self.request.query_params.get("order", None)
+        limit = self.request.query_params.get("limit", 10)
 
         if freeSearch is not None:
             if freeSearch == "":
@@ -296,6 +297,9 @@ class ProjectViewSet(BaseViewSet):
             or projectName is not None
             or order is not None
         ):
+            if not limit.isnumeric() or limit not in ["10","20","30"]:
+                raise APIException(detail="Invalid value for limit parameter")
+            limit = int(limit)
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
             groups = []
@@ -347,7 +351,7 @@ class ProjectViewSet(BaseViewSet):
             )
             
             searchPaginator = PageNumberPagination()
-            searchPaginator.page_size = 10
+            searchPaginator.page_size = limit
             result = searchPaginator.paginate_queryset(combinedQuerysets, request)
             serializer = searchResultSerializer(result, many=True,context = {"hashtags_include": hashTags})
             response = {
