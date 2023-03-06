@@ -371,44 +371,73 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     def validate_projectClass(self, projectClass):
         """
-        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
-        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
+        Function to validate if a Project belongs to a specific Class then it should belong to a related Location
         """
-        projectLocation = self.get_initial().get("projectLocation", None)
+        project = getattr(self, "instance", None)
+        projectLocation = (
+            ProjectLocation.objects.get(
+                id=self.get_initial().get("projectLocation", None)
+            )
+            if self.get_initial().get("projectLocation", None) is not None
+            else None
+        )
+
+        if (
+            projectLocation is None
+            and project is not None
+            and project.projectLocation is not None
+        ):
+            projectLocation = project.projectLocation
 
         if projectClass is not None and projectLocation is not None:
-            projectLocation = ProjectLocation.objects.get(id=projectLocation)
+
             if (
                 (
                     projectClass.name == "Eteläinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Eteläinen/")
                 )
                 or (
                     projectClass.name == "Läntinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Läntinen/")
                 )
                 or (
                     projectClass.name == "Keskinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Keskinen/")
                 )
                 or (
                     projectClass.name == "Pohjoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Pohjoinen/")
                 )
                 or (
                     projectClass.name == "Koillinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Koillinen/")
                 )
                 or (
                     projectClass.name == "Kaakkoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Kaakkoinen/")
                 )
                 or (
                     projectClass.name == "Itäinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Itäinen/")
                 )
                 or (
                     projectClass.name == "Östersundomin suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Östersundom/")
                 )
                 or (
@@ -421,6 +450,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                         "Jalankulun ja pyöräilyn väylät",
                         "Ranta-alueiden kunnostus",
                     ]
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith(
                         (
                             "Östersundom/",
@@ -448,43 +479,71 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     def validate_projectLocation(self, projectLocation):
         """
-        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
-        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
+        Function to validate if a Project belongs to a specific Location then it should belong to a related Class
         """
-        projectClass = self.get_initial().get("projectClass", None)
+        project = getattr(self, "instance", None)
+        projectClass = (
+            ProjectClass.objects.get(id=self.get_initial().get("projectClass", None))
+            if self.get_initial().get("projectClass", None) is not None
+            else None
+        )
+
+        if (
+            projectClass is None
+            and project is not None
+            and project.projectClass is not None
+        ):
+            projectClass = project.projectClass
+
         if projectClass is not None and projectLocation is not None:
-            projectClass = ProjectClass.objects.get(id=projectClass)
+
             if (
                 (
                     projectClass.name == "Eteläinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Eteläinen/")
                 )
                 or (
                     projectClass.name == "Läntinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Läntinen/")
                 )
                 or (
                     projectClass.name == "Keskinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Keskinen/")
                 )
                 or (
                     projectClass.name == "Pohjoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Pohjoinen/")
                 )
                 or (
                     projectClass.name == "Koillinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Koillinen/")
                 )
                 or (
                     projectClass.name == "Kaakkoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Kaakkoinen/")
                 )
                 or (
                     projectClass.name == "Itäinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Itäinen/")
                 )
                 or (
                     projectClass.name == "Östersundomin suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith("Östersundom/")
                 )
                 or (
@@ -497,6 +556,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                         "Jalankulun ja pyöräilyn väylät",
                         "Ranta-alueiden kunnostus",
                     ]
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
                     and not projectLocation.path.startswith(
                         (
                             "Östersundom/",
