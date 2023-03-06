@@ -57,7 +57,7 @@ from rest_framework.decorators import action
 from django.core import serializers
 from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Count
+from django.db.models import Count, Case, When
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -335,7 +335,12 @@ class ProjectViewSet(BaseViewSet):
                 case 'group':
                     combinedQuerysets = list(
                 chain(groups ,queryset, projectClasses, projectLocations,)
-            )
+            )   
+                case 'phase':
+                    queryset = queryset.annotate(relevancy=Count(Case(When(phase__value='proposal', then=1)))).order_by('-relevancy')
+                    combinedQuerysets = list(
+                chain(queryset,groups, projectClasses, projectLocations,)
+            )   
                 case _:
                     return Response(
                 data={"message": "Invalid order"}, status=status.HTTP_400_BAD_REQUEST
@@ -344,7 +349,7 @@ class ProjectViewSet(BaseViewSet):
             searchPaginator = PageNumberPagination()
             searchPaginator.page_size = 10
             result = searchPaginator.paginate_queryset(combinedQuerysets, request)
-            serializer = searchResultSerializer(result, many=True)
+            serializer = searchResultSerializer(result, many=True,context = {"hashtags_include": hashTags})
             response = {
                 "next": searchPaginator.get_next_link(),
                 "previous": searchPaginator.get_previous_link(),
