@@ -87,11 +87,20 @@ class searchResultSerializer(serializers.Serializer):
         rep = super().to_representation(instance)
 
         if instance._meta.model.__name__ == "Project":
-            rep["hashTags"] = (
+
+            include_hashtags_list = self.context.get("hashtags_include", [])
+            projectHashtags = (
                 ProjectHashtagSerializer(instance.hashTags, many=True).data
                 if instance.hashTags is not None
                 else []
             )
+            projectHashtags = list(
+                filter(
+                    lambda hashtag: hashtag["id"] in include_hashtags_list,
+                    projectHashtags,
+                )
+            )
+            rep["hashTags"] = projectHashtags
             rep["phase"] = (
                 ProjectPhaseSerializer(instance.phase).data
                 if instance.phase is not None
