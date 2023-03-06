@@ -64,11 +64,17 @@ class ProjectTestCase(TestCase):
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
     projectClass_1_Id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
     projectClass_2_Id = uuid.UUID("c03b41d4-bb50-4bc5-ada1-496f399eb157")
+    projectClass_3_Id = uuid.UUID("dacd6429-0f60-4ef9-8c9e-54e2a159c8da")
     projectSubClass_1_Id = uuid.UUID("88006f5b-339d-4859-9903-25494deebeca")
     projectSubClass_2_Id = uuid.UUID("48e201a9-7579-42fe-9970-2c0704bd7257")
+    projectSubClass_3_Id = uuid.UUID("fe77dce9-56ec-4642-a011-5b611ff879d6")
+    projectSubClass_4_Id = uuid.UUID("bdcc6c20-6535-4cc2-9b7e-fa4756cb76e0")
+    projectSubClass_5_Id = uuid.UUID("2e147a96-bfee-4a0e-9d44-4095b3c36bdf")
+    projectSubClass_6_Id = uuid.UUID("718f7e0e-0dc9-4456-a071-29a8a99437ca")
     projectMasterClass_1_Id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     projectMasterClass_2_Id = uuid.UUID("073e1dee-9e77-4ddd-8d0c-ad856c51e857")
     projectMasterClass_3_Id = uuid.UUID("a66db3fa-eb71-42dc-b618-9e4fae0db8bc")
+    projectMasterClass_4_Id = uuid.UUID("b723201e-10c2-40f0-b031-c0e8c072ad7e")
     projectHashTag_1_Id = uuid.UUID("e4d7b4b0-830d-4310-8b29-3c7d1e3132ba")
     projectHashTag_2_Id = uuid.UUID("eb8635b3-4e83-45d9-a1af-6bc49bf2aeb7")
     projectHashTag_3_Id = uuid.UUID("aba0e241-0a02-48a0-8426-e4f034c5f527")
@@ -76,10 +82,17 @@ class ProjectTestCase(TestCase):
     projectMainDistrict_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectMainDistrict_2_Id = uuid.UUID("740d6771-442b-4713-8362-8bda3958100e")
     projectMainDistrict_3_Id = uuid.UUID("019eb15d-cfdb-45bc-b1a5-ac3844381e48")
+    projectMainDistrict_4_Id = uuid.UUID("bdd24b4a-ac64-4f49-a979-b2931ac18c8f")
+    projectMainDistrict_5_Id = uuid.UUID("1055e80a-9e2c-4a29-a76a-97528581ff11")
+    projectMainDistrict_6_Id = uuid.UUID("17190fd9-9727-4f3e-a7de-74f682e26a33")
     projectDistrict_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectDistrict_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
+    projectDistrict_3_Id = uuid.UUID("e4864b42-0002-42c6-a0fb-113638810278")
+    projectDistrict_4_Id = uuid.UUID("0e9e1253-cfe2-405e-9cf4-832a5c5185ac")
+    projectDistrict_5_Id = uuid.UUID("070e480a-3a50-49dc-bc12-58651f2c7fa4")
     projectSubDistrict_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
     projectSubDistrict_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
+    projectSubDistrict_3_Id = uuid.UUID("b76b3107-628c-4f3e-a2e1-230439da090f")
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
@@ -2022,3 +2035,156 @@ class ProjectTestCase(TestCase):
             },
             response.json(),
         )
+
+    def test_class_location_validation(self):
+        mainDistrict_1 = ProjectLocation.objects.create(
+            id=self.projectMainDistrict_4_Id,
+            name="Eteläinen",
+            parent=None,
+            path="Eteläinen",
+        )
+        mainDistrict_2 = ProjectLocation.objects.create(
+            id=self.projectMainDistrict_5_Id,
+            name="Läntinen",
+            parent=None,
+            path="Läntinen",
+        )
+        mainDistrict_3 = ProjectLocation.objects.create(
+            id=self.projectMainDistrict_6_Id,
+            name="Keskinen",
+            parent=None,
+            path="Keskinen",
+        )
+        mainDistrict_1.childLocation.create(
+            id=self.projectDistrict_3_Id,
+            name="Munkkiniemi",
+            path="Eteläinen/Munkkiniemi",
+        )
+        mainDistrict_2.childLocation.create(
+            id=self.projectDistrict_4_Id,
+            name="Munkkiniemi",
+            path="Läntinen/Munkkiniemi",
+        )
+        mainDistrict_3.childLocation.create(
+            id=self.projectDistrict_5_Id,
+            name="Munkkiniemi",
+            path="Keskinen/Munkkiniemi",
+        )
+
+        masterClass_1 = ProjectClass.objects.create(
+            id=self.projectMasterClass_3_Id,
+            name="803 Kadut, liikenneväylät",
+            parent=None,
+            path="803 Kadut, liikenneväylät",
+        )
+        _class = masterClass_1.childClass.create(
+            name="Uudisrakentaminen",
+            id=self.projectClass_3_Id,
+            path="803 Kadut, liikenneväylät/Uudisrakentaminen",
+        )
+        _class.childClass.create(
+            name="Läntinen suurpiiri",
+            id=self.projectSubClass_3_Id,
+            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Läntinen suurpiiri",
+        )
+        _class.childClass.create(
+            name="Eteläinen suurpiiri",
+            id=self.projectSubClass_4_Id,
+            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Eteläinen suurpiiri",
+        )
+        _class.childClass.create(
+            name="Katujen peruskorjaukset",
+            id=self.projectSubClass_5_Id,
+            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Katujen peruskorjaukset",
+        )
+        _class.childClass.create(
+            name="Siltojen peruskorjaus ja uusiminen",
+            id=self.projectSubClass_6_Id,
+            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Siltojen peruskorjaus ja uusiminen",
+        )
+
+        data = {
+            "name": "Class Location Validation project",
+            "description": "Test Description",
+            "projectClass": self.projectSubClass_4_Id.__str__(),
+            "projectLocation": self.projectDistrict_3_Id.__str__(),
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+
+        newProjectId = response.json()["id"]
+
+        data = {
+            "projectLocation": self.projectDistrict_4_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.json())
+
+        data = {
+            "projectClass": self.projectSubClass_3_Id.__str__(),
+            "projectLocation": self.projectDistrict_4_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        data = {
+            "projectClass": self.projectSubClass_5_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        data = {
+            "projectClass": self.projectSubClass_6_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        data = {
+            "projectLocation": self.projectDistrict_5_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        data = {
+            "projectClass": self.projectSubClass_3_Id.__str__(),
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newProjectId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.json())
