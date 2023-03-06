@@ -234,7 +234,7 @@ class ProjectViewSet(BaseViewSet):
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
         order = self.request.query_params.get("order", None)
-        limit = self.request.query_params.get("limit", 10)
+        limit = self.request.query_params.get("limit", "10")
 
         if freeSearch is not None:
             if freeSearch == "":
