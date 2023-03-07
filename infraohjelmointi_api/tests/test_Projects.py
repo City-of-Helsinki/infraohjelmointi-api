@@ -1602,7 +1602,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
-            msg="Filtered result should contain 3 projects with groups: {} and {}. Found: {}".format(
+            msg="Filtered result should contain 3 projects with groups: {} or {}. Found: {}".format(
                 self.projectGroup_2_Id,
                 self.projectGroup_1_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
@@ -1635,8 +1635,9 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project with group {}, subClass {} and mainDistrict {}. Found: {}".format(
+            msg="Filtered result should contain 1 project with group {} or {}, subClass {} and mainDistrict {}. Found: {}".format(
                 self.projectGroup_1_Id,
+                self.projectGroup_2_Id,
                 self.projectSubClass_1_Id,
                 self.projectMainDistrict_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
