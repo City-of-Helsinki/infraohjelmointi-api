@@ -369,6 +369,94 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
         return estConstructionEnd
 
+    def _is_projectClass_projectLocation_valid(
+        self,
+        projectLocation,
+        projectClass,
+    ):
+        if projectClass is not None and projectLocation is not None:
+            if (
+                (
+                    projectClass.name == "Eteläinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Eteläinen/")
+                )
+                or (
+                    projectClass.name == "Läntinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Läntinen/")
+                )
+                or (
+                    projectClass.name == "Keskinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Keskinen/")
+                )
+                or (
+                    projectClass.name == "Pohjoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Pohjoinen/")
+                )
+                or (
+                    projectClass.name == "Koillinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Koillinen/")
+                )
+                or (
+                    projectClass.name == "Kaakkoinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Kaakkoinen/")
+                )
+                or (
+                    projectClass.name == "Itäinen suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Itäinen/")
+                )
+                or (
+                    projectClass.name == "Östersundomin suurpiiri"
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith("Östersundom/")
+                )
+                or (
+                    projectClass.name
+                    in [
+                        "Katujen peruskorjaukset",
+                        "Siltojen peruskorjaus ja uusiminen",
+                        "Joukkoliikenteen kehittäminen",
+                        "Liikennejärjestelyt",
+                        "Jalankulun ja pyöräilyn väylät",
+                        "Ranta-alueiden kunnostus",
+                    ]
+                    and projectClass.parent is not None
+                    and projectClass.parent.parent is not None
+                    and not projectLocation.path.startswith(
+                        (
+                            "Östersundom/",
+                            "Eteläinen/",
+                            "Itäinen/",
+                            "Kaakkoinen/",
+                            "Koillinen/",
+                            "Pohjoinen/",
+                            "Keskinen/",
+                            "Läntinen/",
+                            "Eteläinen/",
+                        )
+                    )
+                )
+            ):
+                return False
+            else:
+                return True
+        else:
+            return True
+
     def validate_projectClass(self, projectClass):
         """
         Function to validate if a Project belongs to a specific Class then it should belong to a related Location
@@ -389,91 +477,16 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         ):
             projectLocation = project.projectLocation
 
-        if projectClass is not None and projectLocation is not None:
-
-            if (
-                (
-                    projectClass.name == "Eteläinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Eteläinen/")
+        if not self._is_projectClass_projectLocation_valid(
+            projectLocation=projectLocation, projectClass=projectClass
+        ):
+            raise serializers.ValidationError(
+                "subClass: {} with path: {} cannot have the location: {} under it.".format(
+                    projectClass.name,
+                    projectClass.path,
+                    projectLocation.name,
                 )
-                or (
-                    projectClass.name == "Läntinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Läntinen/")
-                )
-                or (
-                    projectClass.name == "Keskinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Keskinen/")
-                )
-                or (
-                    projectClass.name == "Pohjoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Pohjoinen/")
-                )
-                or (
-                    projectClass.name == "Koillinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Koillinen/")
-                )
-                or (
-                    projectClass.name == "Kaakkoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Kaakkoinen/")
-                )
-                or (
-                    projectClass.name == "Itäinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Itäinen/")
-                )
-                or (
-                    projectClass.name == "Östersundomin suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Östersundom/")
-                )
-                or (
-                    projectClass.name
-                    in [
-                        "Katujen peruskorjaukset",
-                        "Siltojen peruskorjaus ja uusiminen",
-                        "Joukkoliikenteen kehittäminen",
-                        "Liikennejärjestelyt",
-                        "Jalankulun ja pyöräilyn väylät",
-                        "Ranta-alueiden kunnostus",
-                    ]
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith(
-                        (
-                            "Östersundom/",
-                            "Eteläinen/",
-                            "Itäinen/",
-                            "Kaakkoinen/",
-                            "Koillinen/",
-                            "Pohjoinen/",
-                            "Keskinen/",
-                            "Läntinen/",
-                            "Eteläinen/",
-                        )
-                    )
-                )
-            ):
-                raise serializers.ValidationError(
-                    "subClass: {} with path: {} cannot have the location: {} under it.".format(
-                        projectClass.name,
-                        projectClass.path,
-                        projectLocation.name,
-                    )
-                )
+            )
 
         return projectClass
 
@@ -494,93 +507,16 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             and project.projectClass is not None
         ):
             projectClass = project.projectClass
-
-        if projectClass is not None and projectLocation is not None:
-
-            if (
-                (
-                    projectClass.name == "Eteläinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Eteläinen/")
+        if not self._is_projectClass_projectLocation_valid(
+            projectLocation=projectLocation, projectClass=projectClass
+        ):
+            raise serializers.ValidationError(
+                "Location: {} with path: {} cannot be under the subClass: {}".format(
+                    projectLocation.name,
+                    projectLocation.path,
+                    projectClass.name,
                 )
-                or (
-                    projectClass.name == "Läntinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Läntinen/")
-                )
-                or (
-                    projectClass.name == "Keskinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Keskinen/")
-                )
-                or (
-                    projectClass.name == "Pohjoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Pohjoinen/")
-                )
-                or (
-                    projectClass.name == "Koillinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Koillinen/")
-                )
-                or (
-                    projectClass.name == "Kaakkoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Kaakkoinen/")
-                )
-                or (
-                    projectClass.name == "Itäinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Itäinen/")
-                )
-                or (
-                    projectClass.name == "Östersundomin suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Östersundom/")
-                )
-                or (
-                    projectClass.name
-                    in [
-                        "Katujen peruskorjaukset",
-                        "Siltojen peruskorjaus ja uusiminen",
-                        "Joukkoliikenteen kehittäminen",
-                        "Liikennejärjestelyt",
-                        "Jalankulun ja pyöräilyn väylät",
-                        "Ranta-alueiden kunnostus",
-                    ]
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith(
-                        (
-                            "Östersundom/",
-                            "Eteläinen/",
-                            "Itäinen/",
-                            "Kaakkoinen/",
-                            "Koillinen/",
-                            "Pohjoinen/",
-                            "Keskinen/",
-                            "Läntinen/",
-                            "Eteläinen/",
-                        )
-                    )
-                )
-            ):
-                raise serializers.ValidationError(
-                    "Location: {} with path: {} cannot be under the subClass: {}".format(
-                        projectLocation.name,
-                        projectLocation.path,
-                        projectClass.name,
-                    )
-                )
-
+            )
         return projectLocation
 
     # Commented out automatic locking logic when project is created with phase construction
