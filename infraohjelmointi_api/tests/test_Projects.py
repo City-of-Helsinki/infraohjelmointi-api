@@ -1720,7 +1720,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project with id {}. Found: {}".format(
+            msg="Filtered result should contain 1 project with id {} and the string 'park' in its name. Found: {}".format(
                 self.project_3_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
