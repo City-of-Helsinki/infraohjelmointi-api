@@ -373,7 +373,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         self,
         projectLocation,
         projectClass,
-    ):
+    ) -> bool:
         if projectClass is not None and projectLocation is not None:
             if (
                 (
