@@ -342,7 +342,7 @@ class ProjectViewSet(BaseViewSet):
                 )
             elif order == "group":
                 combinedQuerysets = list(
-                    chain(queryset, projectClasses, projectLocations, groups)
+                    chain(groups, queryset, projectClasses, projectLocations)
                 )
             elif order == "phase":
                 queryset = queryset.annotate(
