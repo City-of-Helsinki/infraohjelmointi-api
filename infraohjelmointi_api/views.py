@@ -297,7 +297,7 @@ class ProjectViewSet(BaseViewSet):
             or projectName is not None
             or order is not None
         ):
-            if not limit.isnumeric() or limit not in ["10","20","30"]:
+            if not limit.isnumeric() or limit not in ["10", "20", "30"]:
                 raise APIException(detail="Invalid value for limit parameter")
             limit = int(limit)
             # already filtered queryset
@@ -308,7 +308,7 @@ class ProjectViewSet(BaseViewSet):
             combinedQuerysets = []
 
             if order is None:
-                order='new'
+                order = "new"
 
             if len(projectGroup) > 0:
                 groups = ProjectGroup.objects.filter(
@@ -323,37 +323,51 @@ class ProjectViewSet(BaseViewSet):
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list("projectLocation", flat=True).distinct()
                 )
-            match order:
-                case 'new':
-                    combinedQuerysets = sorted(
-                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.createdDate,reverse=True
-            )
-                case 'old':
-                    combinedQuerysets = sorted(
-                chain(groups, projectClasses, projectLocations, queryset),key=lambda obj: obj.createdDate,reverse=False
-            )
-                case 'project':
-                    combinedQuerysets = list(
-                chain(queryset, projectClasses, projectLocations,groups )
-            )
-                case 'group':
-                    combinedQuerysets = list(
-                chain(groups ,queryset, projectClasses, projectLocations,)
-            )   
-                case 'phase':
-                    queryset = queryset.annotate(relevancy=Count(Case(When(phase__value='proposal', then=1)))).order_by('-relevancy')
-                    combinedQuerysets = list(
-                chain(queryset,groups, projectClasses, projectLocations,)
-            )   
-                case _:
-                    return Response(
-                data={"message": "Invalid order"}, status=status.HTTP_400_BAD_REQUEST
-            )
-            
+
+            if order == "new":
+                combinedQuerysets = sorted(
+                    chain(groups, projectClasses, projectLocations, queryset),
+                    key=lambda obj: obj.createdDate,
+                    reverse=True,
+                )
+            elif order == "old":
+                combinedQuerysets = sorted(
+                    chain(groups, projectClasses, projectLocations, queryset),
+                    key=lambda obj: obj.createdDate,
+                    reverse=False,
+                )
+            elif order == "project":
+                combinedQuerysets = list(
+                    chain(queryset, projectClasses, projectLocations, groups)
+                )
+            elif order == "group":
+                combinedQuerysets = list(
+                    chain(queryset, projectClasses, projectLocations, groups)
+                )
+            elif order == "phase":
+                queryset = queryset.annotate(
+                    relevancy=Count(Case(When(phase__value="proposal", then=1)))
+                ).order_by("-relevancy")
+                combinedQuerysets = list(
+                    chain(
+                        queryset,
+                        groups,
+                        projectClasses,
+                        projectLocations,
+                    )
+                )
+            else:
+                return Response(
+                    data={"message": "Invalid order"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             searchPaginator = PageNumberPagination()
             searchPaginator.page_size = limit
             result = searchPaginator.paginate_queryset(combinedQuerysets, request)
-            serializer = searchResultSerializer(result, many=True,context = {"hashtags_include": hashTags})
+            serializer = searchResultSerializer(
+                result, many=True, context={"hashtags_include": hashTags}
+            )
             response = {
                 "next": searchPaginator.get_next_link(),
                 "previous": searchPaginator.get_previous_link(),
