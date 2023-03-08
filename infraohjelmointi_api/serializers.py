@@ -64,6 +64,44 @@ class searchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
+    hashTags = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
+    path = serializers.SerializerMethodField()
+
+    def get_path(self, obj):
+        instanceType = obj._meta.model.__name__
+        classInstance = None
+        if instanceType == "Project":
+            classInstance = getattr(obj, "projectClass", None)
+        elif instanceType in ["ProjectLocation", "ProjectClass"]:
+            classInstance = obj
+        elif instanceType == "ProjectGroup":
+            classInstance = getattr(obj, "classRelation", None)
+
+        if classInstance is not None:
+            return (
+                str(classInstance.id)
+                if classInstance.parent is None
+                else "{}/{}".format(
+                    str(classInstance.parent.id),
+                    str(classInstance.id),
+                )
+                if classInstance.parent.parent is None
+                and classInstance.parent is not None
+                else "{}/{}/{}".format(
+                    str(classInstance.parent.parent.id),
+                    str(classInstance.parent.id),
+                    str(classInstance.id),
+                )
+            )
+        else:
+            return ""
+
+    def get_phase(self, obj):
+        if hasattr(obj, "phase") and obj.phase is not None:
+            return ProjectPhaseSerializer(obj.phase).data
+        else:
+            return None
 
     def get_name(self, obj):
         return obj.name
@@ -72,101 +110,31 @@ class searchResultSerializer(serializers.Serializer):
         return obj.id
 
     def get_type(self, obj):
-        if obj._meta.model.__name__ == "ProjectLocation":
+        instanceType = obj._meta.model.__name__
+        if instanceType == "ProjectLocation":
             return "locations"
-        elif obj._meta.model.__name__ == "ProjectClass":
+        elif instanceType == "ProjectClass":
             return "classes"
-        elif obj._meta.model.__name__ == "Project":
+        elif instanceType == "Project":
             return "projects"
-        elif obj._meta.model.__name__ == "ProjectGroup":
+        elif instanceType == "ProjectGroup":
             return "groups"
         else:
             raise serializers.ValidationError("Unknown instance type: {}".format(obj))
 
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-
-        if instance._meta.model.__name__ == "Project":
-
+    def get_hashTags(self, obj):
+        if hasattr(obj, "hashTags") and obj.hashTags is not None:
             include_hashtags_list = self.context.get("hashtags_include", [])
-            projectHashtags = (
-                ProjectHashtagSerializer(instance.hashTags, many=True).data
-                if instance.hashTags is not None
-                else []
-            )
+            projectHashtags = ProjectHashtagSerializer(obj.hashTags, many=True).data
             projectHashtags = list(
                 filter(
                     lambda hashtag: hashtag["id"] in include_hashtags_list,
                     projectHashtags,
                 )
             )
-            rep["hashTags"] = projectHashtags
-            rep["phase"] = (
-                ProjectPhaseSerializer(instance.phase).data
-                if instance.phase is not None
-                else None
-            )
-            rep["path"] = (
-                (
-                    str(instance.projectClass.id)
-                    if instance.projectClass.parent is None
-                    else "{}/{}".format(
-                        str(instance.projectClass.parent.id),
-                        str(instance.projectClass.id),
-                    )
-                    if instance.projectClass.parent.parent is None
-                    and instance.projectClass.parent is not None
-                    else "{}/{}/{}".format(
-                        str(instance.projectClass.parent.parent.id),
-                        str(instance.projectClass.parent.id),
-                        str(instance.projectClass.id),
-                    )
-                )
-                if instance.projectClass is not None
-                else ""
-            )
-        elif instance._meta.model.__name__ in ["ProjectLocation", "ProjectClass"]:
-            rep["path"] = (
-                str(instance.id)
-                if instance.parent is None
-                else "{}/{}".format(str(instance.parent.id), str(instance.id))
-                if instance.parent.parent is None and instance.parent is not None
-                else "{}/{}/{}".format(
-                    str(instance.parent.parent.id),
-                    str(instance.parent.id),
-                    str(instance.id),
-                )
-            )
-            rep["hashTags"] = []
-            rep["phase"] = None
-        elif instance._meta.model.__name__ == "ProjectGroup":
-            rep["path"] = (
-                (
-                    str(instance.classRelation.id)
-                    if instance.classRelation.parent is None
-                    else "{}/{}".format(
-                        str(instance.classRelation.parent.id),
-                        str(instance.classRelation.id),
-                    )
-                    if instance.classRelation.parent.parent is None
-                    and instance.classRelation.parent is not None
-                    else "{}/{}/{}".format(
-                        str(instance.classRelation.parent.parent.id),
-                        str(instance.classRelation.parent.id),
-                        str(instance.classRelation.id),
-                    )
-                )
-                if instance.classRelation is not None
-                else ""
-            )
-            rep["hashTags"] = []
-            rep["phase"] = None
+            return projectHashtags
         else:
-            rep["path"] = ""
-            rep["hashTags"] = []
-            rep["phase"] = None
-
-        return rep
+            return []
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
