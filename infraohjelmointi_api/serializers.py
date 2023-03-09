@@ -374,88 +374,23 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         projectLocation,
         projectClass,
     ) -> bool:
-        if projectClass is not None and projectLocation is not None:
-            if (
-                (
-                    projectClass.name == "Eteläinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Eteläinen/")
-                )
-                or (
-                    projectClass.name == "Läntinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Läntinen/")
-                )
-                or (
-                    projectClass.name == "Keskinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Keskinen/")
-                )
-                or (
-                    projectClass.name == "Pohjoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Pohjoinen/")
-                )
-                or (
-                    projectClass.name == "Koillinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Koillinen/")
-                )
-                or (
-                    projectClass.name == "Kaakkoinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Kaakkoinen/")
-                )
-                or (
-                    projectClass.name == "Itäinen suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Itäinen/")
-                )
-                or (
-                    projectClass.name == "Östersundomin suurpiiri"
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith("Östersundom/")
-                )
-                or (
-                    projectClass.name
-                    in [
-                        "Katujen peruskorjaukset",
-                        "Siltojen peruskorjaus ja uusiminen",
-                        "Joukkoliikenteen kehittäminen",
-                        "Liikennejärjestelyt",
-                        "Jalankulun ja pyöräilyn väylät",
-                        "Ranta-alueiden kunnostus",
-                    ]
-                    and projectClass.parent is not None
-                    and projectClass.parent.parent is not None
-                    and not projectLocation.path.startswith(
-                        (
-                            "Östersundom/",
-                            "Eteläinen/",
-                            "Itäinen/",
-                            "Kaakkoinen/",
-                            "Koillinen/",
-                            "Pohjoinen/",
-                            "Keskinen/",
-                            "Läntinen/",
-                            "Eteläinen/",
-                        )
-                    )
-                )
-            ):
-                return False
-            else:
-                return True
-        else:
+        if projectClass is None or projectLocation is None:
             return True
+        if projectClass.parent is None or projectClass.parent.parent is None:
+            return True
+        if (
+            "suurpiiri" in projectClass.name.lower()
+            and len(projectClass.name.split()) == 2
+            and (
+                projectLocation.path.startswith(projectClass.name.split()[0])
+                or projectLocation.path.startswith(projectClass.name.split()[0][:-2])
+            )
+        ):
+            return True
+        elif "suurpiiri" not in projectClass.name.lower():
+            return True
+        else:
+            return False
 
     def validate_projectClass(self, projectClass):
         """
