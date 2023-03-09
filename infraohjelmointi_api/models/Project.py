@@ -61,7 +61,7 @@ class Project(models.Model):
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
     otherPersons = models.CharField(max_length=100, blank=True, null=True)
-    description = models.TextField(max_length=500, blank=False, null=False)
+    description = models.TextField(max_length=1000, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
         related_name="planning",
@@ -261,19 +261,31 @@ class Project(models.Model):
         """
 
         self.name = " ".join(self.name.split())
-        self.description = " ".join(self.description.split())
+        self.description = "\n".join(
+            " ".join(line.split()) for line in self.description.split("\n")
+        )
         if self.address:
-            self.address = " ".join(self.address.split())
+            self.address = "\n".join(
+                " ".join(line.split()) for line in self.address.split("\n")
+            )
         if self.entityName:
             self.entityName = " ".join(self.entityName.split())
         if self.neighborhood:
-            self.neighborhood = " ".join(self.neighborhood.split())
+            self.neighborhood = "\n".join(
+                " ".join(line.split()) for line in self.neighborhood.split("\n")
+            )
         if self.comments:
-            self.comments = " ".join(self.comments.split())
+            self.comments = "\n".join(
+                " ".join(line.split()) for line in self.comments.split("\n")
+            )
         if self.delays:
-            self.delays = " ".join(self.delays.split())
+            self.delays = "\n".join(
+                " ".join(line.split()) for line in self.delays.split("\n")
+            )
         if self.otherPersons:
-            self.otherPersons = " ".join(self.otherPersons.split())
+            self.otherPersons = "\n".join(
+                " ".join(line.split()) for line in self.otherPersons.split("\n")
+            )
 
     class Meta:
         constraints = [
