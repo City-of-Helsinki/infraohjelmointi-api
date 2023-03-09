@@ -2123,9 +2123,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_3_Id.__str__(),
         }
 
-        # Creating project with Class "Eteläinen suurpiiri" and location "Eteläinen/Munkkiniemi"
+        # Creating project with Class "Eteläinen suurpiiri" and location path "Eteläinen/Munkkiniemi"
         # Current class is "Läntinen suurpiiri"
-        # Current location is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen/Munkkiniemi"
         response = self.client.post(
             "/projects/",
             data,
@@ -2143,9 +2143,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_4_Id.__str__(),
         }
 
-        # Patching project with location "Läntinen/Munkkiniemi"
+        # Patching project with location path "Läntinen/Munkkiniemi"
         # Current class is "Eteläinen suurpiiri"
-        # Current location is "Läntinen/Munkkiniemi"
+        # Current location path is "Läntinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2159,9 +2159,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_4_Id.__str__(),
         }
 
-        # Patching project with location "Läntinen/Munkkiniemi" and class "Läntinen suurpiiri"
+        # Patching project with location path "Läntinen/Munkkiniemi" and class "Läntinen suurpiiri"
         # Current class is "Läntinen suurpiiri"
-        # Current location is "Läntinen/Munkkiniemi"
+        # Current location path is "Läntinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2175,9 +2175,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_6_Id.__str__(),
         }
 
-        # Patching project with location "Östersundom/ostersundomTest" and class "Östersundomin suurpiiri"
+        # Patching project with location path "Östersundom/ostersundomTest" and class "Östersundomin suurpiiri"
         # Current class is "Östersundomin suurpiiri"
-        # Current location is "Östersundom/ostersundomTest"
+        # Current location path is "Östersundom/ostersundomTest"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2190,9 +2190,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_3_Id.__str__(),
         }
 
-        # Patching project with location "Eteläinen/Munkkiniemi"
+        # Patching project with location path "Eteläinen/Munkkiniemi"
         # Current class is "Östersundomin suurpiiri"
-        # Current location is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2207,7 +2207,7 @@ class ProjectTestCase(TestCase):
 
         # Patching project with class "Siltojen peruskorjaus ja uusiminen"
         # Current class is "Siltojen peruskorjaus ja uusiminen"
-        # Current location is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2220,9 +2220,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDistrict_5_Id.__str__(),
         }
 
-        # Patching project with location "Keskinen/Munkkiniemi"
+        # Patching project with location path "Keskinen/Munkkiniemi"
         # Current class is "Siltojen peruskorjaus ja uusiminen"
-        # Current location is "Keskinen/Munkkiniemi"
+        # Current location path is "Keskinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2237,7 +2237,7 @@ class ProjectTestCase(TestCase):
 
         # Patching project with class "Läntinen suurpiiri"
         # Current class is "Läntinen suurpiiri"
-        # Current location is "Keskinen/Munkkiniemi"
+        # Current location path is "Keskinen/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
