@@ -567,6 +567,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 "budgetForecast2CurrentYear",
                 "budgetForecast3CurrentYear",
                 "budgetForecast4CurrentYear",
+                "budgetProposalCurrentYearPlus0",
                 "budgetProposalCurrentYearPlus1",
                 "budgetProposalCurrentYearPlus2",
                 "preliminaryCurrentYearPlus3",

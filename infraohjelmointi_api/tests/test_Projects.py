@@ -2048,6 +2048,22 @@ class ProjectTestCase(TestCase):
             response.json()[0],
         )
 
+        data = {"budgetProposalCurrentYearPlus0": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "The field budgetProposalCurrentYearPlus0 cannot be modified when the project is locked",
+            response.json()[0],
+        )
+
         data = {"budgetProposalCurrentYearPlus1": 200}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
