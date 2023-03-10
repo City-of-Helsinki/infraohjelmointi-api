@@ -572,6 +572,7 @@ class ProjectTestCase(TestCase):
             "budgetForecast2CurrentYear": None,
             "budgetForecast3CurrentYear": None,
             "budgetForecast4CurrentYear": None,
+            "budgetProposalCurrentYearPlus0": None,
             "budgetProposalCurrentYearPlus1": None,
             "budgetProposalCurrentYearPlus2": None,
             "preliminaryCurrentYearPlus3": None,

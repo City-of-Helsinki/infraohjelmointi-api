@@ -200,6 +200,9 @@ class Project(models.Model):
     budgetForecast4CurrentYear = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
+    budgetProposalCurrentYearPlus0 = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
     budgetProposalCurrentYearPlus1 = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
