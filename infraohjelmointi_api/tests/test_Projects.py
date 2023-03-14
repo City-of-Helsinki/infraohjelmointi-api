@@ -572,6 +572,7 @@ class ProjectTestCase(TestCase):
             "budgetForecast2CurrentYear": None,
             "budgetForecast3CurrentYear": None,
             "budgetForecast4CurrentYear": None,
+            "budgetProposalCurrentYearPlus0": None,
             "budgetProposalCurrentYearPlus1": None,
             "budgetProposalCurrentYearPlus2": None,
             "preliminaryCurrentYearPlus3": None,
@@ -2044,6 +2045,22 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetForecast4CurrentYear cannot be modified when the project is locked",
+            response.json()[0],
+        )
+
+        data = {"budgetProposalCurrentYearPlus0": 200}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_7_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "The field budgetProposalCurrentYearPlus0 cannot be modified when the project is locked",
             response.json()[0],
         )
 

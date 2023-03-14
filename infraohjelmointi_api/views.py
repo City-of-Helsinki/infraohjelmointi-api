@@ -529,7 +529,7 @@ class ProjectViewSet(BaseViewSet):
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
         currYear = datetime.date.today().year
         yearToFieldMapping = {
-            currYear: "budgetForecast1CurrentYear__gt",
+            currYear: "budgetProposalCurrentYearPlus0__gt",
             currYear + 1: "budgetProposalCurrentYearPlus1__gt",
             currYear + 2: "budgetProposalCurrentYearPlus2__gt",
             currYear + 3: "preliminaryCurrentYearPlus3__gt",
