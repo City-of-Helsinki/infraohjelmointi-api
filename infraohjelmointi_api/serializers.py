@@ -78,30 +78,27 @@ class searchResultSerializer(serializers.Serializer):
         elif instanceType == "ProjectGroup":
             classInstance = getattr(obj, "classRelation", None)
 
-        if classInstance is not None:
-            return (
-                str(classInstance.id)
-                if classInstance.parent is None
-                else "{}/{}".format(
-                    str(classInstance.parent.id),
-                    str(classInstance.id),
-                )
-                if classInstance.parent.parent is None
-                and classInstance.parent is not None
-                else "{}/{}/{}".format(
-                    str(classInstance.parent.parent.id),
-                    str(classInstance.parent.id),
-                    str(classInstance.id),
-                )
-            )
-        else:
+        if classInstance is None:
             return ""
 
-    def get_phase(self, obj):
-        if hasattr(obj, "phase") and obj.phase is not None:
-            return ProjectPhaseSerializer(obj.phase).data
+        if classInstance.parent is not None and classInstance.parent.parent is not None:
+            return "{}/{}/{}".format(
+                str(classInstance.parent.parent.id),
+                str(classInstance.parent.id),
+                str(classInstance.id),
+            )
+        elif classInstance.parent is not None:
+            return "{}/{}".format(
+                str(classInstance.parent.id),
+                str(classInstance.id),
+            )
         else:
+            return str(classInstance.id)
+
+    def get_phase(self, obj):
+        if not hasattr(obj, "phase") or obj.phase is None:
             return None
+        return ProjectPhaseSerializer(obj.phase).data
 
     def get_name(self, obj):
         return obj.name
@@ -120,21 +117,23 @@ class searchResultSerializer(serializers.Serializer):
         elif instanceType == "ProjectGroup":
             return "groups"
         else:
-            raise serializers.ValidationError("Unknown instance type: {}".format(obj))
+            raise serializers.ValidationError(
+                "Unknown instance type: {}".format(instanceType)
+            )
 
     def get_hashTags(self, obj):
-        if hasattr(obj, "hashTags") and obj.hashTags is not None:
-            include_hashtags_list = self.context.get("hashtags_include", [])
-            projectHashtags = ProjectHashtagSerializer(obj.hashTags, many=True).data
-            projectHashtags = list(
-                filter(
-                    lambda hashtag: hashtag["id"] in include_hashtags_list,
-                    projectHashtags,
-                )
-            )
-            return projectHashtags
-        else:
+        if not hasattr(obj, "hashTags") or obj.hashTags is None:
             return []
+
+        include_hashtags_list = self.context.get("hashtags_include", [])
+        projectHashtags = ProjectHashtagSerializer(obj.hashTags, many=True).data
+        projectHashtags = list(
+            filter(
+                lambda hashtag: hashtag["id"] in include_hashtags_list,
+                projectHashtags,
+            )
+        )
+        return projectHashtags
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
