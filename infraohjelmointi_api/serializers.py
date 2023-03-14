@@ -369,6 +369,91 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
         return estConstructionEnd
 
+    def _is_projectClass_projectLocation_valid(
+        self,
+        projectLocation,
+        projectClass,
+    ) -> bool:
+        if projectClass is None or projectLocation is None:
+            return True
+        if projectClass.parent is None or projectClass.parent.parent is None:
+            return True
+        if (
+            "suurpiiri" in projectClass.name.lower()
+            and len(projectClass.name.split()) == 2
+            and (
+                projectLocation.path.startswith(projectClass.name.split()[0])
+                or projectLocation.path.startswith(projectClass.name.split()[0][:-2])
+            )
+        ):
+            return True
+        elif "suurpiiri" not in projectClass.name.lower():
+            return True
+        else:
+            return False
+
+    def validate_projectClass(self, projectClass):
+        """
+        Function to validate if a Project belongs to a specific Class then it should belong to a related Location
+        """
+        project = getattr(self, "instance", None)
+        projectLocation = (
+            ProjectLocation.objects.get(
+                id=self.get_initial().get("projectLocation", None)
+            )
+            if self.get_initial().get("projectLocation", None) is not None
+            else None
+        )
+
+        if (
+            projectLocation is None
+            and project is not None
+            and project.projectLocation is not None
+        ):
+            projectLocation = project.projectLocation
+
+        if not self._is_projectClass_projectLocation_valid(
+            projectLocation=projectLocation, projectClass=projectClass
+        ):
+            raise serializers.ValidationError(
+                "subClass: {} with path: {} cannot have the location: {} under it.".format(
+                    projectClass.name,
+                    projectClass.path,
+                    projectLocation.name,
+                )
+            )
+
+        return projectClass
+
+    def validate_projectLocation(self, projectLocation):
+        """
+        Function to validate if a Project belongs to a specific Location then it should belong to a related Class
+        """
+        project = getattr(self, "instance", None)
+        projectClass = (
+            ProjectClass.objects.get(id=self.get_initial().get("projectClass", None))
+            if self.get_initial().get("projectClass", None) is not None
+            else None
+        )
+
+        if (
+            projectClass is None
+            and project is not None
+            and project.projectClass is not None
+        ):
+            projectClass = project.projectClass
+        if not self._is_projectClass_projectLocation_valid(
+            projectLocation=projectLocation, projectClass=projectClass
+        ):
+            raise serializers.ValidationError(
+                "Location: {} with path: {} cannot be under the subClass: {}".format(
+                    projectLocation.name,
+                    projectLocation.path,
+                    projectClass.name,
+                )
+            )
+        return projectLocation
+
     # Commented out automatic locking logic when project is created with phase construction
     # @override
     # def create(self, validated_data):
