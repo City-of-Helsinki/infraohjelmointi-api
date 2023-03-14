@@ -61,7 +61,7 @@ class Project(models.Model):
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
     otherPersons = models.CharField(max_length=100, blank=True, null=True)
-    description = models.TextField(max_length=500, blank=False, null=False)
+    description = models.TextField(max_length=1000, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
         related_name="planning",
@@ -200,6 +200,9 @@ class Project(models.Model):
     budgetForecast4CurrentYear = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
+    budgetProposalCurrentYearPlus0 = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
     budgetProposalCurrentYearPlus1 = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
@@ -248,6 +251,9 @@ class Project(models.Model):
         # returns percentage of readiness random.randint(0, 100)
         return 95
 
+    def _strip_whitespaces(self, inputString):
+        return "\n".join(" ".join(line.split()) for line in inputString.split("\n"))
+
     @override
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -260,20 +266,20 @@ class Project(models.Model):
         Cleaning charfields: Stripping leading, trailing and excess in between spaces.
         """
 
-        self.name = " ".join(self.name.split())
-        self.description = " ".join(self.description.split())
+        self.name = self._strip_whitespaces(self.name)
+        self.description = self._strip_whitespaces(self.description)
         if self.address:
-            self.address = " ".join(self.address.split())
+            self.address = self._strip_whitespaces(self.address)
         if self.entityName:
-            self.entityName = " ".join(self.entityName.split())
+            self.entityName = self._strip_whitespaces(self.entityName)
         if self.neighborhood:
-            self.neighborhood = " ".join(self.neighborhood.split())
+            self.neighborhood = self._strip_whitespaces(self.neighborhood)
         if self.comments:
-            self.comments = " ".join(self.comments.split())
+            self.comments = self._strip_whitespaces(self.comments)
         if self.delays:
-            self.delays = " ".join(self.delays.split())
+            self.delays = self._strip_whitespaces(self.delays)
         if self.otherPersons:
-            self.otherPersons = " ".join(self.otherPersons.split())
+            self.otherPersons = self._strip_whitespaces(self.otherPersons)
 
     class Meta:
         constraints = [
