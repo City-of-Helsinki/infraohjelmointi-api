@@ -251,6 +251,9 @@ class Project(models.Model):
         # returns percentage of readiness random.randint(0, 100)
         return 95
 
+    def _strip_whitespaces(self, inputString):
+        return "\n".join(" ".join(line.split()) for line in inputString.split("\n"))
+
     @override
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -263,32 +266,20 @@ class Project(models.Model):
         Cleaning charfields: Stripping leading, trailing and excess in between spaces.
         """
 
-        self.name = " ".join(self.name.split())
-        self.description = "\n".join(
-            " ".join(line.split()) for line in self.description.split("\n")
-        )
+        self.name = self._strip_whitespaces(self.name)
+        self.description = self._strip_whitespaces(self.description)
         if self.address:
-            self.address = "\n".join(
-                " ".join(line.split()) for line in self.address.split("\n")
-            )
+            self.address = self._strip_whitespaces(self.address)
         if self.entityName:
-            self.entityName = " ".join(self.entityName.split())
+            self.entityName = self._strip_whitespaces(self.entityName)
         if self.neighborhood:
-            self.neighborhood = "\n".join(
-                " ".join(line.split()) for line in self.neighborhood.split("\n")
-            )
+            self.neighborhood = self._strip_whitespaces(self.neighborhood)
         if self.comments:
-            self.comments = "\n".join(
-                " ".join(line.split()) for line in self.comments.split("\n")
-            )
+            self.comments = self._strip_whitespaces(self.comments)
         if self.delays:
-            self.delays = "\n".join(
-                " ".join(line.split()) for line in self.delays.split("\n")
-            )
+            self.delays = self._strip_whitespaces(self.delays)
         if self.otherPersons:
-            self.otherPersons = "\n".join(
-                " ".join(line.split()) for line in self.otherPersons.split("\n")
-            )
+            self.otherPersons = self._strip_whitespaces(self.otherPersons)
 
     class Meta:
         constraints = [
