@@ -298,7 +298,9 @@ class ProjectViewSet(BaseViewSet):
             or order is not None
         ):
             if not limit.isnumeric() or limit not in ["10", "20", "30"]:
-                raise APIException(detail="Invalid value for limit parameter")
+                raise APIException(
+                    detail={"message": "Invalid value for limit parameter"}
+                )
             limit = int(limit)
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
@@ -358,7 +360,7 @@ class ProjectViewSet(BaseViewSet):
                 )
             else:
                 return Response(
-                    data={"message": "Invalid order"},
+                    data={"message": "Invalid value for order"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -543,12 +545,16 @@ class ProjectViewSet(BaseViewSet):
         }
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric() or not prYearMin.isnumeric():
-                raise APIException(detail="Invalid value for prYearMin or prYearMax")
+                raise APIException(
+                    detail={"message": "Invalid value for prYearMin or prYearMax"}
+                )
 
             prYearMin = int(prYearMin)
             prYearMax = int(prYearMax)
             if prYearMin > prYearMax:
-                raise APIException(detail="prYearMin cannot be greater than prYearMax")
+                raise APIException(
+                    detail={"message": "prYearMin cannot be greater than prYearMax"}
+                )
             if (
                 prYearMin in yearToFieldMapping.keys()
                 and prYearMax in yearToFieldMapping.keys()
@@ -590,7 +596,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMin is not None:
             if not prYearMin.isnumeric():
-                raise APIException(detail="Invalid value for prYearMin")
+                raise APIException(detail={"message": "Invalid value for prYearMin"})
 
             prYearMin = int(prYearMin)
             if prYearMin < currYear:
@@ -620,7 +626,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMax is not None:
             if not prYearMax.isnumeric():
-                raise APIException(detail="Invalid value for prYearMax")
+                raise APIException(detail={"message": "Invalid value for prYearMax"})
 
             prYearMax = int(prYearMax)
             if prYearMax < currYear:
