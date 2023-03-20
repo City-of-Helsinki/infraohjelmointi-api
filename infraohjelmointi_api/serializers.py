@@ -417,6 +417,19 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
         return ProjectFinancialSerializer(queryset, many=False).data
 
 
+class UpdateListSerializer(serializers.ListSerializer):
+    def update(self, instances, validated_data):
+
+        instance_hash = {index: instance for index, instance in enumerate(instances)}
+
+        result = [
+            self.child.update(instance_hash[index], attrs)
+            for index, attrs in enumerate(validated_data)
+        ]
+
+        return result
+
+
 class ProjectCreateSerializer(serializers.ModelSerializer):
     projectReadiness = serializers.SerializerMethodField()
     estPlanningStart = serializers.DateField(
@@ -483,6 +496,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     class Meta(BaseMeta):
         model = Project
+        list_serializer_class = UpdateListSerializer
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
