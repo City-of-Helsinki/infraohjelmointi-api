@@ -63,6 +63,7 @@ from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -613,6 +614,38 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @transaction.atomic
+    @action(methods=["patch"], detail=False, url_path=r"bulk-update")
+    def patch_bulk_projects(self, request):
+        """
+        Custom action to bulk update projects
+        Body contains two keys, "projects" and "updates"
+        projects must be a list of project ids
+        updates must contain a dictionary of fields and the values that need to be updated for those fields
+        """
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            if type(data) is list and len(data) > 0:
+                qs = self.get_queryset().filter(
+                    id__in=[projectData["id"] for projectData in data]
+                )
+                serializer = self.get_serializer(
+                    qs,
+                    data=[projectData["data"] for projectData in data],
+                    many=True,
+                    partial=True,
+                )
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                return Response(
+                    data={"message": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except Exception as e:
+            raise e
 
     def _filter_projects_by_hierarchy(
         self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
