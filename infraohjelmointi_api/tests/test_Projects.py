@@ -665,6 +665,59 @@ class ProjectTestCase(TestCase):
             msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
+    def test_PATCH_multiple_projects(self):
+        data = {"name": "Test name", "description": "Test description"}
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+
+        res_data = response.json()
+        new_createdId = res_data["id"]
+
+        data = [
+            {"id": self.project_1_Id.__str__(), "data": {"name": "new name"}},
+            {"id": new_createdId, "data": {"description": "new description"}},
+        ]
+        response = self.client.patch(
+            "/projects/bulk-update/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            len(response.json()),
+            2,
+            msg="Response must contain 2 updated projects",
+        )
+        self.assertEqual(
+            response.json()[0]["name"],
+            data[0]["data"]["name"],
+        )
+        self.assertEqual(
+            response.json()[1]["description"],
+            data[1]["data"]["description"],
+        )
+
+    def test_DELETE_project(self):
+        response = self.client.delete("/projects/{}/".format(self.project_1_Id))
+        self.assertEqual(
+            response.status_code,
+            204,
+            msg="Error deleting project with Id {}".format(self.project_1_Id),
+        )
+        self.assertEqual(
+            Project.objects.filter(id=self.project_1_Id).exists(),
+            False,
+            msg="Project with Id {} still exists in DB".format(self.project_1_Id),
+        )
+
     def test_notes_project(self):
         Note.objects.create(
             id=self.noteId,
