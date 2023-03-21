@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "infraohjelmointi_api",
     "django_filters",
+    "drf_standardized_errors",
 ]
 
 MIDDLEWARE = [
@@ -155,7 +156,9 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
+    "EXCEPTION_HANDLER": "drf_standardized_errors.handler.exception_handler",
 }
+DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": True}
 
 LOGGING = {
     "version": 1,

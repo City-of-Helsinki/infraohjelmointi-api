@@ -5,7 +5,7 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectLocation,
 )
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ParseError
 import django_filters
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
@@ -298,9 +298,8 @@ class ProjectViewSet(BaseViewSet):
             or order is not None
         ):
             if not limit.isnumeric() or limit not in ["10", "20", "30"]:
-                raise APIException(
-                    detail={"message": "Invalid value for limit parameter"}
-                )
+                raise ParseError(detail={"limit": "Invalid value"})
+
             limit = int(limit)
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
