@@ -157,7 +157,7 @@ class projectGroupTestCase(TestCase):
             400,
             msg="Status code != 400",
         )
-        errorMessage = response.json()["projects"][0]
+        errorMessage = response.json()["errors"][0]["detail"]
         self.assertEqual(
             errorMessage,
             "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
@@ -177,7 +177,7 @@ class projectGroupTestCase(TestCase):
             404,
             msg="Status code != 404",
         )
-        errorMessage = response.json()["detail"]
+        errorMessage = response.json()["errors"][0]["detail"]
         self.assertEqual(
             errorMessage,
             "Not found.",
