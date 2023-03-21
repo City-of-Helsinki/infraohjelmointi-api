@@ -224,6 +224,10 @@ class ProjectFilter(django_filters.FilterSet):
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
     )
+    phase = django_filters.ModelMultipleChoiceFilter(
+        field_name="phase",
+        queryset=ProjectPhaseSerializer.Meta.model.objects.all(),
+    )
 
     programmed = django_filters.TypedMultipleChoiceFilter(
         choices=(
