@@ -481,7 +481,7 @@ class ProjectViewSet(BaseViewSet):
 
             return qs
         except Exception as e:
-            raise APIException(detail={"message": e})
+            raise e
 
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
