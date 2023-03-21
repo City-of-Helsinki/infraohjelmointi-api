@@ -544,16 +544,17 @@ class ProjectViewSet(BaseViewSet):
         }
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric() or not prYearMin.isnumeric():
-                raise APIException(
-                    detail={"message": "Invalid value for prYearMin or prYearMax"}
+                raise ParseError(
+                    detail={None: "Invalid value for prYearMin or prYearMax"}
                 )
 
             prYearMin = int(prYearMin)
             prYearMax = int(prYearMax)
             if prYearMin > prYearMax:
-                raise APIException(
-                    detail={"message": "prYearMin cannot be greater than prYearMax"}
+                raise ParseError(
+                    detail={"prYearMin": "prYearMin cannot be greater than prYearMax"}
                 )
+
             if (
                 prYearMin in yearToFieldMapping.keys()
                 and prYearMax in yearToFieldMapping.keys()
@@ -595,7 +596,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMin is not None:
             if not prYearMin.isnumeric():
-                raise APIException(detail={"message": "Invalid value for prYearMin"})
+                raise ParseError(detail={"prYearMin": "Invalid value"})
 
             prYearMin = int(prYearMin)
             if prYearMin < currYear:
@@ -625,7 +626,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMax is not None:
             if not prYearMax.isnumeric():
-                raise APIException(detail={"message": "Invalid value for prYearMax"})
+                raise ParseError(detail={"prYearMax": "Invalid value"})
 
             prYearMax = int(prYearMax)
             if prYearMax < currYear:
