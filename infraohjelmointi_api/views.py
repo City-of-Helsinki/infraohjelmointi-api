@@ -626,7 +626,7 @@ class ProjectViewSet(BaseViewSet):
         """
         try:
             data = json.loads(request.body.decode("utf-8"))
-            if type(data) is list and len(data) > 0:
+            if self._is_bulk_project_update_data_valid(data):
                 qs = self.get_queryset().filter(
                     id__in=[projectData["id"] for projectData in data]
                 )
@@ -646,6 +646,30 @@ class ProjectViewSet(BaseViewSet):
 
         except Exception as e:
             raise e
+
+    def _is_valid_uuid(self, val):
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+
+    def _is_bulk_project_update_data_valid(self, data):
+        if type(data) is list and len(data) > 0:
+            for d in data:
+                if (
+                    "id" in d
+                    and self._is_valid_uuid(d["id"])
+                    and "data" in d
+                    and type(d["id"]) is str
+                    and type(d["data"]) is dict
+                ):
+                    pass
+                else:
+                    return False
+            return True
+        else:
+            return False
 
     def _filter_projects_by_hierarchy(
         self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
