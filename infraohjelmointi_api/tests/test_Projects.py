@@ -777,8 +777,8 @@ class ProjectTestCase(TestCase):
             "description": "Sample description",
             "estPlanningStart": "14.01.2022",
             "estPlanningEnd": "14.05.2022",
-            "estConstructionStart": "14.02.2022",
-            "estConstructionEnd": "14.05.2022",
+            "estConstructionStart": "20.05.2022",
+            "estConstructionEnd": "01.06.2022",
             "presenceStart": "14.02.2022",
             "presenceEnd": "14.05.2022",
             "visibilityStart": "14.02.2022",
@@ -842,8 +842,8 @@ class ProjectTestCase(TestCase):
             "description": "Sample description",
             "estPlanningStart": "2022-01-15",
             "estPlanningEnd": "2022-05-15",
-            "estConstructionStart": "2022-02-15",
-            "estConstructionEnd": "2022-05-15",
+            "estConstructionStart": "2022-06-15",
+            "estConstructionEnd": "2022-08-15",
             "presenceStart": "2022-02-15",
             "presenceEnd": "2022-05-15",
             "visibilityStart": "2022-02-15",
@@ -852,8 +852,8 @@ class ProjectTestCase(TestCase):
         formatted_data = {
             "estPlanningStart": "15.01.2022",
             "estPlanningEnd": "15.05.2022",
-            "estConstructionStart": "15.02.2022",
-            "estConstructionEnd": "15.05.2022",
+            "estConstructionStart": "15.06.2022",
+            "estConstructionEnd": "15.08.2022",
             "presenceStart": "15.02.2022",
             "presenceEnd": "15.05.2022",
             "visibilityStart": "15.02.2022",
@@ -1814,6 +1814,8 @@ class ProjectTestCase(TestCase):
             id=self.project_7_Id,
             name="Test project fields lock",
             description="Test description",
+            constructionEndYear=2027,
+            planningStartYear=2020
         )
         Person.objects.create(
             id=self.person_7_Id,
@@ -2317,7 +2319,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
+            "Year should be consistent with the field planningStartYear",
             response.json()["errors"][0]["detail"],
         )
 
@@ -2333,7 +2335,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
+            "Year should be consistent with the field estConstructionEnd",
             response.json()["errors"][0]["detail"],
         )
 
