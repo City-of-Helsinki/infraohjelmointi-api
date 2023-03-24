@@ -119,7 +119,7 @@ class searchResultSerializer(serializers.Serializer):
         elif instanceType == "ProjectGroup":
             return "groups"
         else:
-            raise ValidationError(detail={"type": "Invalid value"}, code="invalid_v")
+            raise ValidationError(detail={"type": "Invalid value"}, code="invalid")
 
     def get_hashTags(self, obj):
         if not hasattr(obj, "hashTags") or obj.hashTags is None:
@@ -851,7 +851,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 )
 
         if constructionEndYear is not None and planningStartYear is not None:
-            if planningStartYear > constructionEndYear.year:
+            if planningStartYear > int(constructionEndYear):
                 raise ValidationError(
                     detail="Year cannot be later than constructionEndYear",
                     code="planningStartYear_lt_constructionEndYear",
@@ -918,6 +918,12 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     detail="Year cannot be earlier than estPlanningStart",
                     code="constructionEndYear_et_estPlanningStart",
+                )
+        if constructionEndYear is not None and planningStartYear is not None:
+            if constructionEndYear < int(planningStartYear):
+                raise ValidationError(
+                    detail="Year cannot be earlier than planningStartYear",
+                    code="constructionEndYear_et_planningStartYear",
                 )
         if constructionEndYear is not None and estPlanningEnd is not None:
             if constructionEndYear < estPlanningEnd.year:
