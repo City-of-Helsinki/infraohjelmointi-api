@@ -679,7 +679,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                     code="estConstructionStart_lt_estConstructionEnd",
                 )
 
-        return estPlanningStart
+        return estConstructionStart
 
     def validate_estConstructionEnd(self, estConstructionEnd):
         """
