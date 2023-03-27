@@ -4,6 +4,7 @@ from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectGroup,
     ProjectLocation,
+    ProjectFinancial,
 )
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 import django_filters
@@ -59,6 +60,7 @@ from django.core import serializers
 from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
+from django.shortcuts import get_object_or_404
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -77,6 +79,19 @@ class ProjectFinancialViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectFinancialSerializer
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"(?P<project>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})/(?P<year>[0-9]{4})",
+    )
+    def get_finances_by_year(self, request, project, year):
+        """
+        Custom action to get finances of a project by year
+        """
+        query = {"project": project, "year": year}
+        finance_object = get_object_or_404(ProjectFinancial, **query)
+        return Response(ProjectFinancialSerializer(finance_object).data)
 
 
 class ProjectLockViewSet(BaseViewSet):
