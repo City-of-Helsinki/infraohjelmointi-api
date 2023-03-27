@@ -137,6 +137,7 @@ class searchResultSerializer(serializers.Serializer):
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
+
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
