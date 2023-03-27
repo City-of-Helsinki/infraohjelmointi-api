@@ -23,6 +23,7 @@ from .models import (
     ProjectHashTag,
     ProjectGroup,
     ProjectLock,
+    ProjectFinancial,
 )
 from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework import serializers
@@ -55,6 +56,11 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
+
+
+class ProjectFinancialSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectFinancial
 
 
 class ProjectLockSerializer(serializers.ModelSerializer):

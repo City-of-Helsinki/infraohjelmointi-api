@@ -187,52 +187,6 @@ class Project(models.Model):
     )
     comments = models.CharField(max_length=200, blank=True, null=True)
 
-    # commented fields left out due to translation confusions
-    budgetForecast1CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast2CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast3CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast4CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetProposalCurrentYearPlus0 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetProposalCurrentYearPlus1 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetProposalCurrentYearPlus2 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus3 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus4 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus5 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus6 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus7 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus8 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus9 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    preliminaryCurrentYearPlus10 = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
     responsibleZone = models.ForeignKey(
         ResponsibleZone, on_delete=models.DO_NOTHING, null=True, blank=True
     )
