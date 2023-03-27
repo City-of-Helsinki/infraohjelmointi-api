@@ -5,12 +5,15 @@ from datetime import date
 
 
 class ProjectFinancial(models.Model):
+    def currentYear():
+        return date.today().year
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     year = models.PositiveIntegerField(
         blank=False,
         null=False,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
+        default=currentYear,
     )
     project = models.ForeignKey(
         "Project",

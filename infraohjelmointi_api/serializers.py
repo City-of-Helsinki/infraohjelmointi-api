@@ -26,6 +26,7 @@ from .models import (
     ProjectFinancial,
 )
 from rest_framework.exceptions import ParseError, ValidationError
+from datetime import date
 from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
@@ -349,6 +350,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
+    finances = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
@@ -362,6 +364,13 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
+
+    def get_finances(self, obj):
+        try:
+            queryset = ProjectFinancial.objects.get(project=obj, year=date.today().year)
+            return ProjectFinancialSerializer(queryset, many=False).data
+        except Exception as e:
+            return None
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
