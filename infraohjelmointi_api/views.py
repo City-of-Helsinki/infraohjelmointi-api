@@ -88,9 +88,10 @@ class ProjectFinancialViewSet(BaseViewSet):
     def get_finances_by_year(self, request, project, year):
         """
         Custom action to get finances of a project by year
+        Usage: /project-financials/<project_id>/<year>/
         """
-        query = {"project": project, "year": year}
-        finance_object = get_object_or_404(ProjectFinancial, **query)
+        queryFilter = {"project": project, "year": year}
+        finance_object = get_object_or_404(ProjectFinancial, **queryFilter)
         return Response(ProjectFinancialSerializer(finance_object).data)
 
 
