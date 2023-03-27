@@ -21,3 +21,4 @@ from .ResponsibleZone import ResponsibleZone
 from .ProjectHashTag import ProjectHashTag
 from .ProjectGroup import ProjectGroup
 from .ProjectLock import ProjectLock
+from .ProjectFinancial import ProjectFinancial
