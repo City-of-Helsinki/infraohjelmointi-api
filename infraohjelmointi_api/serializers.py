@@ -862,6 +862,60 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
         return estPlanningEnd
 
+    def validate_presenceStart(self, presenceStart):
+        """
+        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+        """
+
+        project = getattr(self, "instance", None)
+        presenceEnd = self.get_initial().get("presenceEnd", None)
+
+        if presenceEnd is not None:
+            presenceEnd = self._format_date(presenceEnd)
+        elif (
+            presenceEnd is None
+            and project is not None
+            and project.presenceEnd is not None
+        ):
+            presenceEnd = project.presenceEnd
+
+        if presenceStart is not None and presenceEnd is not None:
+            if presenceStart > presenceEnd:
+                raise ValidationError(
+                    detail="Date cannot be later than presenceEnd",
+                    code="presenceStart_lt_presenceEnd",
+                )
+
+        return presenceStart
+
+    def validate_presenceEnd(self, presenceEnd):
+        """
+        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+        """
+
+        project = getattr(self, "instance", None)
+        presenceStart = self.get_initial().get("presenceStart", None)
+
+        if presenceStart is not None:
+            presenceStart = self._format_date(presenceStart)
+        elif (
+            presenceStart is None
+            and project is not None
+            and project.presenceStart is not None
+        ):
+            presenceStart = project.presenceStart
+
+        if presenceEnd is not None and presenceStart is not None:
+            if presenceEnd < presenceStart:
+                raise ValidationError(
+                    detail="Date cannot be earlier than presenceEnd",
+                    code="presenceEnd_et_presenceStart",
+                )
+
+        return presenceEnd
+
     def validate_estConstructionEnd(self, estConstructionEnd):
         """
         Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
