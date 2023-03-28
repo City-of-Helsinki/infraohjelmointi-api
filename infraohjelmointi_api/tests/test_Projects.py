@@ -1815,7 +1815,7 @@ class ProjectTestCase(TestCase):
             name="Test project fields lock",
             description="Test description",
             constructionEndYear=2027,
-            planningStartYear=2020
+            planningStartYear=2020,
         )
         Person.objects.create(
             id=self.person_7_Id,
@@ -2319,7 +2319,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "Year should be consistent with the field planningStartYear",
+            "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
             response.json()["errors"][0]["detail"],
         )
 
@@ -2335,7 +2335,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "Year should be consistent with the field estConstructionEnd",
+            "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
             response.json()["errors"][0]["detail"],
         )
 
