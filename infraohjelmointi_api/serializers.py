@@ -796,7 +796,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             try:
                 return datetime.strptime(dateStr, f).date()
             except ValueError:
-                return None
+                pass
         raise ParseError(detail="Invalid format", code="invalid")
 
     def validate_estPlanningStart(self, estPlanningStart):
@@ -825,6 +825,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             and project.estPlanningEnd is not None
         ):
             estPlanningEnd = project.estPlanningEnd
+
         if estPlanningEnd is not None and estPlanningStart is not None:
             if estPlanningStart > estPlanningEnd:
                 raise ValidationError(
@@ -873,7 +874,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 if estConstructionEnd.year > constructionEndYear:
                     raise ValidationError(
                         detail="estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
-                        code="estConstructionEnd_lt_constructionEndYear",
+                        code="estConstructionEnd_lt_constructionEndYear_locked",
                     )
 
         return estConstructionEnd
