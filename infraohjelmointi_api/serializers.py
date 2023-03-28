@@ -415,538 +415,572 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
 
-    def _format_date(self, dateStr):
-        for f in ["%Y-%m-%d", "%d.%m.%Y"]:
-            try:
-                return datetime.strptime(dateStr, f).date()
-            except ValueError:
-                pass
-        raise ParseError(detail="Invalid format", code="invalid")
-
     def validate_estPlanningStart(self, estPlanningStart):
         """
         Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
         request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
         """
-
         project = getattr(self, "instance", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
+        if project is not None and hasattr(project, "lock"):
             planningStartYear = project.planningStartYear
-
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
-            constructionEndYear = project.constructionEndYear
-
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
-
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
-
-        if planningStartYear is not None and estPlanningStart is not None:
-            if estPlanningStart.year != int(planningStartYear):
-                raise ValidationError(
-                    detail="Year should be consistent with the field planningStartYear",
-                    code="estPlanningStart_ne_planningStartYear",
-                )
-        if constructionEndYear is not None and estPlanningStart is not None:
-            if estPlanningStart.year > int(constructionEndYear):
-                raise ValidationError(
-                    detail="Date cannot be later than constructionEndYear",
-                    code="estPlanningStart_lt_constructionEndYear",
-                )
-        if estPlanningEnd is not None and estPlanningStart is not None:
-            if estPlanningStart > estPlanningEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estPlanningEnd",
-                    code="estPlanningStart_lt_estPlanningEnd",
-                )
-        if estConstructionStart is not None and estPlanningStart is not None:
-            if estPlanningStart > estConstructionStart:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionStart",
-                    code="estPlanningStart_lt_estConstructionStart",
-                )
-        if estConstructionEnd is not None and estPlanningStart is not None:
-            if estPlanningStart > estConstructionEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionEnd",
-                    code="estPlanningStart_lt_estConstructionEnd",
-                )
+            if planningStartYear is not None and estPlanningStart is not None:
+                if estPlanningStart.year < planningStartYear:
+                    raise ValidationError(
+                        detail="estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
+                        code="estPlanningStart_et_planningStartYear",
+                    )
 
         return estPlanningStart
 
-    def validate_estPlanningEnd(self, estPlanningEnd):
-        """
-        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
-        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
-        """
-
-        project = getattr(self, "instance", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
-            planningStartYear = project.planningStartYear
-
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
-            constructionEndYear = project.constructionEndYear
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
-
-        if planningStartYear is not None and estPlanningEnd is not None:
-            if estPlanningEnd.year < int(planningStartYear):
-                raise ValidationError(
-                    detail="Date cannot be earlier than planningStartYear",
-                    code="estPlanningEnd_et_planningStartYear",
-                )
-
-        if constructionEndYear is not None and estPlanningEnd is not None:
-            if estPlanningEnd.year > int(constructionEndYear):
-                raise ValidationError(
-                    detail="Date cannot be later than constructionEndYear",
-                    code="estPlanningEnd_lt_constructionEndYear",
-                )
-        if estPlanningEnd is not None and estPlanningStart is not None:
-            if estPlanningEnd < estPlanningStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningStart",
-                    code="estPlanningEnd_et_estPlanningStart",
-                )
-        if estConstructionStart is not None and estPlanningEnd is not None:
-            if estPlanningEnd > estConstructionStart:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionStart",
-                    code="estPlanningEnd_lt_estConstructionStart",
-                )
-        if estConstructionEnd is not None and estPlanningEnd is not None:
-            if estPlanningEnd > estConstructionEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionEnd",
-                    code="estPlanningEnd_lt_estConstructionEnd",
-                )
-
-        return estPlanningEnd
-
-    def validate_estConstructionStart(self, estConstructionStart):
-        """
-        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
-        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
-        """
-
-        project = getattr(self, "instance", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
-
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
-            planningStartYear = project.planningStartYear
-
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
-            constructionEndYear = project.constructionEndYear
-
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
-
-        if estConstructionStart is not None and estPlanningStart is not None:
-            if estConstructionStart < estPlanningStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningStart",
-                    code="estConstructionStart_et_estPlanningStart",
-                )
-        if estConstructionStart is not None and estPlanningEnd is not None:
-            if estConstructionStart < estPlanningEnd:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningEnd",
-                    code="estConstructionStart_et_estPlanningEnd",
-                )
-        if estConstructionStart is not None and planningStartYear is not None:
-            if estConstructionStart.year < int(planningStartYear):
-                raise ValidationError(
-                    detail="Date cannot be earlier than planningStartYear",
-                    code="estConstructionStart_et_planningStartYear",
-                )
-
-        if estConstructionStart is not None and constructionEndYear is not None:
-            if estConstructionStart.year > int(constructionEndYear):
-                raise ValidationError(
-                    detail="Date cannot be later than constructionEndYear",
-                    code="estConstructionStart_lt_constructionEndYear",
-                )
-
-        if estConstructionStart is not None and estConstructionEnd is not None:
-            if estConstructionStart > estConstructionEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionEnd",
-                    code="estConstructionStart_lt_estConstructionEnd",
-                )
-
-        return estConstructionStart
-
     def validate_estConstructionEnd(self, estConstructionEnd):
         """
-        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
-        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+        Function to check if a project is locked and the dateField estConstructionEnd in the Project PATCH
+        request is not set to a date later than the locked field constructionEndYear on the existing Project instance
         """
-
         project = getattr(self, "instance", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
-
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
-            planningStartYear = project.planningStartYear
-
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
+        if project is not None and hasattr(project, "lock"):
             constructionEndYear = project.constructionEndYear
-
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
-
-        if planningStartYear is not None and estConstructionEnd is not None:
-            if estConstructionEnd.year < int(planningStartYear):
-                raise ValidationError(
-                    detail="Date cannot be earlier than planningStartYear",
-                    code="estConstructionEnd_et_planningStartYear",
-                )
-        if constructionEndYear is not None and estConstructionEnd is not None:
-            if estConstructionEnd.year != int(constructionEndYear):
-                raise ValidationError(
-                    detail="Year should be consistent with the field estConstructionEnd",
-                    code="estConstructionEnd_et_constructionEndYear",
-                )
-        if estConstructionEnd is not None and estPlanningStart is not None:
-            if estConstructionEnd < estPlanningStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningStart",
-                    code="estConstructionEnd_et_estPlanningStart",
-                )
-        if estConstructionEnd is not None and estPlanningEnd is not None:
-            if estConstructionEnd < estPlanningEnd:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningEnd",
-                    code="estConstructionEnd_et_estPlanningEnd",
-                )
-        if estConstructionStart is not None and estConstructionEnd is not None:
-            if estConstructionEnd < estConstructionStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estConstructionStart",
-                    code="estConstructionEnd_et_estConstructionStart",
-                )
+            if constructionEndYear is not None and estConstructionEnd is not None:
+                if estConstructionEnd.year > constructionEndYear:
+                    raise ValidationError(
+                        detail="estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
+                        code="estConstructionEnd_lt_constructionEndYear",
+                    )
 
         return estConstructionEnd
 
-    def validate_planningStartYear(self, planningStartYear):
-        """
-        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
-        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
-        """
+    # def _format_date(self, dateStr):
+    #     for f in ["%Y-%m-%d", "%d.%m.%Y"]:
+    #         try:
+    #             return datetime.strptime(dateStr, f).date()
+    #         except ValueError:
+    #             pass
+    #     raise ParseError(detail="Invalid format", code="invalid")
 
-        project = getattr(self, "instance", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
+    # def validate_estPlanningStart(self, estPlanningStart):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+    #     """
 
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
-            constructionEndYear = project.constructionEndYear
+    #     project = getattr(self, "instance", None)
+    #     estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
+    #     planningStartYear = self.get_initial().get("planningStartYear", None)
+    #     estConstructionStart = self.get_initial().get("estConstructionStart", None)
+    #     estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+    #     constructionEndYear = self.get_initial().get("constructionEndYear", None)
 
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
+    #     if estPlanningEnd is not None:
+    #         estPlanningEnd = self._format_date(estPlanningEnd)
+    #     elif (
+    #         estPlanningEnd is None
+    #         and project is not None
+    #         and project.estPlanningEnd is not None
+    #     ):
+    #         estPlanningEnd = project.estPlanningEnd
+    #     if (
+    #         planningStartYear is None
+    #         and project is not None
+    #         and project.planningStartYear is not None
+    #     ):
+    #         planningStartYear = project.planningStartYear
 
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
+    #     if (
+    #         constructionEndYear is None
+    #         and project is not None
+    #         and project.constructionEndYear is not None
+    #     ):
+    #         constructionEndYear = project.constructionEndYear
 
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
+    #     if estConstructionStart is not None:
+    #         estConstructionStart = self._format_date(estConstructionStart)
+    #     elif (
+    #         estConstructionStart is None
+    #         and project is not None
+    #         and project.estConstructionStart is not None
+    #     ):
+    #         estConstructionStart = project.estConstructionStart
 
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
+    #     if estConstructionEnd is not None:
+    #         estConstructionEnd = self._format_date(estConstructionEnd)
+    #     elif (
+    #         estConstructionEnd is None
+    #         and project is not None
+    #         and project.estConstructionEnd is not None
+    #     ):
+    #         estConstructionEnd = project.estConstructionEnd
 
-        if planningStartYear is not None and estPlanningStart is not None:
-            if planningStartYear != estPlanningStart.year:
-                raise ValidationError(
-                    detail="Year should be consistent with the field estPlanningStart",
-                    code="planningStartYear_ne_estPlanningStart",
-                )
-        if planningStartYear is not None and estPlanningEnd is not None:
-            if planningStartYear > estPlanningEnd.year:
-                raise ValidationError(
-                    detail="Year cannot be later than estPlanningEnd",
-                    code="planningStartYear_lt_estPlanningEnd",
-                )
-        if estConstructionStart is not None and planningStartYear is not None:
-            if planningStartYear > estConstructionStart.year:
-                raise ValidationError(
-                    detail="Year cannot be later than estConstructionStart",
-                    code="planningStartYear_lt_estConstructionStart",
-                )
+    #     if planningStartYear is not None and estPlanningStart is not None:
+    #         if estPlanningStart.year != int(planningStartYear):
+    #             raise ValidationError(
+    #                 detail="Year should be consistent with the field planningStartYear",
+    #                 code="estPlanningStart_ne_planningStartYear",
+    #             )
+    #     if constructionEndYear is not None and estPlanningStart is not None:
+    #         if estPlanningStart.year > int(constructionEndYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than constructionEndYear",
+    #                 code="estPlanningStart_lt_constructionEndYear",
+    #             )
+    #     if estPlanningEnd is not None and estPlanningStart is not None:
+    #         if estPlanningStart > estPlanningEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estPlanningEnd",
+    #                 code="estPlanningStart_lt_estPlanningEnd",
+    #             )
+    #     if estConstructionStart is not None and estPlanningStart is not None:
+    #         if estPlanningStart > estConstructionStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estConstructionStart",
+    #                 code="estPlanningStart_lt_estConstructionStart",
+    #             )
+    #     if estConstructionEnd is not None and estPlanningStart is not None:
+    #         if estPlanningStart > estConstructionEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estConstructionEnd",
+    #                 code="estPlanningStart_lt_estConstructionEnd",
+    #             )
 
-        if estConstructionEnd is not None and planningStartYear is not None:
-            if planningStartYear > estConstructionEnd.year:
-                raise ValidationError(
-                    detail="Year cannot be later than estConstructionEnd",
-                    code="planningStartYear_lt_estConstructionEnd",
-                )
+    #     return estPlanningStart
 
-        if constructionEndYear is not None and planningStartYear is not None:
-            if planningStartYear > int(constructionEndYear):
-                raise ValidationError(
-                    detail="Year cannot be later than constructionEndYear",
-                    code="planningStartYear_lt_constructionEndYear",
-                )
+    # def validate_estPlanningEnd(self, estPlanningEnd):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+    #     """
 
-        return planningStartYear
+    #     project = getattr(self, "instance", None)
+    #     estPlanningStart = self.get_initial().get("estPlanningStart", None)
+    #     planningStartYear = self.get_initial().get("planningStartYear", None)
+    #     estConstructionStart = self.get_initial().get("estConstructionStart", None)
+    #     estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+    #     constructionEndYear = self.get_initial().get("constructionEndYear", None)
 
-    def validate_constructionEndYear(self, constructionEndYear):
-        """
-        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
-        request is not set to a date earlier than the locked field constructionEndYear on the existing Project instance
-        """
+    #     if estPlanningStart is not None:
+    #         estPlanningStart = self._format_date(estPlanningStart)
+    #     elif (
+    #         estPlanningStart is None
+    #         and project is not None
+    #         and project.estPlanningStart is not None
+    #     ):
+    #         estPlanningStart = project.estPlanningStart
+    #     if (
+    #         planningStartYear is None
+    #         and project is not None
+    #         and project.planningStartYear is not None
+    #     ):
+    #         planningStartYear = project.planningStartYear
 
-        project = getattr(self, "instance", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
-            planningStartYear = project.planningStartYear
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
+    #     if (
+    #         constructionEndYear is None
+    #         and project is not None
+    #         and project.constructionEndYear is not None
+    #     ):
+    #         constructionEndYear = project.constructionEndYear
+    #     if estConstructionStart is not None:
+    #         estConstructionStart = self._format_date(estConstructionStart)
+    #     elif (
+    #         estConstructionStart is None
+    #         and project is not None
+    #         and project.estConstructionStart is not None
+    #     ):
+    #         estConstructionStart = project.estConstructionStart
+    #     if estConstructionEnd is not None:
+    #         estConstructionEnd = self._format_date(estConstructionEnd)
+    #     elif (
+    #         estConstructionEnd is None
+    #         and project is not None
+    #         and project.estConstructionEnd is not None
+    #     ):
+    #         estConstructionEnd = project.estConstructionEnd
 
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
+    #     if planningStartYear is not None and estPlanningEnd is not None:
+    #         if estPlanningEnd.year < int(planningStartYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than planningStartYear",
+    #                 code="estPlanningEnd_et_planningStartYear",
+    #             )
 
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
+    #     if constructionEndYear is not None and estPlanningEnd is not None:
+    #         if estPlanningEnd.year > int(constructionEndYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than constructionEndYear",
+    #                 code="estPlanningEnd_lt_constructionEndYear",
+    #             )
+    #     if estPlanningEnd is not None and estPlanningStart is not None:
+    #         if estPlanningEnd < estPlanningStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estPlanningStart",
+    #                 code="estPlanningEnd_et_estPlanningStart",
+    #             )
+    #     if estConstructionStart is not None and estPlanningEnd is not None:
+    #         if estPlanningEnd > estConstructionStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estConstructionStart",
+    #                 code="estPlanningEnd_lt_estConstructionStart",
+    #             )
+    #     if estConstructionEnd is not None and estPlanningEnd is not None:
+    #         if estPlanningEnd > estConstructionEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estConstructionEnd",
+    #                 code="estPlanningEnd_lt_estConstructionEnd",
+    #             )
 
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
+    #     return estPlanningEnd
 
-        if constructionEndYear is not None and estPlanningStart is not None:
-            if constructionEndYear < estPlanningStart.year:
-                raise ValidationError(
-                    detail="Year cannot be earlier than estPlanningStart",
-                    code="constructionEndYear_et_estPlanningStart",
-                )
-        if constructionEndYear is not None and planningStartYear is not None:
-            if constructionEndYear < int(planningStartYear):
-                raise ValidationError(
-                    detail="Year cannot be earlier than planningStartYear",
-                    code="constructionEndYear_et_planningStartYear",
-                )
-        if constructionEndYear is not None and estPlanningEnd is not None:
-            if constructionEndYear < estPlanningEnd.year:
-                raise ValidationError(
-                    detail="Year cannot be earlier than estPlanningEnd",
-                    code="constructionEndYear_et_estPlanningEnd",
-                )
-        if estConstructionStart is not None and constructionEndYear is not None:
-            if constructionEndYear < estConstructionStart.year:
-                raise ValidationError(
-                    detail="Year cannot be earlier than estConstructionStart",
-                    code="constructionEndYear_et_estConstructionStart",
-                )
+    # def validate_estConstructionStart(self, estConstructionStart):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+    #     """
 
-        if estConstructionEnd is not None and constructionEndYear is not None:
-            if constructionEndYear != estConstructionEnd.year:
-                raise ValidationError(
-                    detail="Year should be consistent with the field estConstructionEnd",
-                    code="constructionEndYear_ne_estConstructionEnd",
-                )
+    #     project = getattr(self, "instance", None)
+    #     estPlanningStart = self.get_initial().get("estPlanningStart", None)
+    #     estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
+    #     planningStartYear = self.get_initial().get("planningStartYear", None)
+    #     estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+    #     constructionEndYear = self.get_initial().get("constructionEndYear", None)
 
-        return constructionEndYear
+    #     if estPlanningStart is not None:
+    #         estPlanningStart = self._format_date(estPlanningStart)
+    #     elif (
+    #         estPlanningStart is None
+    #         and project is not None
+    #         and project.estPlanningStart is not None
+    #     ):
+    #         estPlanningStart = project.estPlanningStart
+
+    #     if estPlanningEnd is not None:
+    #         estPlanningEnd = self._format_date(estPlanningEnd)
+    #     elif (
+    #         estPlanningEnd is None
+    #         and project is not None
+    #         and project.estPlanningEnd is not None
+    #     ):
+    #         estPlanningEnd = project.estPlanningEnd
+    #     if (
+    #         planningStartYear is None
+    #         and project is not None
+    #         and project.planningStartYear is not None
+    #     ):
+    #         planningStartYear = project.planningStartYear
+
+    #     if (
+    #         constructionEndYear is None
+    #         and project is not None
+    #         and project.constructionEndYear is not None
+    #     ):
+    #         constructionEndYear = project.constructionEndYear
+
+    #     if estConstructionEnd is not None:
+    #         estConstructionEnd = self._format_date(estConstructionEnd)
+    #     elif (
+    #         estConstructionEnd is None
+    #         and project is not None
+    #         and project.estConstructionEnd is not None
+    #     ):
+    #         estConstructionEnd = project.estConstructionEnd
+
+    #     if estConstructionStart is not None and estPlanningStart is not None:
+    #         if estConstructionStart < estPlanningStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estPlanningStart",
+    #                 code="estConstructionStart_et_estPlanningStart",
+    #             )
+    #     if estConstructionStart is not None and estPlanningEnd is not None:
+    #         if estConstructionStart < estPlanningEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estPlanningEnd",
+    #                 code="estConstructionStart_et_estPlanningEnd",
+    #             )
+    #     if estConstructionStart is not None and planningStartYear is not None:
+    #         if estConstructionStart.year < int(planningStartYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than planningStartYear",
+    #                 code="estConstructionStart_et_planningStartYear",
+    #             )
+
+    #     if estConstructionStart is not None and constructionEndYear is not None:
+    #         if estConstructionStart.year > int(constructionEndYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than constructionEndYear",
+    #                 code="estConstructionStart_lt_constructionEndYear",
+    #             )
+
+    #     if estConstructionStart is not None and estConstructionEnd is not None:
+    #         if estConstructionStart > estConstructionEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be later than estConstructionEnd",
+    #                 code="estConstructionStart_lt_estConstructionEnd",
+    #             )
+
+    #     return estConstructionStart
+
+    # def validate_estConstructionEnd(self, estConstructionEnd):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+    #     """
+
+    #     project = getattr(self, "instance", None)
+    #     estPlanningStart = self.get_initial().get("estPlanningStart", None)
+    #     estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
+    #     planningStartYear = self.get_initial().get("planningStartYear", None)
+    #     estConstructionStart = self.get_initial().get("estConstructionStart", None)
+    #     constructionEndYear = self.get_initial().get("constructionEndYear", None)
+
+    #     if estPlanningStart is not None:
+    #         estPlanningStart = self._format_date(estPlanningStart)
+    #     elif (
+    #         estPlanningStart is None
+    #         and project is not None
+    #         and project.estPlanningStart is not None
+    #     ):
+    #         estPlanningStart = project.estPlanningStart
+
+    #     if estPlanningEnd is not None:
+    #         estPlanningEnd = self._format_date(estPlanningEnd)
+    #     elif (
+    #         estPlanningEnd is None
+    #         and project is not None
+    #         and project.estPlanningEnd is not None
+    #     ):
+    #         estPlanningEnd = project.estPlanningEnd
+    #     if (
+    #         planningStartYear is None
+    #         and project is not None
+    #         and project.planningStartYear is not None
+    #     ):
+    #         planningStartYear = project.planningStartYear
+
+    #     if (
+    #         constructionEndYear is None
+    #         and project is not None
+    #         and project.constructionEndYear is not None
+    #     ):
+    #         constructionEndYear = project.constructionEndYear
+
+    #     if estConstructionStart is not None:
+    #         estConstructionStart = self._format_date(estConstructionStart)
+
+    #     elif (
+    #         estConstructionStart is None
+    #         and project is not None
+    #         and project.estConstructionStart is not None
+    #     ):
+    #         estConstructionStart = project.estConstructionStart
+
+    #     if planningStartYear is not None and estConstructionEnd is not None:
+    #         if estConstructionEnd.year < int(planningStartYear):
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than planningStartYear",
+    #                 code="estConstructionEnd_et_planningStartYear",
+    #             )
+    #     if constructionEndYear is not None and estConstructionEnd is not None:
+    #         if estConstructionEnd.year != int(constructionEndYear):
+    #             raise ValidationError(
+    #                 detail="Year should be consistent with the field estConstructionEnd",
+    #                 code="estConstructionEnd_et_constructionEndYear",
+    #             )
+    #     if estConstructionEnd is not None and estPlanningStart is not None:
+    #         if estConstructionEnd < estPlanningStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estPlanningStart",
+    #                 code="estConstructionEnd_et_estPlanningStart",
+    #             )
+    #     if estConstructionEnd is not None and estPlanningEnd is not None:
+    #         if estConstructionEnd < estPlanningEnd:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estPlanningEnd",
+    #                 code="estConstructionEnd_et_estPlanningEnd",
+    #             )
+    #     if estConstructionStart is not None and estConstructionEnd is not None:
+    #         if estConstructionEnd < estConstructionStart:
+    #             raise ValidationError(
+    #                 detail="Date cannot be earlier than estConstructionStart",
+    #                 code="estConstructionEnd_et_estConstructionStart",
+    #             )
+
+    #     return estConstructionEnd
+
+    # def validate_planningStartYear(self, planningStartYear):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+    #     """
+
+    #     project = getattr(self, "instance", None)
+    #     estPlanningStart = self.get_initial().get("estPlanningStart", None)
+    #     estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
+    #     estConstructionStart = self.get_initial().get("estConstructionStart", None)
+    #     estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+    #     constructionEndYear = self.get_initial().get("constructionEndYear", None)
+
+    #     if (
+    #         constructionEndYear is None
+    #         and project is not None
+    #         and project.constructionEndYear is not None
+    #     ):
+    #         constructionEndYear = project.constructionEndYear
+
+    #     if estPlanningStart is not None:
+    #         estPlanningStart = self._format_date(estPlanningStart)
+    #     elif (
+    #         estPlanningStart is None
+    #         and project is not None
+    #         and project.estPlanningStart is not None
+    #     ):
+    #         estPlanningStart = project.estPlanningStart
+
+    #     if estPlanningEnd is not None:
+    #         estPlanningEnd = self._format_date(estPlanningEnd)
+    #     elif (
+    #         estPlanningEnd is None
+    #         and project is not None
+    #         and project.estPlanningEnd is not None
+    #     ):
+    #         estPlanningEnd = project.estPlanningEnd
+
+    #     if estConstructionStart is not None:
+    #         estConstructionStart = self._format_date(estConstructionStart)
+    #     elif (
+    #         estConstructionStart is None
+    #         and project is not None
+    #         and project.estConstructionStart is not None
+    #     ):
+    #         estConstructionStart = project.estConstructionStart
+
+    #     if estConstructionEnd is not None:
+    #         estConstructionEnd = self._format_date(estConstructionEnd)
+    #     elif (
+    #         estConstructionEnd is None
+    #         and project is not None
+    #         and project.estConstructionEnd is not None
+    #     ):
+    #         estConstructionEnd = project.estConstructionEnd
+
+    #     if planningStartYear is not None and estPlanningStart is not None:
+    #         if planningStartYear != estPlanningStart.year:
+    #             raise ValidationError(
+    #                 detail="Year should be consistent with the field estPlanningStart",
+    #                 code="planningStartYear_ne_estPlanningStart",
+    #             )
+    #     if planningStartYear is not None and estPlanningEnd is not None:
+    #         if planningStartYear > estPlanningEnd.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be later than estPlanningEnd",
+    #                 code="planningStartYear_lt_estPlanningEnd",
+    #             )
+    #     if estConstructionStart is not None and planningStartYear is not None:
+    #         if planningStartYear > estConstructionStart.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be later than estConstructionStart",
+    #                 code="planningStartYear_lt_estConstructionStart",
+    #             )
+
+    #     if estConstructionEnd is not None and planningStartYear is not None:
+    #         if planningStartYear > estConstructionEnd.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be later than estConstructionEnd",
+    #                 code="planningStartYear_lt_estConstructionEnd",
+    #             )
+
+    #     if constructionEndYear is not None and planningStartYear is not None:
+    #         if planningStartYear > int(constructionEndYear):
+    #             raise ValidationError(
+    #                 detail="Year cannot be later than constructionEndYear",
+    #                 code="planningStartYear_lt_constructionEndYear",
+    #             )
+
+    #     return planningStartYear
+
+    # def validate_constructionEndYear(self, constructionEndYear):
+    #     """
+    #     Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+    #     request is not set to a date earlier than the locked field constructionEndYear on the existing Project instance
+    #     """
+
+    #     project = getattr(self, "instance", None)
+    #     planningStartYear = self.get_initial().get("planningStartYear", None)
+    #     estPlanningStart = self.get_initial().get("estPlanningStart", None)
+    #     estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
+    #     estConstructionStart = self.get_initial().get("estConstructionStart", None)
+    #     estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+    #     if (
+    #         planningStartYear is None
+    #         and project is not None
+    #         and project.planningStartYear is not None
+    #     ):
+    #         planningStartYear = project.planningStartYear
+    #     if estPlanningStart is not None:
+    #         estPlanningStart = self._format_date(estPlanningStart)
+    #     elif (
+    #         estPlanningStart is None
+    #         and project is not None
+    #         and project.estPlanningStart is not None
+    #     ):
+    #         estPlanningStart = project.estPlanningStart
+
+    #     if estPlanningEnd is not None:
+    #         estPlanningEnd = self._format_date(estPlanningEnd)
+    #     elif (
+    #         estPlanningEnd is None
+    #         and project is not None
+    #         and project.estPlanningEnd is not None
+    #     ):
+    #         estPlanningEnd = project.estPlanningEnd
+
+    #     if estConstructionStart is not None:
+    #         estConstructionStart = self._format_date(estConstructionStart)
+    #     elif (
+    #         estConstructionStart is None
+    #         and project is not None
+    #         and project.estConstructionStart is not None
+    #     ):
+    #         estConstructionStart = project.estConstructionStart
+
+    #     if estConstructionEnd is not None:
+    #         estConstructionEnd = self._format_date(estConstructionEnd)
+    #     elif (
+    #         estConstructionEnd is None
+    #         and project is not None
+    #         and project.estConstructionEnd is not None
+    #     ):
+    #         estConstructionEnd = project.estConstructionEnd
+
+    #     if constructionEndYear is not None and estPlanningStart is not None:
+    #         if constructionEndYear < estPlanningStart.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be earlier than estPlanningStart",
+    #                 code="constructionEndYear_et_estPlanningStart",
+    #             )
+    #     if constructionEndYear is not None and planningStartYear is not None:
+    #         if constructionEndYear < int(planningStartYear):
+    #             raise ValidationError(
+    #                 detail="Year cannot be earlier than planningStartYear",
+    #                 code="constructionEndYear_et_planningStartYear",
+    #             )
+    #     if constructionEndYear is not None and estPlanningEnd is not None:
+    #         if constructionEndYear < estPlanningEnd.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be earlier than estPlanningEnd",
+    #                 code="constructionEndYear_et_estPlanningEnd",
+    #             )
+    #     if estConstructionStart is not None and constructionEndYear is not None:
+    #         if constructionEndYear < estConstructionStart.year:
+    #             raise ValidationError(
+    #                 detail="Year cannot be earlier than estConstructionStart",
+    #                 code="constructionEndYear_et_estConstructionStart",
+    #             )
+
+    #     if estConstructionEnd is not None and constructionEndYear is not None:
+    #         if constructionEndYear != estConstructionEnd.year:
+    #             raise ValidationError(
+    #                 detail="Year should be consistent with the field estConstructionEnd",
+    #                 code="constructionEndYear_ne_estConstructionEnd",
+    #             )
+
+    #     return constructionEndYear
 
     def _is_projectClass_projectLocation_valid(
         self,
