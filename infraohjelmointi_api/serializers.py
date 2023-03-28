@@ -910,7 +910,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         if presenceEnd is not None and presenceStart is not None:
             if presenceEnd < presenceStart:
                 raise ValidationError(
-                    detail="Date cannot be earlier than presenceEnd",
+                    detail="Date cannot be earlier than presenceStart",
                     code="presenceEnd_et_presenceStart",
                 )
 
