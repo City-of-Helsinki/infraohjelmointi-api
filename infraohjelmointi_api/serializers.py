@@ -796,7 +796,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             try:
                 return datetime.strptime(dateStr, f).date()
             except ValueError:
-                pass
+                return None
         raise ParseError(detail="Invalid format", code="invalid")
 
     def validate_estPlanningStart(self, estPlanningStart):
@@ -833,6 +833,33 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 )
 
         return estPlanningStart
+
+    def validate_estPlanningEnd(self, estPlanningEnd):
+        """
+        Function to check if a project is locked and the dateField estPlanningStart in the Project PATCH
+        request is not set to a date earlier than the locked field planningStartYear on the existing Project instance
+        """
+
+        project = getattr(self, "instance", None)
+        estPlanningStart = self.get_initial().get("estPlanningStart", None)
+
+        if estPlanningStart is not None:
+            estPlanningStart = self._format_date(estPlanningStart)
+        elif (
+            estPlanningStart is None
+            and project is not None
+            and project.estPlanningStart is not None
+        ):
+            estPlanningStart = project.estPlanningStart
+
+        if estPlanningEnd is not None and estPlanningStart is not None:
+            if estPlanningEnd < estPlanningStart:
+                raise ValidationError(
+                    detail="Date cannot be earlier than estPlanningStart",
+                    code="estPlanningEnd_et_estPlanningStart",
+                )
+
+        return estPlanningEnd
 
     def validate_estConstructionEnd(self, estConstructionEnd):
         """
