@@ -1101,6 +1101,24 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                     "personConstruction must be populated if phase is `construction`",
                     code="construction_phase_missing_personConstruction",
                 )
+        if phase.value == "warrantyPeriod":
+            estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
+
+            if estConstructionEnd is not None:
+                estConstructionEnd = self._format_date(estConstructionEnd)
+            elif (
+                estConstructionEnd is None
+                and project is not None
+                and project.estConstructionEnd is not None
+            ):
+                estConstructionEnd = project.estConstructionEnd
+
+            if estConstructionEnd is not None:
+                if datetime.today().date() < estConstructionEnd:
+                    raise ValidationError(
+                        "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
+                        code="warrantyPeriod_phase_invalid_estConstructionEnd",
+                    )
 
         return phase
 
