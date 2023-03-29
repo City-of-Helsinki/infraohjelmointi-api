@@ -26,6 +26,12 @@ from overrides import override
 
 
 class Project(models.Model):
+    def get_default_projectPhase():
+        try:
+            return ProjectPhase.objects.get(value="proposal")
+        except ProjectPhase.DoesNotExist:
+            return None
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
@@ -83,7 +89,11 @@ class Project(models.Model):
         blank=True,
     )
     phase = models.ForeignKey(
-        ProjectPhase, on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectPhase,
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        default=get_default_projectPhase,
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", null=True, blank=True
