@@ -1117,7 +1117,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 if datetime.today().date() < estConstructionEnd:
                     raise ValidationError(
                         "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-                        code="warrantyPeriod_phase_invalid_estConstructionEnd",
+                        code="warrantyPeriod_phase_inconsistent_date",
                     )
 
         return phase
