@@ -571,7 +571,7 @@ class ProjectTestCase(TestCase):
             "personProgramming": None,
             "personConstruction": None,
             "phase": None,
-            "programmed": True,
+            "programmed": False,
             "category": None,
             "constructionPhaseDetail": None,
             "estPlanningStart": None,
