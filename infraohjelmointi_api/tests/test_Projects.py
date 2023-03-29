@@ -570,8 +570,6 @@ class ProjectTestCase(TestCase):
             "personPlanning": None,
             "personProgramming": None,
             "personConstruction": None,
-            "phase": None,
-            "programmed": False,
             "category": None,
             "constructionPhaseDetail": None,
             "estPlanningStart": None,
@@ -653,14 +651,12 @@ class ProjectTestCase(TestCase):
 
         res_data = response.json()
         new_createdId = res_data["id"]
-
         serializer = ProjectCreateSerializer(
             Project.objects.get(id=new_createdId), many=False
         )
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
-
         self.assertEqual(
             response.content, result_expected, msg="Created object data != POST data"
         )
@@ -2991,6 +2987,79 @@ class ProjectTestCase(TestCase):
             response.json()["results"][0]["finances"]["budgetProposalCurrentYearPlus0"],
             "200.00",
             msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
+
+    def test_other_field_validations(self):
+        ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="programming")
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+            "programmed": True,
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "category must be populated if programmed is `True`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+            "programmed": False,
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "phase must be set to `proposal` if programmed is `False`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+        createdId = response.json()["id"]
+        data = {"phase": self.projectPhase_2_Id}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "planningStartYear and constructionEndYear must be populated if phase is `programming`",
+            response.json()["errors"][0]["detail"],
         )
 
     def test_pw_folder_project(self):
