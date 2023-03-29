@@ -1276,9 +1276,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 detail="phase must be set to `proposal` if programmed is `False`",
                 code="programmed_false_missing_phase",
             )
-        if programmed == True and (phase is None or phase.value != "programmed"):
+        if programmed == True and (phase is None or phase.value != "programming"):
             raise ValidationError(
-                detail="phase must be set to `programmed` if programmed is `True`",
+                detail="phase must be set to `programming` if programmed is `True`",
                 code="programmed_true_missing_phase",
             )
 
