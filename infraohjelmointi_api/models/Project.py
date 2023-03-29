@@ -190,7 +190,18 @@ class Project(models.Model):
     responsibleZone = models.ForeignKey(
         ResponsibleZone, on_delete=models.DO_NOTHING, null=True, blank=True
     )
-
+    budgetForecast1CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
+    budgetForecast2CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
+    budgetForecast3CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
+    budgetForecast4CurrentYear = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
     projectProgram = models.TextField(max_length=15000, blank=True, null=True)
 
     delays = models.CharField(max_length=200, blank=True, null=True)

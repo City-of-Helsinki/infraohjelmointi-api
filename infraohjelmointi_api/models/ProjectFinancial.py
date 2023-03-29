@@ -22,18 +22,7 @@ class ProjectFinancial(models.Model):
         null=False,
         related_name="finances",
     )
-    budgetForecast1CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast2CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast3CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
-    budgetForecast4CurrentYear = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
-    )
+
     budgetProposalCurrentYearPlus0 = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
