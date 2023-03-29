@@ -62,6 +62,12 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 class ProjectFinancialSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectFinancial
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ProjectFinancial.objects.all(),
+                fields=["year", "project"],
+            ),
+        ]
 
 
 class ProjectLockSerializer(serializers.ModelSerializer):
