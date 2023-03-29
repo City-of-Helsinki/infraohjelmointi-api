@@ -106,19 +106,19 @@ class Project(models.Model):
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     constructionEndYear = models.PositiveIntegerField(
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     budgetOverrunYear = models.PositiveIntegerField(
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     budgetOverrunAmount = models.PositiveIntegerField(blank=True, null=True, default=0)
     projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
