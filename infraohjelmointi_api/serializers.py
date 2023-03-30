@@ -62,6 +62,7 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 class ProjectFinancialSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectFinancial
+        exclude = ["createdDate", "updatedDate", "project"]
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectFinancial.objects.all(),
@@ -373,7 +374,17 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
     def get_finances(self, obj):
         try:
-            queryset = ProjectFinancial.objects.get(project=obj, year=date.today().year)
+            year = self.context.get("finance_year", None)
+            queryset = ProjectFinancial.objects.none()
+            if year is not None:
+                queryset, _ = ProjectFinancial.objects.get_or_create(
+                    project=obj, year=year
+                )
+            else:
+                queryset, _ = ProjectFinancial.objects.get_or_create(
+                    project=obj, year=date.today().year
+                )
+
             return ProjectFinancialSerializer(queryset, many=False).data
         except Exception as e:
             return None
@@ -429,6 +440,14 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    finances = serializers.SerializerMethodField()
+
+    def get_finances(self, obj):
+        try:
+            queryset = ProjectFinancial.objects.get(project=obj, year=date.today().year)
+            return ProjectFinancialSerializer(queryset, many=False).data
+        except Exception as e:
+            return None
 
     class Meta(BaseMeta):
         model = Project
