@@ -62,13 +62,19 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 class ProjectFinancialSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectFinancial
-        exclude = ["createdDate", "updatedDate", "project"]
+        exclude = ["createdDate", "updatedDate", "id"]
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectFinancial.objects.all(),
                 fields=["year", "project"],
             ),
         ]
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep.pop("project")
+        return rep
 
 
 class ProjectLockSerializer(serializers.ModelSerializer):
@@ -373,21 +379,17 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
         return obj.projectReadiness()
 
     def get_finances(self, obj):
-        try:
-            year = self.context.get("finance_year", None)
-            queryset = ProjectFinancial.objects.none()
-            if year is not None:
-                queryset, _ = ProjectFinancial.objects.get_or_create(
-                    project=obj, year=year
-                )
-            else:
-                queryset, _ = ProjectFinancial.objects.get_or_create(
-                    project=obj, year=date.today().year
-                )
 
-            return ProjectFinancialSerializer(queryset, many=False).data
-        except Exception as e:
-            return None
+        year = self.context.get("finance_year", None)
+        queryset = ProjectFinancial.objects.none()
+        if year is not None:
+            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
+        else:
+            queryset, _ = ProjectFinancial.objects.get_or_create(
+                project=obj, year=date.today().year
+            )
+
+        return ProjectFinancialSerializer(queryset, many=False).data
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
@@ -443,11 +445,17 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField()
 
     def get_finances(self, obj):
-        try:
-            queryset = ProjectFinancial.objects.get(project=obj, year=date.today().year)
-            return ProjectFinancialSerializer(queryset, many=False).data
-        except Exception as e:
-            return None
+
+        year = self.context.get("finance_year", None)
+        queryset = ProjectFinancial.objects.none()
+        if year is not None:
+            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
+        else:
+            queryset, _ = ProjectFinancial.objects.get_or_create(
+                project=obj, year=date.today().year
+            )
+
+        return ProjectFinancialSerializer(queryset, many=False).data
 
     class Meta(BaseMeta):
         model = Project
@@ -597,6 +605,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
+        print(validated_data.get("finances", {}), "PRITNIG FROM UPDATE OF SERIALIER")
+        print(validated_data, "printing whole")
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
             lockedFields = [

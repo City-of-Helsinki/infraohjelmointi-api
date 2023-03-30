@@ -226,6 +226,35 @@ class ProjectViewSet(BaseViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
 
+    @override
+    def partial_update(self, request, pk, *args, **kwargs):
+        finances = request.data.pop("finances", None)
+        if finances is not None and finances.get("year", None) is not None:
+            financeObject, _ = ProjectFinancial.objects.get_or_create(
+                year=finances["year"], project=pk
+            )
+            financeSerializer = ProjectFinancialSerializer(
+                financeObject, data=finances, partial=True, many=False
+            )
+            financeSerializer.is_valid(raise_exception=True)
+            financeSerializer.save()
+
+        project = self.get_object()
+        projectSerializer = self.get_serializer(
+            project,
+            data=request.data,
+            many=False,
+            partial=True,
+            context={
+                "finance_year": finances["year"]
+                if finances is not None and finances.get("year", None) is not None
+                else None
+            },
+        )
+        projectSerializer.is_valid(raise_exception=True)
+        projectSerializer.save()
+        return Response(projectSerializer.data)
+
     @action(
         methods=["get"],
         detail=False,
