@@ -226,6 +226,32 @@ class ProjectViewSet(BaseViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
 
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"(?P<year>[0-9]{4})",
+    )
+    def get_projects_by_financial_year(self, request, year):
+        """
+        Custom action to get projects by financial year
+        Usage: /projects/<year>/
+        """
+        projectQuerySet = self.get_queryset()
+        searchPaginator = PageNumberPagination()
+        searchPaginator.page_size = 20
+
+        result = searchPaginator.paginate_queryset(projectQuerySet, request)
+        serializer = ProjectGetSerializer(
+            result, many=True, context={"finance_year": year}
+        )
+        response = {
+            "next": searchPaginator.get_next_link(),
+            "previous": searchPaginator.get_previous_link(),
+            "count": searchPaginator.page.paginator.count,
+            "results": serializer.data,
+        }
+        return Response(response)
+
     @override
     def get_serializer_class(self):
         """
