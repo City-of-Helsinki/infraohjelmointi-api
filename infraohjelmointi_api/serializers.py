@@ -76,6 +76,34 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
         rep.pop("project")
         return rep
 
+    @override
+    def update(self, instance, validated_data):
+
+        # Check if project is locked and any locked fields are not being updated
+        if hasattr(instance.project, "lock"):
+            lockedFields = [
+                "budgetProposalCurrentYearPlus0",
+                "budgetProposalCurrentYearPlus1",
+                "budgetProposalCurrentYearPlus2",
+                "preliminaryCurrentYearPlus3",
+                "preliminaryCurrentYearPlus4",
+                "preliminaryCurrentYearPlus5",
+                "preliminaryCurrentYearPlus6",
+                "preliminaryCurrentYearPlus7",
+                "preliminaryCurrentYearPlus8",
+                "preliminaryCurrentYearPlus9",
+                "preliminaryCurrentYearPlus10",
+            ]
+            for field in lockedFields:
+                if validated_data.get(field, None) is not None:
+                    raise serializers.ValidationError(
+                        "The field {} cannot be modified when the project is locked".format(
+                            field
+                        )
+                    )
+
+        return super(ProjectFinancialSerializer, self).update(instance, validated_data)
+
 
 class ProjectLockSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
@@ -605,8 +633,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
-        print(validated_data.get("finances", {}), "PRITNIG FROM UPDATE OF SERIALIER")
-        print(validated_data, "printing whole")
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
             lockedFields = [
@@ -623,17 +649,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 "budgetForecast2CurrentYear",
                 "budgetForecast3CurrentYear",
                 "budgetForecast4CurrentYear",
-                "budgetProposalCurrentYearPlus0",
-                "budgetProposalCurrentYearPlus1",
-                "budgetProposalCurrentYearPlus2",
-                "preliminaryCurrentYearPlus3",
-                "preliminaryCurrentYearPlus4",
-                "preliminaryCurrentYearPlus5",
-                "preliminaryCurrentYearPlus6",
-                "preliminaryCurrentYearPlus7",
-                "preliminaryCurrentYearPlus8",
-                "preliminaryCurrentYearPlus9",
-                "preliminaryCurrentYearPlus10",
             ]
             for field in lockedFields:
                 if validated_data.get(field, None) is not None:

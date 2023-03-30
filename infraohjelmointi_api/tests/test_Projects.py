@@ -245,16 +245,6 @@ class ProjectTestCase(TestCase):
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
             budgetForecast4CurrentYear=None,
-            budgetProposalCurrentYearPlus1=None,
-            budgetProposalCurrentYearPlus2=None,
-            preliminaryCurrentYearPlus3=None,
-            preliminaryCurrentYearPlus4=None,
-            preliminaryCurrentYearPlus5=None,
-            preliminaryCurrentYearPlus6=None,
-            preliminaryCurrentYearPlus7=None,
-            preliminaryCurrentYearPlus8=None,
-            preliminaryCurrentYearPlus9=None,
-            preliminaryCurrentYearPlus10=None,
             louhi=False,
             gravel=False,
             budget=50,
@@ -479,16 +469,6 @@ class ProjectTestCase(TestCase):
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
             budgetForecast4CurrentYear=None,
-            budgetProposalCurrentYearPlus1=None,
-            budgetProposalCurrentYearPlus2=None,
-            preliminaryCurrentYearPlus3=None,
-            preliminaryCurrentYearPlus4=None,
-            preliminaryCurrentYearPlus5=None,
-            preliminaryCurrentYearPlus6=None,
-            preliminaryCurrentYearPlus7=None,
-            preliminaryCurrentYearPlus8=None,
-            preliminaryCurrentYearPlus9=None,
-            preliminaryCurrentYearPlus10=None,
         )
         response = self.client.get("/projects/")
         self.assertEqual(
@@ -623,14 +603,20 @@ class ProjectTestCase(TestCase):
             201,
             msg="Status code != 201 , Error: {}".format(response.json()),
         )
-        # deleting id and projectReadiness because request body doesn't contain an id and
-        #  but the response does if new resource is created
+
         res_data = response.json()
         new_createdId = res_data["id"]
-        del res_data["id"]
-        del res_data["projectReadiness"]
 
-        self.assertEqual(res_data, data, msg="Created object data != POST data")
+        serializer = ProjectGetSerializer(
+            Project.objects.get(id=new_createdId), many=False
+        )
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        self.assertEqual(
+            response.content, result_expected, msg="Created object data != POST data"
+        )
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
             True,
@@ -2050,7 +2036,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus0": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus0": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2066,7 +2052,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus1": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus1": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2082,7 +2068,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus2": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus2": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2098,7 +2084,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus3": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus3": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2114,7 +2100,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus4": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus4": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2130,7 +2116,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus5": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus5": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2146,7 +2132,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus6": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus6": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2162,7 +2148,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus7": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus7": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2178,7 +2164,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus8": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus8": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2194,7 +2180,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus9": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus9": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2210,7 +2196,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus10": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus10": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
