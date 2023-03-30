@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from infraohjelmointi_api.models import (
     Project,
     ProjectClass,
@@ -227,11 +228,12 @@ class ProjectViewSet(BaseViewSet):
     filterset_class = ProjectFilter
 
     @override
-    def partial_update(self, request, pk, *args, **kwargs):
+    def partial_update(self, request, *args, **kwargs):
         finances = request.data.pop("finances", None)
-        if finances is not None and finances.get("year", None) is not None:
+        project = self.get_object()
+        if finances is not None:
             financeObject, _ = ProjectFinancial.objects.get_or_create(
-                year=finances["year"], project=pk
+                year=finances.get("year", date.today().year), project=project
             )
             financeSerializer = ProjectFinancialSerializer(
                 financeObject, data=finances, partial=True, many=False
@@ -239,15 +241,14 @@ class ProjectViewSet(BaseViewSet):
             financeSerializer.is_valid(raise_exception=True)
             financeSerializer.save()
 
-        project = self.get_object()
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
             many=False,
             partial=True,
             context={
-                "finance_year": finances["year"]
-                if finances is not None and finances.get("year", None) is not None
+                "finance_year": finances.get("year", date.today().year)
+                if finances is not None
                 else None
             },
         )
