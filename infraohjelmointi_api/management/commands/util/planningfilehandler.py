@@ -1,6 +1,6 @@
 from openpyxl import load_workbook
 import re
-from .hierarchy import buildHierarchies, getColor, MAIN_CLASS_COLOR
+from .hierarchy import buildHierarchiesAndProjects, getColor, MAIN_CLASS_COLOR
 from ....services import PersonService, ProjectService, NoteService
 from . import IExcelFileHandler
 
@@ -39,7 +39,7 @@ class PlanningFileHandler(IExcelFileHandler):
             sheet = wb[sheetname]
             rows = list(sheet.rows)
 
-            buildHierarchies(
+            buildHierarchiesAndProjects(
                 wb=wb,
                 rows=rows,
                 skipables=skipables,
