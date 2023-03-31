@@ -633,6 +633,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
+        print(validated_data)
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
             lockedFields = [
