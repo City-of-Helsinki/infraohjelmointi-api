@@ -400,7 +400,7 @@ def proceedWithDistrict(
     )[0]
 
 
-def buildHierarchies(
+def buildHierarchiesAndProjects(
     wb,
     rows,
     skipables,
