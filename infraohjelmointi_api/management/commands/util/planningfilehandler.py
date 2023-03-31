@@ -1,79 +1,99 @@
-import pandas as pd
-import numpy as np
-import openpyxl
 from openpyxl import load_workbook
-
-from ....models import Project, Person, ProjectCategory, Note
-from .openpyxl_theme_and_tint_to_rgb import theme_and_tint_to_hex
-
-MAIN_CLASS_COLOR = "FFFF0000"
-CLASS_COLOR = "FFFFC000"
-SUBCLASS_COLOR = "FFFFFF00"
-BIG_AREA_COLOR = "C9C9C9"
-CITY_PART_COLOR = "A9D18E"
-GROUP_COLOR = "F8CBAD"
-GROUP_PROJECT_COLOR = "FBE5D6"
+import re
+from .hierarchy import buildHierarchies, getColor, MAIN_CLASS_COLOR
+from ....services import PersonService, ProjectService, NoteService
+from . import IExcelFileHandler
 
 
-def defaultProjectPerson():
-    person, _ = Person.objects.get_or_create(
-        firstName="Command Line",
-        lastName="User",
-        email="placeholder@blank.com",
-        title="Placeholder",
-        phone="000000",
-    )
-    person.save()
-    return person
+class PlanningFileHandler(IExcelFileHandler):
+    """Excel file handler implementation for planning data"""
 
-
-def getColor(wb, color_object):
-    try:
-        color_in_hex = theme_and_tint_to_hex(
-            wb=wb, theme=color_object.theme, tint=color_object.tint
+    def proceed_with_file(self, excel_path, stdout, style):
+        stdout.write(
+            style.ERROR(
+                "\n\nReading project data from planning file {}\n".format(excel_path)
+            )
         )
-    except:
-        color_in_hex = color_object.rgb
 
-    return color_in_hex
+        wb = load_workbook(excel_path, data_only=True, read_only=True)
 
+        skipables = [
+            "none",
+            "ylitysoikeus",
+            "tae&tse raamit",
+            "ylityspaine",
+            "ylitysoikeus yhteensä",
+        ]
 
-def loadProjectCategories():
-    return {pc.value: pc for pc in ProjectCategory.objects.all()}
+        main_class = [
+            cel[0]
+            for cel in wb.worksheets[0][3:11]
+            if cel[0].value
+            and re.match("^\d \d\d.+", cel[0].value.strip())
+            and hex(int(getColor(wb, cel[0].fill.start_color), 16)) == MAIN_CLASS_COLOR
+        ][0].value
 
+        for sheetname in wb.sheetnames:
+            stdout.write(style.NOTICE("\n\nHandling sheet {}\n".format(sheetname)))
 
-def proceedWithPlanningFile(excelPath, stdout, style):
-    stdout.write(
-        style.NOTICE("Reading project data from planning file {}".format(excelPath))
-    )
+            sheet = wb[sheetname]
+            rows = list(sheet.rows)
 
-    # TODO: to identify the main class, you can use index range from 3-8 and match it
+            buildHierarchies(
+                wb=wb,
+                rows=rows,
+                skipables=skipables,
+                main_class=main_class,
+                project_handler=self.proceed_with_project_row,
+            )
 
-    wb = load_workbook(excelPath, data_only=True)
-    sh = wb.worksheets[1]
-    rows = list(sh.rows)
-    for row in rows[3:]:
-        cell = row[0]
+        stdout.write(style.SUCCESS("\n\nTotal rows handled  {}\n".format(len(rows))))
 
-        if cell.value == None:
-            continue
+        stdout.write(style.SUCCESS("Planning file import done\n\n"))
 
-        cell_color = getColor(wb, cell.fill.start_color)
-        if cell_color == MAIN_CLASS_COLOR:
-            print("{} is main class ({})".format(cell.value, cell_color))
-        elif cell_color == CLASS_COLOR:
-            print("{} is class ({})".format(cell.value, cell_color))
-        elif cell_color == SUBCLASS_COLOR:
-            print("{} is sub class ({})".format(cell.value, cell_color))
-        elif cell_color == BIG_AREA_COLOR:
-            print("{} is big area ({})".format(cell.value, cell_color))
-        elif cell_color == CITY_PART_COLOR:
-            print("{} is city part class ({})".format(cell.value, cell_color))
-        elif cell_color == GROUP_COLOR:
-            print("{} is group ({})".format(cell.value, cell_color))
-        elif cell_color == GROUP_PROJECT_COLOR:
-            print("{} is group project ({})".format(cell.value, cell_color))
-        else:  # project without group
-            print("{} is project ({})".format(cell.value, cell_color))
+    def proceed_with_project_row(
+        self, row, name, project_class, project_location, project_group
+    ):
+        sapNumber = row[1].value
+        sapNetwork = row[2].value
+        projectManager = row[4].value.strip() if row[4].value else None
+        responsiblePerson = (
+            PersonService.get_or_create_by_last_name(lastName=projectManager)[0]
+            if projectManager and projectManager != "?"
+            else None
+        )
+        pwNumber = row[29].value
 
-    stdout.write(style.SUCCESS("Planning file import done"))
+        try:
+            project = ProjectService.get(
+                name=name,
+                projectClass=project_class,
+                projectLocation=project_location,
+                projectGroup=project_group,
+            )
+        except:
+            project = ProjectService.create(
+                name=name,
+                projectClass=project_class,
+                description="Kuvaus puuttuu",
+                projectLocation=project_location,
+                projectGroup=project_group,
+            )
+
+        project.sapProject = sapNumber
+        project.sapNetwork = sapNetwork
+        project.hkrId = pwNumber
+        project.personPlanning = responsiblePerson
+        project.save()
+
+        notes = str(row[28].value).strip()
+        if notes != "None" and notes != "?":
+            NoteService.create(
+                content=notes,
+                project=project,
+                byPerson=responsiblePerson
+                if responsiblePerson
+                else PersonService.get_or_create_by_name(
+                    firstName="Excel", lastName="Integraatio"
+                )[0],
+            )
