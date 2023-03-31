@@ -21,7 +21,11 @@ from ..models import (
     ProjectGroup,
     ProjectLock,
 )
-from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
+from ..serializers import (
+    ProjectGetSerializer,
+    ProjectNoteGetSerializer,
+    ProjectCreateSerializer,
+)
 
 from rest_framework.renderers import JSONRenderer
 from overrides import override
@@ -607,7 +611,7 @@ class ProjectTestCase(TestCase):
         res_data = response.json()
         new_createdId = res_data["id"]
 
-        serializer = ProjectGetSerializer(
+        serializer = ProjectCreateSerializer(
             Project.objects.get(id=new_createdId), many=False
         )
 
