@@ -57,7 +57,7 @@ import json
 from rest_framework import status
 from rest_framework.decorators import action
 
-from django.core import serializers
+from django.db import transaction
 from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
@@ -75,7 +75,7 @@ class BaseViewSet(viewsets.ModelViewSet):
 
 class ProjectFinancialViewSet(BaseViewSet):
     """
-    API endpoint that allows Project Lock status to be viewed or edited.
+    API endpoint that allows Project Finances to be viewed or edited.
     """
 
     permission_classes = []
@@ -227,6 +227,7 @@ class ProjectViewSet(BaseViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
 
+    @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
         finances = request.data.pop("finances", None)
