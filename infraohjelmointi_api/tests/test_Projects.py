@@ -26,6 +26,7 @@ from ..serializers import (
     ProjectNoteGetSerializer,
     ProjectCreateSerializer,
 )
+from datetime import date
 
 from rest_framework.renderers import JSONRenderer
 from overrides import override
@@ -2536,3 +2537,74 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 400, msg=response.json())
+
+    def test_project_finances(self):
+        response = self.client.get(
+            "/projects/{}/".format(self.project_1_Id),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["finances"]["year"],
+            date.today().year,
+            msg="Project does not contain current year finances by default",
+        )
+
+        response = self.client.get(
+            "/projects/{}/".format(2025),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["year"],
+            2025,
+            msg="Projects does not contain finances from the URL query year",
+        )
+        data = {"finances": {"year": 2050, "budgetProposalCurrentYearPlus0": 200}}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["finances"]["year"],
+            2050,
+            msg="Finances year != 2050",
+        )
+        self.assertEqual(
+            response.json()["finances"]["budgetProposalCurrentYearPlus0"],
+            "200.00",
+            msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
+        response = self.client.get(
+            "/projects/{}/".format(2050),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["year"],
+            2050,
+            msg="Projects does not contain finances from the URL query year",
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["budgetProposalCurrentYearPlus0"],
+            "200.00",
+            msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
