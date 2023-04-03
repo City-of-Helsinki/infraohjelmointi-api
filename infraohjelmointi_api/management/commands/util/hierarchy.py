@@ -21,21 +21,21 @@ OTHER_CLASSIFICATION_SUBCLASS_COLOR = hex(int("fff2dcdb", 16))
 AGGREGATING_SUB_LEVEL = hex(int("fff4faa4", 16))
 
 color_map = {
-    MAIN_CLASS_COLOR: "Main class color",
-    CLASS_COLOR: "Class color",
-    SUBCLASS_COLOR: "Subclass color",
-    DISTRICT_COLOR: "District color",
-    DIVISION_COLOR: "Division color",
-    GROUP_COLOR: "Group color",
-    GROUP_PROJECT_COLOR: "Group project color",
-    CLASS_GROUP_COLOR: "Class group color",
-    OTHER_CLASSIFICATION_COLOR: "Other classification color",
-    OTHER_CLASSIFICATION_SUBCLASS_COLOR: "Other classification subclass color",
-    AGGREGATING_SUB_LEVEL: "Aggregating sub level",
+    "FFFF0000": "MAIN CLASS",
+    "FFFFC000": "CLASS",
+    "FFFFFF00": "SUBCLASS",
+    "FFC9C9C9": "DISTRICT",
+    "FFA9D18E": "DIVISION",
+    "FFF8CBAD": "GROUP",
+    "FFFBE5D6": "GROUP PROJECT",
+    "FF66FF66": "CLASS GROUP",
+    "FFE6B9B8": "OTHER CLASSIFICATION",
+    "FFF2DCDB": "OTHER CLASSIFICATION SUBCLASS",
+    "FFF4FAA4": "AGGREGATING SUB LEVEL",
 }
 
 
-def getColor(wb, color_object):
+def getColor(wb, color_object) -> str:
     try:
         color_in_hex = theme_and_tint_to_hex(
             wb=wb, theme=color_object.theme, tint=color_object.tint
@@ -70,22 +70,18 @@ def buildHierarchies(
         pv_cell = row[1]
         pv_code = str(row[0].value).strip() if row[0].value else None
         pv_name = str(pv_cell.value).strip()
-        pv_cell_color_hex = hex(
-            int(
-                getColor(wb, pv_cell.fill.start_color) if pv_cell.fill else "FFFFFFFF",
-                16,
-            )
+        pv_cell_color = (
+            getColor(wb, pv_cell.fill.start_color) if pv_cell.fill else "FFFFFFFF"
         )
+        pv_cell_color_hex = hex(int(pv_cell_color, 16))
         # coordinator view
         cv_cell = row[6]
         cv_code = str(row[5].value).strip() if row[5].value else None
         cv_name = str(cv_cell.value).strip()
-        cv_cell_color_hex = hex(
-            int(
-                getColor(wb, cv_cell.fill.start_color) if cv_cell.fill else "FFFFFFFF",
-                16,
-            )
+        cv_cell_color = (
+            getColor(wb, cv_cell.fill.start_color) if cv_cell.fill else "FFFFFFFF"
         )
+        cv_cell_color_hex = hex(int(cv_cell_color, 16))
         cell_colors = [cv_cell_color_hex, pv_cell_color_hex]
         ##############################
         # Handle main class          #
@@ -97,8 +93,11 @@ def buildHierarchies(
                 pv_main_class = proceedWithMainClass(
                     code=pv_code,
                     name=pv_name,
+                    cell_color=pv_cell_color,
+                    row_number=pv_cell.row,
                 )
                 pv_class_stack.append(pv_main_class)
+
             if cv_cell_color_hex == MAIN_CLASS_COLOR:
                 cv_color_stack.clear()
                 cv_color_stack.append(cv_cell_color_hex)
@@ -109,6 +108,8 @@ def buildHierarchies(
                         name=cv_name,
                         for_coordinator_only=True,
                         related_to=pv_main_class,
+                        cell_color=cv_cell_color,
+                        row_number=cv_cell.row,
                     )
                 )
 
@@ -123,8 +124,11 @@ def buildHierarchies(
                     code=None,
                     name=pv_name,
                     parent=pv_class_stack[-1],
+                    cell_color=pv_cell_color,
+                    row_number=pv_cell.row,
                 )
                 pv_class_stack.append(pv_class)
+
             # coordinator view only has class group
             if cv_cell_color_hex in [
                 CLASS_COLOR,
@@ -171,6 +175,8 @@ def buildHierarchies(
                         parent=cv_class_stack[-1],
                         for_coordinator_only=True,
                         related_to=pv_class,
+                        cell_color=cv_cell_color,
+                        row_number=cv_cell.row,
                     )
                 )
 
@@ -185,12 +191,17 @@ def buildHierarchies(
                     code=None,
                     name=pv_name,
                     parent=pv_class_stack[-1],
+                    cell_color=pv_cell_color,
+                    row_number=pv_cell.row,
                 )
                 pv_class_stack.append(pv_class)
                 # if subslcass is also a district
                 if "suurpiiri" in pv_name.lower():
                     related_to_district = proceedWithDistrict(
-                        name=pv_name, parent_class=pv_class_stack[-1]
+                        name=pv_name,
+                        parent_class=pv_class_stack[-1],
+                        cell_color=str(DISTRICT_COLOR)[2:].upper(),
+                        row_number=pv_cell.row,
                     )
 
             if cv_cell_color_hex in [
@@ -253,6 +264,8 @@ def buildHierarchies(
                         parent=cv_class_stack[-1],
                         for_coordinator_only=True,
                         related_to=pv_class,
+                        cell_color=cv_cell_color,
+                        row_number=cv_cell.row,
                     )
                 )
 
@@ -262,6 +275,8 @@ def buildHierarchies(
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
                     for_coordinator_only=True,
+                    cell_color=cv_cell_color,
+                    row_number=cv_cell.row,
                 )
         #####################################
         # Handle other classification class #
@@ -285,6 +300,8 @@ def buildHierarchies(
                     name=cv_name,
                     parent=cv_class_stack[-1],
                     for_coordinator_only=True,
+                    cell_color=cv_cell_color,
+                    row_number=cv_cell.row,
                 )
             )
 
@@ -304,6 +321,8 @@ def getEndIndex(color_list: list, break_point: hex, check_point: list):
 def proceedWithMainClass(
     code: str,
     name: str,
+    cell_color: str,
+    row_number: int,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
 ) -> ProjectClass:
@@ -319,6 +338,18 @@ def proceedWithMainClass(
         ),  # remove spaces between numbers
         name,
     ).strip()
+    print_with_bg_color(
+        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
+            name,
+            color_map[cell_color],
+            cell_color,
+            row_number,
+            name,
+            related_to.id if related_to else None,
+            for_coordinator_only,
+        ),
+        cell_color,
+    )
     return ProjectClassService.get_or_create(
         name=name,
         parent=None,
@@ -331,6 +362,8 @@ def proceedWithMainClass(
 def proceedWithClass(
     code: str,
     name: str,
+    cell_color: str,
+    row_number: int,
     parent: ProjectClass,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
@@ -345,6 +378,19 @@ def proceedWithClass(
         code if code else "",
         name,
     ).strip()
+
+    print_with_bg_color(
+        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
+            name,
+            color_map[cell_color],
+            cell_color,
+            row_number,
+            "/".join([parent.path, name]),
+            related_to.id if related_to else None,
+            for_coordinator_only,
+        ),
+        cell_color,
+    )
     return ProjectClassService.get_or_create(
         name=name,
         parent=parent,
@@ -357,6 +403,8 @@ def proceedWithClass(
 def proceedWithSubClass(
     code: str,
     name: str,
+    cell_color: str,
+    row_number: int,
     parent: ProjectClass,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
@@ -371,6 +419,18 @@ def proceedWithSubClass(
         code if code else "",
         name,
     ).strip()
+    print_with_bg_color(
+        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
+            name,
+            color_map[cell_color],
+            cell_color,
+            row_number,
+            "/".join([parent.path, name]),
+            related_to.id if related_to else None,
+            for_coordinator_only,
+        ),
+        cell_color,
+    )
     return ProjectClassService.get_or_create(
         name=name,
         parent=parent,
@@ -383,12 +443,26 @@ def proceedWithSubClass(
 def proceedWithDistrict(
     name: str,
     parent_class: ProjectClass,
+    cell_color: str,
+    row_number: int,
     for_coordinator_only: bool = False,
     related_to: ProjectLocation = None,
 ) -> ProjectLocation:
     district = name.split(" ")[0].strip()
     # exceptional case for Östersundom which can be Östersundomin
     district = "Östersundom" if "östersundom" in district.lower() else district
+    print_with_bg_color(
+        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
+            district,
+            color_map[cell_color],
+            cell_color,
+            row_number,
+            district,
+            related_to.id if related_to else None,
+            for_coordinator_only,
+        ),
+        cell_color,
+    )
     # make this district as related to class for districts in coordinator view
     return ProjectLocationService.get_or_create(
         name=district,
@@ -555,7 +629,11 @@ def buildHierarchiesAndProjects(
             indention = 3
             location_stack.append(
                 ProjectLocationService.get_or_create(
-                    name=name,
+                    # keepe number in front of division
+                    name="{} {}".format(
+                        re.sub("[^\d.-]+\s*$", "", str(cell.value).strip()).strip(),
+                        name,
+                    ),
                     parent=location_stack[-1],
                     path="/".join([location_stack[-1].path] + [name]),
                     parentClass=class_stack[-1],
