@@ -1,78 +1,45 @@
-from datetime import datetime
-from os import path
-import environ
-from infraohjelmointi_api.services import ProjectFinancialService, ProjectService
-from .models import (
-    ProjectType,
+from infraohjelmointi_api.models import (
     Project,
-    Person,
-    ProjectSet,
-    ProjectArea,
-    BudgetItem,
-    Task,
-    ProjectPhase,
-    ProjectPriority,
-    TaskStatus,
-    ConstructionPhaseDetail,
-    ProjectCategory,
-    ProjectRisk,
-    ConstructionPhase,
-    PlanningPhase,
     ProjectClass,
-    ProjectQualityLevel,
     ProjectLocation,
-    Note,
-    ResponsibleZone,
-    ProjectHashTag,
-    ProjectGroup,
-    ProjectLock,
-    ProjectFinancial,
+    ProjectPhase,
 )
-from django.db.models import Sum
-from .services import ProjectWiseService
-from .services.ProjectWiseService import PWProjectNotFoundError, PWProjectResponseError
-from rest_framework.exceptions import ParseError, ValidationError
-from datetime import date
-from rest_framework.exceptions import ParseError, ValidationError, APIException
+from infraohjelmointi_api.serializers import BaseMeta, PersonSerializer
+from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
+from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
+    ConstructionPhaseDetailSerializer,
+)
+from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import (
+    ConstructionPhaseSerializer,
+)
+from infraohjelmointi_api.serializers.PlanningPhaseSerializer import (
+    PlanningPhaseSerializer,
+)
+from infraohjelmointi_api.serializers.ProjectAreaSerializer import ProjectAreaSerializer
+from infraohjelmointi_api.serializers.ProjectCategorySerializer import (
+    ProjectCategorySerializer,
+)
+from infraohjelmointi_api.serializers.ProjectPhaseSerializer import (
+    ProjectPhaseSerializer,
+)
+from infraohjelmointi_api.serializers.ProjectPrioritySerializer import (
+    ProjectPrioritySerializer,
+)
+from infraohjelmointi_api.serializers.ProjectQualityLevelSerializer import (
+    ProjectQualityLevelSerializer,
+)
+from infraohjelmointi_api.serializers.ProjectResponsibleZoneSerializer import (
+    ProjectResponsibleZoneSerializer,
+)
+from infraohjelmointi_api.serializers.ProjectRiskSerializer import ProjectRiskSerializer
+from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
+    ProjectSetCreateSerializer,
+)
+from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
 from rest_framework import serializers
-from django.db.models import Q
+from rest_framework.exceptions import ValidationError, ParseError
+from datetime import datetime
 from overrides import override
-from django.shortcuts import get_object_or_404
-from rest_framework.validators import UniqueTogetherValidator
-
-import logging
-
-logger = logging.getLogger("infraohjelmointi_api")
-env = environ.Env()
-env.escape_proxy = True
-
-if path.exists(".env"):
-    env.read_env(".env")
-
-
-class BaseMeta:
-    exclude = ["createdDate"]
-
-
-class DynamicFieldsModelSerializer(serializers.ModelSerializer):
-    """
-    A ModelSerializer that takes an additional `fields` argument that
-    controls which fields should be displayed.
-    """
-
-    def __init__(self, *args, **kwargs):
-        # Don't pass the 'fields' arg up to the superclass
-        fields = kwargs.pop("fields", None)
-
-        # Instantiate the superclass normally
-        super().__init__(*args, **kwargs)
-
-        if fields is not None:
-            # Drop any fields that are not specified in the `fields` argument.
-            allowed = set(fields)
-            existing = set(self.fields)
-            for field_name in existing - allowed:
-                self.fields.pop(field_name)
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -237,7 +204,11 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        yearToFieldMapping = ProjectFinancialService.get_year_to_financial_field_names_mapping(start_year=year)
+        yearToFieldMapping = (
+            ProjectFinancialService.get_year_to_financial_field_names_mapping(
+                start_year=year
+            )
+        )
         if hasattr(instance.project, "lock"):
             lockedFields = [
                 "value",
@@ -251,343 +222,6 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
                     )
 
         return super(ProjectFinancialSerializer, self).update(instance, validated_data)
-
-
-class ProjectLockSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectLock
-
-
-class SearchResultSerializer(serializers.Serializer):
-    name = serializers.SerializerMethodField()
-    id = serializers.SerializerMethodField()
-    type = serializers.SerializerMethodField()
-    hashTags = serializers.SerializerMethodField()
-    phase = serializers.SerializerMethodField()
-    path = serializers.SerializerMethodField()
-    programmed = serializers.SerializerMethodField()
-
-    def get_path(self, obj):
-        instanceType = obj._meta.model.__name__
-        classInstance = None
-        locationInstance = None
-        path = ""
-        if instanceType == "Project":
-            classInstance = getattr(obj, "projectClass", None)
-            locationInstance = getattr(obj, "projectLocation", None)
-        elif instanceType == "ProjectClass":
-            classInstance = obj
-        elif instanceType == "ProjectLocation":
-            classInstance = obj.parentClass
-            locationInstance = obj
-        elif instanceType == "ProjectGroup":
-            classInstance = getattr(obj, "classRelation", None)
-            locationInstance = getattr(obj, "locationRelation", None)
-
-        if classInstance is None:
-            return path
-
-        if classInstance.parent is not None and classInstance.parent.parent is not None:
-            path = "{}/{}/{}".format(
-                str(classInstance.parent.parent.id),
-                str(classInstance.parent.id),
-                str(classInstance.id),
-            )
-        elif classInstance.parent is not None:
-            path = "{}/{}".format(
-                str(classInstance.parent.id),
-                str(classInstance.id),
-            )
-        else:
-            path = str(classInstance.id)
-
-        if "suurpiiri" in classInstance.name.lower():
-            return path
-
-        if locationInstance is None:
-            return path
-
-        if locationInstance.parent is None:
-            path = path + "/{}".format(str(locationInstance.id))
-        if (
-            locationInstance.parent is not None
-            and locationInstance.parent.parent is not None
-        ):
-            path = path + "/{}".format(str(locationInstance.parent.parent.id))
-        if (
-            locationInstance.parent is not None
-            and locationInstance.parent.parent is None
-        ):
-            path = path + "/{}".format(str(locationInstance.parent.id))
-
-        return path
-
-    def get_phase(self, obj):
-        if not hasattr(obj, "phase") or obj.phase is None:
-            return None
-        return ProjectPhaseSerializer(obj.phase).data
-
-    def get_name(self, obj):
-        return obj.name
-
-    def get_id(self, obj):
-        return obj.id
-
-    def get_type(self, obj):
-        instanceType = obj._meta.model.__name__
-        if instanceType == "ProjectLocation":
-            return "locations"
-        elif instanceType == "ProjectClass":
-            return "classes"
-        elif instanceType == "Project":
-            return "projects"
-        elif instanceType == "ProjectGroup":
-            return "groups"
-        else:
-            raise ValidationError(detail={"type": "Invalid value"}, code="invalid")
-
-    def get_hashTags(self, obj):
-        if not hasattr(obj, "hashTags") or obj.hashTags is None:
-            return []
-
-        include_hashtags_list = self.context.get("hashtags_include", [])
-        projectHashtags = ProjectHashtagSerializer(obj.hashTags, many=True).data
-        projectHashtags = list(
-            filter(
-                lambda hashtag: hashtag["id"] in include_hashtags_list,
-                projectHashtags,
-            )
-        )
-        return projectHashtags
-
-    def get_programmed(self, obj):
-        """
-        Gets the field `programmed` from a Project instance
-        This function only concerns instances of Project
-        """
-        # Checking if programmed exists on obj
-        # Only exists on Project
-        if hasattr(obj, "programmed"):
-            return obj.programmed
-        return None
-
-
-class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
-    projects = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
-    )
-
-    def validate_projects(self, projectIds):
-        """
-        Check that project doesn't already belong to a group
-        """
-
-        if projectIds is not None and len(projectIds) > 0:
-            # Get existing group instance if there is any
-            # In case of a PATCH or POST request to a group
-            # None if POST request for a new group
-            group = getattr(self, "instance", None)
-            for projectId in projectIds:
-                project = get_object_or_404(Project, pk=projectId)
-                if (
-                    (
-                        # PATCH request to existing group
-                        # Check if a project is in a group which is not same as the group being patched
-                        # Means a project is being assigned to this group which belongs to another group already
-                        group is not None
-                        and project.projectGroup is not None
-                        and project.projectGroup.id != group.id
-                    )
-                    or
-                    # POST request for new group
-                    # A project in the request already belongs to another group
-                    (group is None and project.projectGroup is not None)
-                ):
-                    raise ValidationError(
-                        detail="Project: {} cannot be assigned to this group. It already belongs to group: {} with groupId: {}".format(
-                            project.name,
-                            project.projectGroup.name,
-                            project.projectGroup_id,
-                        ),
-                        code="project_in_group",
-                    )
-        return projectIds
-
-    class Meta(BaseMeta):
-        model = ProjectGroup
-        validators = [
-            UniqueTogetherValidator(
-                queryset=ProjectGroup.objects.all(),
-                fields=["name", "classRelation", "locationRelation"],
-            ),
-        ]
-
-    @override
-    def update(self, instance, validated_data):
-        # new project Ids
-        updatedProjectIds = validated_data.pop("projects", [])
-        # get all project ids that currently belong to this group
-        existingProjectIds = instance.project_set.all().values_list("id", flat=True)
-        # project that are to be removed from this group
-        removedProjects = list(set(existingProjectIds) - set(updatedProjectIds))
-        if len(updatedProjectIds) > 0:
-            for projectId in updatedProjectIds:
-                if projectId not in existingProjectIds:
-                    project = get_object_or_404(Project, pk=projectId)
-                    project.projectGroup = instance
-                    project.save()
-
-        if len(removedProjects) > 0:
-            for projectId in removedProjects:
-                project = get_object_or_404(Project, pk=projectId)
-                project.projectGroup = None
-                project.save()
-
-        return super(ProjectGroupSerializer, self).update(instance, validated_data)
-
-    @override
-    def create(self, validated_data):
-        projectIds = validated_data.pop("projects", None)
-        projectGroup = self.Meta.model.objects.create(**validated_data)
-        if projectIds is not None and len(projectIds) > 0:
-            for projectId in projectIds:
-                project = get_object_or_404(Project, pk=projectId)
-                project.projectGroup = projectGroup
-                project.save()
-
-        return projectGroup
-
-
-class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectHashTag
-
-
-class ProjectLocationSerializer(FinancialSumSerializer, serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectLocation
-
-
-class ProjectClassSerializer(FinancialSumSerializer, serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectClass
-
-
-class ProjectQualityLevelSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectQualityLevel
-
-
-class PlanningPhaseSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = PlanningPhase
-
-
-class ConstructionPhaseSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ConstructionPhase
-
-
-class ProjectRiskSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectRisk
-
-
-class ProjectCategorySerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectCategory
-
-
-class ConstructionPhaseDetailSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ConstructionPhaseDetail
-
-
-class TaskStatusSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = TaskStatus
-
-
-class ProjectPhaseSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectPhase
-
-
-class ProjectPrioritySerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectPriority
-
-
-class PersonSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = Person
-
-
-class NotePersonSerializer(serializers.ModelSerializer):
-    class Meta:
-        fields = ("id", "firstName", "lastName")
-        model = Person
-
-
-class NoteHistorySerializer(serializers.ModelSerializer):
-    updatedBy = NotePersonSerializer(read_only=True)
-
-    class Meta:
-        model = Note.history.model
-        fields = "__all__"
-
-
-class ProjectTypeSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectType
-
-
-class BudgetItemSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = BudgetItem
-
-
-class ProjectAreaSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectArea
-        exclude = ["createdDate", "updatedDate", "location"]
-
-
-class ProjectResponsibleZoneSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ResponsibleZone
-
-
-class ProjectSetGetSerializer(serializers.ModelSerializer):
-    sapProjects = serializers.SerializerMethodField()
-    sapNetworks = serializers.SerializerMethodField()
-    phase = ProjectPhaseSerializer(read_only=True)
-
-    class Meta(BaseMeta):
-        model = ProjectSet
-
-    def get_sapNetworks(self, obj):
-        return [
-            network
-            for obj in obj.project_set.all()
-            .filter(~Q(sapNetwork=None))
-            .values("sapNetwork")
-            for network in obj["sapNetwork"]
-        ]
-
-    def get_sapProjects(self, obj):
-        return [
-            project
-            for obj in obj.project_set.all()
-            .filter(~Q(sapNetwork=None))
-            .values("sapProject")
-            for project in obj["sapProject"]
-        ]
-
-
-class ProjectSetCreateSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = ProjectSet
 
 
 class ProjectWithFinancesSerializer(serializers.ModelSerializer):
@@ -628,79 +262,6 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
 
     class Meta(BaseMeta):
         model = Project
-
-
-class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
-    projectReadiness = serializers.SerializerMethodField()
-    projectSet = ProjectSetCreateSerializer(read_only=True)
-    siteId = BudgetItemSerializer(read_only=True)
-    area = ProjectAreaSerializer(read_only=True)
-    type = ProjectTypeSerializer(read_only=True)
-    priority = ProjectPrioritySerializer(read_only=True)
-    phase = ProjectPhaseSerializer(read_only=True)
-    personPlanning = PersonSerializer(read_only=True)
-    personProgramming = PersonSerializer(read_only=True)
-    personConstruction = PersonSerializer(read_only=True)
-    estPlanningStart = serializers.DateField(format="%d.%m.%Y")
-    estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
-    category = ProjectCategorySerializer(read_only=True)
-    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
-    riskAssessment = ProjectRiskSerializer(read_only=True)
-    estConstructionStart = serializers.DateField(format="%d.%m.%Y")
-    estConstructionEnd = serializers.DateField(format="%d.%m.%Y")
-    presenceStart = serializers.DateField(format="%d.%m.%Y")
-    presenceEnd = serializers.DateField(format="%d.%m.%Y")
-    visibilityStart = serializers.DateField(format="%d.%m.%Y")
-    visibilityEnd = serializers.DateField(format="%d.%m.%Y")
-    constructionPhase = ConstructionPhaseSerializer(read_only=True)
-    planningPhase = PlanningPhaseSerializer(read_only=True)
-    projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
-    responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
-    locked = serializers.SerializerMethodField()
-    finances = serializers.SerializerMethodField()
-    spentBudget = serializers.SerializerMethodField(method_name="get_spent_budget")
-    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
-    projectWiseService = None
-
-    class Meta(BaseMeta):
-        model = Project
-
-    def get_spent_budget(self, project: Project):
-        year = self.context.get("finance_year", date.today().year)
-        if year is None:
-            year = date.today().year
-        spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
-            project_id=project.id, max_year=year
-        ).aggregate(spent_budget=Sum("value", default=0))["spent_budget"]
-
-        return int(spentBudget)
-
-    def get_pw_folder_link(self, project: Project):
-        if not self.context.get("get_pw_link", False) or project.hkrId is None:
-            return None
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
-
-        try:
-            pwInstanceId = self.projectWiseService.get_project_from_pw(
-                id=project.hkrId
-            ).get("instanceId", None)
-            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
-        except (PWProjectNotFoundError, PWProjectResponseError):
-            return None
-
-    def get_locked(self, project):
-        try:
-            lockData = ProjectLockSerializer(project.lock, many=False).data
-            return lockData
-        except:
-            return None
-
-    def get_projectReadiness(self, project):
-        return project.projectReadiness()
 
 
 class UpdateListSerializer(serializers.ListSerializer):
@@ -1427,84 +988,4 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             if instance.responsibleZone != None
             else None
         )
-        return rep
-
-
-class PersonSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = Person
-
-
-class TaskSerializer(serializers.ModelSerializer):
-    class Meta(BaseMeta):
-        model = Task
-
-
-class NoteGetSerializer(serializers.ModelSerializer):
-    updatedBy = NotePersonSerializer(read_only=True)
-    deleted = serializers.ReadOnlyField()
-
-    class Meta(BaseMeta):
-        exclude = ["updatedDate"]
-        model = Note
-
-
-class ProjectNoteGetSerializer(serializers.ModelSerializer):
-    updatedBy = NotePersonSerializer(read_only=True)
-    deleted = serializers.ReadOnlyField()
-
-    class Meta(BaseMeta):
-        exclude = ["updatedDate"]
-        model = Note
-
-    @override
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-        rep["history"] = NoteHistorySerializer(instance.history.all(), many=True).data
-
-        return rep
-
-
-class NoteCreateSerializer(serializers.ModelSerializer):
-    deleted = serializers.ReadOnlyField()
-
-    class Meta(BaseMeta):
-        exclude = ["updatedDate"]
-        model = Note
-
-    @override
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-        rep["updatedBy"] = (
-            NotePersonSerializer(instance.updatedBy).data
-            if instance.updatedBy != None
-            else None
-        )
-
-        return rep
-
-
-class NoteUpdateSerializer(serializers.ModelSerializer):
-    deleted = serializers.ReadOnlyField()
-
-    class Meta(BaseMeta):
-        exclude = ["updatedDate"]
-        model = Note
-
-    @override
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-
-        rep["updatedBy"] = (
-            NotePersonSerializer(instance.updatedBy).data
-            if instance.updatedBy != None
-            else None
-        )
-
-        rep["history"] = (
-            NoteHistorySerializer(instance.history.all(), many=True).data
-            if instance.history
-            else None
-        )
-
         return rep
