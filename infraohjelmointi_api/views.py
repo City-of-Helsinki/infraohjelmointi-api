@@ -5,7 +5,7 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectLocation,
 )
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ParseError, ValidationError
 import django_filters
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
@@ -297,8 +297,13 @@ class ProjectViewSet(BaseViewSet):
             or projectName is not None
             or order is not None
         ):
-            if not limit.isnumeric() or limit not in ["10", "20", "30"]:
-                raise APIException(detail="Invalid value for limit parameter")
+            if not limit.isnumeric():
+                raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+            if limit not in ["10", "20", "30"]:
+                raise ValidationError(
+                    detail={"limit": "Value out of range"}, code="out_of_range"
+                )
+
             limit = int(limit)
             # already filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
@@ -358,7 +363,7 @@ class ProjectViewSet(BaseViewSet):
                 )
             else:
                 return Response(
-                    data={"message": "Invalid order"},
+                    data={"message": "Invalid value for order"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -479,7 +484,7 @@ class ProjectViewSet(BaseViewSet):
 
             return qs
         except Exception as e:
-            raise APIException(detail={"message": e})
+            raise e
 
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
@@ -542,13 +547,19 @@ class ProjectViewSet(BaseViewSet):
             currYear + 10: "preliminaryCurrentYearPlus10__gt",
         }
         if prYearMin is not None and prYearMax is not None:
-            if not prYearMax.isnumeric() or not prYearMin.isnumeric():
-                raise APIException(detail="Invalid value for prYearMin or prYearMax")
+            if not prYearMax.isnumeric():
+                raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
+            if not prYearMin.isnumeric():
+                raise ParseError(detail={"prYearMin": "Invalid value"}, code="invalid")
 
             prYearMin = int(prYearMin)
             prYearMax = int(prYearMax)
             if prYearMin > prYearMax:
-                raise APIException(detail="prYearMin cannot be greater than prYearMax")
+                raise ValidationError(
+                    detail={"prYearMin": "prYearMin cannot be greater than prYearMax"},
+                    code="prYearMin_gt_prYearMax",
+                )
+
             if (
                 prYearMin in yearToFieldMapping.keys()
                 and prYearMax in yearToFieldMapping.keys()
@@ -590,7 +601,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMin is not None:
             if not prYearMin.isnumeric():
-                raise APIException(detail="Invalid value for prYearMin")
+                raise ParseError(detail={"prYearMin": "Invalid value"}, code="invalid")
 
             prYearMin = int(prYearMin)
             if prYearMin < currYear:
@@ -620,7 +631,7 @@ class ProjectViewSet(BaseViewSet):
 
         elif prYearMax is not None:
             if not prYearMax.isnumeric():
-                raise APIException(detail="Invalid value for prYearMax")
+                raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
 
             prYearMax = int(prYearMax)
             if prYearMax < currYear:
