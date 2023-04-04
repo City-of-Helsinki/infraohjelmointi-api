@@ -15,3 +15,4 @@ django-simple-history                          #To maintain history of table dat
 overrides                                     # Decorators to assert function overrides
 openpyxl                                      # dependency for reading excel files through pandas
 django-filter                                 # DRF package to add filtering on viewsets
+drf-standardized-errors                       # DRF package to standerdize all 5xx and 4xx errors

@@ -1,3 +1,4 @@
+from datetime import datetime
 from .models import (
     ProjectType,
     Project,
@@ -23,6 +24,7 @@ from .models import (
     ProjectGroup,
     ProjectLock,
 )
+from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
@@ -117,9 +119,7 @@ class searchResultSerializer(serializers.Serializer):
         elif instanceType == "ProjectGroup":
             return "groups"
         else:
-            raise serializers.ValidationError(
-                "Unknown instance type: {}".format(instanceType)
-            )
+            raise ValidationError(detail={"type": "Invalid value"}, code="invalid")
 
     def get_hashTags(self, obj):
         if not hasattr(obj, "hashTags") or obj.hashTags is None:
@@ -137,6 +137,7 @@ class searchResultSerializer(serializers.Serializer):
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
+
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
@@ -150,13 +151,14 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer):
             for projectId in projectIds:
                 project = get_object_or_404(Project, pk=projectId)
                 if project.projectGroup is not None:
-                    raise serializers.ValidationError(
-                        "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
+                    raise ValidationError(
+                        detail="Project: {} with id: {} already belongs to the group: {} with id: {}".format(
                             project.name,
                             projectId,
                             project.projectGroup.name,
                             project.projectGroup_id,
-                        )
+                        ),
+                        code="project_in_group",
                     )
         return projectIds
 
@@ -423,8 +425,9 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             planningStartYear = project.planningStartYear
             if planningStartYear is not None and estPlanningStart is not None:
                 if estPlanningStart.year < planningStartYear:
-                    raise serializers.ValidationError(
-                        "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
+                    raise ValidationError(
+                        detail="estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
+                        code="estPlanningStart_et_planningStartYear",
                     )
 
         return estPlanningStart
@@ -439,8 +442,9 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             constructionEndYear = project.constructionEndYear
             if constructionEndYear is not None and estConstructionEnd is not None:
                 if estConstructionEnd.year > constructionEndYear:
-                    raise serializers.ValidationError(
-                        "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
+                    raise ValidationError(
+                        detail="estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
+                        code="estConstructionEnd_lt_constructionEndYear",
                     )
 
         return estConstructionEnd
@@ -491,12 +495,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         if not self._is_projectClass_projectLocation_valid(
             projectLocation=projectLocation, projectClass=projectClass
         ):
-            raise serializers.ValidationError(
-                "subClass: {} with path: {} cannot have the location: {} under it.".format(
+            raise ValidationError(
+                detail="subClass: {} with path: {} cannot have the location: {} under it.".format(
                     projectClass.name,
                     projectClass.path,
                     projectLocation.name,
-                )
+                ),
+                code="projectClass_invalid_projectLocation",
             )
 
         return projectClass
@@ -521,12 +526,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         if not self._is_projectClass_projectLocation_valid(
             projectLocation=projectLocation, projectClass=projectClass
         ):
-            raise serializers.ValidationError(
+            raise ValidationError(
                 "Location: {} with path: {} cannot be under the subClass: {}".format(
                     projectLocation.name,
                     projectLocation.path,
                     projectClass.name,
-                )
+                ),
+                code="projectLocation_invalid_projectClass",
             )
         return projectLocation
 
@@ -581,10 +587,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             ]
             for field in lockedFields:
                 if validated_data.get(field, None) is not None:
-                    raise serializers.ValidationError(
+                    raise ValidationError(
                         "The field {} cannot be modified when the project is locked".format(
                             field
-                        )
+                        ),
+                        code="project_locked",
                     )
 
         # Commented out logic for automatic locking of project if phase updated to construction
