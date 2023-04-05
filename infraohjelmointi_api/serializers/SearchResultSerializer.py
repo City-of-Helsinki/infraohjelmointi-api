@@ -4,7 +4,7 @@ from .ProjectHashtagSerializer import ProjectHashtagSerializer
 from .ProjectPhaseSerializer import ProjectPhaseSerializer
 
 
-class searchResultSerializer(serializers.Serializer):
+class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
