@@ -36,6 +36,26 @@ from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
     ProjectSetCreateSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
+from infraohjelmointi_api.validators.ProjectValidators import (
+    ConstructionEndYearValidator,
+    ConstructionPhaseDetailValidator,
+    EstConstructionEndValidator,
+    EstConstructionStartValidator,
+    EstPlanningEndValidator,
+    LockedFieldsValidator,
+    PlanningStartYearValidator,
+    PresenceEndValidator,
+    ProgrammedValidator,
+    ProjectClassValidator,
+    ProjectLocationValidator,
+    ProjectPhaseValidator,
+    VisibilityEndValidator,
+    VisibilityStartValidator,
+)
+from infraohjelmointi_api.validators.ProjectValidators.EstPlanningStartValidator import (
+    EstPlanningStartValidator,
+)
+from infraohjelmointi_api.validators.ProjectValidators import PresenceStartValidator
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, ParseError
 from datetime import datetime
@@ -332,6 +352,24 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
+        validators = [
+            EstPlanningStartValidator(),
+            EstPlanningEndValidator(),
+            PresenceStartValidator(),
+            PresenceEndValidator(),
+            VisibilityStartValidator(),
+            VisibilityEndValidator(),
+            EstConstructionStartValidator(),
+            EstConstructionEndValidator(),
+            ProjectClassValidator(),
+            ProjectLocationValidator(),
+            ProjectPhaseValidator(),
+            ConstructionPhaseDetailValidator(),
+            PlanningStartYearValidator(),
+            ConstructionEndYearValidator(),
+            ProgrammedValidator(),
+            LockedFieldsValidator(),
+        ]
 
     def get_pw_folder_link(self, project: Project):
         if project.hkrId is None:
@@ -353,498 +391,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     def get_projectReadiness(self, project):
         return project.projectReadiness()
 
-    def _format_date(self, dateStr):
-        for f in ["%Y-%m-%d", "%d.%m.%Y"]:
-            try:
-                return datetime.strptime(dateStr, f).date()
-            except ValueError:
-                pass
-        raise ParseError(detail="Invalid format", code="invalid")
-
-    def validate_estPlanningStart(self, estPlanningStart):
-        if estPlanningStart is None:
-            return estPlanningStart
-        project = getattr(self, "instance", None)
-        estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-
-        if project is not None and hasattr(project, "lock"):
-            planningStartYear = project.planningStartYear
-            if planningStartYear is not None and estPlanningStart is not None:
-                if estPlanningStart.year < planningStartYear:
-                    raise ValidationError(
-                        detail="estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
-                        code="estPlanningStart_et_planningStartYear_locked",
-                    )
-        if estPlanningEnd is not None:
-            estPlanningEnd = self._format_date(estPlanningEnd)
-        elif (
-            estPlanningEnd is None
-            and project is not None
-            and project.estPlanningEnd is not None
-        ):
-            estPlanningEnd = project.estPlanningEnd
-
-        if estPlanningEnd is not None and estPlanningStart is not None:
-            if estPlanningStart > estPlanningEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estPlanningEnd",
-                    code="estPlanningStart_lt_estPlanningEnd",
-                )
-
-        return estPlanningStart
-
-    def validate_estPlanningEnd(self, estPlanningEnd):
-        project = getattr(self, "instance", None)
-        estPlanningStart = self.get_initial().get("estPlanningStart", None)
-
-        if estPlanningStart is not None:
-            estPlanningStart = self._format_date(estPlanningStart)
-        elif (
-            estPlanningStart is None
-            and project is not None
-            and project.estPlanningStart is not None
-        ):
-            estPlanningStart = project.estPlanningStart
-
-        if estPlanningEnd is not None and estPlanningStart is not None:
-            if estPlanningEnd < estPlanningStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningStart",
-                    code="estPlanningEnd_et_estPlanningStart",
-                )
-
-        return estPlanningEnd
-
-    def validate_presenceStart(self, presenceStart):
-        project = getattr(self, "instance", None)
-        presenceEnd = self.get_initial().get("presenceEnd", None)
-
-        if presenceEnd is not None:
-            presenceEnd = self._format_date(presenceEnd)
-        elif (
-            presenceEnd is None
-            and project is not None
-            and project.presenceEnd is not None
-        ):
-            presenceEnd = project.presenceEnd
-
-        if presenceStart is not None and presenceEnd is not None:
-            if presenceStart > presenceEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than presenceEnd",
-                    code="presenceStart_lt_presenceEnd",
-                )
-
-        return presenceStart
-
-    def validate_presenceEnd(self, presenceEnd):
-        project = getattr(self, "instance", None)
-        presenceStart = self.get_initial().get("presenceStart", None)
-
-        if presenceStart is not None:
-            presenceStart = self._format_date(presenceStart)
-        elif (
-            presenceStart is None
-            and project is not None
-            and project.presenceStart is not None
-        ):
-            presenceStart = project.presenceStart
-
-        if presenceEnd is not None and presenceStart is not None:
-            if presenceEnd < presenceStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than presenceStart",
-                    code="presenceEnd_et_presenceStart",
-                )
-
-        return presenceEnd
-
-    def validate_visibilityStart(self, visibilityStart):
-        project = getattr(self, "instance", None)
-        visibilityEnd = self.get_initial().get("visibilityEnd", None)
-
-        if visibilityEnd is not None:
-            visibilityEnd = self._format_date(visibilityEnd)
-        elif (
-            visibilityEnd is None
-            and project is not None
-            and project.visibilityEnd is not None
-        ):
-            visibilityEnd = project.visibilityEnd
-
-        if visibilityStart is not None and visibilityEnd is not None:
-            if visibilityStart > visibilityEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than visibilityEnd",
-                    code="visibilityStart_lt_visibilityEnd",
-                )
-
-        return visibilityStart
-
-    def validate_visibilityEnd(self, visibilityEnd):
-        project = getattr(self, "instance", None)
-        visibilityStart = self.get_initial().get("visibilityStart", None)
-
-        if visibilityStart is not None:
-            visibilityStart = self._format_date(visibilityStart)
-        elif (
-            visibilityStart is None
-            and project is not None
-            and project.visibilityStart is not None
-        ):
-            visibilityStart = project.visibilityStart
-
-        if visibilityEnd is not None and visibilityStart is not None:
-            if visibilityEnd < visibilityStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than visibilityStart",
-                    code="visibilityEnd_et_visibilityStart",
-                )
-
-        return visibilityEnd
-
-    def validate_estConstructionStart(self, estConstructionStart):
-        if estConstructionStart is None:
-            return estConstructionStart
-        project = getattr(self, "instance", None)
-        estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-
-        if estConstructionEnd is not None:
-            estConstructionEnd = self._format_date(estConstructionEnd)
-        elif (
-            estConstructionEnd is None
-            and project is not None
-            and project.estConstructionEnd is not None
-        ):
-            estConstructionEnd = project.estConstructionEnd
-
-        if estConstructionEnd is not None and estConstructionStart is not None:
-            if estConstructionStart > estConstructionEnd:
-                raise ValidationError(
-                    detail="Date cannot be later than estConstructionEnd",
-                    code="estConstructionStart_lt_estConstructionEnd",
-                )
-
-        return estConstructionStart
-
-    def validate_estConstructionEnd(self, estConstructionEnd):
-        project = getattr(self, "instance", None)
-        estConstructionStart = self.get_initial().get("estConstructionStart", None)
-        if project is not None and hasattr(project, "lock"):
-            constructionEndYear = project.constructionEndYear
-            if constructionEndYear is not None and estConstructionEnd is not None:
-                if estConstructionEnd.year > constructionEndYear:
-                    raise ValidationError(
-                        detail="estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
-                        code="estConstructionEnd_lt_constructionEndYear_locked",
-                    )
-
-        if estConstructionStart is not None:
-            estConstructionStart = self._format_date(estConstructionStart)
-        elif (
-            estConstructionStart is None
-            and project is not None
-            and project.estConstructionStart is not None
-        ):
-            estConstructionStart = project.estConstructionStart
-
-        if estConstructionStart is not None and estConstructionEnd is not None:
-            if estConstructionEnd < estConstructionStart:
-                raise ValidationError(
-                    detail="Date cannot be earlier than estConstructionStart",
-                    code="estConstructionEnd_et_estConstructionStart",
-                )
-        return estConstructionEnd
-
-    def _is_projectClass_projectLocation_valid(
-        self,
-        projectLocation,
-        projectClass,
-    ) -> bool:
-        if projectClass is None or projectLocation is None:
-            return True
-        if projectClass.parent is None or projectClass.parent.parent is None:
-            return True
-        if (
-            "suurpiiri" in projectClass.name.lower()
-            and len(projectClass.name.split()) == 2
-            and (
-                projectLocation.path.startswith(projectClass.name.split()[0])
-                or projectLocation.path.startswith(projectClass.name.split()[0][:-2])
-            )
-        ):
-            return True
-        elif "suurpiiri" not in projectClass.name.lower():
-            return True
-        else:
-            return False
-
-    def validate_projectClass(self, projectClass):
-        """
-        Function to validate if a Project belongs to a specific Class then it should belong to a related Location
-        """
-        project = getattr(self, "instance", None)
-        if (
-            "projectLocation" in self.get_initial()
-            and self.get_initial().get("projectLocation") is None
-        ):
-            return projectClass
-
-        projectLocation = (
-            ProjectLocation.objects.get(id=self.get_initial().get("projectLocation"))
-            if self.get_initial().get("projectLocation", None) is not None
-            else None
-        )
-
-        if (
-            projectLocation is None
-            and project is not None
-            and project.projectLocation is not None
-        ):
-            projectLocation = project.projectLocation
-
-        if not self._is_projectClass_projectLocation_valid(
-            projectLocation=projectLocation, projectClass=projectClass
-        ):
-            raise ValidationError(
-                detail="subClass: {} with path: {} cannot have the location: {} under it.".format(
-                    projectClass.name,
-                    projectClass.path,
-                    projectLocation.name,
-                ),
-                code="projectClass_invalid_projectLocation",
-            )
-
-        return projectClass
-
-    def validate_projectLocation(self, projectLocation):
-        """
-        Function to validate if a Project belongs to a specific Location then it should belong to a related Class
-        """
-        project = getattr(self, "instance", None)
-        projectClass = (
-            ProjectClass.objects.get(id=self.get_initial().get("projectClass", None))
-            if self.get_initial().get("projectClass", None) is not None
-            else None
-        )
-
-        if (
-            projectClass is None
-            and project is not None
-            and project.projectClass is not None
-        ):
-            projectClass = project.projectClass
-        if not self._is_projectClass_projectLocation_valid(
-            projectLocation=projectLocation, projectClass=projectClass
-        ):
-            raise ValidationError(
-                "Location: {} with path: {} cannot be under the subClass: {}".format(
-                    projectLocation.name,
-                    projectLocation.path,
-                    projectClass.name,
-                ),
-                code="projectLocation_invalid_projectClass",
-            )
-        return projectLocation
-
-    def validate_phase(self, phase):
-        """
-        Function to validate the field `phase`
-        """
-        if phase is None:
-            return phase
-        project = getattr(self, "instance", None)
-        if phase.value == "programming":
-            category = self.get_initial().get("category", None)
-            planningStartYear = self.get_initial().get("planningStartYear", None)
-            constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-            if planningStartYear is None and project is not None:
-                planningStartYear = project.planningStartYear
-
-            if category is None and project is not None:
-                category = project.category
-
-            if constructionEndYear is None and project is not None:
-                constructionEndYear = project.constructionEndYear
-
-            if planningStartYear is None or constructionEndYear is None:
-                raise ValidationError(
-                    "planningStartYear and constructionEndYear must be populated if phase is `programming`",
-                    code="programming_phase_missing_dates",
-                )
-            if category is None:
-                raise ValidationError(
-                    "category must be populated if phase is `programming`",
-                    code="programming_phase_missing_category",
-                )
-
-        if phase.value == "draftInitiation":
-            estPlanningStart = self.get_initial().get("estPlanningStart", None)
-            estPlanningEnd = self.get_initial().get("estPlanningEnd", None)
-            personPlanning = self.get_initial().get("personPlanning", None)
-
-            if estPlanningStart is None and project is not None:
-                estPlanningStart = project.estPlanningStart
-            if estPlanningEnd is None and project is not None:
-                estPlanningEnd = project.estPlanningEnd
-            if personPlanning is None and project is not None:
-                personPlanning = project.personPlanning
-
-            if estPlanningStart is None or estPlanningEnd is None:
-                raise ValidationError(
-                    "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
-                    code="draftInitiation_phase_missing_dates",
-                )
-            if personPlanning is None:
-                raise ValidationError(
-                    "personPlanning must be populated if phase is `draftInitiation`",
-                    code="draftInitiation_phase_missing_personPlanning",
-                )
-
-        if phase.value == "construction":
-            estConstructionStart = self.get_initial().get("estConstructionStart", None)
-            estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-            personConstruction = self.get_initial().get("personConstruction", None)
-
-            if estConstructionStart is None and project is not None:
-                estConstructionStart = project.estConstructionStart
-            if estConstructionEnd is None and project is not None:
-                estConstructionEnd = project.estConstructionEnd
-            if personConstruction is None and project is not None:
-                personConstruction = project.personConstruction
-
-            if estConstructionStart is None or estConstructionEnd is None:
-                raise ValidationError(
-                    "estConstructionStart and estConstructionEnd must be populated if phase is `construction`",
-                    code="construction_phase_missing_dates",
-                )
-            if personConstruction is None:
-                raise ValidationError(
-                    "personConstruction must be populated if phase is `construction`",
-                    code="construction_phase_missing_personConstruction",
-                )
-        if phase.value == "warrantyPeriod":
-            estConstructionEnd = self.get_initial().get("estConstructionEnd", None)
-
-            if estConstructionEnd is not None:
-                estConstructionEnd = self._format_date(estConstructionEnd)
-            elif (
-                estConstructionEnd is None
-                and project is not None
-                and project.estConstructionEnd is not None
-            ):
-                estConstructionEnd = project.estConstructionEnd
-
-            if estConstructionEnd is not None:
-                if datetime.today().date() < estConstructionEnd:
-                    raise ValidationError(
-                        "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-                        code="warrantyPeriod_phase_inconsistent_date",
-                    )
-
-        return phase
-
-    def validate_constructionPhaseDetail(self, constructionPhaseDetail):
-        if constructionPhaseDetail is None:
-            return constructionPhaseDetail
-        project = getattr(self, "instance", None)
-        phase = self.get_initial().get("phase", None)
-        if phase is not None:
-            try:
-                phase = ProjectPhase.objects.get(id=phase)
-            except ProjectPhase.DoesNotExist:
-                phase = None
-        if phase is None and project is not None:
-            phase = project.phase
-
-        if phase is None or phase.value != "construction":
-            raise ValidationError(
-                "constructionPhase detail cannot be populated if phase is not `construction`",
-                code="constructionPhaseDetail_invalid_phase",
-            )
-
-        return constructionPhaseDetail
-
-    def validate_planningStartYear(self, planningStartYear):
-        if planningStartYear is None:
-            return planningStartYear
-        project = getattr(self, "instance", None)
-        constructionEndYear = self.get_initial().get("constructionEndYear", None)
-
-        if (
-            constructionEndYear is None
-            and project is not None
-            and project.constructionEndYear is not None
-        ):
-            constructionEndYear = project.constructionEndYear
-
-        if constructionEndYear is not None and planningStartYear is not None:
-            if planningStartYear > int(constructionEndYear):
-                raise ValidationError(
-                    detail="Year cannot be later than constructionEndYear",
-                    code="planningStartYear_lt_constructionEndYear",
-                )
-
-        return planningStartYear
-
-    def validate_constructionEndYear(self, constructionEndYear):
-        if constructionEndYear is None:
-            return constructionEndYear
-
-        project = getattr(self, "instance", None)
-        planningStartYear = self.get_initial().get("planningStartYear", None)
-
-        if (
-            planningStartYear is None
-            and project is not None
-            and project.planningStartYear is not None
-        ):
-            planningStartYear = project.planningStartYear
-
-        if constructionEndYear is not None and planningStartYear is not None:
-            if constructionEndYear < int(planningStartYear):
-                raise ValidationError(
-                    detail="Year cannot be earlier than planningStartYear",
-                    code="constructionEndYear_et_planningStartYear",
-                )
-
-        return constructionEndYear
-
-    def validate_programmed(self, programmed):
-        if programmed is None:
-            return programmed
-        project = getattr(self, "instance", None)
-        category = self.get_initial().get("category", None)
-        phase = self.get_initial().get("phase", None)
-        if phase is not None:
-            try:
-                phase = ProjectPhase.objects.get(id=phase)
-            except ProjectPhase.DoesNotExist:
-                phase = None
-        if phase is None and project is not None:
-            phase = project.phase
-        if category is None and project is not None:
-            category = project.category
-
-        if category is None and programmed == True:
-            raise ValidationError(
-                detail="category must be populated if programmed is `True`",
-                code="programmed_true_missing_category",
-            )
-        if programmed == False and (phase is None or phase.value != "proposal"):
-            raise ValidationError(
-                detail="phase must be set to `proposal` if programmed is `False`",
-                code="programmed_false_missing_phase",
-            )
-        if programmed == True and (phase is None or phase.value != "programming"):
-            raise ValidationError(
-                detail="phase must be set to `programming` if programmed is `True`",
-                code="programmed_true_missing_phase",
-            )
-
-        return programmed
-
     @override
     def create(self, validated_data):
         phase = validated_data.get("phase", None)
@@ -864,31 +410,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def update(self, instance, validated_data):
-        # Check if project is locked and any locked fields are not being updated
-        if hasattr(instance, "lock"):
-            lockedFields = [
-                "phase",
-                "planningStartYear",
-                "constructionEndYear",
-                "programmed",
-                "projectClass",
-                "projectLocation",
-                "siteId",
-                "realizedCost",
-                "budgetOverrunAmount",
-                "budgetForecast1CurrentYear",
-                "budgetForecast2CurrentYear",
-                "budgetForecast3CurrentYear",
-                "budgetForecast4CurrentYear",
-            ]
-            for field in lockedFields:
-                if validated_data.get(field, None) is not None:
-                    raise ValidationError(
-                        "The field {} cannot be modified when the project is locked".format(
-                            field
-                        ),
-                        code="project_locked",
-                    )
         phase = validated_data.get("phase", None)
 
         if phase is not None and phase.value == "programming":
