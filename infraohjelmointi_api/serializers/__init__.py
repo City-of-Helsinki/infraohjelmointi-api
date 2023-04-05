@@ -28,6 +28,6 @@ from .ProjectRiskSerializer import ProjectRiskSerializer
 from .ProjectSetCreateSerializer import ProjectSetCreateSerializer
 from .ProjectSetGetSerializer import ProjectSetGetSerializer
 from .ProjectTypeSerializer import ProjectTypeSerializer
-from .SearchResultSerializer import searchResultSerializer
+from .SearchResultSerializer import SearchResultSerializer
 from .TaskSerializer import TaskSerializer
 from .TaskStatusSerializer import TaskStatusSerializer
