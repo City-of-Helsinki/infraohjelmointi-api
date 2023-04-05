@@ -220,12 +220,12 @@ class Project(models.Model):
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
-    def projectReadiness(self):
+    def projectReadiness(self) -> int:
         # some calculation based on cost and stuff
         # returns percentage of readiness random.randint(0, 100)
         return 95
 
-    def _strip_whitespaces(self, inputString):
+    def _strip_whitespaces(self, inputString: str) -> str:
         return "\n".join(" ".join(line.split()) for line in inputString.split("\n"))
 
     @override

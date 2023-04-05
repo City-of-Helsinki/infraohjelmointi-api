@@ -57,8 +57,6 @@ from infraohjelmointi_api.validators.ProjectValidators.EstPlanningStartValidator
 )
 from infraohjelmointi_api.validators.ProjectValidators import PresenceStartValidator
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, ParseError
-from datetime import datetime
 from overrides import override
 
 
@@ -388,8 +386,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         except (PWProjectNotFoundError, PWProjectResponseError):
             return None
 
-    def get_projectReadiness(self, project):
-        return project.projectReadiness()
+    def get_projectReadiness(self, obj: Project) -> int:
+        return obj.projectReadiness()
 
     @override
     def create(self, validated_data):
