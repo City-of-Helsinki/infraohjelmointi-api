@@ -1,3 +1,5 @@
+from uuid import UUID
+from infraohjelmointi_api.models import ProjectHashTag
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
@@ -12,7 +14,7 @@ class SearchResultSerializer(serializers.Serializer):
     phase = serializers.SerializerMethodField()
     path = serializers.SerializerMethodField()
 
-    def get_path(self, obj):
+    def get_path(self, obj) -> str:
         instanceType = obj._meta.model.__name__
         classInstance = None
         if instanceType == "Project":
@@ -44,13 +46,13 @@ class SearchResultSerializer(serializers.Serializer):
             return None
         return ProjectPhaseSerializer(obj.phase).data
 
-    def get_name(self, obj):
+    def get_name(self, obj) -> str:
         return obj.name
 
-    def get_id(self, obj):
+    def get_id(self, obj) -> UUID:
         return obj.id
 
-    def get_type(self, obj):
+    def get_type(self, obj) -> str:
         instanceType = obj._meta.model.__name__
         if instanceType == "ProjectLocation":
             return "locations"
@@ -63,7 +65,7 @@ class SearchResultSerializer(serializers.Serializer):
         else:
             raise ValidationError(detail={"type": "Invalid value"}, code="invalid")
 
-    def get_hashTags(self, obj):
+    def get_hashTags(self, obj) -> list:
         if not hasattr(obj, "hashTags") or obj.hashTags is None:
             return []
 
