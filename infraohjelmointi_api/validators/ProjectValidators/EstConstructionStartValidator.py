@@ -22,6 +22,8 @@ class EstConstructionStartValidator:
         if estConstructionEnd is not None and estConstructionStart is not None:
             if estConstructionStart > estConstructionEnd:
                 raise ValidationError(
-                    detail="Date cannot be later than estConstructionEnd",
+                    detail={
+                        "estConstructionStart": "Date cannot be later than estConstructionEnd"
+                    },
                     code="estConstructionStart_lt_estConstructionEnd",
                 )

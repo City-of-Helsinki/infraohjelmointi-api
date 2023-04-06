@@ -22,6 +22,8 @@ class VisibilityStartValidator:
         if visibilityStart is not None and visibilityEnd is not None:
             if visibilityStart > visibilityEnd:
                 raise ValidationError(
-                    detail="Date cannot be later than visibilityEnd",
+                    detail={
+                        "visibilityStart": "Date cannot be later than visibilityEnd"
+                    },
                     code="visibilityStart_lt_visibilityEnd",
                 )

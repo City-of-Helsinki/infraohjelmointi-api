@@ -20,7 +20,9 @@ class EstPlanningStartValidator:
             if planningStartYear is not None and estPlanningStart is not None:
                 if estPlanningStart.year < planningStartYear:
                     raise ValidationError(
-                        detail="estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
+                        detail={
+                            "estPlanningStart": "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
+                        },
                         code="estPlanningStart_et_planningStartYear_locked",
                     )
         if (
@@ -33,6 +35,8 @@ class EstPlanningStartValidator:
         if estPlanningEnd is not None and estPlanningStart is not None:
             if estPlanningStart > estPlanningEnd:
                 raise ValidationError(
-                    detail="Date cannot be later than estPlanningEnd",
+                    detail={
+                        "estPlanningStart": "Date cannot be later than estPlanningEnd"
+                    },
                     code="estPlanningStart_lt_estPlanningEnd",
                 )

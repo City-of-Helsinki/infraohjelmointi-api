@@ -25,11 +25,13 @@ class ProjectLocationValidator:
             projectLocation=projectLocation, projectClass=projectClass
         ):
             raise ValidationError(
-                "Location: {} with path: {} cannot be under the subClass: {}".format(
-                    projectLocation.name,
-                    projectLocation.path,
-                    projectClass.name,
-                ),
+                detail={
+                    "projectLocation": "Location: {} with path: {} cannot be under the subClass: {}".format(
+                        projectLocation.name,
+                        projectLocation.path,
+                        projectClass.name,
+                    )
+                },
                 code="projectLocation_invalid_projectClass",
             )
         return projectLocation

@@ -22,6 +22,8 @@ class EstPlanningEndValidator:
         if estPlanningEnd is not None and estPlanningStart is not None:
             if estPlanningEnd < estPlanningStart:
                 raise ValidationError(
-                    detail="Date cannot be earlier than estPlanningStart",
+                    detail={
+                        "estPlanningEnd": "Date cannot be earlier than estPlanningStart"
+                    },
                     code="estPlanningEnd_et_estPlanningStart",
                 )

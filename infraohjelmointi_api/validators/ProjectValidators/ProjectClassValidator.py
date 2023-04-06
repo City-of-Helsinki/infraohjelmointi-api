@@ -26,10 +26,12 @@ class ProjectClassValidator:
             projectLocation=projectLocation, projectClass=projectClass
         ):
             raise ValidationError(
-                detail="subClass: {} with path: {} cannot have the location: {} under it.".format(
-                    projectClass.name,
-                    projectClass.path,
-                    projectLocation.name,
-                ),
+                detail={
+                    "projectClass": "subClass: {} with path: {} cannot have the location: {} under it.".format(
+                        projectClass.name,
+                        projectClass.path,
+                        projectLocation.name,
+                    )
+                },
                 code="projectClass_invalid_projectLocation",
             )

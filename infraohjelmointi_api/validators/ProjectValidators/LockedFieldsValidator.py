@@ -38,8 +38,12 @@ class LockedFieldsValidator:
             for field in lockedFields:
                 if allFields.get(field, None) is not None:
                     raise ValidationError(
-                        "The field {} cannot be modified when the project is locked".format(
-                            field
-                        ),
+                        detail={
+                            "{}".format(
+                                field
+                            ): "The field {} cannot be modified when the project is locked".format(
+                                field
+                            )
+                        },
                         code="project_locked",
                     )

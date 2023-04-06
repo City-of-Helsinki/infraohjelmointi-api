@@ -28,12 +28,16 @@ class ProjectPhaseValidator:
 
             if planningStartYear is None or constructionEndYear is None:
                 raise ValidationError(
-                    "planningStartYear and constructionEndYear must be populated if phase is `programming`",
+                    detail={
+                        "phase": "planningStartYear and constructionEndYear must be populated if phase is `programming`"
+                    },
                     code="programming_phase_missing_dates",
                 )
             if category is None:
                 raise ValidationError(
-                    "category must be populated if phase is `programming`",
+                    detail={
+                        "phase": "category must be populated if phase is `programming`"
+                    },
                     code="programming_phase_missing_category",
                 )
 
@@ -51,12 +55,16 @@ class ProjectPhaseValidator:
 
             if estPlanningStart is None or estPlanningEnd is None:
                 raise ValidationError(
-                    "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
+                    detail={
+                        "phase": "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`"
+                    },
                     code="draftInitiation_phase_missing_dates",
                 )
             if personPlanning is None:
                 raise ValidationError(
-                    "personPlanning must be populated if phase is `draftInitiation`",
+                    detail={
+                        "phase": "personPlanning must be populated if phase is `draftInitiation`"
+                    },
                     code="draftInitiation_phase_missing_personPlanning",
                 )
 
@@ -74,12 +82,16 @@ class ProjectPhaseValidator:
 
             if estConstructionStart is None or estConstructionEnd is None:
                 raise ValidationError(
-                    "estConstructionStart and estConstructionEnd must be populated if phase is `construction`",
+                    detail={
+                        "phase": "estConstructionStart and estConstructionEnd must be populated if phase is `construction`"
+                    },
                     code="construction_phase_missing_dates",
                 )
             if personConstruction is None:
                 raise ValidationError(
-                    "personConstruction must be populated if phase is `construction`",
+                    detail={
+                        "phase": "personConstruction must be populated if phase is `construction`"
+                    },
                     code="construction_phase_missing_personConstruction",
                 )
         if phase.value == "warrantyPeriod":
@@ -95,6 +107,8 @@ class ProjectPhaseValidator:
             if estConstructionEnd is not None:
                 if datetime.today().date() < estConstructionEnd:
                     raise ValidationError(
-                        "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
+                        detail={
+                            "phase": "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd"
+                        },
                         code="warrantyPeriod_phase_inconsistent_date",
                     )
