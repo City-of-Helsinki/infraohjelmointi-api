@@ -19,16 +19,22 @@ class ProgrammedValidator:
 
         if category is None and programmed == True:
             raise ValidationError(
-                detail="category must be populated if programmed is `True`",
+                detail={
+                    "programmed": "category must be populated if programmed is `True`"
+                },
                 code="programmed_true_missing_category",
             )
         if programmed == False and (phase is None or phase.value != "proposal"):
             raise ValidationError(
-                detail="phase must be set to `proposal` if programmed is `False`",
+                detail={
+                    "programmed": "phase must be set to `proposal` if programmed is `False`"
+                },
                 code="programmed_false_missing_phase",
             )
         if programmed == True and (phase is None or phase.value != "programming"):
             raise ValidationError(
-                detail="phase must be set to `programming` if programmed is `True`",
+                detail={
+                    "programmed": "phase must be set to `programming` if programmed is `True`"
+                },
                 code="programmed_true_missing_phase",
             )

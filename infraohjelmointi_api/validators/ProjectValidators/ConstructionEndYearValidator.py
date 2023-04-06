@@ -22,6 +22,8 @@ class ConstructionEndYearValidator:
         if constructionEndYear is not None and planningStartYear is not None:
             if constructionEndYear < int(planningStartYear):
                 raise ValidationError(
-                    detail="Year cannot be earlier than planningStartYear",
+                    detail={
+                        "constructionYearEnd": "Year cannot be earlier than planningStartYear"
+                    },
                     code="constructionEndYear_et_planningStartYear",
                 )

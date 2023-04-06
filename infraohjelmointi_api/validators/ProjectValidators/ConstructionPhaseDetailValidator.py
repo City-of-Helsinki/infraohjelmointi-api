@@ -16,6 +16,8 @@ class ConstructionPhaseDetailValidator:
 
         if phase is None or phase.value != "construction":
             raise ValidationError(
-                "constructionPhase detail cannot be populated if phase is not `construction`",
+                detail={
+                    "constructionPhaseDetail": "constructionPhase detail cannot be populated if phase is not `construction`"
+                },
                 code="constructionPhaseDetail_invalid_phase",
             )

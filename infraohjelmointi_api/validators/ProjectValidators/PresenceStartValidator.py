@@ -22,6 +22,6 @@ class PresenceStartValidator:
         if presenceStart is not None and presenceEnd is not None:
             if presenceStart > presenceEnd:
                 raise ValidationError(
-                    detail="Date cannot be later than presenceEnd",
+                    detail={"presenceStart": "Date cannot be later than presenceEnd"},
                     code="presenceStart_lt_presenceEnd",
                 )

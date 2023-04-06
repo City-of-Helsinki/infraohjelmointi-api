@@ -16,7 +16,9 @@ class EstConstructionEndValidator:
             if constructionEndYear is not None and estConstructionEnd is not None:
                 if estConstructionEnd.year > constructionEndYear:
                     raise ValidationError(
-                        detail="estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
+                        detail={
+                            "estConstructionEnd": "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked"
+                        },
                         code="estConstructionEnd_lt_constructionEndYear_locked",
                     )
 
@@ -30,6 +32,8 @@ class EstConstructionEndValidator:
         if estConstructionStart is not None and estConstructionEnd is not None:
             if estConstructionEnd < estConstructionStart:
                 raise ValidationError(
-                    detail="Date cannot be earlier than estConstructionStart",
+                    detail={
+                        "estConstructionEnd": "Date cannot be earlier than estConstructionStart"
+                    },
                     code="estConstructionEnd_et_estConstructionStart",
                 )
