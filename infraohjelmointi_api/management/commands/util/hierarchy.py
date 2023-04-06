@@ -718,7 +718,7 @@ def buildHierarchiesAndProjects(
                     name=name,
                     project_class=class_stack[-1],
                     project_location=location_stack[-1],
-                    project_group=project_group,
+                    project_group=None,
                 )
 
         print_with_bg_color(
