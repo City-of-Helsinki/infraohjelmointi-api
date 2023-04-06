@@ -13,6 +13,8 @@ class ProjectClassValidator:
         if projectClass is None:
             return
         project = serializer.instance
+        if "projectLocation" in allFields and allFields.get("projectLocation") is None:
+            return
         projectLocation = allFields.get("projectLocation", None)
 
         if (
