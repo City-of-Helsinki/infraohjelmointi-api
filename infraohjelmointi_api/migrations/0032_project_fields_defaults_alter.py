@@ -14,7 +14,7 @@ def update_altered_field_to_new_defaults(apps, schema_editor):
         Q(planningStartYear=0) | Q(budgetOverrunYear=0) | Q(constructionEndYear=0)
     ).update(planningStartYear=None, budgetOverrunYear=None, constructionEndYear=None)
     Project.objects.filter(phase=None).update(
-        phase=infraohjelmointi_api.models.Project.get_default_projectPhase
+        phase=infraohjelmointi_api.models.Project.get_default_projectPhase()
     )
 
 
