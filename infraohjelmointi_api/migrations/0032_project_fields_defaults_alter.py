@@ -7,7 +7,7 @@ import infraohjelmointi_api.models.Project
 from django.db.models import Q
 
 
-def set_existing_project_defaults_to_null(apps, schema_editor):
+def update_altered_field_to_new_defaults(apps, schema_editor):
 
     Project = apps.get_model("infraohjelmointi_api", "Project")
     Project.objects.filter(
@@ -78,5 +78,5 @@ class Migration(migrations.Migration):
                 ],
             ),
         ),
-        migrations.RunPython(set_existing_project_defaults_to_null),
+        migrations.RunPython(update_altered_field_to_new_defaults),
     ]
