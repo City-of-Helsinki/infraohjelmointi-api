@@ -4,6 +4,18 @@ import django.core.validators
 from django.db import migrations, models
 import django.db.models.deletion
 import infraohjelmointi_api.models.Project
+from django.db.models import Q
+
+
+def set_existing_project_defaults_to_null(apps, schema_editor):
+
+    Project = apps.get_model("infraohjelmointi_api", "Project")
+    Project.objects.filter(
+        Q(planningStartYear=0) | Q(budgetOverrunYear=0) | Q(constructionEndYear=0)
+    ).update(planningStartYear=None, budgetOverrunYear=None, constructionEndYear=None)
+    Project.objects.filter(phase=None).update(
+        phase=infraohjelmointi_api.models.Project.get_default_projectPhase
+    )
 
 
 class Migration(migrations.Migration):
@@ -66,4 +78,5 @@ class Migration(migrations.Migration):
                 ],
             ),
         ),
+        migrations.RunPython(set_existing_project_defaults_to_null),
     ]
