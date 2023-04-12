@@ -624,9 +624,8 @@ class ProjectViewSet(BaseViewSet):
     def patch_bulk_projects(self, request):
         """
         Custom action to bulk update projects
-        Body contains two keys, "projects" and "updates"
-        projects must be a list of project ids
-        updates must contain a dictionary of fields and the values that need to be updated for those fields
+        Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+
         """
         try:
             data = json.loads(request.body.decode("utf-8"))
