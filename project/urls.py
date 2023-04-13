@@ -92,6 +92,11 @@ router.register(
     views.ProjectLockViewSet,
     basename="projectLock",
 )
+router.register(
+    r"project-financials",
+    views.ProjectFinancialViewSet,
+    basename="projectFinancials",
+)
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),

@@ -23,8 +23,10 @@ from .models import (
     ProjectHashTag,
     ProjectGroup,
     ProjectLock,
+    ProjectFinancial,
 )
 from rest_framework.exceptions import ParseError, ValidationError
+from datetime import date
 from rest_framework import serializers
 from django.db.models import Q
 from overrides import override
@@ -55,6 +57,52 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
+
+
+class ProjectFinancialSerializer(serializers.ModelSerializer):
+    class Meta(BaseMeta):
+        model = ProjectFinancial
+        exclude = ["createdDate", "updatedDate", "id"]
+        validators = [
+            UniqueTogetherValidator(
+                queryset=ProjectFinancial.objects.all(),
+                fields=["year", "project"],
+            ),
+        ]
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep.pop("project")
+        return rep
+
+    @override
+    def update(self, instance, validated_data):
+
+        # Check if project is locked and any locked fields are not being updated
+        if hasattr(instance.project, "lock"):
+            lockedFields = [
+                "budgetProposalCurrentYearPlus0",
+                "budgetProposalCurrentYearPlus1",
+                "budgetProposalCurrentYearPlus2",
+                "preliminaryCurrentYearPlus3",
+                "preliminaryCurrentYearPlus4",
+                "preliminaryCurrentYearPlus5",
+                "preliminaryCurrentYearPlus6",
+                "preliminaryCurrentYearPlus7",
+                "preliminaryCurrentYearPlus8",
+                "preliminaryCurrentYearPlus9",
+                "preliminaryCurrentYearPlus10",
+            ]
+            for field in lockedFields:
+                if validated_data.get(field, None) is not None:
+                    raise serializers.ValidationError(
+                        "The field {} cannot be modified when the project is locked".format(
+                            field
+                        )
+                    )
+
+        return super(ProjectFinancialSerializer, self).update(instance, validated_data)
 
 
 class ProjectLockSerializer(serializers.ModelSerializer):
@@ -343,6 +391,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
+    finances = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
@@ -356,6 +405,19 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
     def get_projectReadiness(self, obj):
         return obj.projectReadiness()
+
+    def get_finances(self, obj):
+
+        year = self.context.get("finance_year", None)
+        queryset = ProjectFinancial.objects.none()
+        if year is not None:
+            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
+        else:
+            queryset, _ = ProjectFinancial.objects.get_or_create(
+                project=obj, year=date.today().year
+            )
+
+        return ProjectFinancialSerializer(queryset, many=False).data
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
@@ -408,6 +470,20 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    finances = serializers.SerializerMethodField()
+
+    def get_finances(self, obj):
+
+        year = self.context.get("finance_year", None)
+        queryset = ProjectFinancial.objects.none()
+        if year is not None:
+            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
+        else:
+            queryset, _ = ProjectFinancial.objects.get_or_create(
+                project=obj, year=date.today().year
+            )
+
+        return ProjectFinancialSerializer(queryset, many=False).data
 
     class Meta(BaseMeta):
         model = Project
@@ -573,17 +649,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 "budgetForecast2CurrentYear",
                 "budgetForecast3CurrentYear",
                 "budgetForecast4CurrentYear",
-                "budgetProposalCurrentYearPlus0",
-                "budgetProposalCurrentYearPlus1",
-                "budgetProposalCurrentYearPlus2",
-                "preliminaryCurrentYearPlus3",
-                "preliminaryCurrentYearPlus4",
-                "preliminaryCurrentYearPlus5",
-                "preliminaryCurrentYearPlus6",
-                "preliminaryCurrentYearPlus7",
-                "preliminaryCurrentYearPlus8",
-                "preliminaryCurrentYearPlus9",
-                "preliminaryCurrentYearPlus10",
             ]
             for field in lockedFields:
                 if validated_data.get(field, None) is not None:

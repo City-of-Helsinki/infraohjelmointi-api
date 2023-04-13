@@ -1,9 +1,11 @@
 import uuid
+from datetime import date
 from infraohjelmointi_api.models import (
     Project,
     ProjectClass,
     ProjectGroup,
     ProjectLocation,
+    ProjectFinancial,
 )
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 import django_filters
@@ -45,6 +47,7 @@ from .serializers import (
     ProjectGroupSerializer,
     ProjectLockSerializer,
     searchResultSerializer,
+    ProjectFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from rest_framework import status
@@ -54,10 +57,11 @@ import json
 from rest_framework import status
 from rest_framework.decorators import action
 
-from django.core import serializers
+from django.db import transaction
 from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
+from django.shortcuts import get_object_or_404
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -67,6 +71,29 @@ class BaseViewSet(viewsets.ModelViewSet):
         Overriden ModelViewSet class method to get appropriate queryset using serializer class
         """
         return self.get_serializer_class().Meta.model.objects.all()
+
+
+class ProjectFinancialViewSet(BaseViewSet):
+    """
+    API endpoint that allows Project Finances to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ProjectFinancialSerializer
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"(?P<project>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})/(?P<year>[0-9]{4})",
+    )
+    def get_finances_by_year(self, request, project, year):
+        """
+        Custom action to get finances of a project by year
+        Usage: /project-financials/<project_id>/<year>/
+        """
+        queryFilter = {"project": project, "year": year}
+        finance_object = get_object_or_404(ProjectFinancial, **queryFilter)
+        return Response(ProjectFinancialSerializer(finance_object).data)
 
 
 class ProjectLockViewSet(BaseViewSet):
@@ -199,6 +226,62 @@ class ProjectViewSet(BaseViewSet):
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
+
+    @transaction.atomic
+    @override
+    def partial_update(self, request, *args, **kwargs):
+        finances = request.data.pop("finances", None)
+        project = self.get_object()
+        if finances is not None:
+            financeObject, _ = ProjectFinancial.objects.get_or_create(
+                year=finances.get("year", date.today().year), project=project
+            )
+            financeSerializer = ProjectFinancialSerializer(
+                financeObject, data=finances, partial=True, many=False
+            )
+            financeSerializer.is_valid(raise_exception=True)
+            financeSerializer.save()
+
+        projectSerializer = self.get_serializer(
+            project,
+            data=request.data,
+            many=False,
+            partial=True,
+            context={
+                "finance_year": finances.get("year", date.today().year)
+                if finances is not None
+                else None
+            },
+        )
+        projectSerializer.is_valid(raise_exception=True)
+        projectSerializer.save()
+        return Response(projectSerializer.data)
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"(?P<year>[0-9]{4})",
+    )
+    def get_projects_by_financial_year(self, request, year):
+        """
+        Custom action to get projects by financial year
+        Usage: /projects/<year>/
+        """
+        projectQuerySet = self.get_queryset()
+        searchPaginator = PageNumberPagination()
+        searchPaginator.page_size = 20
+
+        result = searchPaginator.paginate_queryset(projectQuerySet, request)
+        serializer = ProjectGetSerializer(
+            result, many=True, context={"finance_year": year}
+        )
+        response = {
+            "next": searchPaginator.get_next_link(),
+            "previous": searchPaginator.get_previous_link(),
+            "count": searchPaginator.page.paginator.count,
+            "results": serializer.data,
+        }
+        return Response(response)
 
     @override
     def get_serializer_class(self):
