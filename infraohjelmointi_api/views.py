@@ -64,6 +64,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -630,14 +633,46 @@ class ProjectViewSet(BaseViewSet):
         try:
             data = json.loads(request.body.decode("utf-8"))
             if self._is_bulk_project_update_data_valid(data):
-                qs = self.get_queryset().filter(
-                    id__in=[projectData["id"] for projectData in data]
+                projectIds = [projectData["id"] for projectData in data]
+                # Building an order by query which makes sure the order is preserved when filtering using __in clause
+                preserved = Case(
+                    *[When(id=val, then=pos) for pos, val in enumerate(projectIds)],
+                    default=len(projectIds)
                 )
+                qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
+                financesData = [
+                    {
+                        "project": projectData["id"],
+                        "finances": projectData["data"].pop("finances", None),
+                    }
+                    for projectData in data
+                ]
+                for financeData in financesData:
+                    finances = financeData.get("finances", None)
+                    if finances is not None:
+                        financeObject, _ = ProjectFinancial.objects.get_or_create(
+                            year=finances.get("year", date.today().year),
+                            project=Project(id=financeData["project"]),
+                        )
+                        financeSerializer = ProjectFinancialSerializer(
+                            financeObject, data=finances, partial=True, many=False
+                        )
+                        financeSerializer.is_valid(raise_exception=True)
+                        financeSerializer.save()
+
                 serializer = self.get_serializer(
                     qs,
                     data=[projectData["data"] for projectData in data],
                     many=True,
                     partial=True,
+                    context={
+                        financeData["project"]: (
+                            financeData["finances"].get("year", None)
+                            if financeData["finances"] is not None
+                            else None
+                        )
+                        for financeData in financesData
+                    },
                 )
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
