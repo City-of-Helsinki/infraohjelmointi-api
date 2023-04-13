@@ -683,7 +683,17 @@ class ProjectTestCase(TestCase):
 
         data = [
             {"id": self.project_1_Id.__str__(), "data": {"name": "new name"}},
-            {"id": new_createdId, "data": {"description": "new description"}},
+            {
+                "id": new_createdId,
+                "data": {
+                    "description": "new description",
+                    "finances": {
+                        "budgetProposalCurrentYearPlus1": 200,
+                        "budgetProposalCurrentYearPlus0": 2,
+                        "year": 2025,
+                    },
+                },
+            },
         ]
         response = self.client.patch(
             "/projects/bulk-update/",
@@ -697,12 +707,33 @@ class ProjectTestCase(TestCase):
             msg="Response must contain 2 updated projects",
         )
         self.assertEqual(
+            response.json()[0]["id"],
+            data[0]["id"],
+        )
+        self.assertEqual(
             response.json()[0]["name"],
             data[0]["data"]["name"],
         )
         self.assertEqual(
+            response.json()[1]["id"],
+            data[1]["id"],
+        )
+        self.assertEqual(
             response.json()[1]["description"],
             data[1]["data"]["description"],
+        )
+
+        self.assertEqual(
+            response.json()[1]["finances"]["year"],
+            2025,
+        )
+        self.assertEqual(
+            response.json()[1]["finances"]["budgetProposalCurrentYearPlus1"],
+            "200.00",
+        )
+        self.assertEqual(
+            response.json()[1]["finances"]["budgetProposalCurrentYearPlus0"],
+            "2.00",
         )
 
     def test_DELETE_project(self):

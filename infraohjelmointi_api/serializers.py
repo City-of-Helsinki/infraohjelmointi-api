@@ -33,6 +33,10 @@ from overrides import override
 from django.shortcuts import get_object_or_404
 from rest_framework.validators import UniqueTogetherValidator
 
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
+
 
 class BaseMeta:
     exclude = ["createdDate", "updatedDate"]
@@ -405,7 +409,8 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
         return obj.projectReadiness()
 
     def get_finances(self, obj):
-        year = self.context.get("finance_year", None)
+        year = None
+        year = self.context.get(str(obj.id), self.context.get("finance_year", None))
         queryset = ProjectFinancial.objects.none()
         if year is not None:
             queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
@@ -419,7 +424,6 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
 
 class UpdateListSerializer(serializers.ListSerializer):
     def update(self, instances, validated_data):
-
         instance_hash = {index: instance for index, instance in enumerate(instances)}
 
         result = [
@@ -483,7 +487,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField()
 
     def get_finances(self, obj):
-        year = self.context.get("finance_year", None)
+        year = None
+        year = self.context.get(str(obj.id), self.context.get("finance_year", None))
         queryset = ProjectFinancial.objects.none()
         if year is not None:
             queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
