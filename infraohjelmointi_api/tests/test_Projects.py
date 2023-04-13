@@ -21,7 +21,12 @@ from ..models import (
     ProjectGroup,
     ProjectLock,
 )
-from ..serializers import ProjectGetSerializer, ProjectNoteGetSerializer
+from ..serializers import (
+    ProjectGetSerializer,
+    ProjectNoteGetSerializer,
+    ProjectCreateSerializer,
+)
+from datetime import date
 
 from rest_framework.renderers import JSONRenderer
 from overrides import override
@@ -245,16 +250,6 @@ class ProjectTestCase(TestCase):
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
             budgetForecast4CurrentYear=None,
-            budgetProposalCurrentYearPlus1=None,
-            budgetProposalCurrentYearPlus2=None,
-            preliminaryCurrentYearPlus3=None,
-            preliminaryCurrentYearPlus4=None,
-            preliminaryCurrentYearPlus5=None,
-            preliminaryCurrentYearPlus6=None,
-            preliminaryCurrentYearPlus7=None,
-            preliminaryCurrentYearPlus8=None,
-            preliminaryCurrentYearPlus9=None,
-            preliminaryCurrentYearPlus10=None,
             louhi=False,
             gravel=False,
             budget=50,
@@ -479,16 +474,6 @@ class ProjectTestCase(TestCase):
             budgetForecast2CurrentYear=None,
             budgetForecast3CurrentYear=None,
             budgetForecast4CurrentYear=None,
-            budgetProposalCurrentYearPlus1=None,
-            budgetProposalCurrentYearPlus2=None,
-            preliminaryCurrentYearPlus3=None,
-            preliminaryCurrentYearPlus4=None,
-            preliminaryCurrentYearPlus5=None,
-            preliminaryCurrentYearPlus6=None,
-            preliminaryCurrentYearPlus7=None,
-            preliminaryCurrentYearPlus8=None,
-            preliminaryCurrentYearPlus9=None,
-            preliminaryCurrentYearPlus10=None,
         )
         response = self.client.get("/projects/")
         self.assertEqual(
@@ -623,14 +608,20 @@ class ProjectTestCase(TestCase):
             201,
             msg="Status code != 201 , Error: {}".format(response.json()),
         )
-        # deleting id and projectReadiness because request body doesn't contain an id and
-        #  but the response does if new resource is created
+
         res_data = response.json()
         new_createdId = res_data["id"]
-        del res_data["id"]
-        del res_data["projectReadiness"]
 
-        self.assertEqual(res_data, data, msg="Created object data != POST data")
+        serializer = ProjectCreateSerializer(
+            Project.objects.get(id=new_createdId), many=False
+        )
+
+        # convert the serialized data to JSON
+        result_expected = JSONRenderer().render(serializer.data)
+
+        self.assertEqual(
+            response.content, result_expected, msg="Created object data != POST data"
+        )
         self.assertEqual(
             Project.objects.filter(id=new_createdId).exists(),
             True,
@@ -2050,7 +2041,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus0": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus0": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2066,7 +2057,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus1": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus1": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2082,7 +2073,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"budgetProposalCurrentYearPlus2": 200}
+        data = {"finances": {"budgetProposalCurrentYearPlus2": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2098,7 +2089,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus3": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus3": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2114,7 +2105,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus4": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus4": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2130,7 +2121,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus5": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus5": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2146,7 +2137,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus6": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus6": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2162,7 +2153,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus7": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus7": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2178,7 +2169,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus8": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus8": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2194,7 +2185,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus9": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus9": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2210,7 +2201,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"preliminaryCurrentYearPlus10": 200}
+        data = {"finances": {"preliminaryCurrentYearPlus10": 200}}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2546,3 +2537,74 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 400, msg=response.json())
+
+    def test_project_finances(self):
+        response = self.client.get(
+            "/projects/{}/".format(self.project_1_Id),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["finances"]["year"],
+            date.today().year,
+            msg="Project does not contain current year finances by default",
+        )
+
+        response = self.client.get(
+            "/projects/{}/".format(2025),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["year"],
+            2025,
+            msg="Projects does not contain finances from the URL query year",
+        )
+        data = {"finances": {"year": 2050, "budgetProposalCurrentYearPlus0": 200}}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["finances"]["year"],
+            2050,
+            msg="Finances year != 2050",
+        )
+        self.assertEqual(
+            response.json()["finances"]["budgetProposalCurrentYearPlus0"],
+            "200.00",
+            msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
+        response = self.client.get(
+            "/projects/{}/".format(2050),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["year"],
+            2050,
+            msg="Projects does not contain finances from the URL query year",
+        )
+        self.assertEqual(
+            response.json()["results"][0]["finances"]["budgetProposalCurrentYearPlus0"],
+            "200.00",
+            msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
