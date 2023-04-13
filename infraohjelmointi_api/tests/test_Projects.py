@@ -20,6 +20,7 @@ from ..models import (
     ProjectHashTag,
     ProjectGroup,
     ProjectLock,
+    ProjectFinancial,
 )
 from ..serializers import (
     ProjectGetSerializer,
@@ -104,6 +105,9 @@ class ProjectTestCase(TestCase):
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
+    projectFinancial_1_Id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
+    projectFinancial_2_Id = uuid.UUID("ec17c3c6-7414-4fec-ad2e-6e6f63a88bcb")
+    projectFinancial_3_Id = uuid.UUID("8dba8690-11fd-4715-9978-f65c4e9a6e22")
 
     fixtures = []
     maxDiff = None
@@ -1037,6 +1041,145 @@ class ProjectTestCase(TestCase):
             projectClass=masterClass_2,
             projectGroup=projectGroup_3,
             personPlanning=personPlanning,
+        )
+        projectFinances_1 = ProjectFinancial.objects.create(
+            project=project_1,
+            budgetProposalCurrentYearPlus0=10.00,
+            budgetProposalCurrentYearPlus1=20.00,
+            budgetProposalCurrentYearPlus2=30.00,
+            preliminaryCurrentYearPlus3=40.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=0.00,
+            preliminaryCurrentYearPlus8=0.00,
+            preliminaryCurrentYearPlus9=0.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_2 = ProjectFinancial.objects.create(
+            project=project_2,
+            budgetProposalCurrentYearPlus0=0.00,
+            budgetProposalCurrentYearPlus1=0.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=40.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+
+        projectFinances_3 = ProjectFinancial.objects.create(
+            project=project_3,
+            budgetProposalCurrentYearPlus0=0.00,
+            budgetProposalCurrentYearPlus1=0.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=40.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMin={}".format(2025),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            2,
+            msg="Filtered result should contain 2 projects with financial fields related to year >= 2025 with values > 0 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMin={}".format(2030),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            1,
+            msg="Filtered result should contain 1 projects with financial fields related to year >= 2030 with values > 0 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMax={}".format(2024),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            1,
+            msg="Filtered result should contain 1 projects with financial fields related to year <= 2024 with values > 0 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMin={}&prYearMax={}".format(2030, 2032),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            1,
+            msg="Filtered result should contain 1 project with financial fields > 0 for years in range 2030-2032 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMin={}&prYearMax={}".format(2030, 2032),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            1,
+            msg="Filtered result should contain 1 project with financial fields > 0 for years in range 2030-2032 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/?prYearMin={}&prYearMax={}".format(2028, 2029),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            len(response.json()["results"]),
+            0,
+            msg="Filtered result should contain 0 project with financial fields > 0 for years in range 2028-2029 and programmed = true. Found: {}".format(
+                len(response.json()["results"])
+            ),
         )
 
         response = self.client.get(
