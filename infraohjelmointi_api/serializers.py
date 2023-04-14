@@ -286,7 +286,7 @@ class searchResultSerializer(serializers.Serializer):
             locationInstance = getattr(obj, "districtRelation", None)
 
         if classInstance is None:
-            return ""
+            return path
 
         if classInstance.parent is not None and classInstance.parent.parent is not None:
             path = "{}/{}/{}".format(
@@ -305,15 +305,7 @@ class searchResultSerializer(serializers.Serializer):
         if locationInstance is None:
             return path
 
-        if (
-            locationInstance.parent is not None
-            and locationInstance.parent.parent is None
-        ):
-            return path + "/{}/{}".format(
-                str(locationInstance.parent.id),
-                str(locationInstance.id),
-            )
-        else:
+        if locationInstance.parent is None:
             return path + "/{}".format(str(locationInstance.id))
 
     def get_phase(self, obj):
