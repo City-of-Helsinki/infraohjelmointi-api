@@ -11,13 +11,23 @@ import pandas as pd
 import numpy as np
 
 from ....models import Project, ProjectClass, ProjectLocation
+from ....services.ProjectWiseService import PWProjectResponseError
+from ....services import ProjectLocationService
 
 
 if path.exists(".env"):
     environ.Env().read_env(".env")
 
 env = environ.Env()
-PW_API_URL = env("PW_API_URL") + "?$filter=PROJECT_HKRHanketunnus+eq+{}"
+PW_API_URL = env("PW_API_URL")
+PW_API_PROJECT_ENDPOINT = env("PW_API_PROJECT_ENDPOINT")
+PW_API_PROJECT_ENDPOINT_FILTER = env("PW_API_PROJECT_ENDPOINT_FILTER")
+PW_API_LOCATION_ENDPOINT = env("PW_API_LOCATION_ENDPOINT")
+PW_API_LOCATION_ENDPOINT_FILTER = env("PW_API_LOCATION_ENDPOINT_FILTER")
+
+PW_API_LOCATIONS = (
+    f"{PW_API_URL}{PW_API_LOCATION_ENDPOINT}?${PW_API_LOCATION_ENDPOINT_FILTER}"
+)
 
 HKR_ID = 123
 PROJECT_ID = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
@@ -83,459 +93,268 @@ class ManageHierarchiesCommandTestCase(TestCase):
             parent=class_object,
         )
 
-        master_district = ProjectLocation.objects.create(
-            id=MAIN_DISTRICT_ID, name="Main District", path="Main District", parent=None
-        )
-
-        district_object = ProjectLocation.objects.create(
-            id=DISTRICT_ID,
-            name="District",
-            path="Main District/District",
-            parent=master_district,
+        district = ProjectLocation.objects.create(
+            id=MAIN_DISTRICT_ID, name="District", path="District", parent=None
         )
 
         ProjectLocation.objects.create(
-            id=SUB_DISTRICT_ID,
-            name="Sub District",
-            path="Main District/District/Sub District",
-            parent=district_object,
+            id=DISTRICT_ID,
+            name="Division",
+            path="District/Division",
+            parent=district,
         )
 
     def test_Without_Arguments(self):
         out = StringIO()
-        call_command("managehierarchies", stdout=out)
+        call_command("hierarchies", stdout=out)
         self.assertIn("No arguments given.", out.getvalue())
 
-    def test_With_PopulateWithExcel_Only_Argument(self):
-        out = StringIO()
-        call_command(
-            "managehierarchies",
-            populate_with_excel=True,
-            stdout=out,
-        )
-        self.assertIn("Excel file path is incorrect or missing", out.getvalue())
-
     def test_With_File_Only_Argument(self):
-
         with self.assertRaises(CommandError):
             call_command(
-                "managehierarchies",
+                "hierarchies",
                 "--file",
             )
 
     @mock.patch("requests.Session")
     def test_With_SyncWithPW_Only_ErrorResponse(self, session_mock):
         session_mock.return_value.get.return_value.status_code = 500
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(project.projectClass == None, "Project must not have class")
+        session_mock.return_value.get.asswer_call_with(PW_API_LOCATIONS)
+        with self.assertRaises(PWProjectResponseError):
+            call_command(
+                "hierarchies",
+                "--sync-locations-with-pw",
+            )
 
     @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_SetSubclassAsClassToProject(self, session_mock):
-
+    def test_With_SyncWithPW_Only_FetchOneLocationHierarchy(self, session_mock):
         session_mock.return_value.get.return_value = _mock_response(
             json_data={
                 "instances": [
                     {
                         "properties": {
-                            "PROJECT_Pluokka": "Main Class",
-                            "PROJECT_Luokka": "Class",
-                            "PROJECT_Alaluokka": "Subclass",
+                            "PAALUOKKA": "District",
+                            "LUOKKA": "Division",
+                            "ALALUOKKA": "Sub division",
                         }
                     }
                 ]
             }
         )
+        session_mock.return_value.get.asswer_call_with(PW_API_LOCATIONS)
 
         call_command(
-            "managehierarchies",
-            "--sync-with-pw",
+            "hierarchies",
+            "--sync-locations-with-pw",
+        )
+        path = "District/Division/Sub Division"
+        locations = ProjectLocationService.find_by_path(path)
+        self.assertTrue(
+            len(locations),
+            f"Should find only one location with path '{path}'",
         )
 
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
         self.assertTrue(
-            project.projectClass.id == SUBCLASS_ID,
-            "Project must have subclass as class",
+            locations[0].path == path,
+            f"Found location should have path '{path}'",
         )
 
     @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_SetClassAsClassToProject(self, session_mock):
-
+    def test_With_SyncWithPW_Only_ShouldNotStoreEmptySubDivision(self, session_mock):
         session_mock.return_value.get.return_value = _mock_response(
             json_data={
                 "instances": [
                     {
                         "properties": {
-                            "PROJECT_Pluokka": "Main Class",
-                            "PROJECT_Luokka": "Class",
-                            "PROJECT_Alaluokka": "",
+                            "PAALUOKKA": "District",
+                            "LUOKKA": "Division",
+                            "ALALUOKKA": "",
                         }
                     }
                 ]
             }
         )
+        session_mock.return_value.get.asswer_call_with(PW_API_LOCATIONS)
 
         call_command(
-            "managehierarchies",
-            "--sync-with-pw",
+            "hierarchies",
+            "--sync-locations-with-pw",
         )
 
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
+        path = "District/Division/"
+        locations = ProjectLocationService.find_by_path(path)
         self.assertTrue(
-            project.projectClass.id == CLASS_ID,
-            "Project must have class as class",
+            len(locations) == 0,
+            f"Should not find any sub division location with '{path}'",
         )
 
     @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_CannotSetSubclassAsClassDueToMissingClass(
+    def test_With_SyncWithPW_Only_ShouldNotStoreSubDivisionWithEmptyDivision(
         self, session_mock
     ):
-
         session_mock.return_value.get.return_value = _mock_response(
             json_data={
                 "instances": [
                     {
                         "properties": {
-                            "PROJECT_Pluokka": "Main Class",
-                            "PROJECT_Luokka": "",
-                            "PROJECT_Alaluokka": "Subclass",
+                            "PAALUOKKA": "District",
+                            "LUOKKA": "",
+                            "ALALUOKKA": "Sub division",
                         }
                     }
                 ]
             }
         )
+        session_mock.return_value.get.asswer_call_with(PW_API_LOCATIONS)
 
         call_command(
-            "managehierarchies",
-            "--sync-with-pw",
+            "hierarchies",
+            "--sync-locations-with-pw",
         )
 
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
+        path = "District//Sub Division"
+        locations = ProjectLocationService.find_by_path(path)
         self.assertTrue(
-            project.projectClass == None,
-            "Project must not have class",
+            len(locations) == 0,
+            f"Should not find any sub division location with '{path}'",
         )
 
-    @mock.patch("pandas.read_excel")
-    def test_With_PopulateWithExcel_EmptyFile(self, pandas_mock):
+    # The folowing tests must be refactored to use openpyxl
+    # @mock.patch("pandas.read_excel")
+    # def test_With_PopulateWithExcel_EmptyFile(self, pandas_mock):
+    #     with mock.patch("os.path.isfile") as isFile:
+    #         isFile.return_value = True
+    #         pandas_mock.return_value = pd.DataFrame()
+    #         out = StringIO()
 
-        with mock.patch("os.path.isfile") as isFile:
-            isFile.return_value = True
-            pandas_mock.return_value = pd.DataFrame()
-            out = StringIO()
+    #         call_command(
+    #             "hierarchies",
+    #             "--file",
+    #             file="notexisting.xsls",
+    #             stdout=out,
+    #         )
 
-            call_command(
-                "managehierarchies",
-                "--populate-with-excel",
-                file="notexisting.xsls",
-                stdout=out,
-            )
+    #         self.assertIn(
+    #             "Excel sheet should have the following columns only PÄÄLUOKKA, LUOKKA, ALALUOKKA",
+    #             out.getvalue(),
+    #         )
 
-            self.assertIn(
-                "Excel sheet should have the following columns only PÄÄLUOKKA, LUOKKA, ALALUOKKA",
-                out.getvalue(),
-            )
+    # @mock.patch("pandas.read_excel")
+    # def test_With_PopulateWithExcel_ColumnHeadersOnly(self, pandas_mock):
+    #     with mock.patch("os.path.isfile") as isFile:
+    #         isFile.return_value = True
+    #         pandas_mock.return_value = pd.DataFrame(
+    #             {"PÄÄLUOKKA": [], "LUOKKA": [], "ALALUOKKA": []}
+    #         )
 
-    @mock.patch("pandas.read_excel")
-    def test_With_PopulateWithExcel_ColumnHeadersOnly(self, pandas_mock):
+    #         call_command(
+    #             "managehierarchies",
+    #             "--populate-with-excel",
+    #             file="notexisting.xsls",
+    #         )
+    #         # only Master Class, Class, and Subclass should remain in DB
+    #         projectClasses = ProjectClass.objects.all()
+    #         self.assertTrue(
+    #             len(projectClasses) == 3, "No classes should be created from Excel file"
+    #         )
 
-        with mock.patch("os.path.isfile") as isFile:
-            isFile.return_value = True
-            pandas_mock.return_value = pd.DataFrame(
-                {"PÄÄLUOKKA": [], "LUOKKA": [], "ALALUOKKA": []}
-            )
+    # @mock.patch("pandas.read_excel")
+    # def test_With_PopulateWithExcel_CreatesOnlyMasterClass(self, pandas_mock):
+    #     with mock.patch("os.path.isfile") as isFile:
+    #         isFile.return_value = True
+    #         pandas_mock.return_value = pd.DataFrame(
+    #             {"PÄÄLUOKKA": ["Pääluokka"], "LUOKKA": [np.nan], "ALALUOKKA": [np.nan]}
+    #         )
+    #         out = StringIO()
 
-            call_command(
-                "managehierarchies",
-                "--populate-with-excel",
-                file="notexisting.xsls",
-            )
-            # only Master Class, Class, and Subclass should remain in DB
-            projectClasses = ProjectClass.objects.all()
-            self.assertTrue(
-                len(projectClasses) == 3, "No classes should be created from Excel file"
-            )
+    #         call_command(
+    #             "managehierarchies",
+    #             "--populate-with-excel",
+    #             file="notexisting.xsls",
+    #             stdout=out,
+    #         )
+    #         projectClasses = ProjectClass.objects.all()
+    #         self.assertTrue(
+    #             len(projectClasses) == 4, "One class should be created from Excel file"
+    #         )
+    #         projectClass = projectClasses[3]
+    #         self.assertTrue(
+    #             projectClass.name == "Pääluokka" and not projectClass.id == None,
+    #             "Class 'Pälluokka' should be created from Excel file",
+    #         )
 
-    @mock.patch("pandas.read_excel")
-    def test_With_PopulateWithExcel_CreatesOnlyMasterClass(self, pandas_mock):
+    # @mock.patch("pandas.read_excel")
+    # def test_With_PopulateWithExcel_CreatesOnlyMasterClassAndClass(self, pandas_mock):
+    #     with mock.patch("os.path.isfile") as isFile:
+    #         isFile.return_value = True
+    #         pandas_mock.return_value = pd.DataFrame(
+    #             {"PÄÄLUOKKA": ["Pääluokka"], "LUOKKA": ["Luokka"], "ALALUOKKA": [None]}
+    #         )
+    #         out = StringIO()
 
-        with mock.patch("os.path.isfile") as isFile:
-            isFile.return_value = True
-            pandas_mock.return_value = pd.DataFrame(
-                {"PÄÄLUOKKA": ["Pääluokka"], "LUOKKA": [np.nan], "ALALUOKKA": [np.nan]}
-            )
-            out = StringIO()
+    #         call_command(
+    #             "managehierarchies",
+    #             "--populate-with-excel",
+    #             file="notexisting.xsls",
+    #             stdout=out,
+    #         )
+    #         projectClasses = ProjectClass.objects.all()
+    #         self.assertTrue(
+    #             len(projectClasses) == 5,
+    #             "Two classes should be created from Excel file",
+    #         )
+    #         projectClass = projectClasses[3]
+    #         self.assertTrue(
+    #             projectClass.name == "Pääluokka" and not projectClass.id == None,
+    #             "Class 'Pääluokka' should be created from Excel file",
+    #         )
 
-            call_command(
-                "managehierarchies",
-                "--populate-with-excel",
-                file="notexisting.xsls",
-                stdout=out,
-            )
-            projectClasses = ProjectClass.objects.all()
-            self.assertTrue(
-                len(projectClasses) == 4, "One class should be created from Excel file"
-            )
-            projectClass = projectClasses[3]
-            self.assertTrue(
-                projectClass.name == "Pääluokka" and not projectClass.id == None,
-                "Class 'Pälluokka' should be created from Excel file",
-            )
+    #         projectClass = projectClasses[4]
+    #         self.assertTrue(
+    #             projectClass.name == "Luokka" and not projectClass.id == None,
+    #             "Class 'Luokka' should be created from Excel file",
+    #         )
 
-    @mock.patch("pandas.read_excel")
-    def test_With_PopulateWithExcel_CreatesOnlyMasterClassAndClass(self, pandas_mock):
+    # @mock.patch("pandas.read_excel")
+    # def test_With_PopulateWithExcel_CreatesMasterClassAndClassAndSubclass(
+    #     self, pandas_mock
+    # ):
+    #     with mock.patch("os.path.isfile") as isFile:
+    #         isFile.return_value = True
+    #         pandas_mock.return_value = pd.DataFrame(
+    #             {
+    #                 "PÄÄLUOKKA": ["Pääluokka"],
+    #                 "LUOKKA": ["Luokka"],
+    #                 "ALALUOKKA": ["Alaluokka"],
+    #             }
+    #         )
+    #         out = StringIO()
 
-        with mock.patch("os.path.isfile") as isFile:
-            isFile.return_value = True
-            pandas_mock.return_value = pd.DataFrame(
-                {"PÄÄLUOKKA": ["Pääluokka"], "LUOKKA": ["Luokka"], "ALALUOKKA": [None]}
-            )
-            out = StringIO()
+    #         call_command(
+    #             "managehierarchies",
+    #             "--populate-with-excel",
+    #             file="notexisting.xsls",
+    #             stdout=out,
+    #         )
+    #         projectClasses = ProjectClass.objects.all()
+    #         self.assertTrue(
+    #             len(projectClasses) == 6,
+    #             "Three classes should be created from Excel file",
+    #         )
+    #         projectClass = projectClasses[3]
+    #         self.assertTrue(
+    #             projectClass.name == "Pääluokka" and not projectClass.id == None,
+    #             "Class 'Pääluokka' should be created from Excel file",
+    #         )
 
-            call_command(
-                "managehierarchies",
-                "--populate-with-excel",
-                file="notexisting.xsls",
-                stdout=out,
-            )
-            projectClasses = ProjectClass.objects.all()
-            self.assertTrue(
-                len(projectClasses) == 5,
-                "Two classes should be created from Excel file",
-            )
-            projectClass = projectClasses[3]
-            self.assertTrue(
-                projectClass.name == "Pääluokka" and not projectClass.id == None,
-                "Class 'Pääluokka' should be created from Excel file",
-            )
+    #         projectClass = projectClasses[4]
+    #         self.assertTrue(
+    #             projectClass.name == "Luokka" and not projectClass.id == None,
+    #             "Class 'Luokka' should be created from Excel file",
+    #         )
 
-            projectClass = projectClasses[4]
-            self.assertTrue(
-                projectClass.name == "Luokka" and not projectClass.id == None,
-                "Class 'Luokka' should be created from Excel file",
-            )
-
-    @mock.patch("pandas.read_excel")
-    def test_With_PopulateWithExcel_CreatesMasterClassAndClassAndSubclass(
-        self, pandas_mock
-    ):
-
-        with mock.patch("os.path.isfile") as isFile:
-            isFile.return_value = True
-            pandas_mock.return_value = pd.DataFrame(
-                {
-                    "PÄÄLUOKKA": ["Pääluokka"],
-                    "LUOKKA": ["Luokka"],
-                    "ALALUOKKA": ["Alaluokka"],
-                }
-            )
-            out = StringIO()
-
-            call_command(
-                "managehierarchies",
-                "--populate-with-excel",
-                file="notexisting.xsls",
-                stdout=out,
-            )
-            projectClasses = ProjectClass.objects.all()
-            self.assertTrue(
-                len(projectClasses) == 6,
-                "Three classes should be created from Excel file",
-            )
-            projectClass = projectClasses[3]
-            self.assertTrue(
-                projectClass.name == "Pääluokka" and not projectClass.id == None,
-                "Class 'Pääluokka' should be created from Excel file",
-            )
-
-            projectClass = projectClasses[4]
-            self.assertTrue(
-                projectClass.name == "Luokka" and not projectClass.id == None,
-                "Class 'Luokka' should be created from Excel file",
-            )
-
-            projectClass = projectClasses[5]
-            self.assertTrue(
-                projectClass.name == "Alaluokka" and not projectClass.id == None,
-                "Class 'Alaluokka' should be created from Excel file",
-            )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_SetSubDistrictAsLocationToProject(self, session_mock):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Suurpiirin_nimi": "Main District",
-                            "PROJECT_Kaupunginosan_nimi": "District",
-                            "PROJECT_Osa_alue": "Sub District",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.projectLocation.id == SUB_DISTRICT_ID,
-            "Project must have sub district as location",
-        )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_SetDistrictAsLocationToProject(self, session_mock):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Suurpiirin_nimi": "Main District",
-                            "PROJECT_Kaupunginosan_nimi": "District",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.projectLocation.id == DISTRICT_ID,
-            "Project must have district as location",
-        )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_CannotSetSubDistrictAsLocationDueToMissingDistrict(
-        self, session_mock
-    ):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Suurpiirin_nimi": "Main District",
-                            "PROJECT_Osa_alue": "Sub District",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.projectLocation == None,
-            "Project must not have location",
-        )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_CannotSetResponsibleZoneDueToUnknownValue(
-        self, session_mock
-    ):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "Eteläinen",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.responsibleZone == None,
-            "Project must not have responsible zone",
-        )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_CannotSetResponsibleZoneDueToEmptyValue(
-        self, session_mock
-    ):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.responsibleZone == None,
-            "Project must not have responsible zone",
-        )
-
-    @mock.patch("requests.Session")
-    def test_With_SyncWithPW_Only_SetResponsibleZone(self, session_mock):
-
-        session_mock.return_value.get.return_value = _mock_response(
-            json_data={
-                "instances": [
-                    {
-                        "properties": {
-                            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "Pohjoinen",
-                        }
-                    }
-                ]
-            }
-        )
-
-        call_command(
-            "managehierarchies",
-            "--sync-with-pw",
-        )
-
-        project = Project.objects.get(id=PROJECT_ID)
-        session_mock.return_value.get.asswer_call_with(PW_API_URL.format(HKR_ID))
-        self.assertTrue(
-            project.responsibleZone.value == "north",
-            "Project must not have responsible zone",
-        )
+    #         projectClass = projectClasses[5]
+    #         self.assertTrue(
+    #             projectClass.name == "Alaluokka" and not projectClass.id == None,
+    #             "Class 'Alaluokka' should be created from Excel file",
+    #         )

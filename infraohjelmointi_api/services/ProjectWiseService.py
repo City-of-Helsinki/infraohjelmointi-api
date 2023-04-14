@@ -19,11 +19,15 @@ from .ProjectPhaseService import ProjectPhaseService
 from .ProjectAreaService import ProjectAreaService
 from .ResponsibleZoneService import ResponsibleZoneService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
+from .ProjectLocationService import ProjectLocationService
 
-if path.exists(".env"):
-    environ.Env().read_env(".env")
 
 env = environ.Env()
+env.escape_proxy = True
+
+if path.exists(".env"):
+    env.read_env(".env")
+
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 
 
@@ -34,6 +38,9 @@ class ProjectWiseService:
         self.session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         self.pw_api_url = env("PW_API_URL")
         self.pw_api_project_endpoint = env("PW_API_PROJECT_ENDPOINT")
+        self.pw_api_project_endpoint_filter = env("PW_API_PROJECT_ENDPOINT_FILTER")
+        self.pw_api_location_endpoint = env("PW_API_LOCATION_ENDPOINT")
+        self.pw_api_location_endpoint_filter = env("PW_API_LOCATION_ENDPOINT_FILTER")
 
         # preload data from DB to optimize performance
         self.project_phases = self.__load_and_transform_phases()
@@ -95,10 +102,12 @@ class ProjectWiseService:
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
         start_time = time.perf_counter()
-        response = self.session.get(
-            f"{self.pw_api_url}{self.pw_api_project_endpoint}+{id}"
-        )
+        api_url = f"{self.pw_api_url}{self.pw_api_project_endpoint}?${self.pw_api_project_endpoint_filter}{id}"
+
+        logger.debug("Requesting API {}".format(api_url))
+        response = self.session.get(api_url)
         response_time = time.perf_counter() - start_time
+
         logger.debug(f"PW responded in {response_time}s")
 
         # Check if PW responded with error
@@ -115,6 +124,87 @@ class ProjectWiseService:
             )
 
         return json_response[0]
+
+    def fetch_locations(self):
+        """
+        Currently fetches only sub divisions from PW.
+        Other locations come from Excel files.
+        """
+        api_url = f"{self.pw_api_url}{self.pw_api_location_endpoint}?${self.pw_api_location_endpoint_filter}"
+
+        logger.debug("Requesting API {}".format(api_url))
+
+        response = self.session.get(api_url)
+
+        # Check if PW responded with error
+        if response.status_code != 200:
+            raise PWProjectResponseError(
+                f"PW responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
+            )
+        locations = response.json()["instances"]
+        logger.info(f"PW responded with {len(locations)} locations")
+
+        # Iterate the result received from PW
+        for model_data in locations:
+            model_data = model_data["properties"]
+            district = model_data["PAALUOKKA"].strip().title()
+            division = model_data["LUOKKA"].strip().title()
+            district_division_path = f"{district}/{division}"
+
+            sub_division = model_data["ALALUOKKA"].strip().title()
+            sub_division_path = f"{district_division_path}/{sub_division}"
+
+            if not sub_division:
+                logger.error(
+                    "Sub division '{}' cannot be handled".format(
+                        sub_division, sub_division_path
+                    )
+                )
+                continue
+
+            district_divisions = list(
+                ProjectLocationService.find_by_path(path=district_division_path)
+            )
+
+            if len(district_divisions) == 0:
+                # skip thi record because the district should be found in DB
+                logger.error(
+                    "No parent location found by path '{}'. Cannot create sub division '{}' with path '{}'".format(
+                        district_division_path, sub_division, sub_division_path
+                    )
+                )
+                continue
+
+            sub_divisions = list(
+                ProjectLocationService.find_by_path(path=sub_division_path)
+            )
+            if len(sub_divisions) > 0:
+                logger.info(
+                    "Sub division '{}' already exists in DB with path '{}'".format(
+                        sub_division, sub_division_path
+                    )
+                )
+                continue
+
+            for parent_location in district_divisions:
+                try:
+                    location, _ = ProjectLocationService.get_or_create(
+                        name=sub_division,
+                        parent=parent_location,
+                        path=sub_division_path,
+                        parentClass=parent_location.parentClass,
+                    )
+                    logger.info(
+                        "Sub division '{}' successfully created with '{}'. Its id '{}'".format(
+                            sub_division, sub_division_path, location.id
+                        )
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Error occurred while creating sub division '{}' with path '{}'. \nError: {}".format(
+                            sub_division, sub_division_path, e
+                        )
+                    )
 
     def __proceed_with_pw_project(self, pw_project, project: Project) -> None:
         """Helper method to handle PW project data and copy it to given project"""

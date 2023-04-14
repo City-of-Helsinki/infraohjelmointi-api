@@ -21,9 +21,18 @@ class ProjectLocationService:
         )
 
     @staticmethod
-    def list_all_for_programmer() -> list[ProjectClass]:
+    def list_all() -> list[ProjectLocation]:
+        """List all project locations for programmer view"""
         return ProjectLocation.objects.all().filter(forCoordinatorOnly=False)
 
     @staticmethod
-    def list_all_for_coordinator() -> list[ProjectClass]:
+    def list_all_for_coordinator() -> list[ProjectLocation]:
+        """List all project locations for coordinator view"""
         return ProjectLocation.objects.all().filter(forCoordinatorOnly=True)
+
+    @staticmethod
+    def find_by_path(path: str) -> list[ProjectLocation]:
+        """Find all project locations by path for programmer view"""
+        return list(
+            ProjectLocation.objects.all().filter(path=path, forCoordinatorOnly=False)
+        )
