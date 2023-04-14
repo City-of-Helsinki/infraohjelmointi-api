@@ -78,7 +78,6 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
 
     @override
     def update(self, instance, validated_data):
-
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance.project, "lock"):
             lockedFields = [
@@ -185,7 +184,6 @@ class searchResultSerializer(serializers.Serializer):
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer):
-
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
@@ -407,7 +405,6 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
         return obj.projectReadiness()
 
     def get_finances(self, obj):
-
         year = self.context.get("finance_year", None)
         queryset = ProjectFinancial.objects.none()
         if year is not None:
@@ -473,7 +470,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField()
 
     def get_finances(self, obj):
-
         year = self.context.get("finance_year", None)
         queryset = ProjectFinancial.objects.none()
         if year is not None:
@@ -633,7 +629,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
-        print(validated_data)
+
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
             lockedFields = [
