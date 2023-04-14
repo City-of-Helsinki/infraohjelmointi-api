@@ -306,7 +306,9 @@ class searchResultSerializer(serializers.Serializer):
             return path
 
         if locationInstance.parent is None:
-            return path + "/{}".format(str(locationInstance.id))
+            path = path + "/{}".format(str(locationInstance.id))
+
+        return path
 
     def get_phase(self, obj):
         if not hasattr(obj, "phase") or obj.phase is None:
