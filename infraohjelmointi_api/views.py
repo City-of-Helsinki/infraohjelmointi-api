@@ -50,6 +50,7 @@ from .serializers import (
     ProjectFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
+from .services import ProjectClassService, ProjectLocationService
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -146,6 +147,18 @@ class ProjectLocationViewSet(BaseViewSet):
     permission_classes = []
     serializer_class = ProjectLocationSerializer
 
+    def get_queryset(self):
+        """Default is programmer view"""
+        return ProjectLocationService.list_all()
+
+    @action(methods=["get"], detail=False, url_path=r"coordinator")
+    def list_for_coordinator(self, reqeust):
+        """List for coordinator view"""
+        serializer = ProjectLocationSerializer(
+            ProjectLocationService.list_all_for_coordinator(), many=True
+        )
+        return Response(serializer.data)
+
 
 class ProjectClassViewSet(BaseViewSet):
     """
@@ -154,6 +167,19 @@ class ProjectClassViewSet(BaseViewSet):
 
     permission_classes = []
     serializer_class = ProjectClassSerializer
+
+    @override
+    def get_queryset(self):
+        """Default is programmer view"""
+        return ProjectClassService.list_all()
+
+    @action(methods=["get"], detail=False, url_path=r"coordinator")
+    def list_for_coordinator(self, reqeust):
+        """List for coordinator view"""
+        serializer = ProjectClassSerializer(
+            ProjectClassService.list_all_for_coordinator(), many=True
+        )
+        return Response(serializer.data)
 
 
 class ProjectQualityLevelViewSet(BaseViewSet):
@@ -405,11 +431,15 @@ class ProjectViewSet(BaseViewSet):
 
             if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
                 projectClasses = ProjectClass.objects.filter(
-                    id__in=queryset.values_list("projectClass", flat=True).distinct()
+                    id__in=queryset.values_list("projectClass", flat=True).distinct(),
+                    forCoordinatorOnly=False,
                 )
             if len(mainDistrict) > 0 or len(district) > 0 or len(subDistrict) > 0:
                 projectLocations = ProjectLocation.objects.filter(
-                    id__in=queryset.values_list("projectLocation", flat=True).distinct()
+                    id__in=queryset.values_list(
+                        "projectLocation", flat=True
+                    ).distinct(),
+                    forCoordinatorOnly=False,
                 )
 
             if order == "new":
@@ -594,6 +624,7 @@ class ProjectViewSet(BaseViewSet):
                 id__in=search_ids,
                 parent__isnull=not has_parent,
                 parent__parent__isnull=not has_parent_parent,
+                forCoordinatorOnly=False,
             )
             .distinct()
             .values_list("path", flat=True)

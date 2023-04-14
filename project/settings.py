@@ -167,6 +167,7 @@ LOGGING = {
         "console": {
             "format": "%(asctime)s %(levelname)s %(pathname)s:%(lineno)d %(message)s",
             "datefmt": "[%d/%b/%Y %H:%M:%S]",
+            "()": "project.customlogging.ColoredFormatter",
         },
     },
     "handlers": {
@@ -179,7 +180,7 @@ LOGGING = {
     "loggers": {
         "infraohjelmointi_api": {
             "handlers": ["console"],
-            "level": env("LOG_LEVEL"),
+            "level": 1,
             "propagate": False,
         },
     },

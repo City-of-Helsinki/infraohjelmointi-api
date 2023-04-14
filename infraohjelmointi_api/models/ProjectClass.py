@@ -15,3 +15,7 @@ class ProjectClass(models.Model):
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
     path = models.CharField(max_length=300, blank=True, null=True)
+    relatedTo = models.ForeignKey(
+        "self", blank=True, null=True, on_delete=models.DO_NOTHING
+    )
+    forCoordinatorOnly = models.BooleanField(default=False)
