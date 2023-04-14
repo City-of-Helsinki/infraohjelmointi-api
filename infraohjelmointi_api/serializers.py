@@ -28,6 +28,7 @@ from .models import (
     ProjectFinancial,
 )
 from .services import ProjectWiseService
+from .services.ProjectWiseService import PWProjectNotFoundError
 from rest_framework.exceptions import ParseError, ValidationError
 from datetime import date
 from rest_framework import serializers
@@ -427,9 +428,12 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
 
     def get_PWFolder(self, obj):
         if hasattr(obj, "hkrId") and obj.hkrId is not None:
-            instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
-                id=obj.hkrId
-            ).get("instanceId", None)
+            try:
+                instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                    id=obj.hkrId
+                ).get("instanceId", None)
+            except PWProjectNotFoundError:
+                instanceId = None
             if instanceId is not None:
                 return self.PWFolderBase.format(instanceId)
 
@@ -515,9 +519,12 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     def get_PWFolder(self, obj):
         if hasattr(obj, "hkrId") and obj.hkrId is not None:
-            instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
-                id=obj.hkrId
-            ).get("instanceId", None)
+            try:
+                instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                    id=obj.hkrId
+                ).get("instanceId", None)
+            except PWProjectNotFoundError:
+                instanceId = None
             if instanceId is not None:
                 return self.PWFolderBase.format(instanceId)
 
