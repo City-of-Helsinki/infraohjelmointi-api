@@ -21,6 +21,8 @@ class ProjectClassService:
     @staticmethod
     def list_all() -> list[ProjectClass]:
         """List all project classes for programmer view"""
+
+    def list_all_for_programmer() -> list[ProjectClass]:
         return ProjectClass.objects.all().filter(forCoordinatorOnly=False)
 
     @staticmethod
