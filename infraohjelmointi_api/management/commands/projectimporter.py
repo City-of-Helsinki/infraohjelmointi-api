@@ -1,48 +1,38 @@
 from django.core.management.base import BaseCommand, CommandError
 
-import requests
 import os
-from os import path
-
-
-import environ
 
 from django.db import transaction
-from .util.budjetfilehandler import proceedWithBudjetFile
-from .util.pwhandler import proceedWithPWArgument
-
-
-requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
-if path.exists(".env"):
-    environ.Env().read_env(".env")
-
-env = environ.Env()
+from .util import IExcelFileHandler, PlanningFileHandler, BudgetFileHandler
+from ...services import ProjectWiseService
 
 
 class Command(BaseCommand):
     help = (
-        "Populates the DB with project excel data. "
+        "Populates the DB with project excel and synchronize with PW data. "
         + "\nUsage: python manage.py projectimporter"
-        + " --import-from-budjet /path/to/budjet.xsls"
+        + " --import-from-budget /path/to/budget.xsls"
         + " --import-from-plan /path/to/plan.xsls"
+        + " --sync-projects-with-pw"
+        + " --sync-project-with-pw pwid"
     )
 
     def add_arguments(self, parser):
         """
         Add the following arguments to the manageclasses command
 
-        --import-from-budjet /path/to/budjet.xsls"
+        --import-from-budget /path/to/budget.xsls"
         --import-from-plan /path/to/plan.xsls"
         """
 
-        ## --import-from-budjet argument, used to provide the path to excel file
-        ## which contains project budjet data, must give full path
+        ## --import-from-budget argument, used to provide the path to excel file
+        ## which contains project budget data, must give full path
         parser.add_argument(
-            "--import-from-budjet",
+            "--import-from-budget",
             type=str,
             help=(
-                "Argument to give full path to the budjet excel file. "
-                + "Usage: --import-from-budjet /path/to/budjet.xsls"
+                "Argument to give full path to the budget excel file. "
+                + "Usage: --import-from-budget /path/to/budget.xsls"
             ),
             default="",
         )
@@ -59,50 +49,73 @@ class Command(BaseCommand):
             default="",
         )
 
-        ## --import-from-pw argument, used to import data from PW
         parser.add_argument(
-            "--import-from-pw",
+            "--sync-projects-with-pw",
             action="store_true",
             help=(
-                "Argument to load data from PW into local DB. "
-                + "Usage: --import-from-pw"
+                "Argument to give to synchronize all projects in DB which have PW id. "
+                + "Usage: --sync-projects-with-pw"
             ),
+        )
+
+        parser.add_argument(
+            "--sync-project-with-pw",
+            type=str,
+            help=(
+                "Argument to give to synchronize given project PW id. "
+                + "Usage: --sync-project-with-pw pw_id"
+            ),
+            default="",
         )
 
     def handle(self, *args, **options):
 
         if (
-            not options["import_from_pw"]
-            and not options["import_from_budjet"]
+            not options["sync_projects_with_pw"]
+            and not options["sync_project_with_pw"]
+            and not options["import_from_budget"]
             and not options["import_from_plan"]
         ):
             self.stdout.write(
                 self.style.ERROR(
-                    "No arguments given. "
-                    + "\nUsage: python manage.py projectimporter"
-                    + " --import-from-budjet /path/to/budjet.xsls"
-                    + " --import-from-plan /path/to/plan.xsls"
-                    + " [--import-from-pw]"
+                    "No arguments given. \n"
+                    + "\nUsage: python manage.py projectimporter\n"
+                    + " --import-from-budget /path/to/budget.xsls\n"
+                    + " --import-from-plan /path/to/plan.xsls\n"
+                    + " [--sync-projects-with-pw]\n"
+                    + " [--sync-project-with-pw pwid]\n"
                 )
             )
             return
 
-        if "import_from_pw" in options:
-            proceedWithPWArgument(
-                session=requests.Session(),
-                env=env,
-                stdout=self.stdout,
-                style=self.style,
-            )
+        if options["sync_projects_with_pw"] == True:
+            ProjectWiseService().sync_all_projects_from_pw()
             return
 
-        self.proceedWithFileArgument(
-            "--import-from-budjet", "import_from_budjet", options, proceedWithBudjetFile
-        )
-        # self.proceedWithArgument("--import-from-plan", "import_from_plan", options)
+        if options["sync_project_with_pw"] != "":
+            ProjectWiseService().syn_project_from_pw(options["sync_project_with_pw"])
+            return
+
+        if options["import_from_budget"] != "":
+            self.proceedWithFileArgument(
+                argument="--import-from-budget",
+                option="import_from_budget",
+                options=options,
+                handler=BudgetFileHandler(),
+            )
+
+        if options["import_from_plan"] != "":
+            self.proceedWithFileArgument(
+                argument="--import-from-plan",
+                option="import_from_plan",
+                options=options,
+                handler=PlanningFileHandler(),
+            )
 
     @transaction.atomic
-    def proceedWithFileArgument(self, argument, option, options, handler):
+    def proceedWithFileArgument(
+        self, argument, option, options, handler: IExcelFileHandler
+    ):
         if options[option]:
             if not os.path.isfile(options[option]):
                 self.stdout.write(
@@ -115,9 +128,10 @@ class Command(BaseCommand):
                 return
 
             try:
-                handler(options[option], self.stdout, self.style)
+                handler.proceed_with_file(options[option], self.stdout, self.style)
 
             except Exception as e:
+                e.with_traceback()
                 self.stdout.write(
                     self.style.ERROR(
                         "Error occurred while reading file {}. Error: {}".format(
