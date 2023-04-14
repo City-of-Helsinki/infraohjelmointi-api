@@ -27,6 +27,7 @@ from .models import (
     ProjectLock,
     ProjectFinancial,
 )
+from .services import ProjectWiseService
 from rest_framework.exceptions import ParseError, ValidationError
 from datetime import date
 from rest_framework import serializers
@@ -416,9 +417,23 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
+    finances = serializers.SerializerMethodField()
+    PWFolder = serializers.SerializerMethodField()
+    ProjectWiseService = ProjectWiseService()
+    PWFolderBase = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/"
 
     class Meta(BaseMeta):
         model = Project
+
+    def get_PWFolder(self, obj):
+        if hasattr(obj, "hkrId") and obj.hkrId is not None:
+            instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                id=obj.hkrId
+            ).get("instanceId", None)
+            if instanceId is not None:
+                return self.PWFolderBase.format(instanceId)
+
+        return None
 
     def get_locked(self, project):
         try:
@@ -493,6 +508,20 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
+
+    PWFolder = serializers.SerializerMethodField()
+    ProjectWiseService = ProjectWiseService()
+    PWFolderBase = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/"
+
+    def get_PWFolder(self, obj):
+        if hasattr(obj, "hkrId") and obj.hkrId is not None:
+            instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                id=obj.hkrId
+            ).get("instanceId", None)
+            if instanceId is not None:
+                return self.PWFolderBase.format(instanceId)
+
+        return None
 
     class Meta(BaseMeta):
         model = Project

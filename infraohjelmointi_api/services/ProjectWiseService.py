@@ -42,6 +42,8 @@ class ProjectWiseService:
         self.pw_api_location_endpoint = env("PW_API_LOCATION_ENDPOINT")
         self.pw_api_location_endpoint_filter = env("PW_API_LOCATION_ENDPOINT_FILTER")
 
+        self.pw_api_project_metadata_url = env("PW_API_PROJECT_META_URL")
+        self.pw_api_project_metadata_endpoint = env("PW_API_PROJECT_META_ENDPOINT")
         # preload data from DB to optimize performance
         self.project_phases = self.__load_and_transform_phases()
         self.project_areas = self.__load_and_transform_project_areas()
@@ -205,6 +207,23 @@ class ProjectWiseService:
                             sub_division, sub_division_path, e
                         )
                     )
+
+    def get_project_with_metadata_from_pw(self, id: str):
+        """Method to fetch project with meta data from PW with given PW project id"""
+        start_time = time.perf_counter()
+        response = self.session.get(
+            f"{self.pw_api_project_metadata_url}&${self.pw_api_project_metadata_endpoint}+{id}"
+        )
+        response_time = time.perf_counter() - start_time
+        logger.debug(f"PW responded in {response_time}s")
+        # Check if the project exists on PW
+        json_response = response.json()["instances"]
+        if len(json_response) == 0:
+            raise PWProjectNotFoundError(
+                "No project found from PW with given id '{}'".format(id)
+            )
+
+        return json_response[0]
 
     def __proceed_with_pw_project(self, pw_project, project: Project) -> None:
         """Helper method to handle PW project data and copy it to given project"""
