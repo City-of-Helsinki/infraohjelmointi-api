@@ -5,16 +5,22 @@ from openpyxl import load_workbook
 from django.db import transaction
 import traceback
 
+from ...services import ProjectWiseService
+
 
 class Command(BaseCommand):
     help = (
         "Populates the DB with correct project class and location hierarchies. "
         + "\nUsage: python manage.py hierarchies --file <path/to/excel.xlsx>"
+        + "\n--sync-locations-with-pw"
     )
 
     def add_arguments(self, parser):
         """
         Add the following arguments to the hierarchies command
+
+        --file /folder/folder/file.xlsx
+        --sync-locations-with-pw
         """
 
         ## --file, used to tell the script to populate local db with
@@ -28,15 +34,30 @@ class Command(BaseCommand):
             ),
             default="",
         )
+        ## --sync-locations-with-pw, used to tell the script to populate local db with
+        ## location data from PW
+
+        parser.add_argument(
+            "--sync-locations-with-pw",
+            action="store_true",
+            help=(
+                "Argument to give to synchronize all locations from PW into DB. "
+                + "Usage: --sync-locations-with-pw"
+            ),
+        )
 
     def handle(self, *args, **options):
-        if not options["file"]:
+        if not options["file"] and not options["sync_locations_with_pw"]:
             self.stdout.write(
                 self.style.ERROR(
                     "No arguments given. "
                     + "\nUsage: python manage.py hierarchies --file <path/to/excel.xlsx>"
+                    + "\n --sync-locations-with-pw"
                 )
             )
+            return
+        if options["sync_locations_with_pw"]:
+            ProjectWiseService().fetch_locations()
             return
 
         if not os.path.isfile(options["file"]):

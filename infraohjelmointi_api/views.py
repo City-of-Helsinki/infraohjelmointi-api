@@ -149,7 +149,7 @@ class ProjectLocationViewSet(BaseViewSet):
 
     def get_queryset(self):
         """Default is programmer view"""
-        return ProjectLocationService.list_all_for_programmer()
+        return ProjectLocationService.list_all()
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, reqeust):
@@ -171,7 +171,7 @@ class ProjectClassViewSet(BaseViewSet):
     @override
     def get_queryset(self):
         """Default is programmer view"""
-        return ProjectClassService.list_all_for_programmer()
+        return ProjectClassService.list_all()
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, reqeust):
