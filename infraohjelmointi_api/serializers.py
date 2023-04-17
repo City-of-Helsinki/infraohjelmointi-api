@@ -213,7 +213,7 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectGroup.objects.all(),
-                fields=["name", "classRelation", "districtRelation"],
+                fields=["name", "classRelation", "locationRelation"],
             ),
         ]
 
