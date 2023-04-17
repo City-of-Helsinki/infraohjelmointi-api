@@ -219,7 +219,6 @@ class ConstructionPhaseViewSet(BaseViewSet):
 
 
 class ProjectFilter(django_filters.FilterSet):
-
     hashtag = django_filters.ModelMultipleChoiceFilter(
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
@@ -329,9 +328,9 @@ class ProjectViewSet(BaseViewSet):
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
 
-        mainDistrict = self.request.query_params.getlist("mainDistrict", [])
         district = self.request.query_params.getlist("district", [])
-        subDistrict = self.request.query_params.getlist("subDistrict", [])
+        division = self.request.query_params.getlist("division", [])
+        subDivision = self.request.query_params.getlist("subDivision", [])
 
         hkrId = request.query_params.get("hkrId", None)
         category = request.query_params.get("category", None)
@@ -393,9 +392,9 @@ class ProjectViewSet(BaseViewSet):
             or len(masterClass) > 0
             or len(_class) > 0
             or len(subClass) > 0
-            or len(mainDistrict) > 0
             or len(district) > 0
-            or len(subDistrict) > 0
+            or len(division) > 0
+            or len(subDivision) > 0
             or len(hashTags) > 0
             or len(programmed) > 0
             or hkrId is not None
@@ -434,7 +433,7 @@ class ProjectViewSet(BaseViewSet):
                     id__in=queryset.values_list("projectClass", flat=True).distinct(),
                     forCoordinatorOnly=False,
                 )
-            if len(mainDistrict) > 0 or len(district) > 0 or len(subDistrict) > 0:
+            if len(district) > 0 or len(division) > 0 or len(subDivision) > 0:
                 projectLocations = ProjectLocation.objects.filter(
                     id__in=queryset.values_list(
                         "projectLocation", flat=True
@@ -509,15 +508,14 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def get_queryset(self):
-
         qs = super().get_queryset()
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
 
-        mainDistrict = self.request.query_params.getlist("mainDistrict", [])
         district = self.request.query_params.getlist("district", [])
-        subDistrict = self.request.query_params.getlist("subDistrict", [])
+        division = self.request.query_params.getlist("division", [])
+        subDivision = self.request.query_params.getlist("subDivision", [])
 
         prYearMin = self.request.query_params.get("prYearMin", None)
         prYearMax = self.request.query_params.get("prYearMax", None)
@@ -570,28 +568,28 @@ class ProjectViewSet(BaseViewSet):
                     model_class=ProjectClass,
                 )
 
-            if len(mainDistrict) > 0:
+            if len(district) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=False,
                     has_parent_parent=False,
-                    search_ids=mainDistrict,
+                    search_ids=district,
                     model_class=ProjectLocation,
                 )
-            if len(district) > 0:
+            if len(division) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=False,
-                    search_ids=district,
+                    search_ids=division,
                     model_class=ProjectLocation,
                 )
-            if len(subDistrict) > 0:
+            if len(subDivision) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=True,
-                    search_ids=subDistrict,
+                    search_ids=subDivision,
                     model_class=ProjectLocation,
                 )
 
@@ -678,7 +676,6 @@ class ProjectViewSet(BaseViewSet):
                 prYearMin in yearToFieldMapping.keys()
                 and prYearMax in yearToFieldMapping.keys()
             ):
-
                 financialProjectIds = (
                     ProjectFinancial.objects.filter(
                         Q(
@@ -711,7 +708,6 @@ class ProjectViewSet(BaseViewSet):
                 )
                 qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
             elif prYearMax in yearToFieldMapping.keys():
-
                 financialProjectIds = (
                     ProjectFinancial.objects.filter(
                         Q(
