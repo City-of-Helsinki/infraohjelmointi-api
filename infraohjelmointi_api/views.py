@@ -322,6 +322,32 @@ class ProjectViewSet(BaseViewSet):
         }
         return Response(response)
 
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"planning-view",
+    )
+    def get_projects_for_planning_view(self, request):
+        """
+        Custom action to get projects by financial year
+        Usage: /projects/planning-view/
+        """
+        # apply filtering
+        queryset = self.filter_queryset(self.get_queryset())
+        financeYear = request.query_params.get("year", None)
+        if financeYear is not None and not financeYear.isnumeric():
+            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+        # pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(
+                page, many=True, context={"finance_year": financeYear}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     @override
     def get_serializer_class(self):
         """
