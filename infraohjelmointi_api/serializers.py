@@ -549,10 +549,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         Function to validate if a Project belongs to a specific Class then it should belong to a related Location
         """
         project = getattr(self, "instance", None)
+        if (
+            "projectLocation" in self.get_initial()
+            and self.get_initial().get("projectLocation") is None
+        ):
+            return
         projectLocation = (
-            ProjectLocation.objects.get(
-                id=self.get_initial().get("projectLocation", None)
-            )
+            ProjectLocation.objects.get(id=self.get_initial().get("projectLocation"))
             if self.get_initial().get("projectLocation", None) is not None
             else None
         )
