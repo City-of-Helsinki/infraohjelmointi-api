@@ -335,10 +335,9 @@ class ProjectViewSet(BaseViewSet):
         # apply filtering
         queryset = self.filter_queryset(self.get_queryset())
         financeYear = request.query_params.get("year", None)
-        limit = request.query_params.get("limit", "20")
-
-        if limit is not None and not limit.isnumeric():
-            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+        limit = request.query_params.get("limit", None)
+        if limit is None:
+            limit = queryset.count()
 
         if financeYear is not None and not financeYear.isnumeric():
             raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
