@@ -335,17 +335,26 @@ class ProjectViewSet(BaseViewSet):
         # apply filtering
         queryset = self.filter_queryset(self.get_queryset())
         financeYear = request.query_params.get("year", None)
+        limit = request.query_params.get("limit", "10")
+
+        if limit is not None and not limit.isnumeric():
+            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+
         if financeYear is not None and not financeYear.isnumeric():
             raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
         # pagination
-        page = self.paginate_queryset(queryset)
+        paginator = PageNumberPagination()
+        paginator.page_size = limit
+        page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = self.get_serializer(
                 page, many=True, context={"finance_year": financeYear}
             )
-            return self.get_paginated_response(serializer.data)
+            return paginator.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(
+            queryset, many=True, context={"finance_year": financeYear}
+        )
         return Response(serializer.data)
 
     @override
