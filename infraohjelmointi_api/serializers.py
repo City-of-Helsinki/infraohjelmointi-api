@@ -419,13 +419,13 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
     finances = serializers.SerializerMethodField()
-    PWFolder = serializers.SerializerMethodField()
+    pwFolder = serializers.SerializerMethodField()
     ProjectWiseService = ProjectWiseService()
 
     class Meta(BaseMeta):
         model = Project
 
-    def get_PWFolder(self, obj):
+    def get_pwFolder(self, obj):
         if obj.pwGUID is None and obj.hkrId is not None:
             try:
                 obj.pwGUID = self.ProjectWiseService.get_project_with_metadata_from_pw(
@@ -514,7 +514,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     PWFolder = serializers.SerializerMethodField()
     ProjectWiseService = ProjectWiseService()
 
-    def get_PWFolder(self, obj):
+    def get_pwFolder(self, obj):
         return obj.pw_folder
 
     class Meta(BaseMeta):
