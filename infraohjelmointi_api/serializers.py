@@ -421,23 +421,21 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     finances = serializers.SerializerMethodField()
     PWFolder = serializers.SerializerMethodField()
     ProjectWiseService = ProjectWiseService()
-    PWFolderBase = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/"
 
     class Meta(BaseMeta):
         model = Project
 
     def get_PWFolder(self, obj):
-        if hasattr(obj, "hkrId") and obj.hkrId is not None:
+        if obj.pwGUID is None and obj.hkrId is not None:
             try:
-                instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                obj.pwGUID = self.ProjectWiseService.get_project_with_metadata_from_pw(
                     id=obj.hkrId
                 ).get("instanceId", None)
+                obj.save()
+                obj.refresh_from_db()
             except PWProjectNotFoundError:
-                instanceId = None
-            if instanceId is not None:
-                return self.PWFolderBase.format(instanceId)
-
-        return None
+                pass
+        return obj.pw_folder
 
     def get_locked(self, project):
         try:
@@ -515,20 +513,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     PWFolder = serializers.SerializerMethodField()
     ProjectWiseService = ProjectWiseService()
-    PWFolderBase = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/"
 
     def get_PWFolder(self, obj):
-        if hasattr(obj, "hkrId") and obj.hkrId is not None:
-            try:
-                instanceId = self.ProjectWiseService.get_project_with_metadata_from_pw(
-                    id=obj.hkrId
-                ).get("instanceId", None)
-            except PWProjectNotFoundError:
-                instanceId = None
-            if instanceId is not None:
-                return self.PWFolderBase.format(instanceId)
-
-        return None
+        return obj.pw_folder
 
     class Meta(BaseMeta):
         model = Project
@@ -662,19 +649,31 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         return projectLocation
 
     # Commented out automatic locking logic when project is created with phase construction
-    # @override
-    # def create(self, validated_data):
-    #     """
-    #     Overriding the create method to populate ProjectLockStatus Table
-    #     with appropriate lock status based on the phase
-    #     """
-    #     newPhase = validated_data.get("phase", None)
-    #     project = super(ProjectCreateSerializer, self).create(validated_data)
-    #     if newPhase is not None and newPhase.value == "construction":
-    #         project.lock.create(lockType="status_construction", lockedBy=None)
+    # TODO: Write test to check hkrId on creation gets pwGUID
+    @override
+    def create(self, validated_data):
+        # newPhase = validated_data.get("phase", None)
+        if "hkrId" in validated_data and validated_data["hkrId"] is not None:
+            try:
+                validated_data[
+                    "pwGUID"
+                ] = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                    id=validated_data.get("hkrId")
+                ).get(
+                    "instanceId", None
+                )
 
-    #     return project
+            except PWProjectNotFoundError:
+                validated_data["pwGUID"] = None
+        elif "hkrId" in validated_data and validated_data["hkrId"] is None:
+            validated_data["pwGUID"] = None
+        project = super(ProjectCreateSerializer, self).create(validated_data)
+        # if newPhase is not None and newPhase.value == "construction":
+        #     project.lock.create(lockType="status_construction", lockedBy=None)
 
+        return project
+
+    # TODO: Write test to check hkrId on updation gets GUID
     @override
     def update(self, instance, validated_data):
         """
@@ -708,6 +707,21 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                         ),
                         code="project_locked",
                     )
+
+        if "hkrId" in validated_data and validated_data["hkrId"] is not None:
+            try:
+                validated_data[
+                    "pwGUID"
+                ] = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                    id=validated_data.get("hkrId")
+                ).get(
+                    "instanceId", None
+                )
+
+            except PWProjectNotFoundError:
+                validated_data["pwGUID"] = None
+        elif "hkrId" in validated_data and validated_data["hkrId"] is None:
+            validated_data["pwGUID"] = None
 
         # Commented out logic for automatic locking of project if phase updated to construction
         # else:
