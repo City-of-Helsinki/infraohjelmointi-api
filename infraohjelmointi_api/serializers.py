@@ -358,7 +358,7 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         """
         Check that project doesn't already belong to a group
         """
-        print(projectIds)
+
         if projectIds is not None and len(projectIds) > 0:
             for projectId in projectIds:
                 project = get_object_or_404(Project, pk=projectId)
