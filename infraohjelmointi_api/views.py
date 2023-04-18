@@ -572,11 +572,17 @@ class ProjectViewSet(BaseViewSet):
         projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
+        # TODO: Write test for this
+        direct = self.request.query_params.get("direct", False)
 
         try:
             if projectName is not None:
                 qs = qs.filter(name__icontains=projectName)
 
+            if direct in ["true", "True"]:
+                direct = True
+            elif direct in ["false", "False"]:
+                direct = False
             if inGroup is not None:
                 if inGroup in ["true", "True"]:
                     qs = qs.filter(projectGroup__isnull=False)
@@ -597,6 +603,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=False,
                     search_ids=masterClass,
                     model_class=ProjectClass,
+                    direct=direct,
                 )
 
             if len(_class) > 0:
@@ -606,6 +613,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=False,
                     search_ids=_class,
                     model_class=ProjectClass,
+                    direct=direct,
                 )
 
             if len(subClass) > 0:
@@ -615,6 +623,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=True,
                     search_ids=subClass,
                     model_class=ProjectClass,
+                    direct=direct,
                 )
 
             if len(district) > 0:
@@ -624,6 +633,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=False,
                     search_ids=district,
                     model_class=ProjectLocation,
+                    direct=direct,
                 )
             if len(division) > 0:
                 qs = self._filter_projects_by_hierarchy(
@@ -632,6 +642,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=False,
                     search_ids=division,
                     model_class=ProjectLocation,
+                    direct=direct,
                 )
             if len(subDivision) > 0:
                 qs = self._filter_projects_by_hierarchy(
@@ -640,6 +651,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=True,
                     search_ids=subDivision,
                     model_class=ProjectLocation,
+                    direct=direct,
                 )
 
             return qs
@@ -751,8 +763,19 @@ class ProjectViewSet(BaseViewSet):
             return False
 
     def _filter_projects_by_hierarchy(
-        self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class
+        self,
+        qs,
+        has_parent: bool,
+        has_parent_parent: bool,
+        search_ids,
+        model_class,
+        direct=False,
     ):
+        if direct == True:
+            if model_class.__name__ == "ProjectLocation":
+                return qs.filter(projectLocation__in=search_ids)
+            elif model_class.__name__ == "ProjectClass":
+                return qs.filter(projectClass__in=search_ids)
         paths = (
             model_class.objects.filter(
                 id__in=search_ids,
