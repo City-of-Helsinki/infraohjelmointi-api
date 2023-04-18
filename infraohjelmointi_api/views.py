@@ -775,6 +775,7 @@ class ProjectViewSet(BaseViewSet):
             if model_class.__name__ == "ProjectLocation":
                 return qs.filter(projectLocation__in=search_ids)
             elif model_class.__name__ == "ProjectClass":
+                # TODO: write test for this case
                 return qs.filter(
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
