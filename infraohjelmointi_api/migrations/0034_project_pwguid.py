@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('infraohjelmointi_api', '0032_remove_project_budgetproposalcurrentyearplus0_and_more'),
+        ("infraohjelmointi_api", "0033_forcoordinatoronly_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='project',
-            name='pwGUID',
+            model_name="project",
+            name="pwGUID",
             field=models.UUIDField(blank=True, default=None, null=True),
         ),
     ]
