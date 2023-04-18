@@ -649,7 +649,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         return projectLocation
 
     # Commented out automatic locking logic when project is created with phase construction
-    # TODO: Write test to check hkrId on creation gets pwGUID
     @override
     def create(self, validated_data):
         # newPhase = validated_data.get("phase", None)
@@ -673,7 +672,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
         return project
 
-    # TODO: Write test to check hkrId on updation gets GUID
     @override
     def update(self, instance, validated_data):
         """
