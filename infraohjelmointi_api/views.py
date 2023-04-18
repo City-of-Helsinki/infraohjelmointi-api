@@ -337,10 +337,11 @@ class ProjectViewSet(BaseViewSet):
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
         if limit is None:
-            limit = queryset.count()
+            limit = queryset.count() if queryset.count() > 0 else 1
 
         if financeYear is not None and not financeYear.isnumeric():
             raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+
         # pagination
         paginator = PageNumberPagination()
         paginator.page_size = limit
@@ -774,7 +775,9 @@ class ProjectViewSet(BaseViewSet):
             if model_class.__name__ == "ProjectLocation":
                 return qs.filter(projectLocation__in=search_ids)
             elif model_class.__name__ == "ProjectClass":
-                return qs.filter(projectClass__in=search_ids)
+                return qs.filter(
+                    projectClass__in=search_ids, projectLocation__isnull=True
+                )
         paths = (
             model_class.objects.filter(
                 id__in=search_ids,
