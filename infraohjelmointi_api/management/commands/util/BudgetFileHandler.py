@@ -1,4 +1,5 @@
 from openpyxl import load_workbook
+import datetime
 
 from .hierarchy import buildHierarchiesAndProjects, getColor, MAIN_CLASS_COLOR
 from ....services import (
@@ -6,6 +7,7 @@ from ....services import (
     ProjectService,
     NoteService,
     ProjectCategoryService,
+    ProjectFinancialService,
 )
 
 from . import IExcelFileHandler
@@ -19,6 +21,7 @@ class BudgetFileHandler(IExcelFileHandler):
         self.project_categories_map = {
             str(pc.value).lower(): pc for pc in ProjectCategoryService.list_all()
         }
+        self.current_budget_year = datetime.date.today().year
 
     def proceed_with_file(self, excel_path, stdout, style):
         stdout.write(
@@ -42,6 +45,14 @@ class BudgetFileHandler(IExcelFileHandler):
 
             sheet = wb[sheetname]
             rows = list(sheet.rows)
+            year_heading = None
+            # there is a need to find the year for the budget file
+            for year in rows[8:11]:
+                if str(year[19].value).lower() == "tae":
+                    year_heading = "tae"
+                elif year_heading == "tae" and str(year[19].value).isnumeric():
+                    self.current_budget_year = year[19].value
+                    break
 
             buildHierarchiesAndProjects(
                 wb=wb,
@@ -67,16 +78,17 @@ class BudgetFileHandler(IExcelFileHandler):
         effectHousing = str(row[2].value).strip()
         effectHousing = True if effectHousing == "K" else False
         costForecast = row[6].value
-        budgetProposalCurrentYearPlus1 = row[19].value
-        budgetProposalCurrentYearPlus2 = row[20].value
-        preliminaryCurrentYearPlus3 = row[21].value
-        preliminaryCurrentYearPlus4 = row[22].value
-        preliminaryCurrentYearPlus5 = row[23].value
-        preliminaryCurrentYearPlus6 = row[24].value
-        preliminaryCurrentYearPlus7 = row[25].value
-        preliminaryCurrentYearPlus8 = row[26].value
-        preliminaryCurrentYearPlus9 = row[27].value
-        preliminaryCurrentYearPlus10 = row[28].value
+
+        budgetProposalCurrentYearPlus0 = row[19].value
+        budgetProposalCurrentYearPlus1 = row[20].value
+        budgetProposalCurrentYearPlus2 = row[21].value
+        preliminaryCurrentYearPlus3 = row[22].value
+        preliminaryCurrentYearPlus4 = row[23].value
+        preliminaryCurrentYearPlus5 = row[24].value
+        preliminaryCurrentYearPlus6 = row[25].value
+        preliminaryCurrentYearPlus7 = row[26].value
+        preliminaryCurrentYearPlus8 = row[27].value
+        preliminaryCurrentYearPlus9 = row[28].value
 
         notes = str(row[29].value).strip()
         pwNumber = str(row[30].value).strip()
@@ -102,56 +114,67 @@ class BudgetFileHandler(IExcelFileHandler):
             project.effectHousing = effectHousing
             # if value already converted into float, convert it back to string to void validation error
             project.costForecast = str(costForecast) if costForecast != None else None
-            project.budgetProposalCurrentYearPlus1 = (
+
+            project_financial, created = ProjectFinancialService.get_or_create(
+                year=self.current_budget_year, project_id=project.id
+            )
+
+            print(f"Project financial {project_financial.id} created {created}")
+
+            project_financial.budgetProposalCurrentYearPlus0 = (
+                str(budgetProposalCurrentYearPlus0)
+                if budgetProposalCurrentYearPlus0 != None
+                else None
+            )
+
+            project_financial.budgetProposalCurrentYearPlus1 = (
                 str(budgetProposalCurrentYearPlus1)
                 if budgetProposalCurrentYearPlus1 != None
                 else None
             )
-            project.budgetProposalCurrentYearPlus2 = (
+            project_financial.budgetProposalCurrentYearPlus2 = (
                 str(budgetProposalCurrentYearPlus2)
                 if budgetProposalCurrentYearPlus2 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus3 = (
+            project_financial.preliminaryCurrentYearPlus3 = (
                 str(preliminaryCurrentYearPlus3)
                 if preliminaryCurrentYearPlus3 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus4 = (
+            project_financial.preliminaryCurrentYearPlus4 = (
                 str(preliminaryCurrentYearPlus4)
                 if preliminaryCurrentYearPlus4 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus5 = (
+            project_financial.preliminaryCurrentYearPlus5 = (
                 str(preliminaryCurrentYearPlus5)
                 if preliminaryCurrentYearPlus5 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus6 = (
+            project_financial.preliminaryCurrentYearPlus6 = (
                 str(preliminaryCurrentYearPlus6)
                 if preliminaryCurrentYearPlus6 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus7 = (
+            project_financial.preliminaryCurrentYearPlus7 = (
                 str(preliminaryCurrentYearPlus7)
                 if preliminaryCurrentYearPlus7 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus8 = (
+            project_financial.preliminaryCurrentYearPlus8 = (
                 str(preliminaryCurrentYearPlus8)
                 if preliminaryCurrentYearPlus8 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus9 = (
+            project_financial.preliminaryCurrentYearPlus9 = (
                 str(preliminaryCurrentYearPlus9)
                 if preliminaryCurrentYearPlus9 != None
                 else None
             )
-            project.preliminaryCurrentYearPlus10 = (
-                str(preliminaryCurrentYearPlus10)
-                if preliminaryCurrentYearPlus10 != None
-                else None
-            )
+
+            project_financial.save()
+
             project.hkrId = pwNumber if pwNumber != "None" and pwNumber != "?" else None
             project.save()
         except Exception as e:
