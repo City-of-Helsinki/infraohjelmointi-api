@@ -36,10 +36,3 @@ class ProjectLocationService:
         return list(
             ProjectLocation.objects.all().filter(path=path, forCoordinatorOnly=False)
         )
-
-    def list_all_for_programmer() -> list[ProjectClass]:
-        return ProjectLocation.objects.all().filter(forCoordinatorOnly=False)
-
-    @staticmethod
-    def list_all_for_coordinator() -> list[ProjectClass]:
-        return ProjectLocation.objects.all().filter(forCoordinatorOnly=True)
