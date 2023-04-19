@@ -511,7 +511,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         allow_null=True,
     )
 
-    PWFolder = serializers.SerializerMethodField()
+    pwFolder = serializers.SerializerMethodField()
     ProjectWiseService = ProjectWiseService()
 
     def get_pwFolder(self, obj):

@@ -5,7 +5,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("infraohjelmointi_api", "0033_forcoordinatoronly_and_more"),
+        (
+            "infraohjelmointi_api",
+            "0034_remove_projectgroup_unique together constraint project group_and_more",
+        ),
     ]
 
     operations = [
