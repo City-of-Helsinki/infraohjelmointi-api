@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from infraohjelmointi_api.services import ProjectFinancialService
 from .models import (
     ProjectType,
     Project,
@@ -380,7 +382,9 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         )
         if year is None:
             year = date.today().year
-        queryset, _ = ProjectFinancial.objects.get_or_create(project=project, year=year)
+        queryset, _ = ProjectFinancialService.get_or_create(
+            project_id=project.id, year=year
+        )
 
         return ProjectFinancialSerializer(queryset, many=False).data
 
