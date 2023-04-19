@@ -37,13 +37,15 @@ class ProjectWiseService:
         self.session = requests.Session()
         self.session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         self.pw_api_url = env("PW_API_URL")
-        # self.pw_api_project_endpoint = env("PW_API_PROJECT_ENDPOINT")
-        # self.pw_api_project_endpoint_filter = env("PW_API_PROJECT_ENDPOINT_FILTER")
+
         self.pw_api_location_endpoint = env("PW_API_LOCATION_ENDPOINT")
         self.pw_api_location_endpoint_filter = env("PW_API_LOCATION_ENDPOINT_FILTER")
 
-        self.pw_api_project_metadata_url = env("PW_API_PROJECT_META_URL")
         self.pw_api_project_metadata_endpoint = env("PW_API_PROJECT_META_ENDPOINT")
+        self.pw_api_project_metadata_endpoint_filter = env(
+            "PW_API_PROJECT_META_ENDPOINT_FILTER"
+        )
+
         # preload data from DB to optimize performance
         self.project_phases = self.__load_and_transform_phases()
         self.project_areas = self.__load_and_transform_project_areas()
@@ -104,7 +106,7 @@ class ProjectWiseService:
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
         start_time = time.perf_counter()
-        api_url = f"{self.pw_api_project_metadata_url}&${self.pw_api_project_metadata_endpoint}+{id}"
+        api_url = f"{self.pw_api_url}{self.pw_api_project_metadata_endpoint}${self.pw_api_project_metadata_endpoint_filter}{id}"
 
         logger.debug("Requesting API {}".format(api_url))
         response = self.session.get(api_url)
