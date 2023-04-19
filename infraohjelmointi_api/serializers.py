@@ -367,7 +367,14 @@ class ProjectSetCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectWithFinancesSerializer(serializers.ModelSerializer):
+    finances = serializers.SerializerMethodField()
+
     def get_finances(self, project):
+        """
+        A function used to get financial fields of a project using context passed to the serializer.
+        If no year is passed to the serializer using either the project id or finance_year as key
+        the current year is used as the default.
+        """
         year = self.context.get(
             str(project.id), self.context.get("finance_year", date.today().year)
         )
@@ -405,7 +412,6 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
-    finances = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
@@ -483,7 +489,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
-    finances = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
