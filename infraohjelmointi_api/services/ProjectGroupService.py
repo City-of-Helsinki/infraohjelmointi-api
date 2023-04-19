@@ -5,11 +5,11 @@ class ProjectGroupService:
     @staticmethod
     def get_or_create(
         name: str,
-        districtRelation: ProjectLocation,
+        locationRelation: ProjectLocation,
         classRelation: ProjectClass,
     ) -> ProjectGroup:
         return ProjectGroup.objects.get_or_create(
             name=name,
-            districtRelation=districtRelation,
+            locationRelation=locationRelation,
             classRelation=classRelation,
         )
