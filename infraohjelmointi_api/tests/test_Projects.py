@@ -86,22 +86,22 @@ class ProjectTestCase(TestCase):
     projectHashTag_2_Id = uuid.UUID("eb8635b3-4e83-45d9-a1af-6bc49bf2aeb7")
     projectHashTag_3_Id = uuid.UUID("aba0e241-0a02-48a0-8426-e4f034c5f527")
     projectHashTag_4_Id = uuid.UUID("5057f0e5-bdcd-4278-a433-74db4ee34b4b")
-    projectMainDistrict_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-    projectMainDistrict_2_Id = uuid.UUID("740d6771-442b-4713-8362-8bda3958100e")
-    projectMainDistrict_3_Id = uuid.UUID("019eb15d-cfdb-45bc-b1a5-ac3844381e48")
-    projectMainDistrict_4_Id = uuid.UUID("bdd24b4a-ac64-4f49-a979-b2931ac18c8f")
-    projectMainDistrict_5_Id = uuid.UUID("1055e80a-9e2c-4a29-a76a-97528581ff11")
-    projectMainDistrict_6_Id = uuid.UUID("17190fd9-9727-4f3e-a7de-74f682e26a33")
-    projectMainDistrict_7_Id = uuid.UUID("b69e4208-83c6-40bb-854f-4519b3841f66")
-    projectDistrict_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
-    projectDistrict_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
-    projectDistrict_3_Id = uuid.UUID("e4864b42-0002-42c6-a0fb-113638810278")
-    projectDistrict_4_Id = uuid.UUID("0e9e1253-cfe2-405e-9cf4-832a5c5185ac")
-    projectDistrict_5_Id = uuid.UUID("070e480a-3a50-49dc-bc12-58651f2c7fa4")
-    projectDistrict_6_Id = uuid.UUID("8aea2fe2-0d74-49c1-a7a0-8a080755a8b8")
-    projectSubDistrict_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
-    projectSubDistrict_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
-    projectSubDistrict_3_Id = uuid.UUID("b76b3107-628c-4f3e-a2e1-230439da090f")
+    projectDistrict_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectDistrict_2_Id = uuid.UUID("740d6771-442b-4713-8362-8bda3958100e")
+    projectDistrict_3_Id = uuid.UUID("019eb15d-cfdb-45bc-b1a5-ac3844381e48")
+    projectDistrict_4_Id = uuid.UUID("bdd24b4a-ac64-4f49-a979-b2931ac18c8f")
+    projectDistrict_5_Id = uuid.UUID("1055e80a-9e2c-4a29-a76a-97528581ff11")
+    projectDistrict_6_Id = uuid.UUID("17190fd9-9727-4f3e-a7de-74f682e26a33")
+    projectDistrict_7_Id = uuid.UUID("b69e4208-83c6-40bb-854f-4519b3841f66")
+    projectDivision_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
+    projectDivision_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
+    projectDivision_3_Id = uuid.UUID("e4864b42-0002-42c6-a0fb-113638810278")
+    projectDivision_4_Id = uuid.UUID("0e9e1253-cfe2-405e-9cf4-832a5c5185ac")
+    projectDivision_5_Id = uuid.UUID("070e480a-3a50-49dc-bc12-58651f2c7fa4")
+    projectDivision_6_Id = uuid.UUID("8aea2fe2-0d74-49c1-a7a0-8a080755a8b8")
+    projectSubDivision_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
+    projectSubDivision_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
+    projectSubDivision_3_Id = uuid.UUID("b76b3107-628c-4f3e-a2e1-230439da090f")
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
@@ -115,7 +115,6 @@ class ProjectTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
-
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,
             budgetMain=10000,
@@ -131,11 +130,11 @@ class ProjectTestCase(TestCase):
         self.projectHashTag_2 = ProjectHashTag.objects.create(
             id=self.projectHashTag_2_Id, value="Hash2"
         )
-        self.mainDistrict = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_1_Id, name="Test main district", parent=None
+        self.district = ProjectLocation.objects.create(
+            id=self.projectDistrict_1_Id, name="Test main district", parent=None
         )
-        self.projectLocation = self.mainDistrict.childLocation.create(
-            id=self.projectDistrict_1_Id, name="Test district"
+        self.projectLocation = self.district.childLocation.create(
+            id=self.projectDivision_1_Id, name="Test district"
         )
         self.projectCategory = ProjectCategory.objects.create(
             id=self.projectCategory_1_Id, value="K5"
@@ -288,7 +287,6 @@ class ProjectTestCase(TestCase):
         self.assertEqual(project, self.project, msg="Object from DB != created Object")
 
     def test_project_foreign_keys_exists(self):
-
         self.assertDictEqual(
             self.budgetItem.project_set.all().values()[0],
             Project.objects.filter(id=self.project_1_Id).values()[0],
@@ -916,32 +914,32 @@ class ProjectTestCase(TestCase):
         projectGroup_3 = ProjectGroup.objects.create(
             id=self.projectGroup_3_Id, name="Test Group 3 park"
         )
-        mainDistrict_1 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_2_Id,
-            name="Main District 1",
-            parent=None,
-            path="Main District 1",
-        )
-        mainDistrict_2 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_3_Id,
-            name="Main District 2",
-            parent=None,
-            path="Main District 2",
-        )
-        district = mainDistrict_1.childLocation.create(
+        district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_2_Id,
             name="District 1",
-            path="Main District 1/District 1",
+            parent=None,
+            path="District 1",
         )
-        subDistrict_1 = district.childLocation.create(
-            id=self.projectSubDistrict_1_Id,
-            name="Sub district 1",
-            path="Main District 1/District 1/Sub district 1",
+        district_2 = ProjectLocation.objects.create(
+            id=self.projectDistrict_3_Id,
+            name="District 2",
+            parent=None,
+            path="District 2",
         )
-        subDistrict_2 = district.childLocation.create(
-            id=self.projectSubDistrict_2_Id,
-            name="Sub district 2",
-            path="Main District 1/District 1/Sub district 2",
+        division = district_1.childLocation.create(
+            id=self.projectDivision_2_Id,
+            name="District 1",
+            path="District 1/Division 1",
+        )
+        subDivision_1 = division.childLocation.create(
+            id=self.projectSubDivision_1_Id,
+            name="SubDivision 1",
+            path="District 1/Division 1/SubDivision 1",
+        )
+        subDivision_2 = division.childLocation.create(
+            id=self.projectSubDivision_2_Id,
+            name="SubDivision 2",
+            path="District 1/Division 1/SubDivision 2",
         )
 
         category_1 = ProjectCategory.objects.create(
@@ -999,7 +997,7 @@ class ProjectTestCase(TestCase):
             description="Random desc",
             programmed=True,
             category=category_1,
-            projectLocation=mainDistrict_1,
+            projectLocation=district_1,
             projectClass=subClass_1,
             projectGroup=projectGroup_1,
             personPlanning=personPlanning,
@@ -1012,7 +1010,7 @@ class ProjectTestCase(TestCase):
             description="Random desc",
             programmed=True,
             category=category_2,
-            projectLocation=subDistrict_1,
+            projectLocation=subDivision_1,
             projectClass=_class,
             projectGroup=projectGroup_1,
             personPlanning=personPlanning,
@@ -1025,7 +1023,7 @@ class ProjectTestCase(TestCase):
             description="Random desc",
             programmed=False,
             category=category_2,
-            projectLocation=mainDistrict_2,
+            projectLocation=district_2,
             projectClass=subClass_2,
             projectGroup=projectGroup_2,
         )
@@ -1037,7 +1035,7 @@ class ProjectTestCase(TestCase):
             description="Random desc",
             programmed=False,
             category=category_2,
-            projectLocation=subDistrict_2,
+            projectLocation=subDivision_2,
             projectClass=masterClass_2,
             projectGroup=projectGroup_3,
             personPlanning=personPlanning,
@@ -1460,7 +1458,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?mainDistrict={}".format(self.projectMainDistrict_2_Id),
+            "/projects/?district={}".format(self.projectDistrict_2_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1470,8 +1468,8 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             3,
-            msg="Filtered result should contain 3 projects belonging to mainDistrict Id: {}, directly or indirectly. Found: {}".format(
-                self.projectMainDistrict_2_Id,
+            msg="Filtered result should contain 3 projects belonging to district Id: {}, directly or indirectly. Found: {}".format(
+                self.projectDistrict_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
@@ -1479,17 +1477,17 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             3,
             msg="Filtered result should contain 3 locations with id {}, {} and {}. Found: {}".format(
-                self.projectMainDistrict_2_Id,
-                self.projectSubDistrict_1_Id,
-                self.projectSubDistrict_2_Id,
+                self.projectDistrict_2_Id,
+                self.projectSubDivision_1_Id,
+                self.projectSubDivision_2_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&hashtag={}".format(
-                self.projectMainDistrict_3_Id, self.projectHashTag_3_Id
+            "/projects/?district={}&hashtag={}".format(
+                self.projectDistrict_3_Id, self.projectHashTag_3_Id
             ),
         )
         self.assertEqual(
@@ -1500,9 +1498,9 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, \
+            msg="Filtered result should contain 1 project belonging to district Id: {}, directly or indirectly, \
                 with the hashTag: {} . Found: {}".format(
-                self.projectMainDistrict_3_Id,
+                self.projectDistrict_3_Id,
                 self.projectHashTag_3_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
@@ -1511,15 +1509,15 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
             msg="Filtered result should contain 1 locations with id {}. Found: {}".format(
-                self.projectMainDistrict_2_Id,
+                self.projectDistrict_2_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&mainDistrict={}".format(
-                self.projectMainDistrict_2_Id, self.projectMainDistrict_3_Id
+            "/projects/?district={}&district={}".format(
+                self.projectDistrict_2_Id, self.projectDistrict_3_Id
             ),
         )
         self.assertEqual(
@@ -1530,9 +1528,9 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             4,
-            msg="Filtered result should contain 4 projects belonging to mainDistrict Id: {} or {}, directly or indirectly. Found: {}".format(
-                self.projectMainDistrict_2_Id,
-                self.projectMainDistrict_3_Id,
+            msg="Filtered result should contain 4 projects belonging to district Id: {} or {}, directly or indirectly. Found: {}".format(
+                self.projectDistrict_2_Id,
+                self.projectDistrict_3_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
@@ -1540,9 +1538,9 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             4,
             msg="Filtered result should contain 4 locations with id {}, {}, {} and {}. Found: {}".format(
-                self.projectMainDistrict_2_Id,
-                self.projectMainDistrict_3_Id,
-                self.projectSubDistrict_1_Id,
+                self.projectDistrict_2_Id,
+                self.projectDistrict_3_Id,
+                self.projectSubDivision_1_Id,
                 self.projectSubClass_2_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
@@ -1550,8 +1548,8 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?mainDistrict={}&programmed={}".format(
-                self.projectMainDistrict_3_Id, "false"
+            "/projects/?district={}&programmed={}".format(
+                self.projectDistrict_3_Id, "false"
             ),
         )
         self.assertEqual(
@@ -1562,8 +1560,8 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project belonging to mainDistrict Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
-                self.projectMainDistrict_3_Id,
+            msg="Filtered result should contain 1 project belonging to district Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectDistrict_3_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
@@ -1571,7 +1569,7 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
             msg="Filtered result should contain 1 location with id {}. Found: {}".format(
-                self.projectMainDistrict_3_Id,
+                self.projectDistrict_3_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
@@ -1754,11 +1752,11 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?group={}&group={}&subClass={}&mainDistrict={}".format(
+            "/projects/?group={}&group={}&subClass={}&district={}".format(
                 self.projectGroup_2_Id,
                 self.projectGroup_1_Id,
                 self.projectSubClass_1_Id,
-                self.projectMainDistrict_2_Id,
+                self.projectDistrict_2_Id,
             ),
         )
         self.assertEqual(
@@ -1770,11 +1768,11 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             1,
-            msg="Filtered result should contain 1 project with group {} or {}, subClass {} and mainDistrict {}. Found: {}".format(
+            msg="Filtered result should contain 1 project with group {} or {}, subClass {} and district {}. Found: {}".format(
                 self.projectGroup_1_Id,
                 self.projectGroup_2_Id,
                 self.projectSubClass_1_Id,
-                self.projectMainDistrict_2_Id,
+                self.projectDistrict_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
@@ -1790,7 +1788,7 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
             msg="Filtered result should contain 1 location with id {}. Found: {}".format(
-                self.projectMainDistrict_2_Id,
+                self.projectDistrict_2_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
@@ -2056,7 +2054,7 @@ class ProjectTestCase(TestCase):
             response.json()["errors"][0]["detail"],
         )
 
-        data = {"projectLocation": self.projectDistrict_1_Id.__str__()}
+        data = {"projectLocation": self.projectDivision_1_Id.__str__()}
         response = self.client.patch(
             "/projects/{}/".format(self.project_7_Id),
             data,
@@ -2474,47 +2472,47 @@ class ProjectTestCase(TestCase):
         )
 
     def test_class_location_validation(self):
-        mainDistrict_1 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_4_Id,
+        district_1 = ProjectLocation.objects.create(
+            id=self.projectDistrict_4_Id,
             name="Eteläinen",
             parent=None,
             path="Eteläinen",
         )
-        mainDistrict_2 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_5_Id,
+        district_2 = ProjectLocation.objects.create(
+            id=self.projectDistrict_5_Id,
             name="Läntinen",
             parent=None,
             path="Läntinen",
         )
-        mainDistrict_3 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_6_Id,
+        district_3 = ProjectLocation.objects.create(
+            id=self.projectDistrict_6_Id,
             name="Keskinen",
             parent=None,
             path="Keskinen",
         )
-        mainDistrict_4 = ProjectLocation.objects.create(
-            id=self.projectMainDistrict_7_Id,
+        district_4 = ProjectLocation.objects.create(
+            id=self.projectDistrict_7_Id,
             name="Östersundom",
             parent=None,
             path="Östersundom",
         )
-        mainDistrict_1.childLocation.create(
-            id=self.projectDistrict_3_Id,
+        district_1.childLocation.create(
+            id=self.projectDivision_3_Id,
             name="Munkkiniemi",
             path="Eteläinen/Munkkiniemi",
         )
-        mainDistrict_2.childLocation.create(
-            id=self.projectDistrict_4_Id,
+        district_2.childLocation.create(
+            id=self.projectDivision_4_Id,
             name="Munkkiniemi",
             path="Läntinen/Munkkiniemi",
         )
-        mainDistrict_3.childLocation.create(
-            id=self.projectDistrict_5_Id,
+        district_3.childLocation.create(
+            id=self.projectDivision_5_Id,
             name="Munkkiniemi",
             path="Keskinen/Munkkiniemi",
         )
-        mainDistrict_4.childLocation.create(
-            id=self.projectDistrict_6_Id,
+        district_4.childLocation.create(
+            id=self.projectDivision_6_Id,
             name="ostersundomTest",
             path="Östersundom/ostersundomTest",
         )
@@ -2555,7 +2553,7 @@ class ProjectTestCase(TestCase):
             "name": "Class Location Validation project",
             "description": "Test Description",
             "projectClass": self.projectSubClass_4_Id.__str__(),
-            "projectLocation": self.projectDistrict_3_Id.__str__(),
+            "projectLocation": self.projectDivision_3_Id.__str__(),
         }
 
         # Creating project with Class "Eteläinen suurpiiri" and location path "Eteläinen/Munkkiniemi"
@@ -2575,7 +2573,7 @@ class ProjectTestCase(TestCase):
         newProjectId = response.json()["id"]
 
         data = {
-            "projectLocation": self.projectDistrict_4_Id.__str__(),
+            "projectLocation": self.projectDivision_4_Id.__str__(),
         }
 
         # Patching project with location path "Läntinen/Munkkiniemi"
@@ -2591,7 +2589,7 @@ class ProjectTestCase(TestCase):
 
         data = {
             "projectClass": self.projectSubClass_3_Id.__str__(),
-            "projectLocation": self.projectDistrict_4_Id.__str__(),
+            "projectLocation": self.projectDivision_4_Id.__str__(),
         }
 
         # Patching project with location path "Läntinen/Munkkiniemi" and class "Läntinen suurpiiri"
@@ -2607,7 +2605,7 @@ class ProjectTestCase(TestCase):
 
         data = {
             "projectClass": self.projectSubClass_5_Id.__str__(),
-            "projectLocation": self.projectDistrict_6_Id.__str__(),
+            "projectLocation": self.projectDivision_6_Id.__str__(),
         }
 
         # Patching project with location path "Östersundom/ostersundomTest" and class "Östersundomin suurpiiri"
@@ -2622,7 +2620,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg=response.json())
 
         data = {
-            "projectLocation": self.projectDistrict_3_Id.__str__(),
+            "projectLocation": self.projectDivision_3_Id.__str__(),
         }
 
         # Patching project with location path "Eteläinen/Munkkiniemi"
@@ -2652,7 +2650,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg=response.json())
 
         data = {
-            "projectLocation": self.projectDistrict_5_Id.__str__(),
+            "projectLocation": self.projectDivision_5_Id.__str__(),
         }
 
         # Patching project with location path "Keskinen/Munkkiniemi"

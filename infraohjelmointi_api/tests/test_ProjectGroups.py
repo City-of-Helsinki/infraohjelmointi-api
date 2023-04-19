@@ -17,7 +17,7 @@ class projectGroupTestCase(TestCase):
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
     projectClassId = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
     projectMasterClassId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
-    projectMainDistrictId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    projectDistrictId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectLocationId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
 
@@ -30,13 +30,13 @@ class projectGroupTestCase(TestCase):
         self.projectClass = self.projectMasterClass.childClass.create(
             name="Test Class", id=self.projectClassId
         )
-        self.mainDistrict = ProjectLocation.objects.create(
-            id=self.projectMainDistrictId,
-            name="Test main districtRelation",
+        self.district = ProjectLocation.objects.create(
+            id=self.projectDistrictId,
+            name="Test district",
             parent=None,
         )
-        self.projectLocation = self.mainDistrict.childLocation.create(
-            id=self.projectLocationId, name="Test districtRelation"
+        self.projectLocation = self.district.childLocation.create(
+            id=self.projectLocationId, name="Test division"
         )
 
         self.project = Project.objects.create(
@@ -47,12 +47,11 @@ class projectGroupTestCase(TestCase):
         self.projectGroup = ProjectGroup.objects.create(
             id=self.projectGroup_1_Id,
             name="Test Group",
-            districtRelation=self.projectLocation,
+            locationRelation=self.projectLocation,
             classRelation=self.projectClass,
         )
 
     def test_ProjectGroup_is_created(self):
-
         self.assertEqual(
             ProjectGroup.objects.filter(id=self.projectGroup_1_Id).exists(),
             True,
@@ -113,7 +112,7 @@ class projectGroupTestCase(TestCase):
         data = {
             "name": "POST Group",
             "classRelation": None,
-            "districtRelation": None,
+            "locationRelation": None,
         }
         response = self.client.post(
             "/project-groups/", data, content_type="application/json"
@@ -130,7 +129,7 @@ class projectGroupTestCase(TestCase):
         data = {
             "name": "POST Group with project",
             "classRelation": None,
-            "districtRelation": None,
+            "locationRelation": None,
             "projects": [self.projectId],
         }
         response = self.client.post(

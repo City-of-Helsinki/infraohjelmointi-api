@@ -7,7 +7,7 @@ from .ProjectClass import ProjectClass
 class ProjectGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=False, null=False)
-    districtRelation = models.ForeignKey(
+    locationRelation = models.ForeignKey(
         ProjectLocation, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     classRelation = models.ForeignKey(
@@ -21,7 +21,7 @@ class ProjectGroup(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "name",
-                    "districtRelation",
+                    "locationRelation",
                     "classRelation",
                 ],
                 name="Unique together Constraint Project Group",
