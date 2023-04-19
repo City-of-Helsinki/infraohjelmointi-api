@@ -27,7 +27,7 @@ from overrides import override
 
 class Project(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pwGUID = models.UUIDField(editable=True, null=True, default=None, blank=True)
+    pwInstanceId = models.UUIDField(editable=True, null=True, default=None, blank=True)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
     )
@@ -212,12 +212,14 @@ class Project(models.Model):
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
     @property
-    def pw_folder(self):
-        if self.pwGUID is not None:
-            return "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/".format(
-                self.pwGUID
+    def pw_folder_link(self):
+        return (
+            "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{{{}}}/".format(
+                self.pwInstanceId
             )
-        return None
+            if self.pwInstanceId
+            else None
+        )
 
     def projectReadiness(self):
         # some calculation based on cost and stuff

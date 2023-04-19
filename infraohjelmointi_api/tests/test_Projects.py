@@ -108,9 +108,9 @@ class ProjectTestCase(TestCase):
     projectFinancial_1_Id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
     projectFinancial_2_Id = uuid.UUID("ec17c3c6-7414-4fec-ad2e-6e6f63a88bcb")
     projectFinancial_3_Id = uuid.UUID("8dba8690-11fd-4715-9978-f65c4e9a6e22")
-    pwGUID = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
-    pwGUID_hkrId = 1461
-    pwGUID_hkrId_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
+    pwInstanceId = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
+    pwInstanceId_hkrId = 1461
+    pwInstanceId_hkrId_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
 
     fixtures = []
     maxDiff = None
@@ -2841,7 +2841,7 @@ class ProjectTestCase(TestCase):
         data = {
             "name": "Test Project for PW folder",
             "description": "Test description",
-            "hkrId": self.pwGUID_hkrId,
+            "hkrId": self.pwInstanceId_hkrId,
         }
         response = self.client.post(
             "/projects/",
@@ -2851,14 +2851,14 @@ class ProjectTestCase(TestCase):
         newCreatedId = response.json()["id"]
         self.assertEqual(response.status_code, 201)
         self.assertEqual(
-            response.json()["pwGUID"],
-            self.pwGUID,
-            msg="pwGUID must be set when hkrId is not None and exists in PW",
+            response.json()["pwInstanceId"],
+            self.pwInstanceId,
+            msg="pwInstanceId must be set when hkrId is not None and exists in PW",
         )
         self.assertEqual(
-            response.json()["pwFolder"],
-            self.pwGUID_hkrId_folder,
-            msg="pwFolder must be set when pwGUID is not None",
+            response.json()["pwFolderLink"],
+            self.pwInstanceId_hkrId_folder,
+            msg="pwFolderLink must be set when pwInstanceId is not None",
         )
 
         data = {
@@ -2871,18 +2871,18 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["pwGUID"],
+            response.json()["pwInstanceId"],
             None,
-            msg="pwGUID must be set to None when hkrId is None",
+            msg="pwInstanceId must be set to None when hkrId is None",
         )
         self.assertEqual(
-            response.json()["pwFolder"],
+            response.json()["pwFolderLink"],
             None,
-            msg="pwFolder must be None when pwGUID is None",
+            msg="pwFolderLink must be None when pwInstanceId is None",
         )
 
         data = {
-            "hkrId": self.pwGUID_hkrId,
+            "hkrId": self.pwInstanceId_hkrId,
         }
         response = self.client.patch(
             "/projects/{}/".format(newCreatedId),
@@ -2891,14 +2891,14 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["pwGUID"],
-            self.pwGUID,
-            msg="pwGUID must be set when hkrId is not None and exists in PW",
+            response.json()["pwInstanceId"],
+            self.pwInstanceId,
+            msg="pwInstanceId must be set when hkrId is not None and exists in PW",
         )
         self.assertEqual(
-            response.json()["pwFolder"],
-            self.pwGUID_hkrId_folder,
-            msg="pwFolder must be set when pwGUID is not None",
+            response.json()["pwFolderLink"],
+            self.pwInstanceId_hkrId_folder,
+            msg="pwFolderLink must be set when pwInstanceId is not None",
         )
 
         data = {
@@ -2911,12 +2911,12 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["pwGUID"],
+            response.json()["pwInstanceId"],
             None,
-            msg="pwGUID must be set to None when hkrId is not None and does not exist in PW",
+            msg="pwInstanceId must be set to None when hkrId is not None and does not exist in PW",
         )
         self.assertEqual(
-            response.json()["pwFolder"],
+            response.json()["pwFolderLink"],
             None,
-            msg="pwFolder must be None when pwGUID is None",
+            msg="pwFolderLink must be None when pwInstanceId is None",
         )
