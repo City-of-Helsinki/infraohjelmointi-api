@@ -63,6 +63,10 @@ from overrides import override
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Case, When
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -222,6 +226,10 @@ class ProjectFilter(django_filters.FilterSet):
     hashtag = django_filters.ModelMultipleChoiceFilter(
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
+    )
+    phase = django_filters.ModelMultipleChoiceFilter(
+        field_name="phase",
+        queryset=ProjectPhaseSerializer.Meta.model.objects.all(),
     )
 
     programmed = django_filters.TypedMultipleChoiceFilter(
@@ -613,6 +621,93 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @transaction.atomic
+    @action(methods=["patch"], detail=False, url_path=r"bulk-update")
+    def patch_bulk_projects(self, request):
+        """
+        Custom action to bulk update projects
+        Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+
+        """
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            if self._is_bulk_project_update_data_valid(data):
+                projectIds = [projectData["id"] for projectData in data]
+                # Building an order by query which makes sure the order is preserved when filtering using __in clause
+                preserved = Case(
+                    *[When(id=val, then=pos) for pos, val in enumerate(projectIds)],
+                    default=len(projectIds)
+                )
+                qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
+                financesData = [
+                    {
+                        "project": projectData["id"],
+                        "finances": projectData["data"].pop("finances", None),
+                    }
+                    for projectData in data
+                ]
+                for financeData in financesData:
+                    finances = financeData.get("finances", None)
+                    if finances is not None:
+                        financeObject, _ = ProjectFinancial.objects.get_or_create(
+                            year=finances.get("year", date.today().year),
+                            project=Project(id=financeData["project"]),
+                        )
+                        financeSerializer = ProjectFinancialSerializer(
+                            financeObject, data=finances, partial=True, many=False
+                        )
+                        financeSerializer.is_valid(raise_exception=True)
+                        financeSerializer.save()
+
+                serializer = self.get_serializer(
+                    qs,
+                    data=[projectData["data"] for projectData in data],
+                    many=True,
+                    partial=True,
+                    context={
+                        financeData["project"]: (
+                            financeData["finances"].get("year", None)
+                            if financeData["finances"] is not None
+                            else None
+                        )
+                        for financeData in financesData
+                    },
+                )
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                return Response(
+                    data={"message": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except Exception as e:
+            raise e
+
+    def _is_valid_uuid(self, val):
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+
+    def _is_bulk_project_update_data_valid(self, data):
+        if type(data) is list and len(data) > 0:
+            for d in data:
+                if (
+                    "id" in d
+                    and self._is_valid_uuid(d["id"])
+                    and "data" in d
+                    and type(d["id"]) is str
+                    and type(d["data"]) is dict
+                ):
+                    pass
+                else:
+                    return False
+            return True
+        else:
+            return False
 
     def _filter_projects_by_hierarchy(
         self, qs, has_parent: bool, has_parent_parent: bool, search_ids, model_class

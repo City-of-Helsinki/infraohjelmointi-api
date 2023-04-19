@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from infraohjelmointi_api.services import ProjectFinancialService
 from .models import (
     ProjectType,
     Project,
@@ -32,6 +34,10 @@ from django.db.models import Q
 from overrides import override
 from django.shortcuts import get_object_or_404
 from rest_framework.validators import UniqueTogetherValidator
+
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class BaseMeta:
@@ -362,7 +368,28 @@ class ProjectSetCreateSerializer(serializers.ModelSerializer):
         model = ProjectSet
 
 
-class ProjectGetSerializer(DynamicFieldsModelSerializer):
+class ProjectWithFinancesSerializer(serializers.ModelSerializer):
+    finances = serializers.SerializerMethodField()
+
+    def get_finances(self, project):
+        """
+        A function used to get financial fields of a project using context passed to the serializer.
+        If no year is passed to the serializer using either the project id or finance_year as key
+        the current year is used as the default.
+        """
+        year = self.context.get(
+            str(project.id), self.context.get("finance_year", date.today().year)
+        )
+        if year is None:
+            year = date.today().year
+        queryset, _ = ProjectFinancialService.get_or_create(
+            project_id=project.id, year=year
+        )
+
+        return ProjectFinancialSerializer(queryset, many=False).data
+
+
+class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
     projectReadiness = serializers.SerializerMethodField()
     projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)
@@ -389,35 +416,34 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer):
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
-    finances = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
         model = Project
 
-    def get_locked(self, obj):
+    def get_locked(self, project):
         try:
-            lockData = ProjectLockSerializer(obj.lock, many=False).data
+            lockData = ProjectLockSerializer(project.lock, many=False).data
             return lockData
         except:
             return None
 
-    def get_projectReadiness(self, obj):
-        return obj.projectReadiness()
-
-    def get_finances(self, obj):
-        year = self.context.get("finance_year", None)
-        queryset = ProjectFinancial.objects.none()
-        if year is not None:
-            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
-        else:
-            queryset, _ = ProjectFinancial.objects.get_or_create(
-                project=obj, year=date.today().year
-            )
-
-        return ProjectFinancialSerializer(queryset, many=False).data
+    def get_projectReadiness(self, project):
+        return project.projectReadiness()
 
 
-class ProjectCreateSerializer(serializers.ModelSerializer):
+class UpdateListSerializer(serializers.ListSerializer):
+    def update(self, instances, validated_data):
+        instance_hash = {index: instance for index, instance in enumerate(instances)}
+
+        result = [
+            self.child.update(instance_hash[index], attrs)
+            for index, attrs in enumerate(validated_data)
+        ]
+
+        return result
+
+
+class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     projectReadiness = serializers.SerializerMethodField()
     estPlanningStart = serializers.DateField(
         format="%d.%m.%Y",
@@ -467,25 +493,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-    finances = serializers.SerializerMethodField()
-
-    def get_finances(self, obj):
-        year = self.context.get("finance_year", None)
-        queryset = ProjectFinancial.objects.none()
-        if year is not None:
-            queryset, _ = ProjectFinancial.objects.get_or_create(project=obj, year=year)
-        else:
-            queryset, _ = ProjectFinancial.objects.get_or_create(
-                project=obj, year=date.today().year
-            )
-
-        return ProjectFinancialSerializer(queryset, many=False).data
 
     class Meta(BaseMeta):
         model = Project
+        list_serializer_class = UpdateListSerializer
 
-    def get_projectReadiness(self, obj):
-        return obj.projectReadiness()
+    def get_projectReadiness(self, project):
+        return project.projectReadiness()
 
     def validate_estPlanningStart(self, estPlanningStart):
         """
