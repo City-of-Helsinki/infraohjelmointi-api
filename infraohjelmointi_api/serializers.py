@@ -428,7 +428,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     def get_pwFolder(self, obj):
         if obj.pwGUID is None and obj.hkrId is not None:
             try:
-                obj.pwGUID = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                obj.pwGUID = self.ProjectWiseService.get_project_from_pw(
                     id=obj.hkrId
                 ).get("instanceId", None)
                 obj.save()
@@ -654,13 +654,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         # newPhase = validated_data.get("phase", None)
         if "hkrId" in validated_data and validated_data["hkrId"] is not None:
             try:
-                validated_data[
-                    "pwGUID"
-                ] = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                validated_data["pwGUID"] = self.ProjectWiseService.get_project_from_pw(
                     id=validated_data.get("hkrId")
-                ).get(
-                    "instanceId", None
-                )
+                ).get("instanceId", None)
 
             except PWProjectNotFoundError:
                 validated_data["pwGUID"] = None
@@ -708,13 +704,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
         if "hkrId" in validated_data and validated_data["hkrId"] is not None:
             try:
-                validated_data[
-                    "pwGUID"
-                ] = self.ProjectWiseService.get_project_with_metadata_from_pw(
+                validated_data["pwGUID"] = self.ProjectWiseService.get_project_from_pw(
                     id=validated_data.get("hkrId")
-                ).get(
-                    "instanceId", None
-                )
+                ).get("instanceId", None)
 
             except PWProjectNotFoundError:
                 validated_data["pwGUID"] = None
