@@ -652,7 +652,7 @@ def buildHierarchiesAndProjects(
 
             project_group = ProjectGroupService.get_or_create(
                 name=name,
-                districtRelation=location,
+                locationRelation=location,
                 classRelation=class_stack[-1],
             )[0]
 
@@ -664,7 +664,7 @@ def buildHierarchiesAndProjects(
                     row=row,
                     name=name,
                     project_class=class_stack[-1],
-                    project_location=project_group.districtRelation,
+                    project_location=project_group.locationRelation,
                     project_group=project_group,
                 )
         # for coordinator data
