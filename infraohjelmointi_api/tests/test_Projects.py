@@ -173,7 +173,7 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
+        self.conPhaseDetail, _ = ConstructionPhaseDetail.objects.get_or_create(
             id=self.conPhaseDetailId, value="preConstruction"
         )
         self.person_3 = Person.objects.create(
@@ -184,8 +184,8 @@ class ProjectTestCase(TestCase):
             title="Contractor",
             phone="0414853275",
         )
-        self.projectPhase = ProjectPhase.objects.create(
-            id=self.projectPhase_1_Id, value="Proposal"
+        self.projectPhase, _ = ProjectPhase.objects.get_or_create(
+            id=self.projectPhase_1_Id, value="proposal"
         )
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
@@ -196,12 +196,12 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=True,
         )
-        self.projectArea = ProjectArea.objects.create(
+        self.projectArea, _ = ProjectArea.objects.get_or_create(
             id=self.projectAreaId,
-            value="Hervanta",
+            value="honkasuo",
             location="inisnoorinkatu 60c",
         )
-        self.projectType = ProjectType.objects.create(
+        self.projectType, _ = ProjectType.objects.get_or_create(
             id=self.projectTypeId, value="projectComplex"
         )
 
