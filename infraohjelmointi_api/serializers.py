@@ -419,13 +419,13 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
     finances = serializers.SerializerMethodField()
-    pwFolderLink = serializers.SerializerMethodField()
+    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
 
-    def get_pwFolderLink(self, project: Project):
+    def get_pw_folder_link(self, project: Project):
         # Initializing the service here instead of when first defining the variable in the class body
         # Because on app startup, before DB tables are created, Serializer gets initialized and
         # causes the initialization of ProjectWiseService which calls the DB
@@ -516,10 +516,10 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         allow_null=True,
     )
 
-    pwFolderLink = serializers.SerializerMethodField()
+    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
 
-    def get_pwFolderLink(self, project: Project):
+    def get_pw_folder_link(self, project: Project):
         return project.pw_folder_link
 
     class Meta(BaseMeta):
