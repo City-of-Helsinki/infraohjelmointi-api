@@ -426,6 +426,9 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         model = Project
 
     def get_pwFolderLink(self, project: Project):
+        # Initializing the service here instead of when first defining the variable in the class body
+        # Because on app startup, before DB tables are created, Serializer gets initialized and
+        # causes the initialization of ProjectWiseService which calls the DB
         if self.projectWiseService is None:
             self.projectWiseService = ProjectWiseService()
         if project.pwInstanceId is None and project.hkrId is not None:
@@ -652,6 +655,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def create(self, validated_data):
+        # Initializing the service here instead of when first defining the variable in the class body
+        # Because on app startup, before DB tables are created, Serializer gets initialized and
+        # causes the initialization of ProjectWiseService which calls the DB
         if self.projectWiseService is None:
             self.projectWiseService = ProjectWiseService()
         if "hkrId" in validated_data and validated_data["hkrId"] is not None:
@@ -679,6 +685,10 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
+
+        # Initializing the service here instead of when first defining the variable in the class body
+        # Because on app startup, before DB tables are created, Serializer gets initialized and
+        # causes the initialization of ProjectWiseService which calls the DB
         if self.projectWiseService is None:
             self.projectWiseService = ProjectWiseService()
 
