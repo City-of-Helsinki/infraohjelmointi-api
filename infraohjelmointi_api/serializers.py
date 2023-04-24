@@ -420,12 +420,14 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     locked = serializers.SerializerMethodField()
     finances = serializers.SerializerMethodField()
     pwFolderLink = serializers.SerializerMethodField()
-    projectWiseService = ProjectWiseService()
+    projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
 
     def get_pwFolderLink(self, project: Project):
+        if self.projectWiseService is None:
+            self.projectWiseService = ProjectWiseService()
         if project.pwInstanceId is None and project.hkrId is not None:
             try:
                 project.pwInstanceId = self.projectWiseService.get_project_from_pw(
@@ -512,7 +514,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     )
 
     pwFolderLink = serializers.SerializerMethodField()
-    projectWiseService = ProjectWiseService()
+    projectWiseService = None
 
     def get_pwFolderLink(self, project: Project):
         return project.pw_folder_link
@@ -650,6 +652,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def create(self, validated_data):
+        if self.projectWiseService is None:
+            self.projectWiseService = ProjectWiseService()
         if "hkrId" in validated_data and validated_data["hkrId"] is not None:
             try:
                 validated_data[
@@ -675,6 +679,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
+        if self.projectWiseService is None:
+            self.projectWiseService = ProjectWiseService()
 
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
