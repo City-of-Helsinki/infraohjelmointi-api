@@ -991,7 +991,7 @@ class ProjectTestCase(TestCase):
             msg="visibilityEnd format in POST request != format in response",
         )
 
-    def test_endpoint_filter_project(self):
+    def test_search_results_endpoint_project(self):
         projectGroup_1 = ProjectGroup.objects.create(
             id=self.projectGroup_1_Id, name="Test Group 1 rain"
         )
@@ -1172,7 +1172,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMin={}".format(2025),
+            "/projects/search-results/?prYearMin={}".format(2025),
         )
         self.assertEqual(
             response.status_code,
@@ -1188,7 +1188,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMin={}".format(2030),
+            "/projects/search-results/?prYearMin={}".format(2030),
         )
         self.assertEqual(
             response.status_code,
@@ -1204,7 +1204,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMax={}".format(2024),
+            "/projects/search-results/?prYearMax={}".format(2024),
         )
         self.assertEqual(
             response.status_code,
@@ -1220,7 +1220,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMin={}&prYearMax={}".format(2030, 2032),
+            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2030, 2032),
         )
         self.assertEqual(
             response.status_code,
@@ -1236,7 +1236,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMin={}&prYearMax={}".format(2030, 2032),
+            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2030, 2032),
         )
         self.assertEqual(
             response.status_code,
@@ -1252,7 +1252,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?prYearMin={}&prYearMax={}".format(2028, 2029),
+            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2028, 2029),
         )
         self.assertEqual(
             response.status_code,
@@ -1268,7 +1268,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?hkrId={}".format(2222),
+            "/projects/search-results/?hkrId={}".format(2222),
         )
         self.assertEqual(
             response.status_code,
@@ -1283,7 +1283,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?freeSearch={}".format("jira"),
+            "/projects/search-results/?freeSearch={}".format("jira"),
         )
         self.assertEqual(
             response.status_code,
@@ -1306,7 +1306,7 @@ class ProjectTestCase(TestCase):
             msg="Filtered result should contain 0 groups with the string 'jira' appearing in value field",
         )
         response = self.client.get(
-            "/projects/?freeSearch={}".format("park"),
+            "/projects/search-results/?freeSearch={}".format("park"),
         )
         self.assertEqual(
             response.status_code,
@@ -1329,7 +1329,7 @@ class ProjectTestCase(TestCase):
             msg="Filtered result should contain 1 group with the string 'park' appearing in name field",
         )
         response = self.client.get(
-            "/projects/?freeSearch={}".format("Parking"),
+            "/projects/search-results/?freeSearch={}".format("Parking"),
         )
         self.assertEqual(
             response.status_code,
@@ -1348,7 +1348,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?programmed={}".format("false"),
+            "/projects/search-results/?programmed={}".format("false"),
         )
         self.assertEqual(
             response.status_code,
@@ -1363,7 +1363,9 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?programmed={}&programmed={}".format("false", "true"),
+            "/projects/search-results/?programmed={}&programmed={}".format(
+                "false", "true"
+            ),
         )
         self.assertEqual(
             response.status_code,
@@ -1376,7 +1378,7 @@ class ProjectTestCase(TestCase):
             msg="Filtered result should contain all projects existing in the DB",
         )
         response = self.client.get(
-            "/projects/?programmed={}&hkrId={}".format("false", "3333"),
+            "/projects/search-results/?programmed={}&hkrId={}".format("false", "3333"),
         )
         self.assertEqual(
             response.status_code,
@@ -1391,7 +1393,9 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?masterClass={}".format(self.projectMasterClass_2_Id),
+            "/projects/search-results/?masterClass={}".format(
+                self.projectMasterClass_2_Id
+            ),
         )
         self.assertEqual(
             response.status_code,
@@ -1414,7 +1418,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?subClass={}&masterClass={}".format(
+            "/projects/search-results/?subClass={}&masterClass={}".format(
                 self.projectSubClass_2_Id, self.projectMasterClass_3_Id
             ),
         )
@@ -1438,7 +1442,7 @@ class ProjectTestCase(TestCase):
             msg="Filtered result should contain 0 classes",
         )
         response = self.client.get(
-            "/projects/?subClass={}".format(self.projectSubClass_1_Id),
+            "/projects/search-results/?subClass={}".format(self.projectSubClass_1_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1462,7 +1466,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?subClass={}&subClass={}".format(
+            "/projects/search-results/?subClass={}&subClass={}".format(
                 self.projectSubClass_1_Id, self.projectSubClass_2_Id
             ),
         )
@@ -1491,7 +1495,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?subClass={}&category={}".format(
+            "/projects/search-results/?subClass={}&category={}".format(
                 self.projectSubClass_2_Id, self.projectCategory_3_Id
             ),
         )
@@ -1518,7 +1522,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?class={}".format(self.projectClass_2_Id),
+            "/projects/search-results/?class={}".format(self.projectClass_2_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1545,7 +1549,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?district={}".format(self.projectDistrict_2_Id),
+            "/projects/search-results/?district={}".format(self.projectDistrict_2_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1573,7 +1577,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?district={}&hashtag={}".format(
+            "/projects/search-results/?district={}&hashtag={}".format(
                 self.projectDistrict_3_Id, self.projectHashTag_3_Id
             ),
         )
@@ -1603,7 +1607,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?district={}&district={}".format(
+            "/projects/search-results/?district={}&district={}".format(
                 self.projectDistrict_2_Id, self.projectDistrict_3_Id
             ),
         )
@@ -1635,7 +1639,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?district={}&programmed={}".format(
+            "/projects/search-results/?district={}&programmed={}".format(
                 self.projectDistrict_3_Id, "false"
             ),
         )
@@ -1663,7 +1667,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?masterClass={}&subClass={}".format(
+            "/projects/search-results/?masterClass={}&subClass={}".format(
                 self.projectMasterClass_2_Id, self.projectSubClass_2_Id
             ),
         )
@@ -1689,7 +1693,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?programmed={}&category={}".format(
+            "/projects/search-results/?programmed={}&category={}".format(
                 "true", self.projectCategory_3_Id
             ),
         )
@@ -1707,7 +1711,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?masterClass={}&masterClass={}&subClass={}&subClass={}".format(
+            "/projects/search-results/?masterClass={}&masterClass={}&subClass={}&subClass={}".format(
                 self.projectMasterClass_2_Id,
                 self.projectMasterClass_3_Id,
                 self.projectSubClass_1_Id,
@@ -1739,7 +1743,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?hashtag={}".format(self.projectHashTag_3_Id),
+            "/projects/search-results/?hashtag={}".format(self.projectHashTag_3_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1757,7 +1761,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?hashtag={}&hashtag={}".format(
+            "/projects/search-results/?hashtag={}&hashtag={}".format(
                 self.projectHashTag_3_Id, self.projectHashTag_4_Id
             ),
         )
@@ -1777,7 +1781,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?hashtag={}&hashtag={}&group={}".format(
+            "/projects/search-results/?hashtag={}&hashtag={}&group={}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
                 self.projectGroup_1_Id,
@@ -1808,7 +1812,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         response = self.client.get(
-            "/projects/?group={}&group={}".format(
+            "/projects/search-results/?group={}&group={}".format(
                 self.projectGroup_2_Id,
                 self.projectGroup_1_Id,
             ),
@@ -1839,7 +1843,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?group={}&group={}&subClass={}&district={}".format(
+            "/projects/search-results/?group={}&group={}&subClass={}&district={}".format(
                 self.projectGroup_2_Id,
                 self.projectGroup_1_Id,
                 self.projectSubClass_1_Id,
@@ -1891,7 +1895,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?personPlanning={}".format(self.person_4_Id),
+            "/projects/search-results/?personPlanning={}".format(self.person_4_Id),
         )
         self.assertEqual(
             response.status_code,
@@ -1909,7 +1913,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?project={}&project={}".format(
+            "/projects/search-results/?project={}&project={}".format(
                 self.project_3_Id, self.project_4_Id
             ),
         )
@@ -1928,7 +1932,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?project={}&project={}&projectName={}".format(
+            "/projects/search-results/?project={}&project={}&projectName={}".format(
                 self.project_3_Id, self.project_4_Id, "park"
             ),
         )
@@ -1948,7 +1952,7 @@ class ProjectTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/projects/?inGroup={}".format("false"),
+            "/projects/search-results/?inGroup={}".format("false"),
         )
         self.assertEqual(
             response.status_code,

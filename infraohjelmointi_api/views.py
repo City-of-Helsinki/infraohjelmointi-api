@@ -325,74 +325,26 @@ class ProjectViewSet(BaseViewSet):
     @action(
         methods=["get"],
         detail=False,
-        url_path=r"planning-view",
+        url_path=r"search-results",
     )
-    def get_projects_for_planning_view(self, request):
+    def get_search_resuls(self, request):
         """
         Custom action to get projects by financial year
-        Usage: /projects/planning-view/
+        Usage: /projects/search-results/?<filter-params>
         """
-        # apply filtering
-        queryset = self.filter_queryset(self.get_queryset())
-        financeYear = request.query_params.get("year", None)
-        limit = request.query_params.get("limit", None)
-        if limit is None:
-            limit = queryset.count() if queryset.count() > 0 else 1
 
-        if financeYear is not None and not financeYear.isnumeric():
-            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
-
-        # pagination
-        paginator = PageNumberPagination()
-        paginator.page_size = limit
-        page = paginator.paginate_queryset(queryset, request)
-        if page is not None:
-            serializer = self.get_serializer(
-                page, many=True, context={"finance_year": financeYear}
-            )
-            return paginator.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(
-            queryset, many=True, context={"finance_year": financeYear}
-        )
-        return Response(serializer.data)
-
-    @override
-    def get_serializer_class(self):
-        """
-        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
-        """
-        if self.action == "list":
-            return ProjectGetSerializer
-        if self.action == "retrieve":
-            return ProjectGetSerializer
-        return ProjectCreateSerializer
-
-    @override
-    def list(self, request, *args, **kwargs):
         response = {}
         freeSearch = request.query_params.get("freeSearch", None)
         projectGroup = request.query_params.getlist("group", [])
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
-
         district = self.request.query_params.getlist("district", [])
         division = self.request.query_params.getlist("division", [])
         subDivision = self.request.query_params.getlist("subDivision", [])
-
-        hkrId = request.query_params.get("hkrId", None)
-        category = request.query_params.get("category", None)
         hashTags = request.query_params.getlist("hashtag", [])
-        phase = request.query_params.get("phase", None)
-        personPlanning = request.query_params.get("personPlanning", None)
-        programmed = request.query_params.getlist("programmed", [])
-        projects = self.request.query_params.getlist("project", [])
-        inGroup = self.request.query_params.get("inGroup", None)
-        projectName = self.request.query_params.get("projectName", None)
         order = self.request.query_params.get("order", None)
         limit = self.request.query_params.get("limit", "10")
-
         if freeSearch is not None:
             if freeSearch == "":
                 return Response(
@@ -435,125 +387,130 @@ class ProjectViewSet(BaseViewSet):
                     ],
                 }
             )
-        elif (
-            len(projects) > 0
-            or len(projectGroup) > 0
-            or len(masterClass) > 0
-            or len(_class) > 0
-            or len(subClass) > 0
-            or len(district) > 0
-            or len(division) > 0
-            or len(subDivision) > 0
-            or len(hashTags) > 0
-            or len(programmed) > 0
-            or hkrId is not None
-            or category is not None
-            or phase is not None
-            or personPlanning is not None
-            or (inGroup is not None and inGroup in ["true", "True", "false", "False"])
-            or projectName is not None
-            or order is not None
-        ):
-            if not limit.isnumeric():
-                raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
-            if limit not in ["10", "20", "30"]:
-                raise ValidationError(
-                    detail={"limit": "Value out of range"}, code="out_of_range"
-                )
 
-            limit = int(limit)
-            # already filtered queryset
-            queryset = self.filter_queryset(self.get_queryset())
-            groups = []
-            projectClasses = []
-            projectLocations = []
-            combinedQuerysets = []
-
-            if order is None:
-                order = "new"
-
-            if len(projectGroup) > 0:
-                groups = ProjectGroup.objects.filter(
-                    id__in=queryset.values_list("projectGroup", flat=True).distinct()
-                ).select_related("classRelation")
-
-            if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
-                projectClasses = ProjectClass.objects.filter(
-                    id__in=queryset.values_list("projectClass", flat=True).distinct(),
-                    forCoordinatorOnly=False,
-                )
-            if len(district) > 0 or len(division) > 0 or len(subDivision) > 0:
-                projectLocations = ProjectLocation.objects.filter(
-                    id__in=queryset.values_list(
-                        "projectLocation", flat=True
-                    ).distinct(),
-                    forCoordinatorOnly=False,
-                )
-
-            if order == "new":
-                combinedQuerysets = sorted(
-                    chain(groups, projectClasses, projectLocations, queryset),
-                    key=lambda obj: obj.createdDate,
-                    reverse=True,
-                )
-            elif order == "old":
-                combinedQuerysets = sorted(
-                    chain(groups, projectClasses, projectLocations, queryset),
-                    key=lambda obj: obj.createdDate,
-                    reverse=False,
-                )
-            elif order == "project":
-                combinedQuerysets = list(
-                    chain(queryset, projectClasses, projectLocations, groups)
-                )
-            elif order == "group":
-                combinedQuerysets = list(
-                    chain(groups, queryset, projectClasses, projectLocations)
-                )
-            elif order == "phase":
-                queryset = queryset.annotate(
-                    relevancy=Count(Case(When(phase__value="proposal", then=1)))
-                ).order_by("-relevancy")
-                combinedQuerysets = list(
-                    chain(
-                        queryset,
-                        groups,
-                        projectClasses,
-                        projectLocations,
-                    )
-                )
-            else:
-                return Response(
-                    data={"message": "Invalid value for order"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            searchPaginator = PageNumberPagination()
-            searchPaginator.page_size = limit
-            result = searchPaginator.paginate_queryset(combinedQuerysets, request)
-            serializer = searchResultSerializer(
-                result, many=True, context={"hashtags_include": hashTags}
+        if not limit.isnumeric():
+            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+        if limit not in ["10", "20", "30"]:
+            raise ValidationError(
+                detail={"limit": "Value out of range"}, code="out_of_range"
             )
-            response = {
-                "next": searchPaginator.get_next_link(),
-                "previous": searchPaginator.get_previous_link(),
-                "count": searchPaginator.page.paginator.count,
-                "results": serializer.data,
-            }
 
-            return Response(response)
+        limit = int(limit)
+        # already filtered queryset
+        queryset = self.filter_queryset(self.get_queryset())
+        groups = []
+        projectClasses = []
+        projectLocations = []
+        combinedQuerysets = []
 
+        if order is None:
+            order = "new"
+
+        if len(projectGroup) > 0:
+            groups = ProjectGroup.objects.filter(
+                id__in=queryset.values_list("projectGroup", flat=True).distinct()
+            ).select_related("classRelation")
+
+        if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
+            projectClasses = ProjectClass.objects.filter(
+                id__in=queryset.values_list("projectClass", flat=True).distinct(),
+                forCoordinatorOnly=False,
+            )
+        if len(district) > 0 or len(division) > 0 or len(subDivision) > 0:
+            projectLocations = ProjectLocation.objects.filter(
+                id__in=queryset.values_list("projectLocation", flat=True).distinct(),
+                forCoordinatorOnly=False,
+            )
+
+        if order == "new":
+            combinedQuerysets = sorted(
+                chain(groups, projectClasses, projectLocations, queryset),
+                key=lambda obj: obj.createdDate,
+                reverse=True,
+            )
+        elif order == "old":
+            combinedQuerysets = sorted(
+                chain(groups, projectClasses, projectLocations, queryset),
+                key=lambda obj: obj.createdDate,
+                reverse=False,
+            )
+        elif order == "project":
+            combinedQuerysets = list(
+                chain(queryset, projectClasses, projectLocations, groups)
+            )
+        elif order == "group":
+            combinedQuerysets = list(
+                chain(groups, queryset, projectClasses, projectLocations)
+            )
+        elif order == "phase":
+            queryset = queryset.annotate(
+                relevancy=Count(Case(When(phase__value="proposal", then=1)))
+            ).order_by("-relevancy")
+            combinedQuerysets = list(
+                chain(
+                    queryset,
+                    groups,
+                    projectClasses,
+                    projectLocations,
+                )
+            )
         else:
-            # with filter
-            queryset = self.filter_queryset(self.get_queryset())
-            # pagination
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
+            return Response(
+                data={"message": "Invalid value for order"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
+        searchPaginator = PageNumberPagination()
+        searchPaginator.page_size = limit
+        result = searchPaginator.paginate_queryset(combinedQuerysets, request)
+        serializer = searchResultSerializer(
+            result, many=True, context={"hashtags_include": hashTags}
+        )
+        response = {
+            "next": searchPaginator.get_next_link(),
+            "previous": searchPaginator.get_previous_link(),
+            "count": searchPaginator.page.paginator.count,
+            "results": serializer.data,
+        }
+
+        return Response(response)
+
+    @override
+    def get_serializer_class(self):
+        """
+        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
+        """
+        if self.action == "list":
+            return ProjectGetSerializer
+        if self.action == "retrieve":
+            return ProjectGetSerializer
+        return ProjectCreateSerializer
+
+    @override
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        financeYear = request.query_params.get("year", None)
+        limit = request.query_params.get("limit", None)
+        if limit is None:
+            limit = queryset.count() if queryset.count() > 0 else 1
+
+        if financeYear is not None and not financeYear.isnumeric():
+            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+
+        # pagination
+        paginator = PageNumberPagination()
+        paginator.page_size = limit
+        page = paginator.paginate_queryset(queryset, request)
+        if page is not None:
+            serializer = self.get_serializer(
+                page, many=True, context={"finance_year": financeYear}
+            )
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(
+            queryset, many=True, context={"finance_year": financeYear}
+        )
+        return Response(serializer.data)
 
     @override
     def get_queryset(self):
