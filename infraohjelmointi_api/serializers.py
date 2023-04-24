@@ -1,5 +1,6 @@
 from datetime import datetime
-
+from os import path
+import environ
 from infraohjelmointi_api.services import ProjectFinancialService
 from .models import (
     ProjectType,
@@ -40,6 +41,11 @@ from rest_framework.validators import UniqueTogetherValidator
 import logging
 
 logger = logging.getLogger("infraohjelmointi_api")
+env = environ.Env()
+env.escape_proxy = True
+
+if path.exists(".env"):
+    env.read_env(".env")
 
 
 class BaseMeta:
@@ -426,21 +432,21 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         model = Project
 
     def get_pw_folder_link(self, project: Project):
+        if not self.context.get("get_pw_link", False) or project.hkrId is None:
+            return None
         # Initializing the service here instead of when first defining the variable in the class body
         # Because on app startup, before DB tables are created, Serializer gets initialized and
         # causes the initialization of ProjectWiseService which calls the DB
         if self.projectWiseService is None:
             self.projectWiseService = ProjectWiseService()
-        if project.pwInstanceId is None and project.hkrId is not None:
-            try:
-                project.pwInstanceId = self.projectWiseService.get_project_from_pw(
-                    id=project.hkrId
-                ).get("instanceId", None)
-                project.save()
-                project.refresh_from_db()
-            except PWProjectNotFoundError:
-                pass
-        return project.pw_folder_link
+
+        try:
+            pwInstanceId = self.projectWiseService.get_project_from_pw(
+                id=project.hkrId
+            ).get("instanceId", None)
+            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
+        except PWProjectNotFoundError:
+            return None
 
     def get_locked(self, project):
         try:
@@ -515,12 +521,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
-
-    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
-    projectWiseService = None
-
-    def get_pw_folder_link(self, project: Project):
-        return project.pw_folder_link
 
     class Meta(BaseMeta):
         model = Project
@@ -654,43 +654,12 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         return projectLocation
 
     @override
-    def create(self, validated_data):
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
-        if "hkrId" in validated_data and validated_data["hkrId"] is not None:
-            try:
-                validated_data[
-                    "pwInstanceId"
-                ] = self.projectWiseService.get_project_from_pw(
-                    id=validated_data.get("hkrId")
-                ).get(
-                    "instanceId", None
-                )
-
-            except PWProjectNotFoundError:
-                validated_data["pwInstanceId"] = None
-        elif "hkrId" in validated_data and validated_data["hkrId"] is None:
-            validated_data["pwInstanceId"] = None
-        project = super(ProjectCreateSerializer, self).create(validated_data)
-
-        return project
-
-    @override
     def update(self, instance, validated_data):
         """
         Overriding the update method to populate ProjectLockStatus Table
         with appropriate lock status based on the phase and validating if
         locked fields are not being updated
         """
-
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
 
         # Check if project is locked and any locked fields are not being updated
         if hasattr(instance, "lock"):
@@ -717,21 +686,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                         ),
                         code="project_locked",
                     )
-
-        if "hkrId" in validated_data and validated_data["hkrId"] is not None:
-            try:
-                validated_data[
-                    "pwInstanceId"
-                ] = self.projectWiseService.get_project_from_pw(
-                    id=validated_data.get("hkrId")
-                ).get(
-                    "instanceId", None
-                )
-
-            except PWProjectNotFoundError:
-                validated_data["pwInstanceId"] = None
-        elif "hkrId" in validated_data and validated_data["hkrId"] is None:
-            validated_data["pwInstanceId"] = None
 
         return super(ProjectCreateSerializer, self).update(instance, validated_data)
 
