@@ -290,6 +290,12 @@ class ProjectViewSet(BaseViewSet):
         projectSerializer.save()
         return Response(projectSerializer.data)
 
+    @override
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, context={"get_pw_link": True})
+        return Response(serializer.data)
+
     @action(
         methods=["get"],
         detail=False,
