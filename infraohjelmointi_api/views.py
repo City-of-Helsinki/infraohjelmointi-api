@@ -530,6 +530,8 @@ class ProjectViewSet(BaseViewSet):
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
 
+        # This query param gives the projects which are directly under any given location or class if set to True
+        # Else the queryset will also contain the projects containing the child locations/districts
         direct = self.request.query_params.get("direct", False)
 
         try:
