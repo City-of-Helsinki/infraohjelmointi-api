@@ -529,7 +529,7 @@ class ProjectViewSet(BaseViewSet):
         projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.get("projectName", None)
-        # TODO: Write test for this
+
         direct = self.request.query_params.get("direct", False)
 
         try:
@@ -732,7 +732,6 @@ class ProjectViewSet(BaseViewSet):
             if model_class.__name__ == "ProjectLocation":
                 return qs.filter(projectLocation__in=search_ids)
             elif model_class.__name__ == "ProjectClass":
-                # TODO: write test for this case
                 return qs.filter(
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
