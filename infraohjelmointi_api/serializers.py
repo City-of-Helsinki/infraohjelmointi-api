@@ -81,6 +81,7 @@ class FinancialCalculationSerializer(serializers.Serializer):
         Takes in a list of Projects with Financial data and returns back calculated sums for financial data
         """
         super().__init__(**kwargs)
+
         self.instance = (
             (
                 pd.DataFrame(
@@ -93,7 +94,9 @@ class FinancialCalculationSerializer(serializers.Serializer):
             else pd.DataFrame(
                 [
                     {
-                        "year": 2023,
+                        "year": kwargs["context"].get(
+                            "finance_year", date.today().year
+                        ),
                         "budget": 0.0,
                         "budgetProposalCurrentYearPlus0": 0.0,
                         "budgetProposalCurrentYearPlus1": 0.0,
@@ -169,17 +172,19 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def get_finance_sums(self, instance):
         _type = instance._meta.model.__name__
-
+        year = self.context.get("finance_year", date.today().year)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
         allFinancials = ProjectGetSerializer(
             relatedProjects,
             fields=("finances", "costForecast"),
             many=True,
-            context={"finance_year": date.today().year},
+            context={"finance_year": year},
         ).data
 
-        response = FinancialCalculationSerializer(allFinancials).data
+        response = FinancialCalculationSerializer(
+            allFinancials, context={"finance_year": year}
+        ).data
 
         return response
 

@@ -173,6 +173,14 @@ class ProjectClassViewSet(BaseViewSet):
     serializer_class = ProjectClassSerializer
 
     @override
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year", date.today().year)
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
+
+        return Response(serializer.data)
+
+    @override
     def get_queryset(self):
         """Default is programmer view"""
         return ProjectClassService.list_all()
