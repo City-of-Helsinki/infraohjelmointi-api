@@ -78,7 +78,7 @@ class FinancialCalculationSerializer(serializers.Serializer):
     @override
     def __init__(self, instance: list[Project], **kwargs):
         """
-        Takes in a list of Projects and returns back calculated sums for financial data
+        Takes in a list of Projects with Financial data and returns back calculated sums for financial data
         """
         super().__init__(**kwargs)
         self.instance = (
@@ -169,6 +169,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def get_finance_sums(self, instance):
         _type = instance._meta.model.__name__
+
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
         allFinancials = ProjectGetSerializer(
