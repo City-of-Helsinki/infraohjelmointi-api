@@ -16,3 +16,4 @@ overrides                                     # Decorators to assert function ov
 openpyxl                                      # dependency for reading excel files through pandas
 django-filter                                 # DRF package to add filtering on viewsets
 drf-standardized-errors                       # DRF package to standerdize all 5xx and 4xx errors
+pandas                                        # Faster sums calculations

@@ -1,6 +1,7 @@
 from datetime import datetime
 from os import path
 import environ
+import pandas as pd
 from infraohjelmointi_api.services import ProjectFinancialService
 from .models import (
     ProjectType,
@@ -255,6 +256,65 @@ class ProjectLocationSerializer(serializers.ModelSerializer):
 
 
 class ProjectClassSerializer(serializers.ModelSerializer):
+    finances = serializers.SerializerMethodField(method_name="get_finance_sums")
+
+    def get_finance_sums(self, projectClass: ProjectClass):
+        relatedProjects = self.get_related_projects(projectClass=projectClass)
+        if relatedProjects.count() == 0:
+            return None
+        allFinancials = ProjectGetSerializer(
+            relatedProjects,
+            fields=("finances", "costForecast"),
+            many=True,
+            context={"finance_year": date.today().year},
+        ).data
+
+        financialsDf = pd.DataFrame(
+            [{**f["finances"], "budget": f["costForecast"]} for f in allFinancials]
+        ).astype(float)
+        response = {
+            "year": date.today().year,
+            "year0": {
+                "actualBudget": financialsDf["budget"].sum(),
+                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus0"].sum(),
+            },
+            "year1": {
+                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus1"].sum()
+            },
+            "year2": {
+                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus2"].sum()
+            },
+            "year3": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus3"].sum()
+            },
+            "year4": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus4"].sum()
+            },
+            "year5": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus5"].sum()
+            },
+            "year6": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus6"].sum()
+            },
+            "year7": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus7"].sum()
+            },
+            "year8": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus8"].sum()
+            },
+            "year9": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus9"].sum()
+            },
+            "year10": {
+                "plannedBudget": financialsDf["preliminaryCurrentYearPlus10"].sum()
+            },
+        }
+        return response
+
+    def get_related_projects(self, projectClass: ProjectClass) -> list[Project]:
+        path = projectClass.path
+        return Project.objects.filter(projectClass__path__startswith=path)
+
     class Meta(BaseMeta):
         model = ProjectClass
 
