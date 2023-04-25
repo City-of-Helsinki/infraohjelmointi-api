@@ -74,6 +74,128 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
                 self.fields.pop(field_name)
 
 
+class FinancialCalculationSerializer(serializers.Serializer):
+    @override
+    def __init__(self, instance: list[Project], **kwargs):
+        """
+        Takes in a list of Projects and returns back calculated sums for financial data
+        """
+        super().__init__(**kwargs)
+        self.instance = (
+            (
+                pd.DataFrame(
+                    [{**f["finances"], "budget": f["costForecast"]} for f in instance]
+                )
+                .fillna(0.0)
+                .astype(float)
+            )
+            if len(instance) > 0
+            else pd.DataFrame(
+                [
+                    {
+                        "year": 2023,
+                        "budget": 0.0,
+                        "budgetProposalCurrentYearPlus0": 0.0,
+                        "budgetProposalCurrentYearPlus1": 0.0,
+                        "budgetProposalCurrentYearPlus2": 0.0,
+                        "preliminaryCurrentYearPlus3": 0.0,
+                        "preliminaryCurrentYearPlus4": 0.0,
+                        "preliminaryCurrentYearPlus5": 0.0,
+                        "preliminaryCurrentYearPlus6": 0.0,
+                        "preliminaryCurrentYearPlus7": 0.0,
+                        "preliminaryCurrentYearPlus8": 0.0,
+                        "preliminaryCurrentYearPlus9": 0.0,
+                        "preliminaryCurrentYearPlus10": 0.0,
+                    }
+                ]
+            )
+        )
+
+    year = serializers.SerializerMethodField()
+    year0 = serializers.SerializerMethodField()
+    year1 = serializers.SerializerMethodField()
+    year2 = serializers.SerializerMethodField()
+    year3 = serializers.SerializerMethodField()
+    year4 = serializers.SerializerMethodField()
+    year5 = serializers.SerializerMethodField()
+    year6 = serializers.SerializerMethodField()
+    year7 = serializers.SerializerMethodField()
+    year8 = serializers.SerializerMethodField()
+    year9 = serializers.SerializerMethodField()
+    year10 = serializers.SerializerMethodField()
+
+    def get_year(self, obj: pd.DataFrame):
+        return int(obj["year"][0])
+
+    def get_year0(self, obj: pd.DataFrame):
+        return {
+            "actualBudget": obj["budget"].sum(),
+            "plannedBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
+        }
+
+    def get_year1(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
+
+    def get_year2(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
+
+    def get_year3(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus3"].sum()}
+
+    def get_year4(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus4"].sum()}
+
+    def get_year5(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus5"].sum()}
+
+    def get_year6(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus6"].sum()}
+
+    def get_year7(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus7"].sum()}
+
+    def get_year8(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus8"].sum()}
+
+    def get_year9(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus9"].sum()}
+
+    def get_year10(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus10"].sum()}
+
+
+class FinancialSumSerializer(serializers.ModelSerializer):
+    finances = serializers.SerializerMethodField(method_name="get_finance_sums")
+
+    def get_finance_sums(self, instance):
+        _type = instance._meta.model.__name__
+        relatedProjects = self.get_related_projects(instance=instance, _type=_type)
+
+        allFinancials = ProjectGetSerializer(
+            relatedProjects,
+            fields=("finances", "costForecast"),
+            many=True,
+            context={"finance_year": date.today().year},
+        ).data
+
+        response = FinancialCalculationSerializer(allFinancials).data
+
+        return response
+
+    def get_related_projects(self, instance, _type) -> list[Project]:
+        if _type == "ProjectLocation":
+            return Project.objects.filter(
+                projectLocation__path__startswith=instance.path
+            )
+        if _type == "ProjectClass":
+            return Project.objects.filter(projectClass__path__startswith=instance.path)
+
+        if _type == "ProjectGroup":
+            return Project.objects.filter(projectGroup=instance)
+
+        return []
+
+
 class ProjectFinancialSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectFinancial
@@ -198,7 +320,7 @@ class searchResultSerializer(serializers.Serializer):
         return projectHashtags
 
 
-class ProjectGroupSerializer(DynamicFieldsModelSerializer):
+class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
@@ -250,106 +372,12 @@ class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
         model = ProjectHashTag
 
 
-class FinancialCalculationSerializer(serializers.Serializer):
-    year = serializers.SerializerMethodField()
-    year0 = serializers.SerializerMethodField()
-    year1 = serializers.SerializerMethodField()
-    year2 = serializers.SerializerMethodField()
-    year3 = serializers.SerializerMethodField()
-    year4 = serializers.SerializerMethodField()
-    year5 = serializers.SerializerMethodField()
-    year6 = serializers.SerializerMethodField()
-    year7 = serializers.SerializerMethodField()
-    year8 = serializers.SerializerMethodField()
-    year9 = serializers.SerializerMethodField()
-    year10 = serializers.SerializerMethodField()
-
-    def get_year(self, obj: pd.DataFrame):
-        return int(obj["year"][0])
-
-    def get_year0(self, obj: pd.DataFrame):
-        return {
-            "actualBudget": obj["budget"].sum(),
-            "plannedBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
-        }
-
-    def get_year1(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
-
-    def get_year2(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
-
-    def get_year3(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus3"].sum()}
-
-    def get_year4(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus4"].sum()}
-
-    def get_year5(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus5"].sum()}
-
-    def get_year6(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus6"].sum()}
-
-    def get_year7(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus7"].sum()}
-
-    def get_year8(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus8"].sum()}
-
-    def get_year9(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus9"].sum()}
-
-    def get_year10(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus10"].sum()}
-
-
-class ProjectLocationSerializer(serializers.ModelSerializer):
+class ProjectLocationSerializer(FinancialSumSerializer, serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectLocation
 
 
-class ProjectClassSerializer(serializers.ModelSerializer):
-    finances = serializers.SerializerMethodField(method_name="get_finance_sums")
-
-    def get_finance_sums(self, projectClass: ProjectClass):
-        response = {
-            "year": date.today().year,
-            "year0": {
-                "actualBudget": 0,
-                "plannedBudget": 0,
-            },
-            "year1": {"plannedBudget": 0},
-            "year2": {"plannedBudget": 0},
-            "year3": {"plannedBudget": 0},
-            "year4": {"plannedBudget": 0},
-            "year5": {"plannedBudget": 0},
-            "year6": {"plannedBudget": 0},
-            "year7": {"plannedBudget": 0},
-            "year8": {"plannedBudget": 0},
-            "year9": {"plannedBudget": 0},
-            "year10": {"plannedBudget": 0},
-        }
-        relatedProjects = self.get_related_projects(projectClass=projectClass)
-        if relatedProjects.count() == 0:
-            return response
-        allFinancials = ProjectGetSerializer(
-            relatedProjects,
-            fields=("finances", "costForecast"),
-            many=True,
-            context={"finance_year": date.today().year},
-        ).data
-        financialsDf = pd.DataFrame(
-            [{**f["finances"], "budget": f["costForecast"]} for f in allFinancials]
-        ).astype(float)
-        response = FinancialCalculationSerializer(financialsDf).data
-
-        return response
-
-    def get_related_projects(self, projectClass: ProjectClass) -> list[Project]:
-        path = projectClass.path
-        return Project.objects.filter(projectClass__path__startswith=path)
-
+class ProjectClassSerializer(FinancialSumSerializer, serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectClass
 
