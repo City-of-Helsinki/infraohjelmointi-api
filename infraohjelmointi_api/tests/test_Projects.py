@@ -108,6 +108,9 @@ class ProjectTestCase(TestCase):
     projectFinancial_1_Id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
     projectFinancial_2_Id = uuid.UUID("ec17c3c6-7414-4fec-ad2e-6e6f63a88bcb")
     projectFinancial_3_Id = uuid.UUID("8dba8690-11fd-4715-9978-f65c4e9a6e22")
+    pwInstanceId = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
+    pwInstanceId_hkrId = 1461
+    pwInstanceId_hkrId_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
 
     fixtures = []
     maxDiff = None
@@ -170,7 +173,7 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
+        self.conPhaseDetail, _ = ConstructionPhaseDetail.objects.get_or_create(
             id=self.conPhaseDetailId, value="preConstruction"
         )
         self.person_3 = Person.objects.create(
@@ -181,8 +184,8 @@ class ProjectTestCase(TestCase):
             title="Contractor",
             phone="0414853275",
         )
-        self.projectPhase = ProjectPhase.objects.create(
-            id=self.projectPhase_1_Id, value="Proposal"
+        self.projectPhase, _ = ProjectPhase.objects.get_or_create(
+            id=self.projectPhase_1_Id, value="proposal"
         )
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
@@ -193,12 +196,12 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=True,
         )
-        self.projectArea = ProjectArea.objects.create(
+        self.projectArea, _ = ProjectArea.objects.get_or_create(
             id=self.projectAreaId,
-            value="Hervanta",
+            value="honkasuo",
             location="inisnoorinkatu 60c",
         )
-        self.projectType = ProjectType.objects.create(
+        self.projectType, _ = ProjectType.objects.get_or_create(
             id=self.projectTypeId, value="projectComplex"
         )
 
@@ -2832,4 +2835,28 @@ class ProjectTestCase(TestCase):
             response.json()["results"][0]["finances"]["budgetProposalCurrentYearPlus0"],
             "200.00",
             msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
+
+    def test_pw_folder_project(self):
+        data = {
+            "name": "Test Project for PW folder",
+            "description": "Test description",
+            "hkrId": self.pwInstanceId_hkrId,
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        newCreatedId = response.json()["id"]
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.get(
+            "/projects/{}/".format(newCreatedId),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["pwFolderLink"], self.pwInstanceId_hkrId_folder
         )

@@ -26,7 +26,6 @@ from overrides import override
 
 
 class Project(models.Model):
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
