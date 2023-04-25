@@ -250,6 +250,60 @@ class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
         model = ProjectHashTag
 
 
+class FinancialCalculationSerializer(serializers.Serializer):
+    year = serializers.SerializerMethodField()
+    year0 = serializers.SerializerMethodField()
+    year1 = serializers.SerializerMethodField()
+    year2 = serializers.SerializerMethodField()
+    year3 = serializers.SerializerMethodField()
+    year4 = serializers.SerializerMethodField()
+    year5 = serializers.SerializerMethodField()
+    year6 = serializers.SerializerMethodField()
+    year7 = serializers.SerializerMethodField()
+    year8 = serializers.SerializerMethodField()
+    year9 = serializers.SerializerMethodField()
+    year10 = serializers.SerializerMethodField()
+
+    def get_year(self, obj: pd.DataFrame):
+        return int(obj["year"][0])
+
+    def get_year0(self, obj: pd.DataFrame):
+        return {
+            "actualBudget": obj["budget"].sum(),
+            "plannedBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
+        }
+
+    def get_year1(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
+
+    def get_year2(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
+
+    def get_year3(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus3"].sum()}
+
+    def get_year4(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus4"].sum()}
+
+    def get_year5(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus5"].sum()}
+
+    def get_year6(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus6"].sum()}
+
+    def get_year7(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus7"].sum()}
+
+    def get_year8(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus8"].sum()}
+
+    def get_year9(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus9"].sum()}
+
+    def get_year10(self, obj: pd.DataFrame):
+        return {"plannedBudget": obj["preliminaryCurrentYearPlus10"].sum()}
+
+
 class ProjectLocationSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectLocation
@@ -259,56 +313,37 @@ class ProjectClassSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
     def get_finance_sums(self, projectClass: ProjectClass):
+        response = {
+            "year": date.today().year,
+            "year0": {
+                "actualBudget": 0,
+                "plannedBudget": 0,
+            },
+            "year1": {"plannedBudget": 0},
+            "year2": {"plannedBudget": 0},
+            "year3": {"plannedBudget": 0},
+            "year4": {"plannedBudget": 0},
+            "year5": {"plannedBudget": 0},
+            "year6": {"plannedBudget": 0},
+            "year7": {"plannedBudget": 0},
+            "year8": {"plannedBudget": 0},
+            "year9": {"plannedBudget": 0},
+            "year10": {"plannedBudget": 0},
+        }
         relatedProjects = self.get_related_projects(projectClass=projectClass)
         if relatedProjects.count() == 0:
-            return None
+            return response
         allFinancials = ProjectGetSerializer(
             relatedProjects,
             fields=("finances", "costForecast"),
             many=True,
             context={"finance_year": date.today().year},
         ).data
-
         financialsDf = pd.DataFrame(
             [{**f["finances"], "budget": f["costForecast"]} for f in allFinancials]
         ).astype(float)
-        response = {
-            "year": date.today().year,
-            "year0": {
-                "actualBudget": financialsDf["budget"].sum(),
-                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus0"].sum(),
-            },
-            "year1": {
-                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus1"].sum()
-            },
-            "year2": {
-                "plannedBudget": financialsDf["budgetProposalCurrentYearPlus2"].sum()
-            },
-            "year3": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus3"].sum()
-            },
-            "year4": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus4"].sum()
-            },
-            "year5": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus5"].sum()
-            },
-            "year6": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus6"].sum()
-            },
-            "year7": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus7"].sum()
-            },
-            "year8": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus8"].sum()
-            },
-            "year9": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus9"].sum()
-            },
-            "year10": {
-                "plannedBudget": financialsDf["preliminaryCurrentYearPlus10"].sum()
-            },
-        }
+        response = FinancialCalculationSerializer(financialsDf).data
+
         return response
 
     def get_related_projects(self, projectClass: ProjectClass) -> list[Project]:
