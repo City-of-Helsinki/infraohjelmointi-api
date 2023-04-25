@@ -139,6 +139,14 @@ class ProjectGroupViewSet(BaseViewSet):
     API endpoint that allows Project Groups to be viewed or edited.
     """
 
+    @override
+    def list(self, request, *args, **kwargs):
+        year = request.query_params.get("year", date.today().year)
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
+
+        return Response(serializer.data)
+
     permission_classes = []
     serializer_class = ProjectGroupSerializer
 
