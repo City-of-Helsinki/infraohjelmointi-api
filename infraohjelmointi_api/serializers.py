@@ -29,6 +29,7 @@ from .models import (
     ProjectLock,
     ProjectFinancial,
 )
+from django.db.models import Sum
 from .services import ProjectWiseService
 from .services.ProjectWiseService import PWProjectNotFoundError, PWProjectResponseError
 from rest_framework.exceptions import ParseError, ValidationError
@@ -558,11 +559,22 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
     finances = serializers.SerializerMethodField()
+    spentBudget = serializers.SerializerMethodField(method_name="get_spent_budget")
     pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
+
+    def get_spent_budget(self, project: Project):
+        year = self.context.get("finance_year", date.today().year)
+        if year is None:
+            year = date.today().year
+        spentBudget = 0.0
+        spentBudget = ProjectFinancial.objects.filter(
+            project=project, year__lt=year
+        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0"))["spent_budget"]
+        return int(spentBudget)
 
     def get_pw_folder_link(self, project: Project):
         if not self.context.get("get_pw_link", False) or project.hkrId is None:
