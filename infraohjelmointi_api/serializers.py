@@ -182,7 +182,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             many=True,
             context={"finance_year": year},
         ).data
-
         response = FinancialCalculationSerializer(
             allFinancials, context={"finance_year": year}
         ).data
@@ -570,10 +569,11 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        spentBudget = 0.0
         spentBudget = ProjectFinancial.objects.filter(
             project=project, year__lt=year
         ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0"))["spent_budget"]
+        if spentBudget is None:
+            return 0
         return int(spentBudget)
 
     def get_pw_folder_link(self, project: Project):
