@@ -29,7 +29,7 @@ from .models import (
     ProjectFinancial,
 )
 from .services import ProjectWiseService
-from .services.ProjectWiseService import PWProjectNotFoundError
+from .services.ProjectWiseService import PWProjectNotFoundError, PWProjectResponseError
 from rest_framework.exceptions import ParseError, ValidationError
 from datetime import date
 from rest_framework import serializers
@@ -445,7 +445,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
                 id=project.hkrId
             ).get("instanceId", None)
             return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
-        except PWProjectNotFoundError:
+        except (PWProjectNotFoundError, PWProjectResponseError):
             return None
 
     def get_locked(self, project):
