@@ -177,6 +177,65 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = self.context.get("finance_year", date.today().year)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
+        summedFinances = relatedProjects.aggregate(
+            year0_actualBudget=Sum("costForecast"),
+            year0_plannedBudget=Sum(
+                "finances__budgetProposalCurrentYearPlus0",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year1=Sum(
+                "finances__budgetProposalCurrentYearPlus1",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year2=Sum(
+                "finances__budgetProposalCurrentYearPlus2",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year3=Sum(
+                "finances__preliminaryCurrentYearPlus3",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year4=Sum(
+                "finances__preliminaryCurrentYearPlus4",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year5=Sum(
+                "finances__preliminaryCurrentYearPlus5",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year6=Sum(
+                "finances__preliminaryCurrentYearPlus6",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year7=Sum(
+                "finances__preliminaryCurrentYearPlus7",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year8=Sum(
+                "finances__preliminaryCurrentYearPlus8",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year9=Sum(
+                "finances__preliminaryCurrentYearPlus9",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year10=Sum(
+                "finances__preliminaryCurrentYearPlus10",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+        )
+
         allFinancials = ProjectWithFinancesSerializer(
             relatedProjects,
             many=True,
