@@ -191,7 +191,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def get_related_projects(self, instance, _type) -> list[Project]:
         if _type == "ProjectLocation":
             return Project.objects.filter(
-                projectLocation__path__startswith=instance.path
+                projectLocation__path__startswith=instance.path,
+                projectLocation__parent__isnull=True,
             )
         if _type == "ProjectClass":
             return Project.objects.filter(projectClass__path__startswith=instance.path)
