@@ -176,7 +176,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         _type = instance._meta.model.__name__
         year = self.context.get("finance_year", date.today().year)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
-
+        # TODO change dictionary format to return
         summedFinances = relatedProjects.aggregate(
             year0_actualBudget=Sum("costForecast"),
             year0_plannedBudget=Sum(
