@@ -175,9 +175,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = self.context.get("finance_year", date.today().year)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
-        allFinancials = ProjectGetSerializer(
+        allFinancials = ProjectWithFinancesSerializer(
             relatedProjects,
-            fields=("finances", "costForecast"),
             many=True,
             context={"finance_year": year},
         ).data
@@ -525,6 +524,9 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         )
 
         return ProjectFinancialSerializer(queryset, many=False).data
+
+    class Meta(BaseMeta):
+        model = Project
 
 
 class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
