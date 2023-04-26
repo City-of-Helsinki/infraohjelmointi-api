@@ -73,13 +73,13 @@ class BalkSumTestCase(TestCase):
             id=self.projectGroup_3_Id, name="Test Group 3 park"
         )
         district_1 = ProjectLocation.objects.create(
-            id=self.projectDistrict_2_Id,
+            id=self.projectDistrict_1_Id,
             name="District 1",
             parent=None,
             path="District 1",
         )
         district_2 = ProjectLocation.objects.create(
-            id=self.projectDistrict_3_Id,
+            id=self.projectDistrict_2_Id,
             name="District 2",
             parent=None,
             path="District 2",
@@ -101,20 +101,20 @@ class BalkSumTestCase(TestCase):
         )
 
         masterClass_1 = ProjectClass.objects.create(
-            id=self.projectMasterClass_2_Id,
+            id=self.projectMasterClass_1_Id,
             name="Master Class 1",
             parent=None,
             path="Master Class 1",
         )
         masterClass_2 = ProjectClass.objects.create(
-            id=self.projectMasterClass_3_Id,
+            id=self.projectMasterClass_2_Id,
             name="Master Class 2",
             parent=None,
             path="Master Class 2",
         )
         _class = masterClass_1.childClass.create(
             name="Test Class 1",
-            id=self.projectClass_2_Id,
+            id=self.projectClass_1_Id,
             path="Master Class 1/Test Class 1",
         )
         subClass_1 = _class.childClass.create(
@@ -137,6 +137,7 @@ class BalkSumTestCase(TestCase):
             projectLocation=district_1,
             projectClass=subClass_1,
             projectGroup=projectGroup_1,
+            costForecast=200,
         )
 
         project_2 = Project.objects.create(
@@ -148,6 +149,7 @@ class BalkSumTestCase(TestCase):
             projectLocation=subDivision_1,
             projectClass=_class,
             projectGroup=projectGroup_1,
+            costForecast=300,
         )
 
         project_3 = Project.objects.create(
@@ -159,6 +161,7 @@ class BalkSumTestCase(TestCase):
             projectLocation=district_2,
             projectClass=subClass_2,
             projectGroup=projectGroup_2,
+            costForecast=100,
         )
 
         project_4 = Project.objects.create(
@@ -170,6 +173,7 @@ class BalkSumTestCase(TestCase):
             projectLocation=subDivision_2,
             projectClass=masterClass_2,
             projectGroup=projectGroup_3,
+            costForecast=100,
         )
         project_5 = Project.objects.create(
             id=self.project_5_Id,
@@ -179,13 +183,41 @@ class BalkSumTestCase(TestCase):
             programmed=True,
             projectClass=_class,
             projectGroup=projectGroup_1,
+            costForecast=100,
+        )
+        project_6 = Project.objects.create(
+            id=self.project_6_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            projectClass=masterClass_1,
+            costForecast=500,
+        )
+        project_7 = Project.objects.create(
+            id=self.project_7_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            projectClass=masterClass_1,
+            costForecast=600,
+        )
+        project_8 = Project.objects.create(
+            id=self.project_8_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            projectClass=masterClass_2,
+            costForecast=100,
         )
         projectFinances_1 = ProjectFinancial.objects.create(
             project=project_1,
             budgetProposalCurrentYearPlus0=10.00,
-            budgetProposalCurrentYearPlus1=20.00,
-            budgetProposalCurrentYearPlus2=30.00,
-            preliminaryCurrentYearPlus3=40.00,
+            budgetProposalCurrentYearPlus1=50.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
             preliminaryCurrentYearPlus4=5.00,
             preliminaryCurrentYearPlus5=0.00,
             preliminaryCurrentYearPlus6=0.00,
@@ -196,10 +228,10 @@ class BalkSumTestCase(TestCase):
         )
         projectFinances_2 = ProjectFinancial.objects.create(
             project=project_2,
-            budgetProposalCurrentYearPlus0=0.00,
-            budgetProposalCurrentYearPlus1=0.00,
+            budgetProposalCurrentYearPlus0=50.00,
+            budgetProposalCurrentYearPlus1=50.00,
             budgetProposalCurrentYearPlus2=50.00,
-            preliminaryCurrentYearPlus3=40.00,
+            preliminaryCurrentYearPlus3=10.00,
             preliminaryCurrentYearPlus4=5.00,
             preliminaryCurrentYearPlus5=0.00,
             preliminaryCurrentYearPlus6=0.00,
@@ -211,10 +243,80 @@ class BalkSumTestCase(TestCase):
 
         projectFinances_3 = ProjectFinancial.objects.create(
             project=project_3,
+            budgetProposalCurrentYearPlus0=100.00,
+            budgetProposalCurrentYearPlus1=50.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_4 = ProjectFinancial.objects.create(
+            project=project_4,
             budgetProposalCurrentYearPlus0=0.00,
             budgetProposalCurrentYearPlus1=0.00,
             budgetProposalCurrentYearPlus2=50.00,
-            preliminaryCurrentYearPlus3=40.00,
+            preliminaryCurrentYearPlus3=10.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_5 = ProjectFinancial.objects.create(
+            project=project_5,
+            budgetProposalCurrentYearPlus0=100.00,
+            budgetProposalCurrentYearPlus1=50.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_6 = ProjectFinancial.objects.create(
+            project=project_6,
+            budgetProposalCurrentYearPlus0=200,
+            budgetProposalCurrentYearPlus1=50.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=0.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_7 = ProjectFinancial.objects.create(
+            project=project_7,
+            budgetProposalCurrentYearPlus0=100,
+            budgetProposalCurrentYearPlus1=50.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
+            preliminaryCurrentYearPlus4=5.00,
+            preliminaryCurrentYearPlus5=5.00,
+            preliminaryCurrentYearPlus6=0.00,
+            preliminaryCurrentYearPlus7=5.00,
+            preliminaryCurrentYearPlus8=9.00,
+            preliminaryCurrentYearPlus9=10.00,
+            preliminaryCurrentYearPlus10=0.00,
+        )
+        projectFinances_8 = ProjectFinancial.objects.create(
+            project=project_8,
+            budgetProposalCurrentYearPlus0=0.00,
+            budgetProposalCurrentYearPlus1=0.00,
+            budgetProposalCurrentYearPlus2=50.00,
+            preliminaryCurrentYearPlus3=10.00,
             preliminaryCurrentYearPlus4=5.00,
             preliminaryCurrentYearPlus5=0.00,
             preliminaryCurrentYearPlus6=0.00,
@@ -224,134 +326,200 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus10=0.00,
         )
 
-    def test_Task_is_created(self):
-        self.assertEqual(
-            Task.objects.filter(id=self.TaskId).exists(),
-            True,
-            msg="Created Task with Id {} does not exist in DB".format(self.TaskId),
-        )
-        task = Task.objects.get(id=self.TaskId)
-        self.assertIsInstance(task, Task, msg="Object retrieved from DB != typeof Task")
-        self.assertEqual(task.id, self.task.id, msg="Object from DB != created Object")
-
-    def test_foreign_keys_exist(self):
-        self.assertDictEqual(
-            self.project.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
-            msg="Project foreign key does not exist in Task with id {}".format(
-                self.TaskId
-            ),
-        )
-        self.assertDictEqual(
-            self.person_1.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
-            msg="Person foreign key does not exist in Task with id {}".format(
-                self.TaskId
-            ),
-        )
-
-        self.assertDictEqual(
-            self.taskStatus.task_set.all().values()[0],
-            Task.objects.filter(id=self.TaskId).values()[0],
-            msg="TaskStatus foreign key does not exist in Task with id {}".format(
-                self.TaskId
-            ),
-        )
-
-    def test_GET_all_Tasks(self):
-        response = self.client.get("/tasks/")
-        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        self.assertEqual(len(response.json()), 1, msg="Number of returned Tasks != 1")
-        Task.objects.create(
-            id=self.TaskId2,
-            projectId=self.project,
-            hkrId=22763,
-            taskType="Very hard task",
-            status=None,
-            startDate="2022-11-20",
-            endDate="2022-11-20",
-            person=self.person_1,
-            realizedCost=10000,
-            plannedCost=50000,
-            riskAssessment="Very risky indeed",
-        )
-        response = self.client.get("/tasks/")
-        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        self.assertEqual(len(response.json()), 2, msg="Number of returned Tasks != 2")
-
-    def test_GET_one_Task(self):
-        response = self.client.get("/tasks/{}/".format(self.TaskId))
-        self.assertEqual(
-            response.json()["taskType"],
-            self.task.taskType,
-            msg="Response doesn't match the object in DB",
+    def test_GET_class_with_sums(self):
+        response = self.client.get(
+            "/project-classes/{}/".format(
+                self.projectMasterClass_1_Id
+            )  # 1 2 3 5 6 7 projects belong to this masterClass directly or indirectly
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        # serialize the model instances
-        serializer = TaskSerializer(Task.objects.get(id=self.TaskId), many=False)
 
-        # convert the serialized data to JSON
-        result_expected = JSONRenderer().render(serializer.data)
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 1800.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 560.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 300.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 300.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 60.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 30.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 25.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 45.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
 
-        # compare the JSON data returned to what is expected
+        response = self.client.get(
+            "/project-classes/{}/".format(
+                self.projectMasterClass_2_Id
+            )  # 4 & 8 project belong to this masterClass
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
-        self.assertEqual(response.status_code, 200, msg="Status code != 200")
-        self.assertEqual(response.content, result_expected)
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 200.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 20.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 18.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 20.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
 
-    def test_POST_Task(self):
-        data = {
-            "id": self.TaskId,
-            "projectId": self.project.id.__str__(),
-            "hkrId": 27618,
-            "taskType": "Very hard task 2",
-            "status": self.taskStatus.id.__str__(),
-            "startDate": "2022-11-20",
-            "endDate": "2022-11-20",
-            "person": None,
-            "realizedCost": 10000,
-            "plannedCost": 50000,
-            "riskAssessment": "Very risky indeed",
-        }
-        response = self.client.post("/tasks/", data, content_type="application/json")
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
-        new_createdId = response.json()["id"]
-        self.assertEqual(
-            Task.objects.filter(id=new_createdId).exists(),
-            True,
-            msg="Task created using POST request does not exist in DB",
+        response = self.client.get(
+            "/project-classes/{}/".format(
+                self.projectClass_1_Id
+            )  # 2 5 project belong to this masterClass
         )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
-    def test_PATCH_Task(self):
-        data = {
-            "taskType": "Easy Task",
-            "status": None,
-        }
-        response = self.client.patch(
-            "/tasks/{}/".format(self.TaskId),
-            data,
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json()["taskType"],
-            data["taskType"],
-            msg="Data not updated in the DB",
-        )
-        self.assertEqual(
-            response.json()["status"],
-            data["status"],
-            msg="Data not updated in the DB",
-        )
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 700.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 260.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 200.00)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 200.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 40.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 20.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 15.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 27.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 30.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
 
-    def test_DELETE_Task(self):
-        response = self.client.delete("/tasks/{}/".format(self.TaskId))
-        self.assertEqual(
-            response.status_code,
-            204,
-            msg="Error deleting task with Id {}".format(self.TaskId),
+        response = self.client.get(
+            "/project-classes/{}/".format(
+                self.projectSubClass_1_Id
+            )  # 3 project belong to this masterClass
         )
-        self.assertEqual(
-            Task.objects.filter(id=self.TaskId).exists(),
-            False,
-            msg="Task with Id {} still exists in DB".format(self.TaskId),
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 200.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50.00)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+        response = self.client.get(
+            "/project-classes/{}/".format(
+                self.projectSubClass_2_Id
+            )  # 1,2,3,5 project belong to this masterClass
         )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+    def test_GET_location_with_sums(self):
+        response = self.client.get(
+            "/project-locations/{}/".format(
+                self.projectDistrict_1_Id
+            )  # 1  project belong to this district directly
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 200.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+        response = self.client.get(
+            "/project-locations/{}/".format(
+                self.projectDistrict_2_Id
+            )  # 3  project belong to this district directly
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+    def test_GET_group_with_sums(self):
+        response = self.client.get(
+            "/project-groups/{}/".format(
+                self.projectGroup_1_Id
+            )  # 1,2 5  project belong to this group directly
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 600.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 160.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 150.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 150.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 30.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 15.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 18.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 20.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+        response = self.client.get(
+            "/project-groups/{}/".format(
+                self.projectGroup_2_Id
+            )  # 3  project belong to this group directly
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
+
+        response = self.client.get(
+            "/project-groups/{}/".format(
+                self.projectGroup_3_Id
+            )  # 3  project belong to this group directly
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["actualBudget"], 100.0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50.0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0.00)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5.0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9.0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10.0)
+        self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0.00)
