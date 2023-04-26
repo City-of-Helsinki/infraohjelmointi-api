@@ -87,8 +87,9 @@ class FinancialCalculationSerializer(serializers.Serializer):
                 pd.DataFrame(
                     [{**f["finances"], "budget": f["costForecast"]} for f in instance]
                 )
-                .fillna(0.0)
+                .fillna(0.00)
                 .astype(float)
+                .astype(int)
             )
             if len(instance) > 0
             else pd.DataFrame(
@@ -97,18 +98,18 @@ class FinancialCalculationSerializer(serializers.Serializer):
                         "year": kwargs["context"].get(
                             "finance_year", date.today().year
                         ),
-                        "budget": 0.0,
-                        "budgetProposalCurrentYearPlus0": 0.0,
-                        "budgetProposalCurrentYearPlus1": 0.0,
-                        "budgetProposalCurrentYearPlus2": 0.0,
-                        "preliminaryCurrentYearPlus3": 0.0,
-                        "preliminaryCurrentYearPlus4": 0.0,
-                        "preliminaryCurrentYearPlus5": 0.0,
-                        "preliminaryCurrentYearPlus6": 0.0,
-                        "preliminaryCurrentYearPlus7": 0.0,
-                        "preliminaryCurrentYearPlus8": 0.0,
-                        "preliminaryCurrentYearPlus9": 0.0,
-                        "preliminaryCurrentYearPlus10": 0.0,
+                        "budget": 0,
+                        "budgetProposalCurrentYearPlus0": 0,
+                        "budgetProposalCurrentYearPlus1": 0,
+                        "budgetProposalCurrentYearPlus2": 0,
+                        "preliminaryCurrentYearPlus3": 0,
+                        "preliminaryCurrentYearPlus4": 0,
+                        "preliminaryCurrentYearPlus5": 0,
+                        "preliminaryCurrentYearPlus6": 0,
+                        "preliminaryCurrentYearPlus7": 0,
+                        "preliminaryCurrentYearPlus8": 0,
+                        "preliminaryCurrentYearPlus9": 0,
+                        "preliminaryCurrentYearPlus10": 0,
                     }
                 ]
             )
