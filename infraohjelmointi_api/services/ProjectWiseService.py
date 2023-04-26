@@ -93,9 +93,7 @@ class ProjectWiseService:
             logger.info(
                 f"Project {project.id} with successully synchronized with PW in {handling_time}s"
             )
-        except PWProjectNotFoundError as e:
-            logger.error(e)
-        except PWProjectResponseError as e:
+        except (PWProjectNotFoundError, PWProjectResponseError) as e:
             logger.error(e)
 
     def get_project_from_pw(self, id: str):
