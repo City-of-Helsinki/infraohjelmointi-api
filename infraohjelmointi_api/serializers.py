@@ -80,10 +80,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def get_finance_sums(self, instance):
         _type = instance._meta.model.__name__
-        year = self.context.get("finance_year", date.today().year)
+        year = int(self.context.get("finance_year", date.today().year))
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         # TODO change dictionary format to return
-        # add this for better performance .prefetch_related('finances')
         summedFinances = relatedProjects.aggregate(
             year0_plannedBudget=Sum("costForecast", default=0),
             year0_frameBudget=Sum(
@@ -185,12 +184,16 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             return Project.objects.filter(
                 projectLocation__path__startswith=instance.path,
                 projectLocation__parent__isnull=True,
-            )
+            ).select_related("finances")
         if _type == "ProjectClass":
-            return Project.objects.filter(projectClass__path__startswith=instance.path)
+            return Project.objects.filter(
+                projectClass__path__startswith=instance.path
+            ).select_related("finances")
 
         if _type == "ProjectGroup":
-            return Project.objects.filter(projectGroup=instance)
+            return Project.objects.filter(projectGroup=instance).select_related(
+                "finances"
+            )
 
         return []
 
