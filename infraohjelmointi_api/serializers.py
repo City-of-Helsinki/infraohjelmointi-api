@@ -82,7 +82,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
-        # TODO change dictionary format to return
         summedFinances = relatedProjects.aggregate(
             year0_plannedBudget=Sum("costForecast", default=0),
             year0_frameBudget=Sum(
@@ -140,6 +139,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 default=0,
                 filter=Q(finances__year=year),
             ),
+            budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
         summedFinances["year"] = year
         summedFinances["year0"] = {
