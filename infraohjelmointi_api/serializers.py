@@ -566,9 +566,10 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
             year = date.today().year
         spentBudget = ProjectFinancial.objects.filter(
             project=project, year__lt=year
-        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0"))["spent_budget"]
-        if spentBudget is None:
-            return 0
+        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
+            "spent_budget"
+        ]
+
         return int(spentBudget)
 
     def get_pw_folder_link(self, project: Project):
