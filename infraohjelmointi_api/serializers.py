@@ -134,39 +134,39 @@ class FinancialCalculationSerializer(serializers.Serializer):
 
     def get_year0(self, obj: pd.DataFrame):
         return {
-            "actualBudget": obj["budget"].sum(),
-            "plannedBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
+            "plannedBudget": obj["budget"].sum(),
+            "frameBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
         }
 
     def get_year1(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
+        return {"frameBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
 
     def get_year2(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
+        return {"frameBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
 
     def get_year3(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus3"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus3"].sum()}
 
     def get_year4(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus4"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus4"].sum()}
 
     def get_year5(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus5"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus5"].sum()}
 
     def get_year6(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus6"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus6"].sum()}
 
     def get_year7(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus7"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus7"].sum()}
 
     def get_year8(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus8"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus8"].sum()}
 
     def get_year9(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus9"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus9"].sum()}
 
     def get_year10(self, obj: pd.DataFrame):
-        return {"plannedBudget": obj["preliminaryCurrentYearPlus10"].sum()}
+        return {"frameBudget": obj["preliminaryCurrentYearPlus10"].sum()}
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -177,6 +177,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = self.context.get("finance_year", date.today().year)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         # TODO change dictionary format to return
+        # add this for better performance .prefetch_related('finances')
         summedFinances = relatedProjects.aggregate(
             year0_actualBudget=Sum("costForecast"),
             year0_plannedBudget=Sum(
