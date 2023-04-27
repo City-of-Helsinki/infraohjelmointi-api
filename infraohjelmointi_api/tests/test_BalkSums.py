@@ -208,7 +208,7 @@ class BalkSumTestCase(TestCase):
             projectClass=masterClass_2,
             costForecast=100,
         )
-        projectFinances_1 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_1,
             budgetProposalCurrentYearPlus0=10,
             budgetProposalCurrentYearPlus1=50,
@@ -222,7 +222,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=0,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_2 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_2,
             budgetProposalCurrentYearPlus0=50,
             budgetProposalCurrentYearPlus1=50,
@@ -237,7 +237,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus10=0,
         )
 
-        projectFinances_3 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_3,
             budgetProposalCurrentYearPlus0=100,
             budgetProposalCurrentYearPlus1=50,
@@ -251,7 +251,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=10,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_4 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_4,
             budgetProposalCurrentYearPlus0=0,
             budgetProposalCurrentYearPlus1=0,
@@ -265,7 +265,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=10,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_5 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_5,
             budgetProposalCurrentYearPlus0=100,
             budgetProposalCurrentYearPlus1=50,
@@ -279,7 +279,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=10,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_6 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_6,
             budgetProposalCurrentYearPlus0=200,
             budgetProposalCurrentYearPlus1=50,
@@ -293,7 +293,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=10,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_7 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_7,
             budgetProposalCurrentYearPlus0=100,
             budgetProposalCurrentYearPlus1=50,
@@ -307,7 +307,7 @@ class BalkSumTestCase(TestCase):
             preliminaryCurrentYearPlus9=10,
             preliminaryCurrentYearPlus10=0,
         )
-        projectFinances_8 = ProjectFinancial.objects.create(
+        ProjectFinancial.objects.create(
             project=project_8,
             budgetProposalCurrentYearPlus0=0,
             budgetProposalCurrentYearPlus1=0,
@@ -386,7 +386,7 @@ class BalkSumTestCase(TestCase):
         response = self.client.get(
             "/project-classes/{}/".format(
                 self.projectSubClass_1_Id
-            )  # 3 project belong to this masterClass
+            )  # 1 project belong to this masterClass
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
