@@ -75,100 +75,6 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
                 self.fields.pop(field_name)
 
 
-class FinancialCalculationSerializer(serializers.Serializer):
-    @override
-    def __init__(self, instance: list[Project], **kwargs):
-        """
-        Takes in a list of Projects with Financial data and returns back calculated sums for financial data
-        """
-        super().__init__(**kwargs)
-
-        self.instance = (
-            (
-                pd.DataFrame(
-                    [{**f["finances"], "budget": f["costForecast"]} for f in instance]
-                )
-                .fillna(0.00)
-                .astype(float)
-                .astype(int)
-            )
-            if len(instance) > 0
-            else pd.DataFrame(
-                [
-                    {
-                        "year": kwargs["context"].get(
-                            "finance_year", date.today().year
-                        ),
-                        "budget": 0,
-                        "budgetProposalCurrentYearPlus0": 0,
-                        "budgetProposalCurrentYearPlus1": 0,
-                        "budgetProposalCurrentYearPlus2": 0,
-                        "preliminaryCurrentYearPlus3": 0,
-                        "preliminaryCurrentYearPlus4": 0,
-                        "preliminaryCurrentYearPlus5": 0,
-                        "preliminaryCurrentYearPlus6": 0,
-                        "preliminaryCurrentYearPlus7": 0,
-                        "preliminaryCurrentYearPlus8": 0,
-                        "preliminaryCurrentYearPlus9": 0,
-                        "preliminaryCurrentYearPlus10": 0,
-                    }
-                ]
-            )
-        )
-
-    year = serializers.SerializerMethodField()
-    year0 = serializers.SerializerMethodField()
-    year1 = serializers.SerializerMethodField()
-    year2 = serializers.SerializerMethodField()
-    year3 = serializers.SerializerMethodField()
-    year4 = serializers.SerializerMethodField()
-    year5 = serializers.SerializerMethodField()
-    year6 = serializers.SerializerMethodField()
-    year7 = serializers.SerializerMethodField()
-    year8 = serializers.SerializerMethodField()
-    year9 = serializers.SerializerMethodField()
-    year10 = serializers.SerializerMethodField()
-
-    def get_year(self, obj: pd.DataFrame):
-        return int(obj["year"][0])
-
-    def get_year0(self, obj: pd.DataFrame):
-        return {
-            "plannedBudget": obj["budget"].sum(),
-            "frameBudget": obj["budgetProposalCurrentYearPlus0"].sum(),
-        }
-
-    def get_year1(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["budgetProposalCurrentYearPlus1"].sum()}
-
-    def get_year2(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["budgetProposalCurrentYearPlus2"].sum()}
-
-    def get_year3(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus3"].sum()}
-
-    def get_year4(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus4"].sum()}
-
-    def get_year5(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus5"].sum()}
-
-    def get_year6(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus6"].sum()}
-
-    def get_year7(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus7"].sum()}
-
-    def get_year8(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus8"].sum()}
-
-    def get_year9(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus9"].sum()}
-
-    def get_year10(self, obj: pd.DataFrame):
-        return {"frameBudget": obj["preliminaryCurrentYearPlus10"].sum()}
-
-
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
@@ -179,74 +85,100 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         # TODO change dictionary format to return
         # add this for better performance .prefetch_related('finances')
         summedFinances = relatedProjects.aggregate(
-            year0_actualBudget=Sum("costForecast"),
-            year0_plannedBudget=Sum(
+            year0_plannedBudget=Sum("costForecast", default=0),
+            year0_frameBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus0",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year1=Sum(
+            year1_frameBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus1",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year2=Sum(
+            year2_frameBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus2",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year3=Sum(
+            year3_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus3",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year4=Sum(
+            year4_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus4",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year5=Sum(
+            year5_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus5",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year6=Sum(
+            year6_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus6",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year7=Sum(
+            year7_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus7",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year8=Sum(
+            year8_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus8",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year9=Sum(
+            year9_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus9",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year10=Sum(
+            year10_frameBudget=Sum(
                 "finances__preliminaryCurrentYearPlus10",
                 default=0,
                 filter=Q(finances__year=year),
             ),
         )
+        summedFinances["year"] = year
+        summedFinances["year0"] = {
+            "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
+            "frameBudget": int(summedFinances.pop("year0_frameBudget")),
+        }
+        summedFinances["year1"] = {
+            "frameBudget": int(summedFinances.pop("year1_frameBudget"))
+        }
+        summedFinances["year2"] = {
+            "frameBudget": int(summedFinances.pop("year2_frameBudget"))
+        }
+        summedFinances["year3"] = {
+            "frameBudget": int(summedFinances.pop("year3_frameBudget"))
+        }
+        summedFinances["year4"] = {
+            "frameBudget": int(summedFinances.pop("year4_frameBudget"))
+        }
+        summedFinances["year5"] = {
+            "frameBudget": int(summedFinances.pop("year5_frameBudget"))
+        }
+        summedFinances["year6"] = {
+            "frameBudget": int(summedFinances.pop("year6_frameBudget"))
+        }
+        summedFinances["year7"] = {
+            "frameBudget": int(summedFinances.pop("year7_frameBudget"))
+        }
+        summedFinances["year8"] = {
+            "frameBudget": int(summedFinances.pop("year8_frameBudget"))
+        }
+        summedFinances["year9"] = {
+            "frameBudget": int(summedFinances.pop("year9_frameBudget"))
+        }
+        summedFinances["year10"] = {
+            "frameBudget": int(summedFinances.pop("year10_frameBudget"))
+        }
 
-        allFinancials = ProjectWithFinancesSerializer(
-            relatedProjects,
-            many=True,
-            context={"finance_year": year},
-        ).data
-        response = FinancialCalculationSerializer(
-            allFinancials, context={"finance_year": year}
-        ).data
-
-        return response
+        return summedFinances
 
     def get_related_projects(self, instance, _type) -> list[Project]:
         if _type == "ProjectLocation":
