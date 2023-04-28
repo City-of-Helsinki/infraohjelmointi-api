@@ -50,29 +50,28 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--sync-projects-with-pw",
+            "--sync-projects-from-pw",
             action="store_true",
             help=(
                 "Argument to give to synchronize all projects in DB which have PW id. "
-                + "Usage: --sync-projects-with-pw"
+                + "Usage: --sync-projects-from-pw"
             ),
         )
 
         parser.add_argument(
-            "--sync-project-with-pw",
+            "--sync-project-from-pw",
             type=str,
             help=(
                 "Argument to give to synchronize given project PW id. "
-                + "Usage: --sync-project-with-pw pw_id"
+                + "Usage: --sync-project-from-pw pw_id"
             ),
             default="",
         )
 
     def handle(self, *args, **options):
-
         if (
-            not options["sync_projects_with_pw"]
-            and not options["sync_project_with_pw"]
+            not options["sync_projects_from_pw"]
+            and not options["sync_project_from_pw"]
             and not options["import_from_budget"]
             and not options["import_from_plan"]
         ):
@@ -82,18 +81,18 @@ class Command(BaseCommand):
                     + "\nUsage: python manage.py projectimporter\n"
                     + " --import-from-budget /path/to/budget.xsls\n"
                     + " --import-from-plan /path/to/plan.xsls\n"
-                    + " [--sync-projects-with-pw]\n"
-                    + " [--sync-project-with-pw pwid]\n"
+                    + " [--sync-projects-from-pw]\n"
+                    + " [--sync-project-from-pw pwid]\n"
                 )
             )
             return
 
-        if options["sync_projects_with_pw"] == True:
+        if options["sync_projects_from_pw"] == True:
             ProjectWiseService().sync_all_projects_from_pw()
             return
 
-        if options["sync_project_with_pw"] != "":
-            ProjectWiseService().syn_project_from_pw(options["sync_project_with_pw"])
+        if options["sync_project_from_pw"] != "":
+            ProjectWiseService().syn_project_from_pw(options["sync_project_from_pw"])
             return
 
         if options["import_from_budget"] != "":
