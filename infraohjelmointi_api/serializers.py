@@ -595,7 +595,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             "projectLocation" in self.get_initial()
             and self.get_initial().get("projectLocation") is None
         ):
-            return
+            return projectClass
+
         projectLocation = (
             ProjectLocation.objects.get(id=self.get_initial().get("projectLocation"))
             if self.get_initial().get("projectLocation", None) is not None
