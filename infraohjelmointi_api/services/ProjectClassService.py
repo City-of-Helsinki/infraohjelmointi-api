@@ -27,3 +27,8 @@ class ProjectClassService:
     def list_all_for_coordinator() -> list[ProjectClass]:
         """List all project classes for coordinator view"""
         return ProjectClass.objects.all().filter(forCoordinatorOnly=True)
+
+    @staticmethod
+    def get_by_id(id: str) -> ProjectClass:
+        """Get project class by id"""
+        return ProjectClass.objects.get(id=id)

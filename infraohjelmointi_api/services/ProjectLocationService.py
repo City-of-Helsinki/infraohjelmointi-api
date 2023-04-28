@@ -36,3 +36,8 @@ class ProjectLocationService:
         return list(
             ProjectLocation.objects.all().filter(path=path, forCoordinatorOnly=False)
         )
+
+    @staticmethod
+    def get_by_id(id: str) -> ProjectLocation:
+        """Get project location by id"""
+        return ProjectLocation.objects.get(id=id)
