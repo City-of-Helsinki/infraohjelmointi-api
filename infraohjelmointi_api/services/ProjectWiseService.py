@@ -106,6 +106,8 @@ class ProjectWiseService:
 
     def sync_project_to_pw(self, data: dict, project: Project) -> None:
         """Method to synchronise given product field value to PW"""
+        if project.hkrId is None or str(project.hkrId).strip() == "":
+            return
         try:
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
                 data=data, project=project
@@ -139,7 +141,11 @@ class ProjectWiseService:
             response = self.session.post(url=api_url, json=pw_update_data)
             logger.debug("PW responded to Update request")
             logger.debug(response.json())
-        except (ProjectWiseDataFieldNotFound,) as e:
+        except (
+            ProjectWiseDataFieldNotFound,
+            PWProjectResponseError,
+            PWProjectNotFoundError,
+        ) as e:
             logger.error(
                 f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
             )
