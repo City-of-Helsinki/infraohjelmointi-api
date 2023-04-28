@@ -12,7 +12,7 @@ class Command(BaseCommand):
     help = (
         "Populates the DB with correct project class and location hierarchies. "
         + "\nUsage: python manage.py hierarchies --file <path/to/excel.xlsx>"
-        + "\n--sync-locations-with-pw"
+        + "\n--sync-locations-from-pw"
     )
 
     def add_arguments(self, parser):
@@ -20,7 +20,7 @@ class Command(BaseCommand):
         Add the following arguments to the hierarchies command
 
         --file /folder/folder/file.xlsx
-        --sync-locations-with-pw
+        --sync-locations-from-pw
         """
 
         ## --file, used to tell the script to populate local db with
@@ -34,29 +34,29 @@ class Command(BaseCommand):
             ),
             default="",
         )
-        ## --sync-locations-with-pw, used to tell the script to populate local db with
+        ## --sync-locations-from-pw, used to tell the script to populate local db with
         ## location data from PW
 
         parser.add_argument(
-            "--sync-locations-with-pw",
+            "--sync-locations-from-pw",
             action="store_true",
             help=(
                 "Argument to give to synchronize all locations from PW into DB. "
-                + "Usage: --sync-locations-with-pw"
+                + "Usage: --sync-locations-from-pw"
             ),
         )
 
     def handle(self, *args, **options):
-        if not options["file"] and not options["sync_locations_with_pw"]:
+        if not options["file"] and not options["sync_locations_from_pw"]:
             self.stdout.write(
                 self.style.ERROR(
                     "No arguments given. "
                     + "\nUsage: python manage.py hierarchies --file <path/to/excel.xlsx>"
-                    + "\n --sync-locations-with-pw"
+                    + "\n --sync-locations-from-pw"
                 )
             )
             return
-        if options["sync_locations_with_pw"]:
+        if options["sync_locations_from_pw"]:
             ProjectWiseService().fetch_locations()
             return
 
