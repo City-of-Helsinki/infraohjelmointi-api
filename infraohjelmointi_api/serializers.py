@@ -83,98 +83,111 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = int(self.context.get("finance_year", date.today().year))
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         summedFinances = relatedProjects.aggregate(
-            year0_plannedBudget=Sum("costForecast", default=0),
-            year0_frameBudget=Sum(
+            year0_plannedBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus0",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year1_frameBudget=Sum(
+            year1_plannedBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus1",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year2_frameBudget=Sum(
+            year2_plannedBudget=Sum(
                 "finances__budgetProposalCurrentYearPlus2",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year3_frameBudget=Sum(
+            year3_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus3",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year4_frameBudget=Sum(
+            year4_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus4",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year5_frameBudget=Sum(
+            year5_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus5",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year6_frameBudget=Sum(
+            year6_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus6",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year7_frameBudget=Sum(
+            year7_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus7",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year8_frameBudget=Sum(
+            year8_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus8",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year9_frameBudget=Sum(
+            year9_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus9",
                 default=0,
                 filter=Q(finances__year=year),
             ),
-            year10_frameBudget=Sum(
+            year10_plannedBudget=Sum(
                 "finances__preliminaryCurrentYearPlus10",
                 default=0,
                 filter=Q(finances__year=year),
             ),
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
+        if _type == "ProjectGroup":
+            summedFinances["projectBudgets"] = relatedProjects.aggregate(
+                projectBudgets=Sum("costForecast", default=0)
+            )["projectBudgets"]
         summedFinances["year"] = year
         summedFinances["year0"] = {
+            "frameBudget": 0,
             "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
-            "frameBudget": int(summedFinances.pop("year0_frameBudget")),
         }
         summedFinances["year1"] = {
-            "frameBudget": int(summedFinances.pop("year1_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
         }
         summedFinances["year2"] = {
-            "frameBudget": int(summedFinances.pop("year2_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
         }
         summedFinances["year3"] = {
-            "frameBudget": int(summedFinances.pop("year3_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
         }
         summedFinances["year4"] = {
-            "frameBudget": int(summedFinances.pop("year4_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
         }
         summedFinances["year5"] = {
-            "frameBudget": int(summedFinances.pop("year5_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
         }
         summedFinances["year6"] = {
-            "frameBudget": int(summedFinances.pop("year6_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
         }
         summedFinances["year7"] = {
-            "frameBudget": int(summedFinances.pop("year7_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
         }
         summedFinances["year8"] = {
-            "frameBudget": int(summedFinances.pop("year8_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
         }
         summedFinances["year9"] = {
-            "frameBudget": int(summedFinances.pop("year9_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
         }
         summedFinances["year10"] = {
-            "frameBudget": int(summedFinances.pop("year10_frameBudget"))
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
         }
 
         return summedFinances
