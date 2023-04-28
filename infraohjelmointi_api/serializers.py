@@ -181,10 +181,13 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def get_related_projects(self, instance, _type) -> list[Project]:
         if _type == "ProjectLocation":
-            return Project.objects.filter(
-                projectLocation__path__startswith=instance.path,
-                projectLocation__parent__isnull=True,
-            ).prefetch_related("finances")
+            if instance.parent is None:
+                return Project.objects.filter(
+                    Q(projectLocation=instance)
+                    | Q(projectLocation__parent=instance)
+                    | Q(projectLocation__parent__parent=instance)
+                ).prefetch_related("finances")
+            return Project.objects.none()
         if _type == "ProjectClass":
             return Project.objects.filter(
                 projectClass__path__startswith=instance.path
@@ -195,7 +198,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 "finances"
             )
 
-        return []
+        return Project.objects.none()
 
 
 class ProjectFinancialSerializer(serializers.ModelSerializer):

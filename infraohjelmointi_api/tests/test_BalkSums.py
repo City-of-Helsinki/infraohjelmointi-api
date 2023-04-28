@@ -427,20 +427,20 @@ class BalkSumTestCase(TestCase):
         response = self.client.get(
             "/project-locations/{}/".format(
                 self.projectDistrict_1_Id
-            )  # 1  project belong to this district directly
+            )  # 1, 2, 4  project belong to this district directly or indirectly
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 200)
-        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 10)
-        self.assertEqual(response.json()["finances"]["year1"]["frameBudget"], 50)
-        self.assertEqual(response.json()["finances"]["year2"]["frameBudget"], 50)
-        self.assertEqual(response.json()["finances"]["year3"]["frameBudget"], 10)
-        self.assertEqual(response.json()["finances"]["year4"]["frameBudget"], 5)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 600)
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 60)
+        self.assertEqual(response.json()["finances"]["year1"]["frameBudget"], 100)
+        self.assertEqual(response.json()["finances"]["year2"]["frameBudget"], 150)
+        self.assertEqual(response.json()["finances"]["year3"]["frameBudget"], 30)
+        self.assertEqual(response.json()["finances"]["year4"]["frameBudget"], 15)
         self.assertEqual(response.json()["finances"]["year5"]["frameBudget"], 0)
         self.assertEqual(response.json()["finances"]["year6"]["frameBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year7"]["frameBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year8"]["frameBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year9"]["frameBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year7"]["frameBudget"], 10)
+        self.assertEqual(response.json()["finances"]["year8"]["frameBudget"], 18)
+        self.assertEqual(response.json()["finances"]["year9"]["frameBudget"], 20)
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(

@@ -97,7 +97,9 @@ router.register(
     views.ProjectFinancialViewSet,
     basename="projectFinancials",
 )
+
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/", admin.site.urls),
+    path("stream", views.StreamView.as_view(), name="streamView"),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

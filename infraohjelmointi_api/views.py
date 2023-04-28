@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import date
 from infraohjelmointi_api.models import (
@@ -8,6 +9,7 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
 )
 from rest_framework.exceptions import APIException, ParseError, ValidationError
+from django.dispatch import receiver
 import django_filters
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
@@ -15,6 +17,8 @@ from distutils.util import strtobool
 import datetime
 from rest_framework.pagination import PageNumberPagination
 from itertools import chain
+from django.http.response import StreamingHttpResponse
+from django.db.models.signals import post_save
 from rest_framework import viewsets
 from .serializers import (
     NoteCreateSerializer,
@@ -1156,3 +1160,21 @@ class NoteViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+
+def stream_data():
+    while True:
+        time.sleep(1)
+        yield "Signal"
+
+
+class StreamView(APIView):
+    def get(self, request, format=None):
+        """
+        Return a stream response on signal change
+        """
+        stream_generator = stream_data()
+        response = StreamingHttpResponse(
+            stream_generator, status=200, content_type="text/event-stream"
+        )
+        return response
