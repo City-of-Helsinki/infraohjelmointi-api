@@ -17,7 +17,8 @@ import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+# asyncronous application for django event stream
+ASGI_APPLICATION = "project.asgi.application"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
@@ -62,6 +63,8 @@ INSTALLED_APPS = [
     "infraohjelmointi_api",
     "django_filters",
     "drf_standardized_errors",
+    "channels",
+    "django_eventstream",
 ]
 
 MIDDLEWARE = [
@@ -76,6 +79,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_grip.GripMiddleware",
 ]
 
 ROOT_URLCONF = "project.urls"

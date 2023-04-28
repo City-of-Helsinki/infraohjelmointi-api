@@ -1,7 +1,6 @@
 from datetime import datetime
 from os import path
 import environ
-import pandas as pd
 from infraohjelmointi_api.services import ProjectFinancialService
 from .models import (
     ProjectType,
