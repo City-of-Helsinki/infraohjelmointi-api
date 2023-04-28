@@ -5,6 +5,8 @@ import re
 import logging
 import time
 
+from datetime import datetime
+
 logger = logging.getLogger("infraohjelmointi_api")
 
 from ..models import (
@@ -13,14 +15,10 @@ from ..models import (
 )
 
 from .PersonService import PersonService
-from .ProjectTypeService import ProjectTypeService
 from .ProjectService import ProjectService
-from .ProjectPhaseService import ProjectPhaseService
-from .ProjectAreaService import ProjectAreaService
-from .ResponsibleZoneService import ResponsibleZoneService
-from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from .ProjectLocationService import ProjectLocationService
 
+from .utils import ProjectWiseDataMapper, ProjectWiseDataFieldNotFound
 
 env = environ.Env()
 env.escape_proxy = True
@@ -41,14 +39,24 @@ class ProjectWiseService:
         self.pw_api_location_endpoint = env("PW_API_LOCATION_ENDPOINT")
         self.pw_api_project_metadata_endpoint = env("PW_API_PROJECT_META_ENDPOINT")
 
+        self.pw_api_project_update_endpoint = env("PW_PROJECT_UPDATE_ENDPOINT")
+
+        self.project_wise_data_mapper = ProjectWiseDataMapper()
+
         # preload data from DB to optimize performance
-        self.project_phases = self.__load_and_transform_phases()
-        self.project_areas = self.__load_and_transform_project_areas()
-        self.responsible_zones = self.__load_and_transform_responsible_zones()
-        self.construction_phase_details = (
-            self.__load_and_transform_construction_phase_details()
+        self.project_phases = self.project_wise_data_mapper.load_and_transform_phases()
+        self.project_areas = (
+            self.project_wise_data_mapper.load_and_transform_project_areas()
         )
-        self.project_types = self.__load_and_transform_project_types()
+        self.responsible_zones = (
+            self.project_wise_data_mapper.load_and_transform_responsible_zones()
+        )
+        self.construction_phase_details = (
+            self.project_wise_data_mapper.load_and_transform_construction_phase_details()
+        )
+        self.project_types = (
+            self.project_wise_data_mapper.load_and_transform_project_types()
+        )
 
     def sync_all_projects_from_pw(self) -> None:
         """Method to synchronise all projects in DB with PW project data.\n"""
@@ -72,12 +80,12 @@ class ProjectWiseService:
         self.sync_project_from_pw(ProjectService.get_by_hkr_id(hkr_id=pw_id))
 
     def sync_project_from_pw(self, project: Project) -> None:
-        """Method to synchronise given project with PW project data.\n
+        """Method to synchronise given project from PW project data.\n
         Given project must have hkrId otherwise project will not be syncrhonized.
         """
 
         logger.debug(
-            f"Synchronizing given project '{project.id}' with PW Id '{project.hkrId}' with PW"
+            f"Synchronizing given project '{project.id}' with PW Id '{project.hkrId}' from PW"
         )
         if not project.hkrId:
             return
@@ -91,10 +99,50 @@ class ProjectWiseService:
 
             handling_time = time.perf_counter() - start_time
             logger.info(
-                f"Project {project.id} with successully synchronized with PW in {handling_time}s"
+                f"Project {project.id} with successully synchronized from PW in {handling_time}s"
             )
         except (PWProjectNotFoundError, PWProjectResponseError) as e:
             logger.error(e)
+
+    def sync_project_to_pw(self, data: dict, project: Project) -> None:
+        """Method to synchronise given product field value to PW"""
+        try:
+            pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
+                data=data, project=project
+            )
+
+            pw_instance_id = self.get_project_from_pw(project.hkrId)[
+                "relationshipInstances"
+            ][0]["relatedInstance"]["instanceId"]
+
+            (
+                schema_name,
+                class_name,
+                *others,
+            ) = self.pw_api_project_update_endpoint.split("/")
+
+            pw_update_data = {
+                "instance": {
+                    "schemaName": schema_name,
+                    "className": class_name,
+                    "instanceId": pw_instance_id,
+                    "changeState": "modified",
+                    "properties": pw_project_data,
+                }
+            }
+
+            api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
+
+            logger.debug(f"PW update endpoint {api_url}")
+            logger.debug(f"Update request data: {pw_update_data}")
+
+            response = self.session.post(url=api_url, json=pw_update_data)
+            logger.debug("PW responded to Update request")
+            logger.debug(response.json())
+        except (ProjectWiseDataFieldNotFound,) as e:
+            logger.error(
+                f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
+            )
 
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
@@ -265,6 +313,54 @@ class ProjectWiseService:
                 "PROJECT_Louhi__hankkeen_valmistumisvuosi"
             ]
 
+        if "PROJECT_Hankkeen_rakentaminen_alkaa" in project_properties:
+            project.estConstructionStart = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_rakentaminen_alkaa"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Hankkeen_rakentaminen_pttyy" in project_properties:
+            project.estConstructionEnd = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_rakentaminen_pttyy"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Nhtvillolo_alku" in project_properties:
+            project.visibilityStart = datetime.strptime(
+                project_properties["PROJECT_Nhtvillolo_alku"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Nhtvillolo_loppu" in project_properties:
+            project.visibilityEnd = datetime.strptime(
+                project_properties["PROJECT_Nhtvillolo_loppu"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Esillaolo_alku" in project_properties:
+            project.presenceStart = datetime.strptime(
+                project_properties["PROJECT_Esillaolo_alku"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Esillaolo_loppu" in project_properties:
+            project.presenceEnd = datetime.strptime(
+                project_properties["PROJECT_Esillaolo_loppu"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Hankkeen_suunnittelu_alkaa" in project_properties:
+            project.estPlanningStart = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_suunnittelu_alkaa"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
+        if "PROJECT_Hankkeen_suunnittelu_pttyy" in project_properties:
+            project.estPlanningEnd = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_suunnittelu_pttyy"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
+
         if not project.personPlanning:
             planning_person_data = "{}, {}, {}, {}".format(
                 project_properties["PROJECT_Vastuuhenkil"],
@@ -293,81 +389,6 @@ class ProjectWiseService:
             )
 
         project.save()
-
-    def __load_and_transform_phases(self):
-        """Helper method to load phases from DB and transform to match PW format"""
-
-        phase_map = {
-            "proposal": "1. Hanke-ehdotus",
-            "design": "1.5 Yleissuunnittelu",
-            "programming": "2. Ohjelmointi",
-            "draftInitiation": "3. Suunnittelun aloitus / Suunnitelmaluonnos",
-            "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
-            "constructionPlan": "5. Rakennussuunnitelma",
-            "constructionWait": "6. Odottaa rakentamista",
-            "construction": "7. Rakentaminen",
-            "warrantyPeriod": "8. Takuuaika",
-            "completed": "9. Valmis / ylläpidossa",
-        }
-        return {phase_map[pph.value]: pph for pph in ProjectPhaseService.list_all()}
-
-    def __load_and_transform_project_areas(self):
-        """Helper method to load project areas from DB and transform to match PW format"""
-
-        pa_map = {
-            "honkasuo": "Honkasuo",
-            "kalasatama": "Kalasatama",
-            "kruunuvuorenranta": "Kruunuvuorenranta",
-            "kuninkaantammi": "Kuninkaantammi",
-            "lansisatama": "Länsisatama",
-            "malminLentokenttaalue": "Malmin lentokenttäalue",
-            "pasila": "Pasila",
-            "ostersundom": "Östersundom",
-        }
-
-        return {pa_map[pa.value]: pa for pa in ProjectAreaService.list_all()}
-
-    def __load_and_transform_responsible_zones(self):
-        """Helper method to load responsible zones from DB and transform to match PW format"""
-
-        rz_map = {
-            "east": "Itä",
-            "west": "Länsi",
-            "north": "Pohjoinen",
-        }
-
-        return {rz_map[rz.value]: rz for rz in ResponsibleZoneService.list_all()}
-
-    def __load_and_transform_project_types(self):
-        """Helper method to load project types from DB and transform to match PW format"""
-
-        pt_map = {
-            "projectComplex": "hankekokonaisuus",
-            "street": "katu",
-            "cityRenewal": "kaupunkiuudistus",
-            "traffic": "liikenne",
-            "sports": "liikunta",
-            "omaStadi": "OmaStadi-hanke",
-            "projectArea": "projektialue",
-            "park": "puisto",
-            "bigTrafficProjects": "suuret liikennehankeet",
-            "spesialtyStructures": "taitorakenne",
-        }
-        return {pt_map[pt.value]: pt for pt in ProjectTypeService.list_all()}
-
-    def __load_and_transform_construction_phase_details(self):
-        """Helper method to load construction phase details from DB and transform to match PW format"""
-
-        pd_map = {
-            "preConstruction": "1. Esirakentaminen",
-            "firstPhase": "2. Ensimmäinen vaihe",
-            "firstPhaseComplete": "3. Ensimmäinen vaihe valmis",
-            "secondPhase": "4. Toinen vaihe / viimeistely",
-        }
-
-        return {
-            pd_map[pd.value]: pd for pd in ConstructionPhaseDetailService.list_all()
-        }
 
     def __get_project_person(self, person_data: str) -> Person:
         """Helper method to load person from DB with PW data"""

@@ -50,7 +50,7 @@ from .serializers import (
     ProjectFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
-from .services import ProjectClassService, ProjectLocationService
+from .services import ProjectClassService, ProjectLocationService, ProjectWiseService
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -255,6 +255,10 @@ class ProjectViewSet(BaseViewSet):
     API endpoint that allows projects to be viewed or edited.
     """
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.projectWiseService = ProjectWiseService()
+
     permission_classes = []
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend]
@@ -287,7 +291,10 @@ class ProjectViewSet(BaseViewSet):
             },
         )
         projectSerializer.is_valid(raise_exception=True)
-        projectSerializer.save()
+        updated_project = projectSerializer.save()
+        self.projectWiseService.sync_project_to_pw(
+            data=request.data, project=updated_project
+        )
         return Response(projectSerializer.data)
 
     @override
@@ -649,7 +656,7 @@ class ProjectViewSet(BaseViewSet):
                 # Building an order by query which makes sure the order is preserved when filtering using __in clause
                 preserved = Case(
                     *[When(id=val, then=pos) for pos, val in enumerate(projectIds)],
-                    default=len(projectIds)
+                    default=len(projectIds),
                 )
                 qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
                 financesData = [
@@ -803,7 +810,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(prYearMin, prYearMax + 1, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -819,7 +826,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(prYearMin, currYear + 11, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -835,7 +842,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(currYear, prYearMax + 1, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -859,7 +866,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(currYear, currYear + 11, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -877,7 +884,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(prYearMin, currYear + 11, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -901,7 +908,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(currYear, currYear + 11, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
@@ -917,7 +924,7 @@ class ProjectViewSet(BaseViewSet):
                                 (yearToFieldMapping[year], 0)
                                 for year in range(currYear, prYearMax + 1, 1)
                             ],
-                            _connector=Q.OR
+                            _connector=Q.OR,
                         )
                         & Q(year=currYear)
                     )
