@@ -324,9 +324,7 @@ class BalkSumTestCase(TestCase):
 
     def test_GET_class_with_sums(self):
         response = self.client.get(
-            "/project-classes/{}/".format(
-                self.projectMasterClass_1_Id
-            )  # 1 2 3 5 6 7 projects belong to this masterClass directly or indirectly
+            "/project-classes/{}/".format(self.projectMasterClass_1_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
@@ -344,9 +342,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(
-            "/project-classes/{}/".format(
-                self.projectMasterClass_2_Id
-            )  # 4 & 8 project belong to this masterClass
+            "/project-classes/{}/".format(self.projectMasterClass_2_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
@@ -364,9 +360,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(
-            "/project-classes/{}/".format(
-                self.projectClass_1_Id
-            )  # 2 5 project belong to this masterClass
+            "/project-classes/{}/".format(self.projectClass_1_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
@@ -384,9 +378,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(
-            "/project-classes/{}/".format(
-                self.projectSubClass_1_Id
-            )  # 1 project belong to this masterClass
+            "/project-classes/{}/".format(self.projectSubClass_1_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
@@ -404,9 +396,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(
-            "/project-classes/{}/".format(
-                self.projectSubClass_2_Id
-            )  # 1,2,3,5 project belong to this masterClass
+            "/project-classes/{}/".format(self.projectSubClass_2_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
@@ -425,9 +415,7 @@ class BalkSumTestCase(TestCase):
 
     def test_GET_location_with_sums(self):
         response = self.client.get(
-            "/project-locations/{}/".format(
-                self.projectDistrict_1_Id
-            )  # 1, 2, 4  project belong to this district directly or indirectly
+            "/project-locations/{}/".format(self.projectDistrict_1_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 600)
@@ -444,9 +432,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
         response = self.client.get(
-            "/project-locations/{}/".format(
-                self.projectDistrict_2_Id
-            )  # 3  project belong to this district directly
+            "/project-locations/{}/".format(self.projectDistrict_2_Id)
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100)
@@ -463,11 +449,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
     def test_GET_group_with_sums(self):
-        response = self.client.get(
-            "/project-groups/{}/".format(
-                self.projectGroup_1_Id
-            )  # 1,2 5  project belong to this group directly
-        )
+        response = self.client.get("/project-groups/{}/".format(self.projectGroup_1_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 600)
         self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 160)
@@ -482,11 +464,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year9"]["frameBudget"], 20)
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
-        response = self.client.get(
-            "/project-groups/{}/".format(
-                self.projectGroup_2_Id
-            )  # 3  project belong to this group directly
-        )
+        response = self.client.get("/project-groups/{}/".format(self.projectGroup_2_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100)
         self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 100)
@@ -501,11 +479,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year9"]["frameBudget"], 10)
         self.assertEqual(response.json()["finances"]["year10"]["frameBudget"], 0)
 
-        response = self.client.get(
-            "/project-groups/{}/".format(
-                self.projectGroup_3_Id
-            )  # 3  project belong to this group directly
-        )
+        response = self.client.get("/project-groups/{}/".format(self.projectGroup_3_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100)
         self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 0)
