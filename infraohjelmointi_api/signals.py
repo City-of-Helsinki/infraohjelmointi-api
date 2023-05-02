@@ -8,40 +8,56 @@ from django_eventstream import send_event
 def get_notified(sender, instance, created, **kwargs):
     project = instance.project
     projectMasterClass = (
-        project.projectClass.id
-        if project.projectClass.parent is None
-        else project.projectClass.parent.id
-        if project.projectClass.parent.parent is None
-        and project.projectClass.parent is not None
-        else project.projectClass.parent.parent.id
-        if project.projectClass.parent.parent is not None
-        and project.projectClass.parent is not None
+        (
+            project.projectClass.id
+            if project.projectClass.parent is None
+            else project.projectClass.parent.id
+            if project.projectClass.parent.parent is None
+            and project.projectClass.parent is not None
+            else project.projectClass.parent.parent.id
+            if project.projectClass.parent.parent is not None
+            and project.projectClass.parent is not None
+            else None
+        )
+        if project.projectClass is not None
         else None
     )
     projectClass = (
-        project.projectClass.id
-        if project.projectClass.parent is not None
-        and project.projectClass.parent.parent is None
-        else project.projectClass.parent.id
-        if project.projectClass.parent is not None
-        and project.projectClass.parent.parent is not None
+        (
+            project.projectClass.id
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is None
+            else project.projectClass.parent.id
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is not None
+            else None
+        )
+        if project.projectClass is not None
         else None
     )
     projectSubClass = (
-        project.projectClass.id
-        if project.projectClass.parent is not None
-        and project.projectClass.parent.parent is not None
+        (
+            project.projectClass.id
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is not None
+            else None
+        )
+        if project.projectClass is not None
         else None
     )
     projectDistrict = (
-        project.projectLocation.id
-        if project.projectLocation.parent is None
-        else project.projectLocation.parent.id
-        if project.projectLocation.parent.parent is None
-        and project.projectLocation.parent is not None
-        else project.projectLocation.parent.parent.id
-        if project.projectLocation.parent.parent is not None
-        and project.projectLocation.parent is not None
+        (
+            project.projectLocation.id
+            if project.projectLocation.parent is None
+            else project.projectLocation.parent.id
+            if project.projectLocation.parent.parent is None
+            and project.projectLocation.parent is not None
+            else project.projectLocation.parent.parent.id
+            if project.projectLocation.parent.parent is not None
+            and project.projectLocation.parent is not None
+            else None
+        )
+        if project.projectLocation is not None
         else None
     )
 
