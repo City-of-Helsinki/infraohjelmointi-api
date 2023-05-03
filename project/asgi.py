@@ -13,7 +13,7 @@ application = ProtocolTypeRouter(
         "http": URLRouter(
             [
                 path(
-                    "finance-events/",
+                    "events/",
                     AuthMiddlewareStack(
                         URLRouter(django_eventstream.routing.urlpatterns)
                     ),
