@@ -17,7 +17,7 @@ application = ProtocolTypeRouter(
                     AuthMiddlewareStack(
                         URLRouter(django_eventstream.routing.urlpatterns)
                     ),
-                    {"channels": ["finance"]},
+                    {"channels": ["finance", "project"]},
                 ),
                 re_path(r"", get_asgi_application()),
             ]
