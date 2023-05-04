@@ -1,8 +1,14 @@
 from django.db.models.signals import post_save
 
-from infraohjelmointi_api.models import ProjectClass, ProjectGroup, ProjectLocation
+from infraohjelmointi_api.models import (
+    Project,
+    ProjectClass,
+    ProjectGroup,
+    ProjectLocation,
+)
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
+    ProjectGetSerializer,
     ProjectGroupSerializer,
     ProjectLocationSerializer,
 )
@@ -40,7 +46,7 @@ def get_sums(
 
 
 @receiver(post_save, sender=ProjectFinancial)
-def get_notified(sender, instance, created, **kwargs):
+def get_notified_project_financial(sender, instance, created, **kwargs):
     project = instance.project
 
     if created:
@@ -118,3 +124,18 @@ def get_notified(sender, instance, created, **kwargs):
             },
         )
         print("Signal Triggered: ProjectFinance Object was updated")
+
+
+@receiver(post_save, sender=Project)
+def get_notified_project(sender, instance, created, **kwargs):
+    if created:
+        print("Signal Triggered: Project was created")
+    else:
+        send_event(
+            "project",
+            "project-update",
+            {
+                "project": ProjectGetSerializer(instance).data,
+            },
+        )
+        print("Signal Triggered: Project was updated")
