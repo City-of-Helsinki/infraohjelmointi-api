@@ -30,7 +30,7 @@ def get_sums(
     if projectClass:
         sums["class"] = ProjectClassSerializer(projectClass).data
     if projectSubClass:
-        sums["class"] = ProjectClassSerializer(projectClass).data
+        sums["subClass"] = ProjectClassSerializer(projectSubClass).data
     if projectGroup:
         sums["group"] = ProjectGroupSerializer(projectGroup).data
     if projectDistrict:
