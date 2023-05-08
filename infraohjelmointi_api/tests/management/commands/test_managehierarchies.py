@@ -119,7 +119,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
         with self.assertRaises(PWProjectResponseError):
             call_command(
                 "hierarchies",
-                "--sync-locations-with-pw",
+                "--sync-locations-from-pw",
             )
 
     @mock.patch("requests.Session")
@@ -141,7 +141,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
 
         call_command(
             "hierarchies",
-            "--sync-locations-with-pw",
+            "--sync-locations-from-pw",
         )
         path = "District/Division/Sub Division"
         locations = ProjectLocationService.find_by_path(path)
@@ -174,7 +174,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
 
         call_command(
             "hierarchies",
-            "--sync-locations-with-pw",
+            "--sync-locations-from-pw",
         )
 
         path = "District/Division/"
@@ -205,7 +205,7 @@ class ManageHierarchiesCommandTestCase(TestCase):
 
         call_command(
             "hierarchies",
-            "--sync-locations-with-pw",
+            "--sync-locations-from-pw",
         )
 
         path = "District//Sub Division"
