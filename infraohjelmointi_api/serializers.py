@@ -677,10 +677,29 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
+    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
+    projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
+
+    def get_pw_folder_link(self, project: Project):
+        if project.hkrId is None:
+            return None
+        # Initializing the service here instead of when first defining the variable in the class body
+        # Because on app startup, before DB tables are created, Serializer gets initialized and
+        # causes the initialization of ProjectWiseService which calls the DB
+        if self.projectWiseService is None:
+            self.projectWiseService = ProjectWiseService()
+
+        try:
+            pwInstanceId = self.projectWiseService.get_project_from_pw(
+                id=project.hkrId
+            ).get("instanceId", None)
+            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
+        except (PWProjectNotFoundError, PWProjectResponseError):
+            return None
 
     def get_projectReadiness(self, project):
         return project.projectReadiness()
