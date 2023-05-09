@@ -2058,6 +2058,25 @@ class ProjectTestCase(TestCase):
             ),
         )
 
+        response = self.client.get(
+            "/projects/search-results/?project={}".format(self.project_5_Id),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["path"],
+            "{}/{}/{}/{}".format(
+                self.projectMasterClass_2_Id,
+                self.projectClass_2_Id,
+                self.projectSubClass_2_Id,
+                self.projectDistrict_3_Id,
+            ),
+            msg="Path does not follow the format masterClass/class/subClass/district",
+        )
+
     # Commented out test to check if a project gets locked automatically on phase change
     # def test_project_gets_locked_on_phase_change(self):
     #     ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="construction")
