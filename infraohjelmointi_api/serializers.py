@@ -263,7 +263,7 @@ class ProjectLockSerializer(serializers.ModelSerializer):
         model = ProjectLock
 
 
-class searchResultSerializer(serializers.Serializer):
+class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
