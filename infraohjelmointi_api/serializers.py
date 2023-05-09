@@ -305,19 +305,18 @@ class SearchResultSerializer(serializers.Serializer):
         if locationInstance is None:
             return path
 
-        if instanceType == "Project":
-            if locationInstance.parent is None:
-                path = path + "/{}".format(locationInstance.id)
-            elif (
-                locationInstance.parent is not None
-                and locationInstance.parent.parent is None
-            ):
-                path = path + "/{}".format(locationInstance.parent.id)
-            elif locationInstance.parent.parent is not None:
-                path = path + "/{}".format(locationInstance.parent.parent.id)
-        else:
-            if locationInstance.parent is None:
-                path = path + "/{}".format(str(locationInstance.id))
+        if locationInstance.parent is None:
+            path = path + "/{}".format(str(locationInstance.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is not None
+        ):
+            path = path + "/{}".format(str(locationInstance.parent.parent.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is None
+        ):
+            path = path + "/{}".format(str(locationInstance.parent.id))
 
         return path
 
