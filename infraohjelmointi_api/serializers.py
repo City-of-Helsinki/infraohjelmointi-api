@@ -579,7 +579,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        spentBudget = ProjectFinancial.objects.filter(
+        spentBudget = ProjectFinancialService.filter(
             project=project, year__lt=year
         ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
             "spent_budget"
