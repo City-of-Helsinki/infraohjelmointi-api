@@ -144,10 +144,10 @@ class ProjectTestCase(TestCase):
             id=self.projectCategory_1_Id, value="K5"
         )
         self.projectMasterClass = ProjectClass.objects.create(
-            id=self.projectMasterClass_1_Id, name="Test Master Class", parent=None
+            id=self.projectMasterClass_1_Id, name="Test Master Class", parent=None,path='Test Master Class'
         )
         self.projectClass = self.projectMasterClass.childClass.create(
-            name="Test Class", id=self.projectClass_1_Id
+            name="Test Class", id=self.projectClass_1_Id,path='Test Master Class/Test Class'
         )
         self.constructionPhase = ConstructionPhase.objects.create(
             id=self.constructionPhaseId, value="planning"
