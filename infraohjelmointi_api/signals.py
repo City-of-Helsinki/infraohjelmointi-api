@@ -1,3 +1,4 @@
+import logging
 from django.db.models.signals import post_save
 
 from infraohjelmointi_api.models import (
@@ -15,6 +16,8 @@ from infraohjelmointi_api.serializers import (
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 def get_sums(
@@ -50,7 +53,7 @@ def get_notified_project_financial(sender, instance, created, **kwargs):
     project = instance.project
 
     if created:
-        print("Signal Triggered: ProjectFinance Object was created")
+        logger.debug("Signal Triggered: ProjectFinance Object was created")
     else:
         projectMasterClass = (
             (
@@ -123,13 +126,13 @@ def get_notified_project_financial(sender, instance, created, **kwargs):
                 ),
             },
         )
-        print("Signal Triggered: ProjectFinance Object was updated")
+        logger.debug("Signal Triggered: ProjectFinance Object was updated")
 
 
 @receiver(post_save, sender=Project)
 def get_notified_project(sender, instance, created, **kwargs):
     if created:
-        print("Signal Triggered: Project was created")
+        logger.debug("Signal Triggered: Project was created")
     else:
         send_event(
             "project",
@@ -138,4 +141,4 @@ def get_notified_project(sender, instance, created, **kwargs):
                 "project": ProjectGetSerializer(instance).data,
             },
         )
-        print("Signal Triggered: Project was updated")
+        logger.debug("Signal Triggered: Project was updated")
