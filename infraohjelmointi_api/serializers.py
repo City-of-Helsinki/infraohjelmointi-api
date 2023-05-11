@@ -206,9 +206,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             ).prefetch_related("finances")
 
         if _type == "ProjectGroup":
-            return ProjectService.findByGroup(group_id=instance.id).prefetch_related(
-                "finances"
-            )
+            return ProjectService.find_by_group_id(
+                group_id=instance.id
+            ).prefetch_related("finances")
 
         return Project.objects.none()
 
@@ -579,7 +579,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        spentBudget = ProjectFinancialService.findByProjectAndMaxYear(
+        spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
             project_id=project.id, max_year=year
         ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
             "spent_budget"
