@@ -1,7 +1,7 @@
 from datetime import datetime
 from os import path
 import environ
-from infraohjelmointi_api.services import ProjectFinancialService
+from infraohjelmointi_api.services import ProjectFinancialService, ProjectService
 from .models import (
     ProjectType,
     Project,
@@ -28,6 +28,7 @@ from .models import (
     ProjectLock,
     ProjectFinancial,
 )
+from django.db.models import Sum
 from .services import ProjectWiseService
 from .services.ProjectWiseService import PWProjectNotFoundError, PWProjectResponseError
 from rest_framework.exceptions import ParseError, ValidationError
@@ -71,6 +72,145 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
+
+
+class FinancialSumSerializer(serializers.ModelSerializer):
+    finances = serializers.SerializerMethodField(method_name="get_finance_sums")
+
+    def get_finance_sums(self, instance):
+        _type = instance._meta.model.__name__
+        year = int(self.context.get("finance_year", date.today().year))
+        relatedProjects = self.get_related_projects(instance=instance, _type=_type)
+        summedFinances = relatedProjects.aggregate(
+            year0_plannedBudget=Sum(
+                "finances__budgetProposalCurrentYearPlus0",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year1_plannedBudget=Sum(
+                "finances__budgetProposalCurrentYearPlus1",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year2_plannedBudget=Sum(
+                "finances__budgetProposalCurrentYearPlus2",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year3_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus3",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year4_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus4",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year5_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus5",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year6_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus6",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year7_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus7",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year8_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus8",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year9_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus9",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            year10_plannedBudget=Sum(
+                "finances__preliminaryCurrentYearPlus10",
+                default=0,
+                filter=Q(finances__year=year),
+            ),
+            budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
+        )
+        if _type == "ProjectGroup":
+            summedFinances["projectBudgets"] = relatedProjects.aggregate(
+                projectBudgets=Sum("costForecast", default=0)
+            )["projectBudgets"]
+        summedFinances["year"] = year
+        summedFinances["year0"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
+        }
+        summedFinances["year1"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
+        }
+        summedFinances["year2"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
+        }
+        summedFinances["year3"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
+        }
+        summedFinances["year4"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
+        }
+        summedFinances["year5"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
+        }
+        summedFinances["year6"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
+        }
+        summedFinances["year7"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
+        }
+        summedFinances["year8"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
+        }
+        summedFinances["year9"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
+        }
+        summedFinances["year10"] = {
+            "frameBudget": 0,
+            "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
+        }
+
+        return summedFinances
+
+    def get_related_projects(self, instance, _type) -> list[Project]:
+        if _type == "ProjectLocation":
+            if instance.parent is None:
+                return Project.objects.filter(
+                    Q(projectLocation=instance)
+                    | Q(projectLocation__parent=instance)
+                    | Q(projectLocation__parent__parent=instance)
+                ).prefetch_related("finances")
+            return Project.objects.none()
+        if _type == "ProjectClass":
+            return Project.objects.filter(
+                projectClass__path__startswith=instance.path
+            ).prefetch_related("finances")
+
+        if _type == "ProjectGroup":
+            return ProjectService.find_by_group_id(
+                group_id=instance.id
+            ).prefetch_related("finances")
+
+        return Project.objects.none()
 
 
 class ProjectFinancialSerializer(serializers.ModelSerializer):
@@ -197,7 +337,7 @@ class searchResultSerializer(serializers.Serializer):
         return projectHashtags
 
 
-class ProjectGroupSerializer(DynamicFieldsModelSerializer):
+class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
@@ -249,12 +389,12 @@ class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
         model = ProjectHashTag
 
 
-class ProjectLocationSerializer(serializers.ModelSerializer):
+class ProjectLocationSerializer(FinancialSumSerializer, serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectLocation
 
 
-class ProjectClassSerializer(serializers.ModelSerializer):
+class ProjectClassSerializer(FinancialSumSerializer, serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ProjectClass
 
@@ -396,6 +536,9 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
 
         return ProjectFinancialSerializer(queryset, many=False).data
 
+    class Meta(BaseMeta):
+        model = Project
+
 
 class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
     projectReadiness = serializers.SerializerMethodField()
@@ -425,11 +568,24 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
     finances = serializers.SerializerMethodField()
+    spentBudget = serializers.SerializerMethodField(method_name="get_spent_budget")
     pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
+
+    def get_spent_budget(self, project: Project):
+        year = self.context.get("finance_year", date.today().year)
+        if year is None:
+            year = date.today().year
+        spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
+            project_id=project.id, max_year=year
+        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
+            "spent_budget"
+        ]
+
+        return int(spentBudget)
 
     def get_pw_folder_link(self, project: Project):
         if not self.context.get("get_pw_link", False) or project.hkrId is None:
