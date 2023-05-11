@@ -39,3 +39,7 @@ class ProjectService:
     @staticmethod
     def get_by_hkr_id(hkr_id: str) -> Project:
         return Project.objects.get(hkrId=hkr_id)
+
+    @staticmethod
+    def find_by_group_id(group_id: str) -> list[Project]:
+        return Project.objects.filter(projectGroup=group_id)

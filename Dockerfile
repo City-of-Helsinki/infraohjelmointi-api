@@ -5,7 +5,7 @@ WORKDIR /app
 ENV STATIC_ROOT /srv/app/static
 COPY . .
 
-RUN TZ="Europe/Helsinki" apk add --update nano python3 py3-pip py3-pandas uwsgi postgresql-client netcat-openbsd gettext libpq-dev unzip bash grep && \
+RUN TZ="Europe/Helsinki" apk add --update nano libffi-dev gcc musl-dev python3-dev python3  py3-pip py3-pandas uwsgi postgresql-client netcat-openbsd gettext libpq-dev unzip bash grep && \
     ln -s /usr/bin/pip3 /usr/local/bin/pip && \
     ln -s /usr/bin/python3 /usr/local/bin/python && \
     # install python project modules
