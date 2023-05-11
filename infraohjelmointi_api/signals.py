@@ -1,5 +1,5 @@
 import logging
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, m2m_changed
 
 from infraohjelmointi_api.models import (
     Project,
@@ -142,3 +142,16 @@ def get_notified_project(sender, instance, created, **kwargs):
             },
         )
         logger.debug("Signal Triggered: Project was updated")
+
+
+@receiver(m2m_changed, sender=Project.hashTags.through)
+def get_notified_m2m_changed(sender, instance, pk_set, action, **kwargs):
+    if action in ["post_add", "post_remove"]:
+        send_event(
+            "project",
+            "project-update",
+            {
+                "project": ProjectGetSerializer(instance).data,
+            },
+        )
+    logger.debug("Signal Triggered: `hashTags` field updated on a Project")
