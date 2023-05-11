@@ -1,7 +1,7 @@
 from datetime import datetime
 from os import path
 import environ
-from infraohjelmointi_api.services import ProjectFinancialService
+from infraohjelmointi_api.services import ProjectFinancialService, ProjectService
 from .models import (
     ProjectType,
     Project,
@@ -206,7 +206,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             ).prefetch_related("finances")
 
         if _type == "ProjectGroup":
-            return Project.objects.filter(projectGroup=instance).prefetch_related(
+            return ProjectService.findByGroup(group_id=instance.id).prefetch_related(
                 "finances"
             )
 
@@ -579,8 +579,8 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        spentBudget = ProjectFinancialService.filter(
-            project=project, year__lt=year
+        spentBudget = ProjectFinancialService.findByProjectAndMaxYear(
+            project_id=project.id, max_year=year
         ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
             "spent_budget"
         ]
