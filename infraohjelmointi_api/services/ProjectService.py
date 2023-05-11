@@ -41,5 +41,5 @@ class ProjectService:
         return Project.objects.get(hkrId=hkr_id)
 
     @staticmethod
-    def findByGroup(group_id: str) -> ProjectGroup:
+    def findByGroup(group_id: str) -> list[Project]:
         return Project.objects.filter(projectGroup=group_id)
