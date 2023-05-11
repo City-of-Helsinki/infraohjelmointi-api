@@ -7,5 +7,7 @@ class ProjectFinancialService:
         return ProjectFinancial.objects.get_or_create(year=year, project_id=project_id)
 
     @staticmethod
-    def findByProjectAndMaxYear(project_id: str, max_year=int):
+    def findByProjectAndMaxYear(
+        project_id: str, max_year=int
+    ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(project=project_id, year__lt=max_year)
