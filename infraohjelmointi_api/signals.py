@@ -138,6 +138,8 @@ def get_notified_project_financial(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=Project)
+# Using this decorator below to make sure the function is only fired when the transaction has commited.
+# This causes the project instance to have the updated many-to-many fields as the update happens after .save() is called on the Project model
 @on_transaction_commit
 def get_notified_project(sender, instance, created, update_fields, **kwargs):
     if created:
