@@ -7,20 +7,19 @@ from channels.auth import AuthMiddlewareStack
 import django_eventstream
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.settings")
-
+urlRouter = URLRouter(
+    [
+        path(
+            "events/",
+            AuthMiddlewareStack(URLRouter(django_eventstream.routing.urlpatterns)),
+            {"channels": ["finance", "project"]},
+        ),
+        re_path(r"", get_asgi_application()),
+    ]
+)
 application = ProtocolTypeRouter(
     {
-        "http": URLRouter(
-            [
-                path(
-                    "events/",
-                    AuthMiddlewareStack(
-                        URLRouter(django_eventstream.routing.urlpatterns)
-                    ),
-                    {"channels": ["finance", "project"]},
-                ),
-                re_path(r"", get_asgi_application()),
-            ]
-        ),
+        "http": urlRouter,
+        "https": urlRouter,
     }
 )
