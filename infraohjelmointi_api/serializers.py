@@ -843,7 +843,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                         ),
                         code="project_locked",
                     )
-
         return super(ProjectCreateSerializer, self).update(instance, validated_data)
 
     @override
