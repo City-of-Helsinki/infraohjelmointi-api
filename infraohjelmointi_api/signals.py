@@ -1,6 +1,7 @@
 import logging
-from django.db.models.signals import post_save
-
+from django.db.models.signals import post_save, m2m_changed
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from infraohjelmointi_api.models import (
     Project,
     ProjectClass,
@@ -18,6 +19,13 @@ from django.dispatch import receiver
 from django_eventstream import send_event
 
 logger = logging.getLogger("infraohjelmointi_api")
+
+
+def on_transaction_commit(func):
+    def inner(*args, **kwargs):
+        transaction.on_commit(lambda: func(*args, **kwargs))
+
+    return inner
 
 
 def get_sums(
@@ -130,7 +138,10 @@ def get_notified_project_financial(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=Project)
-def get_notified_project(sender, instance, created, **kwargs):
+# Using this decorator below to make sure the function is only fired when the transaction has commited.
+# This causes the project instance to have the updated many-to-many fields as the update happens after .save() is called on the Project model
+@on_transaction_commit
+def get_notified_project(sender, instance, created, update_fields, **kwargs):
     if created:
         logger.debug("Signal Triggered: Project was created")
     else:
