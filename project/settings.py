@@ -89,6 +89,10 @@ CORS_ALLOWED_ORIGINS = env("ALLOWED_CORS_ORIGINS")
 # CORS header for django event stream
 EVENTSTREAM_ALLOW_ORIGIN = ",".join(CORS_ALLOWED_ORIGINS)
 
+print(EVENTSTREAM_ALLOW_ORIGIN)
+print(CORS_ALLOWED_ORIGINS)
+print(env("ALLOWED_CORS_ORIGINS"))
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
