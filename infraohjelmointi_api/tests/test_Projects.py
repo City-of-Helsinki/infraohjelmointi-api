@@ -110,8 +110,10 @@ class ProjectTestCase(TestCase):
     projectFinancial_2_Id = uuid.UUID("ec17c3c6-7414-4fec-ad2e-6e6f63a88bcb")
     projectFinancial_3_Id = uuid.UUID("8dba8690-11fd-4715-9978-f65c4e9a6e22")
     pwInstanceId = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
-    pwInstanceId_hkrId = 1461
-    pwInstanceId_hkrId_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
+    pwInstanceId_hkrId_1 = 1461
+    pwInstanceId_hkrId_2 = 1500
+    pwInstanceId_hkrId_1_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
+    pwInstanceId_hkrId_2_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{9d14d060-56c8-45c0-9323-303ab440e652}/"
 
     fixtures = []
     maxDiff = None
@@ -2932,7 +2934,7 @@ class ProjectTestCase(TestCase):
         data = {
             "name": "Test Project for PW folder",
             "description": "Test description",
-            "hkrId": self.pwInstanceId_hkrId,
+            "hkrId": self.pwInstanceId_hkrId_1,
         }
         response = self.client.post(
             "/projects/",
@@ -2949,5 +2951,19 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json()["pwFolderLink"], self.pwInstanceId_hkrId_folder
+            response.json()["pwFolderLink"], self.pwInstanceId_hkrId_1_folder
+        )
+
+        data = {
+            "hkrId": self.pwInstanceId_hkrId_2,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(newCreatedId),
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["pwFolderLink"], self.pwInstanceId_hkrId_2_folder
         )
