@@ -50,7 +50,7 @@ from .serializers import (
     ProjectHashtagSerializer,
     ProjectGroupSerializer,
     ProjectLockSerializer,
-    searchResultSerializer,
+    SearchResultSerializer,
     ProjectFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
@@ -498,7 +498,7 @@ class ProjectViewSet(BaseViewSet):
         searchPaginator = PageNumberPagination()
         searchPaginator.page_size = limit
         result = searchPaginator.paginate_queryset(combinedQuerysets, request)
-        serializer = searchResultSerializer(
+        serializer = SearchResultSerializer(
             result, many=True, context={"hashtags_include": hashTags}
         )
         response = {

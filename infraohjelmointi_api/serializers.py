@@ -263,7 +263,7 @@ class ProjectLockSerializer(serializers.ModelSerializer):
         model = ProjectLock
 
 
-class searchResultSerializer(serializers.Serializer):
+class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
@@ -274,29 +274,51 @@ class searchResultSerializer(serializers.Serializer):
     def get_path(self, obj):
         instanceType = obj._meta.model.__name__
         classInstance = None
+        locationInstance = None
+        path = ""
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
+            locationInstance = getattr(obj, "projectLocation", None)
         elif instanceType in ["ProjectLocation", "ProjectClass"]:
             classInstance = obj
         elif instanceType == "ProjectGroup":
             classInstance = getattr(obj, "classRelation", None)
+            locationInstance = getattr(obj, "districtRelation", None)
 
         if classInstance is None:
-            return ""
+            return path
 
         if classInstance.parent is not None and classInstance.parent.parent is not None:
-            return "{}/{}/{}".format(
+            path = "{}/{}/{}".format(
                 str(classInstance.parent.parent.id),
                 str(classInstance.parent.id),
                 str(classInstance.id),
             )
         elif classInstance.parent is not None:
-            return "{}/{}".format(
+            path = "{}/{}".format(
                 str(classInstance.parent.id),
                 str(classInstance.id),
             )
         else:
-            return str(classInstance.id)
+            path = str(classInstance.id)
+
+        if locationInstance is None:
+            return path
+
+        if locationInstance.parent is None:
+            path = path + "/{}".format(str(locationInstance.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is not None
+        ):
+            path = path + "/{}".format(str(locationInstance.parent.parent.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is None
+        ):
+            path = path + "/{}".format(str(locationInstance.parent.id))
+
+        return path
 
     def get_phase(self, obj):
         if not hasattr(obj, "phase") or obj.phase is None:
