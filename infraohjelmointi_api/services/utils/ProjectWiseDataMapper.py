@@ -6,6 +6,7 @@ from ..ProjectTypeService import ProjectTypeService
 from ..ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from ..ProjectClassService import ProjectClassService
 from ..ProjectLocationService import ProjectLocationService
+from ..PersonService import PersonService
 
 import logging
 
@@ -115,6 +116,19 @@ to_pw_map = {
             "PROJECT_Luokka",
             "PROJECT_Alaluokka",
         ],
+    },
+    "personPlanning": {
+        "type": "multi",
+        "values": [
+            "PROJECT_Vastuuhenkil",
+            "PROJECT_Vastuuhenkiln_titteli",
+            "PROJECT_Vastuuhenkiln_puhelinnumero",
+            "PROJECT_Vastuuhenkiln_shkpostiosoite",
+        ],
+    },
+    "personConstruction": {
+        "type": "enum",
+        "values": ["PROJECT_Vastuuhenkil_rakennuttaminen"],
     },
 }
 
@@ -236,6 +250,30 @@ class ProjectWiseDataMapper:
                         result[mapped_field["values"][1]] = locations[1]
                     if len(locations) > 2:
                         result[mapped_field["values"][2]] = locations[2]
+                elif field == "personPlanning":
+                    planningPersonModel, _ = PersonService.get_by_id(value)
+                    logger.debug("planningPerson", planningPersonModel)
+                    # fullname
+                    result[mapped_field["values"][0]] = "{} {}".format(
+                        planningPersonModel.lastName, planningPersonModel.firstName
+                    )
+                    # title
+                    result[mapped_field["values"][1]] = planningPersonModel.title
+                    # phone
+                    result[mapped_field["values"][2]] = planningPersonModel.phone
+                    # email
+                    result[mapped_field["values"][3]] = planningPersonModel.email
+                elif field == "personConstruction":
+                    constructionPersonModel, _ = PersonService.get_by_id(value)
+                    # fullname
+                    result[mapped_field["values"][0]] = "{} {}, {}, {}, {}".format(
+                        constructionPersonModel.lastName,
+                        constructionPersonModel.firstName,
+                        constructionPersonModel.title,
+                        constructionPersonModel.phone,
+                        constructionPersonModel.email,
+                    )
+
             # Date field handling
             elif mapped_field["type"] == "date":
                 result[mapped_field["field"]] = datetime.strptime(
