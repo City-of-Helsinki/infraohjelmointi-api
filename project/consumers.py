@@ -73,8 +73,13 @@ class CostomEventConsumer(EventsConsumer):
 
         # workaround to support multi CORS origin
         CORS_ALLOWED_ORIGINS = env("ALLOWED_CORS_ORIGINS")
-        if request.META["HTTP_ORIGIN"] in CORS_ALLOWED_ORIGINS:
-            extra_headers["Access-Control-Allow-Origin"] = request.META["HTTP_ORIGIN"]
+        try:
+            if request.META["HTTP_ORIGIN"] in CORS_ALLOWED_ORIGINS:
+                extra_headers["Access-Control-Allow-Origin"] = request.META[
+                    "HTTP_ORIGIN"
+                ]
+        except Exception as e:
+            logger.error("Error occured while setting allowed CORS", e)
 
         # if this was a grip request or we encountered an error, respond now
         if response:
