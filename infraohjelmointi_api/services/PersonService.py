@@ -23,3 +23,9 @@ class PersonService:
         lastName: str,
     ) -> Person:
         return Person.objects.get_or_create(firstName=firstName, lastName=lastName)
+
+    @staticmethod
+    def get_by_id(
+        id: str,
+    ) -> Person:
+        return Person.objects.get_or_create(id=id)
