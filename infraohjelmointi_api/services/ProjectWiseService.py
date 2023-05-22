@@ -390,8 +390,8 @@ class ProjectWiseService:
                 project.personConstruction = construction_person
 
         if project_properties["PROJECT_Muut_vastuuhenkilt"]:
-            project.favPersons.set(
-                self.__get_fav_persons(project_properties["PROJECT_Muut_vastuuhenkilt"])
+            project.otherPersons = self.__get_fav_persons(
+                project_properties["PROJECT_Muut_vastuuhenkilt"]
             )
 
         project.save()
