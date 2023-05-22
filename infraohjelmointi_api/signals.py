@@ -149,7 +149,9 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
             "project",
             "project-update",
             {
-                "project": ProjectGetSerializer(instance).data,
+                "project": ProjectGetSerializer(
+                    instance, context={"get_pw_link": True}
+                ).data,
             },
         )
         logger.debug("Signal Triggered: Project was updated")
