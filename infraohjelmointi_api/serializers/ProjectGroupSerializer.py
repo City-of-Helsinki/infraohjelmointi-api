@@ -1,7 +1,6 @@
 from infraohjelmointi_api.models import Project, ProjectGroup
-from infraohjelmointi_api.serializers import (
-    BaseMeta,
-    DynamicFieldsModelSerializer,
+from infraohjelmointi_api.serializers import BaseMeta
+from infraohjelmointi_api.serializers.FinancialSumSerializer import (
     FinancialSumSerializer,
 )
 from infraohjelmointi_api.validators.ProjectGroupValidators.ProjectsFieldValidator import (
@@ -15,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 
-class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
+class ProjectGroupSerializer(FinancialSumSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(),
         write_only=True,
@@ -29,7 +28,7 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectGroup.objects.all(),
-                fields=["name", "classRelation", "districtRelation"],
+                fields=["name", "classRelation", "locationRelation"],
             ),
         ]
 

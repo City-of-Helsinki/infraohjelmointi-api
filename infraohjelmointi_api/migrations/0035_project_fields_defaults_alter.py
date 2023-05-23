@@ -8,7 +8,6 @@ from django.db.models import Q
 
 
 def update_altered_field_to_new_defaults(apps, schema_editor):
-
     Project = apps.get_model("infraohjelmointi_api", "Project")
     Project.objects.filter(
         Q(planningStartYear=0) | Q(budgetOverrunYear=0) | Q(constructionEndYear=0)
@@ -19,11 +18,10 @@ def update_altered_field_to_new_defaults(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0031_project_budgetproposalcurrentyearplus0_and_description_alter",
+            "0034_remove_projectgroup_unique together constraint project group_and_more",
         ),
     ]
 

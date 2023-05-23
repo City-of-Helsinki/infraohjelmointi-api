@@ -8,7 +8,6 @@ from infraohjelmointi_api.models import (
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
-    ProjectWithFinancesSerializer,
     UpdateListSerializer,
 )
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
@@ -42,6 +41,9 @@ from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
     ProjectSetCreateSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
+from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
+    ProjectWithFinancesSerializer,
+)
 from infraohjelmointi_api.services import ProjectWiseService
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,

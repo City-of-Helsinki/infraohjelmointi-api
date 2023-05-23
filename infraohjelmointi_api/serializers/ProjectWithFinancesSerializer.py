@@ -1,6 +1,9 @@
 from datetime import date
 from infraohjelmointi_api.models import Project
-from infraohjelmointi_api.serializers import BaseMeta, ProjectFinancialSerializer
+from infraohjelmointi_api.serializers import BaseMeta
+from infraohjelmointi_api.serializers.ProjectFinancialSerializer import (
+    ProjectFinancialSerializer,
+)
 from infraohjelmointi_api.services import ProjectFinancialService
 from rest_framework import serializers
 
