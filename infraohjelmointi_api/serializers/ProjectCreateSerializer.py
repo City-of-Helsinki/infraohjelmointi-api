@@ -5,10 +5,13 @@ from infraohjelmointi_api.models import (
     ProjectLocation,
     ProjectPhase,
 )
+from infraohjelmointi_api.services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
+)
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
-    UpdateListSerializer,
 )
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
 from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
@@ -44,6 +47,7 @@ from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSe
 from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
+from infraohjelmointi_api.serializers.UpdateListSerializer import UpdateListSerializer
 from infraohjelmointi_api.services import ProjectWiseService
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,
@@ -166,8 +170,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             ).get("instanceId", None)
             return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
         except (
-            ProjectWiseService.PWProjectNotFoundError,
-            ProjectWiseService.PWProjectResponseError,
+            PWProjectNotFoundError,
+            PWProjectResponseError,
         ):
             return None
 

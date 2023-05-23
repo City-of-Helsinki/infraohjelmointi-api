@@ -1,9 +1,16 @@
+from datetime import date
+from os import path
 from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     DynamicFieldsModelSerializer,
     PersonSerializer,
     ProjectLockSerializer,
+)
+from infraohjelmointi_api.services import ProjectFinancialService
+from infraohjelmointi_api.services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
 )
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
 from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
@@ -39,7 +46,16 @@ from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSe
 from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
+from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
+from django.db.models import Sum
 from rest_framework import serializers
+import environ
+
+env = environ.Env()
+env.escape_proxy = True
+
+if path.exists(".env"):
+    env.read_env(".env")
 
 
 class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
@@ -69,16 +85,49 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     projectQualityLevel = ProjectQualityLevelSerializer(read_only=True)
     responsibleZone = ProjectResponsibleZoneSerializer(read_only=True)
     locked = serializers.SerializerMethodField()
+    finances = serializers.SerializerMethodField()
+    spentBudget = serializers.SerializerMethodField(method_name="get_spent_budget")
+    pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
+    projectWiseService = None
 
     class Meta(BaseMeta):
         model = Project
 
-    def get_locked(self, obj):
+    def get_spent_budget(self, project: Project):
+        year = self.context.get("finance_year", date.today().year)
+        if year is None:
+            year = date.today().year
+        spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
+            project_id=project.id, max_year=year
+        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
+            "spent_budget"
+        ]
+
+        return int(spentBudget)
+
+    def get_pw_folder_link(self, project: Project):
+        if not self.context.get("get_pw_link", False) or project.hkrId is None:
+            return None
+        # Initializing the service here instead of when first defining the variable in the class body
+        # Because on app startup, before DB tables are created, Serializer gets initialized and
+        # causes the initialization of ProjectWiseService which calls the DB
+        if self.projectWiseService is None:
+            self.projectWiseService = ProjectWiseService()
+
         try:
-            lockData = ProjectLockSerializer(obj.lock, many=False).data
+            pwInstanceId = self.projectWiseService.get_project_from_pw(
+                id=project.hkrId
+            ).get("instanceId", None)
+            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
+        except (PWProjectNotFoundError, PWProjectResponseError):
+            return None
+
+    def get_locked(self, project):
+        try:
+            lockData = ProjectLockSerializer(project.lock, many=False).data
             return lockData
         except:
             return None
 
-    def get_projectReadiness(self, obj):
-        return obj.projectReadiness()
+    def get_projectReadiness(self, project):
+        return project.projectReadiness()

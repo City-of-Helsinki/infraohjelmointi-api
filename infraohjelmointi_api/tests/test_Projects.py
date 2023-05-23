@@ -198,9 +198,8 @@ class ProjectTestCase(TestCase):
             title="Contractor",
             phone="0414853275",
         )
-        self.projectPhase, _ = ProjectPhase.objects.get_or_create(
-            id=self.projectPhase_1_Id, value="proposal"
-        )
+        self.projectPhase = ProjectPhase.objects.get(value="proposal")
+        self.projectPhase_1_Id = self.projectPhase.id
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
             name="Project Set 1",
@@ -2996,13 +2995,23 @@ class ProjectTestCase(TestCase):
         )
 
     def test_other_field_validations(self):
-        ProjectPhase.objects.create(id=self.projectPhase_2_Id, value="programming")
-        ProjectPhase.objects.create(id=self.projectPhase_3_Id, value="completed")
-        ProjectPhase.objects.create(id=self.projectPhase_4_Id, value="draftInitiation")
-        ProjectPhase.objects.create(id=self.projectPhase_5_Id, value="construction")
-        ProjectPhase.objects.create(id=self.projectPhase_6_Id, value="warrantyPeriod")
+        self.projectPhase_2_Id = ProjectPhase.objects.get(
+            value="programming"
+        ).id.__str__()
+        self.projectPhase_3_Id = ProjectPhase.objects.get(
+            value="completed"
+        ).id.__str__()
+        self.projectPhase_4_Id = ProjectPhase.objects.get(
+            value="draftInitiation"
+        ).id.__str__()
+        self.projectPhase_5_Id = ProjectPhase.objects.get(
+            value="construction"
+        ).id.__str__()
+        self.projectPhase_6_Id = ProjectPhase.objects.get(
+            value="warrantyPeriod"
+        ).id.__str__()
         ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_2_Id, value="Con Phase Test"
+            id=self.conPhaseDetail_2_Id, value="preConstruction"
         )
         data = {
             "name": "Testing fields",
