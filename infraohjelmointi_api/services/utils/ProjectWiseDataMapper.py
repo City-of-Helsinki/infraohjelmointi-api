@@ -118,7 +118,7 @@ to_pw_map = {
         ],
     },
     "personPlanning": {
-        "type": "multi",
+        "type": "enum",
         "values": [
             "PROJECT_Vastuuhenkil",
             "PROJECT_Vastuuhenkiln_titteli",
@@ -251,7 +251,7 @@ class ProjectWiseDataMapper:
                     if len(locations) > 2:
                         result[mapped_field["values"][2]] = locations[2]
                 elif field == "personPlanning":
-                    planningPersonModel, _ = PersonService.get_by_id(value)
+                    planningPersonModel= PersonService.get_by_id(value)
                     logger.debug("planningPerson", planningPersonModel)
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}".format(
