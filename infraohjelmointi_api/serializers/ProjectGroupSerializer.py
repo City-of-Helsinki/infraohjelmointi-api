@@ -2,7 +2,7 @@ from infraohjelmointi_api.models import Project, ProjectGroup
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     DynamicFieldsModelSerializer,
-    ProjectHashtagSerializer,
+    FinancialSumSerializer,
 )
 from infraohjelmointi_api.validators.ProjectGroupValidators.ProjectsFieldValidator import (
     ProjectsFieldValidator,
@@ -15,8 +15,7 @@ from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 
-class ProjectGroupSerializer(DynamicFieldsModelSerializer):
-
+class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
     projects = serializers.ListField(
         child=serializers.UUIDField(),
         write_only=True,
