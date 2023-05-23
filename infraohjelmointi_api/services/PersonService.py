@@ -28,4 +28,4 @@ class PersonService:
     def get_by_id(
         id: str,
     ) -> Person:
-        return Person.objects.get_or_create(id=id)
+        return Person.objects.get(id=id)
