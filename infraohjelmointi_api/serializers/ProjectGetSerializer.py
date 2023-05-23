@@ -36,10 +36,13 @@ from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
     ProjectSetCreateSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
+from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
+    ProjectWithFinancesSerializer,
+)
 from rest_framework import serializers
 
 
-class ProjectGetSerializer(DynamicFieldsModelSerializer):
+class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSerializer):
     projectReadiness = serializers.SerializerMethodField()
     projectSet = ProjectSetCreateSerializer(read_only=True)
     siteId = BudgetItemSerializer(read_only=True)

@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0032_remove_project_budgetproposalcurrentyearplus0_and_more",
+            "0031_project_budgetproposalcurrentyearplus0_and_description_alter",
         ),
     ]
 
