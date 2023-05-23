@@ -8,11 +8,10 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0031_project_budgetproposalcurrentyearplus0_and_description_alter",
+            "0032_remove_project_budgetproposalcurrentyearplus0_and_more",
         ),
     ]
 

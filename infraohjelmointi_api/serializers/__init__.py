@@ -31,3 +31,7 @@ from .ProjectTypeSerializer import ProjectTypeSerializer
 from .SearchResultSerializer import SearchResultSerializer
 from .TaskSerializer import TaskSerializer
 from .TaskStatusSerializer import TaskStatusSerializer
+from .ProjectWithFinancesSerializer import ProjectWithFinancesSerializer
+from .UpdateListSerializer import UpdateListSerializer
+from .ProjectFinancialSerializer import ProjectFinancialSerializer
+from .FinancialSumSerializer import FinancialSumSerializer
