@@ -251,7 +251,7 @@ class ProjectWiseDataMapper:
                     if len(locations) > 2:
                         result[mapped_field["values"][2]] = locations[2]
                 elif field == "personPlanning":
-                    planningPersonModel= PersonService.get_by_id(value)
+                    planningPersonModel = PersonService.get_by_id(value)
                     logger.debug("planningPerson", planningPersonModel)
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}".format(
@@ -264,7 +264,7 @@ class ProjectWiseDataMapper:
                     # email
                     result[mapped_field["values"][3]] = planningPersonModel.email
                 elif field == "personConstruction":
-                    constructionPersonModel, _ = PersonService.get_by_id(value)
+                    constructionPersonModel = PersonService.get_by_id(value)
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}, {}, {}, {}".format(
                         constructionPersonModel.lastName,
