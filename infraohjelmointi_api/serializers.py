@@ -279,11 +279,14 @@ class SearchResultSerializer(serializers.Serializer):
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
             locationInstance = getattr(obj, "projectLocation", None)
-        elif instanceType in ["ProjectLocation", "ProjectClass"]:
+        elif instanceType == "ProjectClass":
             classInstance = obj
+        elif instanceType == "ProjectLocation":
+            classInstance = obj.parentClass
+            locationInstance = obj
         elif instanceType == "ProjectGroup":
             classInstance = getattr(obj, "classRelation", None)
-            locationInstance = getattr(obj, "districtRelation", None)
+            locationInstance = getattr(obj, "locationRelation", None)
 
         if classInstance is None:
             return path
