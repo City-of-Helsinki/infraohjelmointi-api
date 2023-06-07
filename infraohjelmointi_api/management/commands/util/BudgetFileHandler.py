@@ -90,6 +90,21 @@ class BudgetFileHandler(IExcelFileHandler):
         preliminaryCurrentYearPlus8 = row[27].value
         preliminaryCurrentYearPlus9 = row[28].value
 
+        budget_sum = sum(
+            [
+                budgetProposalCurrentYearPlus0 or 0,
+                budgetProposalCurrentYearPlus1 or 0,
+                budgetProposalCurrentYearPlus2 or 0,
+                preliminaryCurrentYearPlus3 or 0,
+                preliminaryCurrentYearPlus4 or 0,
+                preliminaryCurrentYearPlus5 or 0,
+                preliminaryCurrentYearPlus6 or 0,
+                preliminaryCurrentYearPlus7 or 0,
+                preliminaryCurrentYearPlus8 or 0,
+                preliminaryCurrentYearPlus9 or 0,
+            ]
+        )
+
         notes = str(row[29].value).strip()
         pwNumber = str(row[30].value).strip()
 
@@ -110,6 +125,7 @@ class BudgetFileHandler(IExcelFileHandler):
             )
 
         try:
+            project.programmed = budget_sum > 0
             project.category = category
             project.effectHousing = effectHousing
             # if value already converted into float, convert it back to string to void validation error
