@@ -379,6 +379,12 @@ class ProjectWiseService:
                 person_data=planning_person_data
             )
             if planning_person:
+                logger.debug(
+                    "Person planning: {} for project {}".format(
+                        planning_person_data,
+                        project.hkrId,
+                    )
+                )
                 project.personPlanning = planning_person
 
         if project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"]:
@@ -387,9 +393,21 @@ class ProjectWiseService:
             )
 
             if construction_person:
+                logger.debug(
+                    "Person construction: {} for project {}".format(
+                        project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"],
+                        project.hkrId,
+                    )
+                )
                 project.personConstruction = construction_person
 
         if project_properties["PROJECT_Muut_vastuuhenkilt"]:
+            logger.debug(
+                "Person others: {} for project {}".format(
+                    project_properties["PROJECT_Muut_vastuuhenkilt"],
+                    project.hkrId,
+                )
+            )
             project.otherPersons = project_properties["PROJECT_Muut_vastuuhenkilt"]
 
         project.save()
@@ -398,7 +416,9 @@ class ProjectWiseService:
         """Helper method to load person from DB with PW data"""
 
         person_data = person_data.strip().replace(", ", ",")
+        logger.debug("person_data: {}".format(person_data))
         if not person_data.rstrip(","):
+            logger.debug("No person data present")
             return None
         try:
             full_name, title, phone_nr, email = person_data.split(",")
@@ -419,38 +439,6 @@ class ProjectWiseService:
             return person
         except Exception:
             return None
-
-    def __get_fav_persons(self, person_data: str) -> list[Person]:
-        """Helper method to load persons from DB with PW data"""
-
-        person_data = person_data.strip().replace(", ", ",").rstrip(",")
-        if not person_data:
-            return None
-        fav_persons = []
-        # Firstname Lastname, Title, phone, email format
-        if re.findall(
-            "^[a-zA-ZäöåÄÖÅ]+ [a-zA-ZäöåÄÖÅ]+,[a-zA-ZäöåÄÖ\. ]+,[a-zA-ZäöåÄÖÅ0-9\. ]+,[a-zA-ZäöåÄÖÅ@\.]+$",
-            person_data,
-        ):
-            fav_persons.append(self.__get_project_person(person_data=person_data))
-            return fav_persons
-
-        for person in person_data.split(","):
-            # FirstnameLastname or Firstname Lastname
-            fav_person_data = re.split("(?<=.)(?=[A-Z])", person)
-            if len(fav_person_data) == 1:
-                # email format?
-                fav_person_data = re.split("\\.|@", person)
-            if len(fav_person_data) == 1:
-                # just one string so add an empty value to list
-                fav_person_data.append(" ")
-
-            fav_person = self.__get_project_person(
-                fav_person_data[1] + " " + fav_person_data[0] + ",,,"
-            )
-            if fav_person:
-                fav_persons.append(fav_person)
-        return fav_persons
 
 
 class PWProjectNotFoundError(RuntimeError):
