@@ -81,7 +81,11 @@ class PlanningFileHandler(IExcelFileHandler):
             )
 
         project.sapProject = sapNumber
-        project.sapNetwork = sapNetwork
+        project.sapNetwork = (
+            [sapNetwork]
+            if sapNetwork != None and not str(sapNetwork).strip() in ['"', "?"]
+            else None
+        )
         project.hkrId = pwNumber
         project.personPlanning = responsiblePerson
         project.save()
