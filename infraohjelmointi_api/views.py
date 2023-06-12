@@ -611,13 +611,14 @@ class ProjectViewSet(BaseViewSet):
                 )
 
             if len(subClass) > 0:
+                subClassModel = ProjectClassService.get_by_id(subClass[0])
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=True,
                     search_ids=subClass,
                     model_class=ProjectClass,
-                    direct=direct,
+                    direct=False if len(subClass) == 1 and "suurpiiri" in subClassModel.name.lower() else direct,
                 )
 
             if len(district) > 0:
