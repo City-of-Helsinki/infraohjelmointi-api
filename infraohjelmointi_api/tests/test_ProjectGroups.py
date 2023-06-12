@@ -205,7 +205,12 @@ class projectGroupTestCase(TestCase):
         )
         self.assertEqual(
             response.status_code,
-            204,
+            200,
+            msg="Error deleting projectGroup with Id {}".format(self.projectGroup_1_Id),
+        )
+        self.assertEqual(
+            response.json()["id"],
+            self.projectGroup_1_Id.__str__(),
             msg="Error deleting projectGroup with Id {}".format(self.projectGroup_1_Id),
         )
         self.assertEqual(
