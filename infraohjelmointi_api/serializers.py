@@ -376,9 +376,14 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         """
 
         if projectIds is not None and len(projectIds) > 0:
+            group = getattr(self, "instance", None)
             for projectId in projectIds:
                 project = get_object_or_404(Project, pk=projectId)
-                if project.projectGroup is not None:
+                if (
+                    group is not None
+                    and project.projectGroup is not None
+                    and project.projectGroup.id != group.id
+                ) or (group is None and project.projectGroup is not None):
                     raise ValidationError(
                         detail="Project: {} with id: {} already belongs to the group: {} with id: {}".format(
                             project.name,
@@ -398,6 +403,29 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
                 fields=["name", "classRelation", "locationRelation"],
             ),
         ]
+
+    @override
+    def update(self, instance, validated_data):
+        # new project Ids
+        updatedProjectIds = validated_data.pop("projects", [])
+        # get all project ids that currently belong to this group
+        existingProjectIds = instance.project_set.all().values_list("id", flat=True)
+        # project that are to be removed from this group
+        removedProjects = list(set(existingProjectIds) - set(updatedProjectIds))
+        if len(updatedProjectIds) > 0:
+            for projectId in updatedProjectIds:
+                if projectId not in existingProjectIds:
+                    project = get_object_or_404(Project, pk=projectId)
+                    project.projectGroup = instance
+                    project.save()
+
+        if len(removedProjects) > 0:
+            for projectId in removedProjects:
+                project = get_object_or_404(Project, pk=projectId)
+                project.projectGroup = None
+                project.save()
+
+        return super(ProjectGroupSerializer, self).update(instance, validated_data)
 
     @override
     def create(self, validated_data):

@@ -151,6 +151,16 @@ class ProjectGroupViewSet(BaseViewSet):
 
         return Response(serializer.data)
 
+    @override
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriding destroy action to get the deleted group id as a response
+        """
+        group = self.get_object()
+        data = group.id
+        group.delete()
+        return Response({"id": data})
+
     permission_classes = []
     serializer_class = ProjectGroupSerializer
 
