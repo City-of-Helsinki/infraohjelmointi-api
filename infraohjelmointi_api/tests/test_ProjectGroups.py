@@ -159,9 +159,8 @@ class projectGroupTestCase(TestCase):
         errorMessage = response.json()["errors"][0]["detail"]
         self.assertEqual(
             errorMessage,
-            "Project: {} with id: {} already belongs to the group: {} with id: {}".format(
+            "Project: {} cannot be assigned to this group. It already belongs to group: {} with groupId: {}".format(
                 self.project.name,
-                self.projectId,
                 Project.objects.get(id=self.projectId).projectGroup.name,
                 Project.objects.get(id=self.projectId).projectGroup_id,
             ),
