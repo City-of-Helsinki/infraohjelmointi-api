@@ -305,7 +305,7 @@ class SearchResultSerializer(serializers.Serializer):
         else:
             path = str(classInstance.id)
 
-        if 'suurpiiri' in classInstance.name.lower():
+        if "suurpiiri" in classInstance.name.lower():
             return path
 
         if locationInstance is None:
@@ -376,13 +376,29 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         """
 
         if projectIds is not None and len(projectIds) > 0:
+            # Get existing group instance if there is any
+            # In case of a PATCH or POST request to a group
+            # None if POST request for a new group
+            group = getattr(self, "instance", None)
             for projectId in projectIds:
                 project = get_object_or_404(Project, pk=projectId)
-                if project.projectGroup is not None:
+                if (
+                    (
+                        # PATCH request to existing group
+                        # Check if a project is in a group which is not same as the group being patched
+                        # Means a project is being assigned to this group which belongs to another group already
+                        group is not None
+                        and project.projectGroup is not None
+                        and project.projectGroup.id != group.id
+                    )
+                    or
+                    # POST request for new group
+                    # A project in the request already belongs to another group
+                    (group is None and project.projectGroup is not None)
+                ):
                     raise ValidationError(
-                        detail="Project: {} with id: {} already belongs to the group: {} with id: {}".format(
+                        detail="Project: {} cannot be assigned to this group. It already belongs to group: {} with groupId: {}".format(
                             project.name,
-                            projectId,
                             project.projectGroup.name,
                             project.projectGroup_id,
                         ),
@@ -398,6 +414,29 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
                 fields=["name", "classRelation", "locationRelation"],
             ),
         ]
+
+    @override
+    def update(self, instance, validated_data):
+        # new project Ids
+        updatedProjectIds = validated_data.pop("projects", [])
+        # get all project ids that currently belong to this group
+        existingProjectIds = instance.project_set.all().values_list("id", flat=True)
+        # project that are to be removed from this group
+        removedProjects = list(set(existingProjectIds) - set(updatedProjectIds))
+        if len(updatedProjectIds) > 0:
+            for projectId in updatedProjectIds:
+                if projectId not in existingProjectIds:
+                    project = get_object_or_404(Project, pk=projectId)
+                    project.projectGroup = instance
+                    project.save()
+
+        if len(removedProjects) > 0:
+            for projectId in removedProjects:
+                project = get_object_or_404(Project, pk=projectId)
+                project.projectGroup = None
+                project.save()
+
+        return super(ProjectGroupSerializer, self).update(instance, validated_data)
 
     @override
     def create(self, validated_data):
