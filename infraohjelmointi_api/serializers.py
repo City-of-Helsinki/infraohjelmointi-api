@@ -50,7 +50,7 @@ if path.exists(".env"):
 
 
 class BaseMeta:
-    exclude = ["createdDate", "updatedDate"]
+    exclude = ["createdDate"]
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
