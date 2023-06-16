@@ -48,6 +48,9 @@ class SearchResultSerializer(serializers.Serializer):
         else:
             path = str(classInstance.id)
 
+        if "suurpiiri" in classInstance.name.lower():
+            return path
+
         if locationInstance is None:
             return path
 
