@@ -3,6 +3,8 @@ import re
 from .hierarchy import buildHierarchiesAndProjects, getColor, MAIN_CLASS_COLOR
 from ....services import PersonService, ProjectService, NoteService
 from . import IExcelFileHandler
+from django.contrib import messages
+from io import BytesIO
 
 
 class PlanningFileHandler(IExcelFileHandler):
@@ -50,6 +52,48 @@ class PlanningFileHandler(IExcelFileHandler):
         stdout.write(style.SUCCESS("\n\nTotal rows handled  {}\n".format(len(rows))))
 
         stdout.write(style.SUCCESS("Planning file import done\n\n"))
+
+    def proceed_with_uploaded_file(self, request, uploadedFile):
+        messages.info(
+            request,
+            "Reading project data from planning file {}".format(uploadedFile.name),
+        )
+        wb = load_workbook(
+            filename=BytesIO(uploadedFile.read()), data_only=True, read_only=True
+        )
+
+        skipables = [
+            "none",
+            "ylitysoikeus",
+            "tae&tse raamit",
+            "ylityspaine",
+            "ylitysoikeus yhteensä",
+        ]
+
+        main_class = [
+            cel[0]
+            for cel in wb.worksheets[0][3:11]
+            if cel[0].value
+            and re.match("^\d \d\d.+", cel[0].value.strip())
+            and hex(int(getColor(wb, cel[0].fill.start_color), 16)) == MAIN_CLASS_COLOR
+        ][0].value
+
+        for sheetname in wb.sheetnames:
+            messages.info(request, "\n\nHandling sheet {}\n".format(sheetname))
+
+            sheet = wb[sheetname]
+            rows = list(sheet.rows)
+
+            buildHierarchiesAndProjects(
+                wb=wb,
+                rows=rows,
+                skipables=skipables,
+                main_class=main_class,
+                project_handler=self.proceed_with_project_row,
+            )
+
+        messages.success(request, "\n\nTotal rows handled  {}\n".format(len(rows)))
+        messages.success(request, "Planning file import done\n\n")
 
     def proceed_with_project_row(
         self, row, name, project_class, project_location, project_group

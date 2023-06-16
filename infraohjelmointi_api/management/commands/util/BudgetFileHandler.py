@@ -11,6 +11,8 @@ from ....services import (
 )
 
 from . import IExcelFileHandler
+from django.contrib import messages
+from io import BytesIO
 
 
 class BudgetFileHandler(IExcelFileHandler):
@@ -64,6 +66,40 @@ class BudgetFileHandler(IExcelFileHandler):
         stdout.write(style.SUCCESS("\n\nTotal rows handled  {}\n".format(len(rows))))
 
         stdout.write(style.SUCCESS("Planning file import done\n\n"))
+
+    def proceed_with_uploaded_file(self, request, uploadedFile):
+        messages.info(
+            request,
+            "Reading project data from budget file {}".format(uploadedFile.name),
+        )
+
+        wb = load_workbook(
+            filename=BytesIO(uploadedFile.read()), data_only=True, read_only=True
+        )
+
+        skipables = [
+            "none",
+            "ylitysoikeus",
+            "tae&tse raamit",
+            "ylityspaine",
+            "ylitysoikeus yhteensä",
+        ]
+
+        for sheetname in wb.sheetnames:
+            messages.info(request, "\n\nHandling sheet {}\n".format(sheetname))
+
+            sheet = wb[sheetname]
+            rows = list(sheet.rows)
+
+            buildHierarchiesAndProjects(
+                wb=wb,
+                rows=rows,
+                skipables=skipables,
+                project_handler=self.proceed_with_project_row,
+            )
+
+        messages.success(request, "\n\nTotal rows handled  {}\n".format(len(rows)))
+        messages.success(request, "Planning file import done\n\n")
 
     def proceed_with_project_row(
         self, row, name, project_class, project_location, project_group
