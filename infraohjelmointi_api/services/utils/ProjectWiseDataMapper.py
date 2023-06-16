@@ -210,22 +210,42 @@ class ProjectWiseDataMapper:
                 field_mapper = None
                 if field == "phase":
                     field_mapper = phase_map
-                    value = ProjectPhaseService.get_by_id(value).value
+                    value = (
+                        ProjectPhaseService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
                 elif field == "type":
                     field_mapper = project_type_map
-                    value = ProjectTypeService.get_by_id(value).value
+                    value = (
+                        ProjectTypeService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
                 elif field == "area":
                     field_mapper = project_area_map
-                    value = ProjectAreaService.get_by_id(value).value
+                    value = (
+                        ProjectAreaService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
                 elif field == "responsibleZone":
                     field_mapper = responsible_zone_map
-                    value = ResponsibleZoneService.get_by_id(value).value
+                    value = (
+                        ResponsibleZoneService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
                 elif field == "constructionPhaseDetail":
                     field_mapper = construction_phase_details_map
-                    value = ConstructionPhaseDetailService.get_by_id(value).value
+                    value = (
+                        ConstructionPhaseDetailService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
                 else:
                     raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
-                result[mapped_field["field"]] = field_mapper[value]
+                result[mapped_field["field"]] = field_mapper[value] if value else None
             # Class/Location field handling
             elif mapped_field["type"] == "enum":
                 if field == "projectClass":
