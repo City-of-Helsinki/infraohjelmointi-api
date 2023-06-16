@@ -99,7 +99,7 @@ class BudgetFileHandler(IExcelFileHandler):
             )
 
         messages.success(request, "\n\nTotal rows handled  {}\n".format(len(rows)))
-        messages.success(request, "Planning file import done\n\n")
+        messages.success(request, "Budget file import done\n\n")
 
     def proceed_with_project_row(
         self, row, name, project_class, project_location, project_group
