@@ -23,7 +23,6 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         write_only=True,
         required=False,
         allow_empty=True,
-        validators=[ProjectsFieldValidator()],
     )
 
     class Meta(BaseMeta):
@@ -33,7 +32,31 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
                 queryset=ProjectGroup.objects.all(),
                 fields=["name", "classRelation", "locationRelation"],
             ),
+            ProjectsFieldValidator(),
         ]
+
+    @override
+    def update(self, instance, validated_data):
+        # new project Ids
+        updatedProjectIds = validated_data.pop("projects", [])
+        # get all project ids that currently belong to this group
+        existingProjectIds = instance.project_set.all().values_list("id", flat=True)
+        # project that are to be removed from this group
+        removedProjects = list(set(existingProjectIds) - set(updatedProjectIds))
+        if len(updatedProjectIds) > 0:
+            for projectId in updatedProjectIds:
+                if projectId not in existingProjectIds:
+                    project = get_object_or_404(Project, pk=projectId)
+                    project.projectGroup = instance
+                    project.save()
+
+        if len(removedProjects) > 0:
+            for projectId in removedProjects:
+                project = get_object_or_404(Project, pk=projectId)
+                project.projectGroup = None
+                project.save()
+
+        return super(ProjectGroupSerializer, self).update(instance, validated_data)
 
     @override
     def create(self, validated_data):
