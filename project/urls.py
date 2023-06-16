@@ -100,5 +100,8 @@ router.register(
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("admin/planning-excel-uploader", views.excel_upload_view),
+    path("admin/budget-excel-uploader", views.excel_upload_view),
+    path("admin/class-location-excel-uploader", views.excel_upload_view),
     path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
