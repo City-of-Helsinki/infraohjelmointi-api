@@ -18,7 +18,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import routers
-from infraohjelmointi_api import views
+from infraohjelmointi_api import views, admin_views
 
 router = routers.DefaultRouter()
 router.register(r"projects", views.ProjectViewSet, basename="projects")
@@ -100,8 +100,8 @@ router.register(
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("admin/planning-excel-uploader", views.excel_upload_view),
-    path("admin/budget-excel-uploader", views.excel_upload_view),
-    path("admin/class-location-excel-uploader", views.excel_upload_view),
+    path("admin/planning-excel-uploader", admin_views.excel_upload_view),
+    path("admin/budget-excel-uploader", admin_views.excel_upload_view),
+    path("admin/class-location-excel-uploader", admin_views.excel_upload_view),
     path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
