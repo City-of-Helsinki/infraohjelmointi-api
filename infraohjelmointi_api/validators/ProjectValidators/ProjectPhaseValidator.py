@@ -4,14 +4,22 @@ from datetime import datetime
 
 
 class ProjectPhaseValidator:
-
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
+        print(
+            "all Fields on multiple {}, quersyet on multiple {}".format(
+                allFields, serializer.instance
+            )
+        )
         phase = allFields.get("phase", None)
+        project = serializer.instance
+        if phase is None and project is not None:
+            phase = project.phase
+
         if phase is None:
             return
-        project = serializer.instance
+
         if phase.value == "programming":
             category = allFields.get("category", None)
             planningStartYear = allFields.get("planningStartYear", None)
