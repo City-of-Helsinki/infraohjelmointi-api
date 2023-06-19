@@ -63,6 +63,7 @@ class ExcelFormView(View):
             self.read_class_location_uploaded_file(request, excel)
             url = reverse("admin:index")
             return HttpResponseRedirect(url)
-        projectFileHandler.proceed_with_uploaded_file(request, excel)
+        if projectFileHandler is not None:
+            projectFileHandler.proceed_with_uploaded_file(request, excel)
         url = reverse("admin:index")
         return HttpResponseRedirect(url)
