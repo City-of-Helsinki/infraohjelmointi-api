@@ -7,11 +7,8 @@ class ProjectPhaseValidator:
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
-        print(
-            "all Fields on multiple {}, quersyet on multiple {}".format(
-                allFields, serializer.instance
-            )
-        )
+        # build logic to fix validations using ids in context somehow
+        print(serializer.context)
         phase = allFields.get("phase", None)
         project = serializer.instance
         if phase is None and project is not None:
