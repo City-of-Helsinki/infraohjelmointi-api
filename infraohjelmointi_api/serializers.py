@@ -366,6 +366,12 @@ class SearchResultSerializer(serializers.Serializer):
         return projectHashtags
 
     def get_programmed(self, obj):
+        """
+        Gets the field `programmed` from a Project instance
+        This function only concerns instances of Project
+        """
+        # Checking if programmed exists on obj
+        # Only exists on Project
         if hasattr(obj, "programmed"):
             return obj.programmed
         return None
