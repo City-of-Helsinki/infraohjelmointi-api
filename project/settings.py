@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 from os import path
+import os
 from pathlib import Path
 import dj_database_url
 import environ
@@ -90,7 +91,9 @@ CORS_ALLOWED_ORIGINS = env("ALLOWED_CORS_ORIGINS")
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            os.path.join(BASE_DIR, "templates"),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
