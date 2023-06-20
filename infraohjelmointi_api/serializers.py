@@ -270,6 +270,7 @@ class SearchResultSerializer(serializers.Serializer):
     hashTags = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
     path = serializers.SerializerMethodField()
+    programmed = serializers.SerializerMethodField()
 
     def get_path(self, obj):
         instanceType = obj._meta.model.__name__
@@ -363,6 +364,11 @@ class SearchResultSerializer(serializers.Serializer):
             )
         )
         return projectHashtags
+
+    def get_programmed(self, obj):
+        if hasattr(obj, "programmed"):
+            return obj.programmed
+        return None
 
 
 class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerializer):
