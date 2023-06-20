@@ -1,15 +1,21 @@
+from infraohjelmointi_api.validators.ProjectValidators.BaseValidator import (
+    BaseValidator,
+)
 from rest_framework.exceptions import ValidationError
 
 
-class PlanningStartYearValidator:
-
+class PlanningStartYearValidator(BaseValidator):
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
+        # in case of multiple projects being patched at the same time
+        # this is then required
+        projectId = allFields.get("projectId", None)
+        project = self.getProjectInstance(projectId, serializer=serializer)
         planningStartYear = allFields.get("planningStartYear", None)
         if planningStartYear is None:
             return
-        project = serializer.instance
+
         constructionEndYear = allFields.get("constructionEndYear", None)
 
         if (

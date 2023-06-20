@@ -1,9 +1,6 @@
 from os import path
 from infraohjelmointi_api.models import (
     Project,
-    ProjectClass,
-    ProjectLocation,
-    ProjectPhase,
 )
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
@@ -132,6 +129,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     )
     pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
+    # write only field used when updating multiple projects
+    # helps during validation
+    projectId = serializers.UUIDField(write_only=True, required=False)
 
     class Meta(BaseMeta):
         model = Project
@@ -180,6 +180,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def create(self, validated_data):
+        # remove projectId as it doesn not exist on the Project model
+        validated_data.pop("projectId", None)
         phase = validated_data.get("phase", None)
         if phase is not None and phase.value == "programming":
             validated_data["programmed"] = True
@@ -197,6 +199,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def update(self, instance, validated_data):
+        # remove projectId as it doesn not exist on the Project model
+        validated_data.pop("projectId", None)
+
         phase = validated_data.get("phase", None)
 
         if phase is not None and phase.value == "programming":

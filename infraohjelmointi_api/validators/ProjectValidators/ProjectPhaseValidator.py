@@ -1,16 +1,21 @@
+from infraohjelmointi_api.validators.ProjectValidators.BaseValidator import (
+    BaseValidator,
+)
 from rest_framework.exceptions import ValidationError
 
 from datetime import datetime
 
 
-class ProjectPhaseValidator:
+class ProjectPhaseValidator(BaseValidator):
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
-        # build logic to fix validations using ids in context somehow
-        print(serializer.context)
+        # in case of multiple projects being patched at the same time
+        # this is then required
+        projectId = allFields.get("projectId", None)
+        project = self.getProjectInstance(projectId, serializer=serializer)
+
         phase = allFields.get("phase", None)
-        project = serializer.instance
         if phase is None and project is not None:
             phase = project.phase
 
