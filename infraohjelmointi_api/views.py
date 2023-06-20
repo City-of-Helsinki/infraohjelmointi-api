@@ -70,6 +70,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 import logging
 
+
 logger = logging.getLogger("infraohjelmointi_api")
 
 
@@ -628,7 +629,9 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent=True,
                     search_ids=subClass,
                     model_class=ProjectClass,
-                    direct=False if len(subClass) == 1 and "suurpiiri" in subClassModel.name.lower() else direct,
+                    direct=False
+                    if len(subClass) == 1 and "suurpiiri" in subClassModel.name.lower()
+                    else direct,
                 )
 
             if len(district) > 0:
