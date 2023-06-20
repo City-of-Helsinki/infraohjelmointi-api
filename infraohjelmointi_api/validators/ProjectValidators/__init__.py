@@ -14,3 +14,4 @@ from .PlanningStartYearValidator import PlanningStartYearValidator
 from .ConstructionEndYearValidator import ConstructionEndYearValidator
 from .ProgrammedValidator import ProgrammedValidator
 from .LockedFieldsValidator import LockedFieldsValidator
+from .BaseValidator import BaseValidator

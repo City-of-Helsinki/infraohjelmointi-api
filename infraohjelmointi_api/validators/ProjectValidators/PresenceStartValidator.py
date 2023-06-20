@@ -1,15 +1,22 @@
+from infraohjelmointi_api.validators.ProjectValidators.BaseValidator import (
+    BaseValidator,
+)
 from rest_framework.exceptions import ValidationError
 
 
-class PresenceStartValidator:
-
+class PresenceStartValidator(BaseValidator):
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
+        # in case of multiple projects being patched at the same time
+        # this is then required
+        projectId = allFields.get("projectId", None)
+        project = self.getProjectInstance(projectId, serializer=serializer)
+
         presenceStart = allFields.get("presenceStart", None)
         if presenceStart is None:
             return
-        project = serializer.instance
+
         presenceEnd = allFields.get("presenceEnd", None)
 
         if (

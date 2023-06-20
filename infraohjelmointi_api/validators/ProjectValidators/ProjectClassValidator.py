@@ -1,18 +1,25 @@
+from infraohjelmointi_api.validators.ProjectValidators.BaseValidator import (
+    BaseValidator,
+)
 from rest_framework.exceptions import ValidationError
 from ..util.is_projectClass_projectLocation_valid import (
     _is_projectClass_projectLocation_valid,
 )
 
 
-class ProjectClassValidator:
-
+class ProjectClassValidator(BaseValidator):
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
+        # in case of multiple projects being patched at the same time
+        # this is then required
+        projectId = allFields.get("projectId", None)
+        project = self.getProjectInstance(projectId, serializer=serializer)
+
         projectClass = allFields.get("projectClass", None)
         if projectClass is None:
             return
-        project = serializer.instance
+
         if "projectLocation" in allFields and allFields.get("projectLocation") is None:
             return
         projectLocation = allFields.get("projectLocation", None)
