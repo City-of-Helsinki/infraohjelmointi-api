@@ -14,6 +14,12 @@ class PresenceEndValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
 
         presenceEnd = allFields.get("presenceEnd", None)
+        if (
+            presenceEnd is None
+            and project is not None
+            and "presenceEnd" not in allFields
+        ):
+            presenceEnd = project.presenceEnd
         if presenceEnd is None:
             return
 
@@ -22,7 +28,7 @@ class PresenceEndValidator(BaseValidator):
         if (
             presenceStart is None
             and project is not None
-            and project.presenceStart is not None
+            and "presenceStart" not in allFields
         ):
             presenceStart = project.presenceStart
 

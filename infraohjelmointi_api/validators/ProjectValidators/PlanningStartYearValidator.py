@@ -13,6 +13,12 @@ class PlanningStartYearValidator(BaseValidator):
         projectId = allFields.get("projectId", None)
         project = self.getProjectInstance(projectId, serializer=serializer)
         planningStartYear = allFields.get("planningStartYear", None)
+        if (
+            planningStartYear is None
+            and project is not None
+            and "planningStartYear" not in allFields
+        ):
+            planningStartYear = project.planningStartYear
         if planningStartYear is None:
             return
 
@@ -21,7 +27,7 @@ class PlanningStartYearValidator(BaseValidator):
         if (
             constructionEndYear is None
             and project is not None
-            and project.constructionEndYear is not None
+            and "constructionEndYear" not in allFields
         ):
             constructionEndYear = project.constructionEndYear
 

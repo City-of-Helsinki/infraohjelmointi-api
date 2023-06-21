@@ -17,17 +17,23 @@ class ProjectLocationValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
 
         projectLocation = allFields.get("projectLocation", None)
+        if (
+            projectLocation is None
+            and project is not None
+            and "projectLocation" not in allFields
+        ):
+            projectLocation = project.projectLocation
         if projectLocation is None:
             return
 
         projectClass = allFields.get("projectClass", None)
-
         if (
             projectClass is None
             and project is not None
-            and project.projectClass is not None
+            and "projectClass" not in allFields
         ):
             projectClass = project.projectClass
+
         if not _is_projectClass_projectLocation_valid(
             projectLocation=projectLocation, projectClass=projectClass
         ):

@@ -14,6 +14,12 @@ class VisibilityStartValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
 
         visibilityStart = allFields.get("visibilityStart", None)
+        if (
+            visibilityStart is None
+            and project is not None
+            and "visibilityStart" not in allFields
+        ):
+            visibilityStart = project.visibilityStart
         if visibilityStart is None:
             return
 
@@ -22,7 +28,7 @@ class VisibilityStartValidator(BaseValidator):
         if (
             visibilityEnd is None
             and project is not None
-            and project.visibilityEnd is not None
+            and "visibilityEnd" not in allFields
         ):
             visibilityEnd = project.visibilityEnd
 
