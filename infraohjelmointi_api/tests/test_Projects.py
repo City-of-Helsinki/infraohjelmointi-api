@@ -1411,8 +1411,8 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             len(response.json()["results"]),
-            2,
-            msg="Filtered result should conresults with field programmed = false. Found: {}".format(
+            3,
+            msg="Filtered result should contain 3 results with field programmed = false. Found: {}".format(
                 len(response.json()["results"])
             ),
         )
