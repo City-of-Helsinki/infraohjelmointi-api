@@ -146,10 +146,15 @@ class ProjectTestCase(TestCase):
             id=self.projectCategory_1_Id, value="K5"
         )
         self.projectMasterClass = ProjectClass.objects.create(
-            id=self.projectMasterClass_1_Id, name="Test Master Class", parent=None,path='Test Master Class'
+            id=self.projectMasterClass_1_Id,
+            name="Test Master Class",
+            parent=None,
+            path="Test Master Class",
         )
         self.projectClass = self.projectMasterClass.childClass.create(
-            name="Test Class", id=self.projectClass_1_Id,path='Test Master Class/Test Class'
+            name="Test Class",
+            id=self.projectClass_1_Id,
+            path="Test Master Class/Test Class",
         )
         self.constructionPhase = ConstructionPhase.objects.create(
             id=self.constructionPhaseId, value="planning"
@@ -1930,6 +1935,13 @@ class ProjectTestCase(TestCase):
                 len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
+        self.assertEqual(
+            [x for x in response.json()["results"] if x["type"] == "groups"][0][
+                "programmed"
+            ],
+            None,
+            msg="Groups in search result should have programmed field set to None",
+        )
 
         response = self.client.get(
             "/projects/search-results/?group={}&group={}&subClass={}&district={}".format(
@@ -1965,6 +1977,11 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertEqual(
+            [x for x in response.json()["results"] if x["type"] == "classes"][0]['programmed'],
+            None,
+            msg="Classes in search result should have programmed field set to None",
+        )
+        self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
             1,
             msg="Filtered result should contain 1 location with id {}. Found: {}".format(
@@ -1973,6 +1990,13 @@ class ProjectTestCase(TestCase):
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
             ),
+        )
+        self.assertEqual(
+            [x for x in response.json()["results"] if x["type"] == "locations"][0][
+                "programmed"
+            ],
+            None,
+            msg="Locations in search result should have programmed field set to None",
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "groups"]),
@@ -2075,6 +2099,28 @@ class ProjectTestCase(TestCase):
                 self.projectDistrict_3_Id,
             ),
             msg="Path does not follow the format masterClass/class/subClass/district",
+        )
+
+        response = self.client.get(
+            "/projects/search-results/?project={}".format(
+                self.project_3_Id,
+            ),
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200, Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Should return 1 project with id: {}".format(self.project_3_Id),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["programmed"],
+            True,
+            msg="programmed field in response should be `True`",
         )
 
     # Commented out test to check if a project gets locked automatically on phase change
