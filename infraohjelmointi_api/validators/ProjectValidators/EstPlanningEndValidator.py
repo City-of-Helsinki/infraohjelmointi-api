@@ -13,6 +13,12 @@ class EstPlanningEndValidator(BaseValidator):
         projectId = allFields.get("projectId", None)
         project = self.getProjectInstance(projectId, serializer=serializer)
         estPlanningEnd = allFields.get("estPlanningEnd", None)
+        if (
+            estPlanningEnd is None
+            and project is not None
+            and "estPlanningEnd" not in allFields
+        ):
+            estPlanningEnd = project.estPlanningEnd
         if estPlanningEnd is None:
             return
 
@@ -21,7 +27,7 @@ class EstPlanningEndValidator(BaseValidator):
         if (
             estPlanningStart is None
             and project is not None
-            and project.estPlanningStart is not None
+            and "estPlanningStart" not in allFields
         ):
             estPlanningStart = project.estPlanningStart
 

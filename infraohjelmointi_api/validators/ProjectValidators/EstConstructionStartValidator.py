@@ -14,6 +14,9 @@ class EstConstructionStartValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
 
         estConstructionStart = allFields.get("estConstructionStart", None)
+        if estConstructionStart is None and project is not None:
+            estConstructionStart = project.estConstructionStart
+
         if estConstructionStart is None:
             return
 
@@ -22,7 +25,7 @@ class EstConstructionStartValidator(BaseValidator):
         if (
             estConstructionEnd is None
             and project is not None
-            and project.estConstructionEnd is not None
+            and "estConstructionEnd" not in allFields
         ):
             estConstructionEnd = project.estConstructionEnd
 

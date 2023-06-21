@@ -14,16 +14,16 @@ class ProgrammedValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
         programmed = allFields.get("programmed", None)
 
-        if programmed is None and project is not None:
+        if programmed is None and project is not None and "programmed" not in allFields:
             programmed = project.programmed
         if programmed is None:
             return
 
         category = allFields.get("category", None)
         phase = allFields.get("phase", None)
-        if phase is None and project is not None:
+        if phase is None and project is not None and "phase" not in allFields:
             phase = project.phase
-        if category is None and project is not None:
+        if category is None and project is not None and "category" not in allFields:
             category = project.category
 
         if category is None and programmed == True:

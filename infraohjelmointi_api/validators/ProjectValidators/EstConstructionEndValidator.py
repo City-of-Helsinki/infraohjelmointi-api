@@ -13,11 +13,25 @@ class EstConstructionEndValidator(BaseValidator):
         projectId = allFields.get("projectId", None)
         project = self.getProjectInstance(projectId, serializer=serializer)
         estConstructionEnd = allFields.get("estConstructionEnd", None)
+        if (
+            estConstructionEnd is None
+            and project is not None
+            and "estConstructionEnd" not in allFields
+        ):
+            estConstructionEnd = project.estConstructionEnd
+
         if estConstructionEnd is None:
             return
-        estConstructionStart = allFields.get("estConstructionStart", None)
-        if project is not None and hasattr(project, "lock"):
+
+        constructionEndYear = allFields.get("constructionEndYear", None)
+        if (
+            constructionEndYear is None
+            and project is not None
+            and "constructionEndYear" not in allFields
+        ):
             constructionEndYear = project.constructionEndYear
+
+        if project is not None and hasattr(project, "lock"):
             if constructionEndYear is not None and estConstructionEnd is not None:
                 if estConstructionEnd.year > constructionEndYear:
                     raise ValidationError(
@@ -27,10 +41,12 @@ class EstConstructionEndValidator(BaseValidator):
                         code="estConstructionEnd_lt_constructionEndYear_locked",
                     )
 
+        estConstructionStart = allFields.get("estConstructionStart", None)
+
         if (
             estConstructionStart is None
             and project is not None
-            and project.estConstructionStart is not None
+            and "estConstructionStart" not in allFields
         ):
             estConstructionStart = project.estConstructionStart
 

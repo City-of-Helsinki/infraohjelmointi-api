@@ -14,13 +14,25 @@ class EstPlanningStartValidator(BaseValidator):
         project = self.getProjectInstance(projectId, serializer=serializer)
 
         estPlanningStart = allFields.get("estPlanningStart", None)
+        if (
+            estPlanningStart is None
+            and project is not None
+            and "estPlanningStart" not in allFields
+        ):
+            estPlanningStart = project.estPlanningStart
+
         if estPlanningStart is None:
             return
 
-        estPlanningEnd = allFields.get("estPlanningEnd", None)
+        planningStartYear = allFields.get("planningStartYear", None)
+        if (
+            planningStartYear is None
+            and project is not None
+            and "planningStartYear" not in allFields
+        ):
+            planningStartYear = project.planningStartYear
 
         if project is not None and hasattr(project, "lock"):
-            planningStartYear = project.planningStartYear
             if planningStartYear is not None and estPlanningStart is not None:
                 if estPlanningStart.year < planningStartYear:
                     raise ValidationError(
@@ -29,10 +41,13 @@ class EstPlanningStartValidator(BaseValidator):
                         },
                         code="estPlanningStart_et_planningStartYear_locked",
                     )
+
+        estPlanningEnd = allFields.get("estPlanningEnd", None)
+
         if (
             estPlanningEnd is None
             and project is not None
-            and project.estPlanningEnd is not None
+            and "estPlanningEnd" not in allFields
         ):
             estPlanningEnd = project.estPlanningEnd
 

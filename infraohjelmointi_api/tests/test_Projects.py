@@ -244,7 +244,7 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=False,
             category=self.projectCategory,
-            constructionPhaseDetail=self.conPhaseDetail,
+            constructionPhaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -387,10 +387,10 @@ class ProjectTestCase(TestCase):
                 self.project_1_Id
             ),
         )
-        self.assertDictEqual(
-            self.conPhaseDetail.project_set.all().values()[0],
-            Project.objects.filter(id=self.project_1_Id).values()[0],
-            msg="conPhaseDetail foreign key does not exist in Project with id {}".format(
+        self.assertEqual(
+            len(self.conPhaseDetail.project_set.all()),
+            0,
+            msg="No foreign key should exist for constructionPhaseDetail in Project with id {}".format(
                 self.project_1_Id
             ),
         )
@@ -3319,6 +3319,7 @@ class ProjectTestCase(TestCase):
         data = {
             "programmed": False,
             "phase": ProjectPhase.objects.get(value="proposal").id,
+            "constructionPhaseDetail": None,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
@@ -3375,7 +3376,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "Year cannot be later than constructionEndYear",
+            "Year cannot be earlier than planningStartYear",
             response.json()["errors"][0]["detail"],
         )
         data = {"planningStartYear": 2050, "constructionEndYear": 2060}
