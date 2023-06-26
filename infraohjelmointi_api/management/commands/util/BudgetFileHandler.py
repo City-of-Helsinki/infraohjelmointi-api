@@ -38,6 +38,7 @@ class BudgetFileHandler(IExcelFileHandler):
             "none",
             "ylitysoikeus",
             "tae&tse raamit",
+            "tae & tse raamit",
             "ylityspaine",
             "ylitysoikeus yhteensä",
         ]
@@ -81,6 +82,7 @@ class BudgetFileHandler(IExcelFileHandler):
             "none",
             "ylitysoikeus",
             "tae&tse raamit",
+            "tae&tse raami",
             "ylityspaine",
             "ylitysoikeus yhteensä",
         ]

@@ -512,6 +512,8 @@ def buildHierarchiesAndProjects(
     indention = 0
     type = "MAIN CLASS"
 
+    print("main class", main_class)
+
     for row in rows[2:]:
         cell = row[name_column_index]
         # read class/district name
@@ -643,11 +645,13 @@ def buildHierarchiesAndProjects(
         elif cell_color_hex == GROUP_COLOR:
             type = "GROUP"
             indention = 4
-            location = location_stack[-1]
+            location = location_stack[-1] if len(location_stack) > 0 else None
             # group with name Varaus or Varaukset belong only to district, not to division (city part)
             if (
-                "varaus" in name.lower() or "varaukset" in name.lower()
-            ) and location.parent != None:
+                ("varaus" in name.lower() or "varaukset" in name.lower())
+                and location
+                and location.parent != None
+            ):
                 location = location.parent
 
             project_group = ProjectGroupService.get_or_create(
@@ -712,12 +716,16 @@ def buildHierarchiesAndProjects(
             indention = 4
             type = "PROJECT"
             cell_color = "FFFFFF"
-            if project_handler:
+            print(class_stack)
+            print("name {}".format(name))
+            if name and project_handler:
                 project_handler(
                     row=row,
                     name=name,
                     project_class=class_stack[-1],
-                    project_location=location_stack[-1],
+                    project_location=location_stack[-1]
+                    if len(location_stack) > 0
+                    else None,
                     project_group=None,
                 )
 
