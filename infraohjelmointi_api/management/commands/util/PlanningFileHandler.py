@@ -23,13 +23,14 @@ class PlanningFileHandler(IExcelFileHandler):
             "none",
             "ylitysoikeus",
             "tae&tse raamit",
+            "tae&tse raami",
             "ylityspaine",
             "ylitysoikeus yhteensä",
         ]
 
         main_class = [
             cel[0]
-            for cel in wb.worksheets[0][3:11]
+            for cel in wb.worksheets[0][2:11]
             if cel[0].value
             and re.match("^\d \d\d.+", cel[0].value.strip())
             and hex(int(getColor(wb, cel[0].fill.start_color), 16)) == MAIN_CLASS_COLOR
@@ -106,7 +107,7 @@ class PlanningFileHandler(IExcelFileHandler):
             if projectManager and projectManager != "?"
             else None
         )
-        pwNumber = row[29].value
+        pwNumber = row[29].value if len(row) > 29 else None
 
         try:
             project = ProjectService.get(
@@ -134,7 +135,7 @@ class PlanningFileHandler(IExcelFileHandler):
         project.personPlanning = responsiblePerson
         project.save()
 
-        notes = str(row[28].value).strip()
+        notes = str((row[28].value if len(row) > 28 else "")).strip()
         if notes != "None" and notes != "?":
             NoteService.create(
                 content=notes,
