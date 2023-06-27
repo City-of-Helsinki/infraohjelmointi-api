@@ -512,8 +512,6 @@ def buildHierarchiesAndProjects(
     indention = 0
     type = "MAIN CLASS"
 
-    print("main class", main_class)
-
     for row in rows[2:]:
         cell = row[name_column_index]
         # read class/district name
@@ -716,8 +714,6 @@ def buildHierarchiesAndProjects(
             indention = 4
             type = "PROJECT"
             cell_color = "FFFFFF"
-            print(class_stack)
-            print("name {}".format(name))
             if name and project_handler:
                 project_handler(
                     row=row,

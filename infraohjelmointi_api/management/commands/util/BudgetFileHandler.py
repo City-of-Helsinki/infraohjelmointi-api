@@ -14,6 +14,10 @@ from . import IExcelFileHandler
 from django.contrib import messages
 from io import BytesIO
 
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
+
 
 class BudgetFileHandler(IExcelFileHandler):
     """Excel file handler implementation for budget data"""
@@ -25,11 +29,9 @@ class BudgetFileHandler(IExcelFileHandler):
         }
         self.current_budget_year = datetime.date.today().year
 
-    def proceed_with_file(self, excel_path, stdout, style):
-        stdout.write(
-            style.ERROR(
-                "\n\nReading project data from budget file {}\n".format(excel_path)
-            )
+    def proceed_with_file(self, excel_path):
+        logger.error(
+            "\n\nReading project data from budget file {}\n".format(excel_path)
         )
 
         wb = load_workbook(excel_path, data_only=True, read_only=True)
@@ -39,12 +41,14 @@ class BudgetFileHandler(IExcelFileHandler):
             "ylitysoikeus",
             "tae&tse raamit",
             "tae & tse raamit",
+            "tae&tse raami",
+            "tae & tse raami",
             "ylityspaine",
             "ylitysoikeus yhteensä",
         ]
 
         for sheetname in wb.sheetnames:
-            stdout.write(style.NOTICE("\n\nHandling sheet {}\n".format(sheetname)))
+            logger.debug("\n\nHandling sheet {}\n".format(sheetname))
 
             sheet = wb[sheetname]
             rows = list(sheet.rows)
@@ -64,34 +68,48 @@ class BudgetFileHandler(IExcelFileHandler):
                 project_handler=self.proceed_with_project_row,
             )
 
-        stdout.write(style.SUCCESS("\n\nTotal rows handled  {}\n".format(len(rows))))
-
-        stdout.write(style.SUCCESS("Planning file import done\n\n"))
+        logger.info("\n\nTotal rows handled  {}\n".format(len(rows)))
+        logger.info("Budget file import done\n\n")
 
     def proceed_with_uploaded_file(self, request, uploadedFile):
         messages.info(
             request,
-            "Reading project data from budget file {}".format(uploadedFile.name),
+            "Reading project data from uploaded budget file {}".format(
+                uploadedFile.name
+            ),
         )
 
         wb = load_workbook(
             filename=BytesIO(uploadedFile.read()), data_only=True, read_only=True
         )
 
+        self.proceed_with_excel_data(wb=wb)
+
+        messages.success(request, "Budget file import done\n\n")
+
+    def proceed_with_excel_data(self, wb):
         skipables = [
             "none",
             "ylitysoikeus",
             "tae&tse raamit",
-            "tae&tse raami",
+            "tae & tse raamit",
             "ylityspaine",
             "ylitysoikeus yhteensä",
         ]
 
         for sheetname in wb.sheetnames:
-            messages.info(request, "\n\nHandling sheet {}\n".format(sheetname))
+            logger.debug("\n\nHandling sheet {}\n".format(sheetname))
 
             sheet = wb[sheetname]
             rows = list(sheet.rows)
+            year_heading = None
+            # there is a need to find the year for the budget file
+            for year in rows[8:11]:
+                if str(year[19].value).lower() == "tae":
+                    year_heading = "tae"
+                elif year_heading == "tae" and str(year[19].value).isnumeric():
+                    self.current_budget_year = year[19].value
+                    break
 
             buildHierarchiesAndProjects(
                 wb=wb,
@@ -100,8 +118,7 @@ class BudgetFileHandler(IExcelFileHandler):
                 project_handler=self.proceed_with_project_row,
             )
 
-        messages.success(request, "\n\nTotal rows handled  {}\n".format(len(rows)))
-        messages.success(request, "Budget file import done\n\n")
+        logger.info("\n\nTotal rows handled  {}\n".format(len(rows)))
 
     def proceed_with_project_row(
         self, row, name, project_class, project_location, project_group
@@ -144,7 +161,7 @@ class BudgetFileHandler(IExcelFileHandler):
         )
 
         notes = str(row[29].value).strip()
-        pwNumber = str(row[30].value).strip()
+        pwNumber = str(row[30].value).strip().lower()
 
         try:
             project = ProjectService.get(
@@ -229,7 +246,11 @@ class BudgetFileHandler(IExcelFileHandler):
 
             project_financial.save()
 
-            project.hkrId = pwNumber if pwNumber != "None" and pwNumber != "?" else None
+            project.hkrId = (
+                pwNumber
+                if pwNumber != "none" and pwNumber != "?" and pwNumber != "x"
+                else None
+            )
             project.save()
         except Exception as e:
             print(f"Project {name} handling ended in exception")

@@ -127,7 +127,7 @@ class Command(BaseCommand):
                 return
 
             try:
-                handler.proceed_with_file(options[option], self.stdout, self.style)
+                handler.proceed_with_file(options[option])
 
             except Exception as e:
                 e.with_traceback()
