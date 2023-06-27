@@ -17,7 +17,7 @@ class ProjectFinancial(models.Model):
     )
     project = models.ForeignKey(
         "Project",
-        on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
         blank=False,
         null=False,
         related_name="finances",
