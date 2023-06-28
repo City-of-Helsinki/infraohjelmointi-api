@@ -51,3 +51,4 @@ class ProgrammedValidator(BaseValidator):
                 },
                 code="programmed_true_missing_phase",
             )
+        # programmed == True then check class and locations are filled in
