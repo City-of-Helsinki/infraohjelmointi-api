@@ -8,6 +8,9 @@ from infraohjelmointi_api.models import (
     ProjectLocation,
     ProjectFinancial,
 )
+from infraohjelmointi_api.services.ProjectFinancialService import (
+    ProjectFinancialService,
+)
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 from django.dispatch import receiver
 import django_filters
@@ -315,25 +318,17 @@ class ProjectViewSet(BaseViewSet):
             else date.today().year
         )
         if finances is not None:
-            fieldToYearMapping = {
-                "budgetProposalCurrentYearPlus0": year,
-                "budgetProposalCurrentYearPlus1": year + 1,
-                "budgetProposalCurrentYearPlus2": year + 2,
-                "preliminaryCurrentYearPlus3": year + 3,
-                "preliminaryCurrentYearPlus4": year + 4,
-                "preliminaryCurrentYearPlus5": year + 5,
-                "preliminaryCurrentYearPlus6": year + 6,
-                "preliminaryCurrentYearPlus7": year + 7,
-                "preliminaryCurrentYearPlus8": year + 8,
-                "preliminaryCurrentYearPlus9": year + 9,
-                "preliminaryCurrentYearPlus10": year + 10,
-            }
+            fieldToYearMapping = (
+                ProjectFinancialService.get_financial_field_to_year_mapping(
+                    start_year=year
+                )
+            )
             for field in finances.keys():
                 (
                     projectFinancialObject,
                     created,
-                ) = ProjectFinancial.objects.get_or_create(
-                    year=fieldToYearMapping[field], project=project
+                ) = ProjectFinancialService.get_or_create(
+                    year=fieldToYearMapping[field], project_id=project.id
                 )
                 financeSerializer = ProjectFinancialSerializer(
                     projectFinancialObject,
@@ -755,19 +750,11 @@ class ProjectViewSet(BaseViewSet):
                         year = finances.get("year", date.today().year)
                         if year is None:
                             year = date.today().year
-                        fieldToYearMapping = {
-                            "budgetProposalCurrentYearPlus0": year,
-                            "budgetProposalCurrentYearPlus1": year + 1,
-                            "budgetProposalCurrentYearPlus2": year + 2,
-                            "preliminaryCurrentYearPlus3": year + 3,
-                            "preliminaryCurrentYearPlus4": year + 4,
-                            "preliminaryCurrentYearPlus5": year + 5,
-                            "preliminaryCurrentYearPlus6": year + 6,
-                            "preliminaryCurrentYearPlus7": year + 7,
-                            "preliminaryCurrentYearPlus8": year + 8,
-                            "preliminaryCurrentYearPlus9": year + 9,
-                            "preliminaryCurrentYearPlus10": year + 10,
-                        }
+                        fieldToYearMapping = (
+                            ProjectFinancialService.get_financial_field_to_year_mapping(
+                                start_year=year
+                            )
+                        )
                         for field in finances.keys():
                             # skip the year field in finances
                             if field == "year":
@@ -775,9 +762,9 @@ class ProjectViewSet(BaseViewSet):
                             (
                                 projectFinancialObject,
                                 created,
-                            ) = ProjectFinancial.objects.get_or_create(
+                            ) = ProjectFinancialService.get_or_create(
                                 year=fieldToYearMapping[field],
-                                project=Project(id=financeData["project"]),
+                                project_id=Project(id=financeData["project"]).id,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,
@@ -898,8 +885,8 @@ class ProjectViewSet(BaseViewSet):
                 )
 
             financialProjectIds = (
-                ProjectFinancial.objects.filter(
-                    value__gt=0, year__in=range(prYearMin, prYearMax + 1)
+                ProjectFinancialService.find_by_min_value_and_year_range(
+                    min_value=0, year_range=range(prYearMin, prYearMax + 1)
                 )
                 .values_list("project", flat=True)
                 .distinct()
@@ -912,7 +899,9 @@ class ProjectViewSet(BaseViewSet):
 
             prYearMin = int(prYearMin)
             financialProjectIds = (
-                ProjectFinancial.objects.filter(year__gte=prYearMin, value__gt=0)
+                ProjectFinancialService.find_by_min_value_and_min_year(
+                    min_value=0, min_year=prYearMin
+                )
                 .values_list("project", flat=True)
                 .distinct()
             )
@@ -924,7 +913,9 @@ class ProjectViewSet(BaseViewSet):
             prYearMax = int(prYearMax)
 
             financialProjectIds = (
-                ProjectFinancial.objects.filter(year__lte=prYearMax, value__gt=0)
+                ProjectFinancialService.find_by_min_value_and_max_year(
+                    min_value=0, max_year=prYearMax
+                )
                 .values_list("project", flat=True)
                 .distinct()
             )
