@@ -884,19 +884,7 @@ class ProjectViewSet(BaseViewSet):
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
         currYear = datetime.date.today().year
-        yearToFieldMapping = {
-            currYear: "budgetProposalCurrentYearPlus0__gt",
-            currYear + 1: "budgetProposalCurrentYearPlus1__gt",
-            currYear + 2: "budgetProposalCurrentYearPlus2__gt",
-            currYear + 3: "preliminaryCurrentYearPlus3__gt",
-            currYear + 4: "preliminaryCurrentYearPlus4__gt",
-            currYear + 5: "preliminaryCurrentYearPlus5__gt",
-            currYear + 6: "preliminaryCurrentYearPlus6__gt",
-            currYear + 7: "preliminaryCurrentYearPlus7__gt",
-            currYear + 8: "preliminaryCurrentYearPlus8__gt",
-            currYear + 9: "preliminaryCurrentYearPlus9__gt",
-            currYear + 10: "preliminaryCurrentYearPlus10__gt",
-        }
+
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric():
                 raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
@@ -911,139 +899,39 @@ class ProjectViewSet(BaseViewSet):
                     code="prYearMin_gt_prYearMax",
                 )
 
-            if (
-                prYearMin in yearToFieldMapping.keys()
-                and prYearMax in yearToFieldMapping.keys()
-            ):
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
+            financialProjectIds = (
+                ProjectFinancial.objects.filter(
+                    value__gt=0, year__in=range(prYearMin,prYearMax+1)
                 )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMin in yearToFieldMapping.keys():
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMax in yearToFieldMapping.keys():
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            else:
-                qs = qs.none()
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         elif prYearMin is not None:
             if not prYearMin.isnumeric():
                 raise ParseError(detail={"prYearMin": "Invalid value"}, code="invalid")
 
             prYearMin = int(prYearMin)
-            if prYearMin < currYear:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMin > currYear + 10:
-                qs = qs.none()
-            else:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+            financialProjectIds = (
+                ProjectFinancial.objects.filter(year__gte=prYearMin, value__gt=0)
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         elif prYearMax is not None:
             if not prYearMax.isnumeric():
                 raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
-
             prYearMax = int(prYearMax)
-            if prYearMax < currYear:
-                qs = qs.none()
-            elif prYearMax > currYear + 10:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            else:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+
+            financialProjectIds = (
+                ProjectFinancial.objects.filter(year__lte=prYearMax, value__gt=0)
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+
         return qs
 
 

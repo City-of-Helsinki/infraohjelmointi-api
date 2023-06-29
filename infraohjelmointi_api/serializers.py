@@ -690,9 +690,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
             year = date.today().year
         spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
             project_id=project.id, max_year=year
-        ).aggregate(spent_budget=Sum("value", default=0))[
-            "spent_budget"
-        ]
+        ).aggregate(spent_budget=Sum("value", default=0))["spent_budget"]
 
         return int(spentBudget)
 

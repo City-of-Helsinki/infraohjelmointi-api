@@ -1176,49 +1176,45 @@ class ProjectTestCase(TestCase):
             projectGroup=projectGroup_1,
             personPlanning=personPlanning,
         )
-        projectFinances_1 = ProjectFinancial.objects.create(
-            project=project_1,
-            budgetProposalCurrentYearPlus0=10.00,
-            budgetProposalCurrentYearPlus1=20.00,
-            budgetProposalCurrentYearPlus2=30.00,
-            preliminaryCurrentYearPlus3=40.00,
-            preliminaryCurrentYearPlus4=5.00,
-            preliminaryCurrentYearPlus5=0.00,
-            preliminaryCurrentYearPlus6=0.00,
-            preliminaryCurrentYearPlus7=0.00,
-            preliminaryCurrentYearPlus8=0.00,
-            preliminaryCurrentYearPlus9=0.00,
-            preliminaryCurrentYearPlus10=0.00,
-        )
-        projectFinances_2 = ProjectFinancial.objects.create(
-            project=project_2,
-            budgetProposalCurrentYearPlus0=0.00,
-            budgetProposalCurrentYearPlus1=0.00,
-            budgetProposalCurrentYearPlus2=50.00,
-            preliminaryCurrentYearPlus3=40.00,
-            preliminaryCurrentYearPlus4=5.00,
-            preliminaryCurrentYearPlus5=0.00,
-            preliminaryCurrentYearPlus6=0.00,
-            preliminaryCurrentYearPlus7=5.00,
-            preliminaryCurrentYearPlus8=9.00,
-            preliminaryCurrentYearPlus9=10.00,
-            preliminaryCurrentYearPlus10=0.00,
-        )
+        year = date.today().year
+        # for project_1
+        ProjectFinancial.objects.create(project=project_1, year=year, value=10)
+        ProjectFinancial.objects.create(project=project_1, year=year + 1, value=20)
+        ProjectFinancial.objects.create(project=project_1, year=year + 2, value=30)
+        ProjectFinancial.objects.create(project=project_1, year=year + 3, value=40)
+        ProjectFinancial.objects.create(project=project_1, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_1, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 7, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 8, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 9, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 10, value=0)
 
-        projectFinances_3 = ProjectFinancial.objects.create(
-            project=project_3,
-            budgetProposalCurrentYearPlus0=0.00,
-            budgetProposalCurrentYearPlus1=0.00,
-            budgetProposalCurrentYearPlus2=50.00,
-            preliminaryCurrentYearPlus3=40.00,
-            preliminaryCurrentYearPlus4=5.00,
-            preliminaryCurrentYearPlus5=0.00,
-            preliminaryCurrentYearPlus6=0.00,
-            preliminaryCurrentYearPlus7=5.00,
-            preliminaryCurrentYearPlus8=9.00,
-            preliminaryCurrentYearPlus9=10.00,
-            preliminaryCurrentYearPlus10=0.00,
-        )
+        # for project_2
+        ProjectFinancial.objects.create(project=project_2, year=year, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year+1, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year+2, value=50)
+        ProjectFinancial.objects.create(project=project_2, year=year+3, value=40)
+        ProjectFinancial.objects.create(project=project_2, year=year+4, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year+5, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year+6, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year+7, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year+8, value=9)
+        ProjectFinancial.objects.create(project=project_2, year=year+9, value=10)
+        ProjectFinancial.objects.create(project=project_2, year=year+10, value=0)
+
+        # for project_3
+        ProjectFinancial.objects.create(project=project_3, year=year, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year+1, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year+2, value=50)
+        ProjectFinancial.objects.create(project=project_3, year=year+3, value=40)
+        ProjectFinancial.objects.create(project=project_3, year=year+4, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year+5, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year+6, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year+7, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year+8, value=9)
+        ProjectFinancial.objects.create(project=project_3, year=year+9, value=10)
+        ProjectFinancial.objects.create(project=project_3, year=year+10, value=0)
 
         response = self.client.get(
             "/projects/search-results/?prYearMin={}".format(2025),
@@ -1977,7 +1973,9 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertEqual(
-            [x for x in response.json()["results"] if x["type"] == "classes"][0]['programmed'],
+            [x for x in response.json()["results"] if x["type"] == "classes"][0][
+                "programmed"
+            ],
             None,
             msg="Classes in search result should have programmed field set to None",
         )
