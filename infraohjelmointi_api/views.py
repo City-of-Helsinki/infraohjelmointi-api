@@ -345,8 +345,6 @@ class ProjectViewSet(BaseViewSet):
                 financeSerializer.is_valid(raise_exception=True)
                 financeSerializer.save()
 
-        # manually call signal here or else many signals fired
-
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
@@ -901,7 +899,7 @@ class ProjectViewSet(BaseViewSet):
 
             financialProjectIds = (
                 ProjectFinancial.objects.filter(
-                    value__gt=0, year__in=range(prYearMin,prYearMax+1)
+                    value__gt=0, year__in=range(prYearMin, prYearMax + 1)
                 )
                 .values_list("project", flat=True)
                 .distinct()
