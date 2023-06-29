@@ -631,7 +631,7 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
             year + 10: "preliminaryCurrentYearPlus10",
         }
         queryset = ProjectFinancial.objects.filter(
-            project=project, year__gte=year, year__lte=year + 10
+            project=project, year__in=range(year,year+11)
         )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {"year": year}
