@@ -393,6 +393,23 @@ class ProjectViewSet(BaseViewSet):
         }
         return Response(response)
 
+    @action(methods=["get"], detail=True, url_path=r"financials/(?P<year>[0-9]{4})")
+    def get_project_with_specific_financial_year(self, request, pk, year):
+        """
+        Custom action to get a Project with finances from the year specified in url
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = ProjectGetSerializer(
+                instance, many=False, context={"finance_year": year}
+            ).data
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(
         methods=["get"],
         detail=False,
