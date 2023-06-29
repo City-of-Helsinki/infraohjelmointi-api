@@ -83,59 +83,59 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         summedFinances = relatedProjects.aggregate(
             year0_plannedBudget=Sum(
-                "finances__budgetProposalCurrentYearPlus0",
+                "finances__value",
                 default=0,
                 filter=Q(finances__year=year),
             ),
             year1_plannedBudget=Sum(
-                "finances__budgetProposalCurrentYearPlus1",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 1),
             ),
             year2_plannedBudget=Sum(
-                "finances__budgetProposalCurrentYearPlus2",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 2),
             ),
             year3_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus3",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 3),
             ),
             year4_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus4",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 4),
             ),
             year5_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus5",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 5),
             ),
             year6_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus6",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 6),
             ),
             year7_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus7",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 7),
             ),
             year8_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus8",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 8),
             ),
             year9_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus9",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 9),
             ),
             year10_plannedBudget=Sum(
-                "finances__preliminaryCurrentYearPlus10",
+                "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__year=year + 10),
             ),
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
@@ -233,25 +233,31 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
     @override
     def update(self, instance, validated_data):
         # Check if project is locked and any locked fields are not being updated
+        year = self.context.get("finance_year", date.today().year)
+        if year is None:
+            year = date.today().year
+        yearToFieldMapping = {
+            year: "budgetProposalCurrentYearPlus0",
+            year + 1: "budgetProposalCurrentYearPlus1",
+            year + 2: "budgetProposalCurrentYearPlus2",
+            year + 3: "preliminaryCurrentYearPlus3",
+            year + 4: "preliminaryCurrentYearPlus4",
+            year + 5: "preliminaryCurrentYearPlus5",
+            year + 6: "preliminaryCurrentYearPlus6",
+            year + 7: "preliminaryCurrentYearPlus7",
+            year + 8: "preliminaryCurrentYearPlus8",
+            year + 9: "preliminaryCurrentYearPlus9",
+            year + 10: "preliminaryCurrentYearPlus10",
+        }
         if hasattr(instance.project, "lock"):
             lockedFields = [
-                "budgetProposalCurrentYearPlus0",
-                "budgetProposalCurrentYearPlus1",
-                "budgetProposalCurrentYearPlus2",
-                "preliminaryCurrentYearPlus3",
-                "preliminaryCurrentYearPlus4",
-                "preliminaryCurrentYearPlus5",
-                "preliminaryCurrentYearPlus6",
-                "preliminaryCurrentYearPlus7",
-                "preliminaryCurrentYearPlus8",
-                "preliminaryCurrentYearPlus9",
-                "preliminaryCurrentYearPlus10",
+                "value",
             ]
             for field in lockedFields:
                 if validated_data.get(field, None) is not None:
                     raise serializers.ValidationError(
                         "The field {} cannot be modified when the project is locked".format(
-                            field
+                            yearToFieldMapping[instance.year]
                         )
                     )
 
@@ -604,16 +610,40 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         If no year is passed to the serializer using either the project id or finance_year as key
         the current year is used as the default.
         """
+
         year = self.context.get(
             str(project.id), self.context.get("finance_year", date.today().year)
         )
         if year is None:
             year = date.today().year
-        queryset, _ = ProjectFinancialService.get_or_create(
-            project_id=project.id, year=year
+        year = int(year)
+        yearToFieldMapping = {
+            year: "budgetProposalCurrentYearPlus0",
+            year + 1: "budgetProposalCurrentYearPlus1",
+            year + 2: "budgetProposalCurrentYearPlus2",
+            year + 3: "preliminaryCurrentYearPlus3",
+            year + 4: "preliminaryCurrentYearPlus4",
+            year + 5: "preliminaryCurrentYearPlus5",
+            year + 6: "preliminaryCurrentYearPlus6",
+            year + 7: "preliminaryCurrentYearPlus7",
+            year + 8: "preliminaryCurrentYearPlus8",
+            year + 9: "preliminaryCurrentYearPlus9",
+            year + 10: "preliminaryCurrentYearPlus10",
+        }
+        queryset = ProjectFinancial.objects.filter(
+            project=project, year__gte=year, year__lte=year + 10
         )
+        allFinances = ProjectFinancialSerializer(queryset, many=True).data
+        serializedFinances = {"year": year}
+        for finance in allFinances:
+            serializedFinances[yearToFieldMapping[finance["year"]]] = finance["value"]
+            # pop out already mapped keys
+            yearToFieldMapping.pop(finance["year"])
+        # remaining year keys which had no data in DB
+        for yearKey in yearToFieldMapping.keys():
+            serializedFinances[yearToFieldMapping[yearKey]] = "0.00"
 
-        return ProjectFinancialSerializer(queryset, many=False).data
+        return serializedFinances
 
     class Meta(BaseMeta):
         model = Project

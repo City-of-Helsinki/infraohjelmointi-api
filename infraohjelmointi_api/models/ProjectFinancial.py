@@ -22,7 +22,9 @@ class ProjectFinancial(models.Model):
         null=False,
         related_name="finances",
     )
-
+    value = models.DecimalField(
+        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    )
     budgetProposalCurrentYearPlus0 = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )

@@ -306,28 +306,53 @@ class ProjectViewSet(BaseViewSet):
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
+        # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
+        year = (
+            finances.pop("year", date.today().year)
+            if finances is not None
+            else date.today().year
+        )
         if finances is not None:
-            financeObject, _ = ProjectFinancial.objects.get_or_create(
-                year=finances.get("year", date.today().year), project=project
-            )
-            financeSerializer = ProjectFinancialSerializer(
-                financeObject, data=finances, partial=True, many=False
-            )
-            financeSerializer.is_valid(raise_exception=True)
-            financeSerializer.save()
+            fieldToYearMapping = {
+                "budgetProposalCurrentYearPlus0": year,
+                "budgetProposalCurrentYearPlus1": year + 1,
+                "budgetProposalCurrentYearPlus2": year + 2,
+                "preliminaryCurrentYearPlus3": year + 3,
+                "preliminaryCurrentYearPlus4": year + 4,
+                "preliminaryCurrentYearPlus5": year + 5,
+                "preliminaryCurrentYearPlus6": year + 6,
+                "preliminaryCurrentYearPlus7": year + 7,
+                "preliminaryCurrentYearPlus8": year + 8,
+                "preliminaryCurrentYearPlus9": year + 9,
+                "preliminaryCurrentYearPlus10": year + 10,
+            }
+            for field in finances.keys():
+                (
+                    projectFinancialObject,
+                    created,
+                ) = ProjectFinancial.objects.get_or_create(
+                    year=fieldToYearMapping[field], project=project
+                )
+                financeSerializer = ProjectFinancialSerializer(
+                    projectFinancialObject,
+                    data={"value": finances[field]},
+                    partial=True,
+                    many=False,
+                    context={"finance_year": year},
+                )
+                financeSerializer.is_valid(raise_exception=True)
+                financeSerializer.save()
+
+        # manually call signal here or else many signals fired
 
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
             many=False,
             partial=True,
-            context={
-                "finance_year": finances.get("year", date.today().year)
-                if finances is not None
-                else None
-            },
+            context={"finance_year": year},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -708,18 +733,46 @@ class ProjectViewSet(BaseViewSet):
                     }
                     for projectData in data
                 ]
+
                 for financeData in financesData:
                     finances = financeData.get("finances", None)
                     if finances is not None:
-                        financeObject, _ = ProjectFinancial.objects.get_or_create(
-                            year=finances.get("year", date.today().year),
-                            project=Project(id=financeData["project"]),
-                        )
-                        financeSerializer = ProjectFinancialSerializer(
-                            financeObject, data=finances, partial=True, many=False
-                        )
-                        financeSerializer.is_valid(raise_exception=True)
-                        financeSerializer.save()
+                        year = finances.get("year", date.today().year)
+                        if year is None:
+                            year = date.today().year
+                        fieldToYearMapping = {
+                            "budgetProposalCurrentYearPlus0": year,
+                            "budgetProposalCurrentYearPlus1": year + 1,
+                            "budgetProposalCurrentYearPlus2": year + 2,
+                            "preliminaryCurrentYearPlus3": year + 3,
+                            "preliminaryCurrentYearPlus4": year + 4,
+                            "preliminaryCurrentYearPlus5": year + 5,
+                            "preliminaryCurrentYearPlus6": year + 6,
+                            "preliminaryCurrentYearPlus7": year + 7,
+                            "preliminaryCurrentYearPlus8": year + 8,
+                            "preliminaryCurrentYearPlus9": year + 9,
+                            "preliminaryCurrentYearPlus10": year + 10,
+                        }
+                        for field in finances.keys():
+                            # skip the year field in finances
+                            if field == "year":
+                                continue
+                            (
+                                projectFinancialObject,
+                                created,
+                            ) = ProjectFinancial.objects.get_or_create(
+                                year=fieldToYearMapping[field],
+                                project=Project(id=financeData["project"]),
+                            )
+                            financeSerializer = ProjectFinancialSerializer(
+                                projectFinancialObject,
+                                data={"value": finances[field]},
+                                partial=True,
+                                many=False,
+                                context={"finance_year": year},
+                            )
+                            financeSerializer.is_valid(raise_exception=True)
+                            financeSerializer.save()
 
                 serializer = self.get_serializer(
                     qs,
