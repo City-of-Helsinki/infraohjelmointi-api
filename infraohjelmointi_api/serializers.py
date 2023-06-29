@@ -631,7 +631,7 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
             year + 10: "preliminaryCurrentYearPlus10",
         }
         queryset = ProjectFinancial.objects.filter(
-            project=project, year__in=range(year,year+11)
+            project=project, year__in=range(year, year + 11)
         )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {"year": year}
@@ -690,7 +690,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
             year = date.today().year
         spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
             project_id=project.id, max_year=year
-        ).aggregate(spent_budget=Sum("budgetProposalCurrentYearPlus0", default=0))[
+        ).aggregate(spent_budget=Sum("value", default=0))[
             "spent_budget"
         ]
 
