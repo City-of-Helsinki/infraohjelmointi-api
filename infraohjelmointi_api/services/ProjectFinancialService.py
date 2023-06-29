@@ -7,6 +7,14 @@ class ProjectFinancialService:
         return ProjectFinancial.objects.get_or_create(year=year, project_id=project_id)
 
     @staticmethod
+    def update_or_create(
+        year: str, project_id: str, updatedData: dict
+    ) -> ProjectFinancial:
+        return ProjectFinancial.objects.update_or_create(
+            year=year, project_id=project_id, defaults=updatedData
+        )
+
+    @staticmethod
     def find_by_project_id_and_max_year(
         project_id: str, max_year=int
     ) -> list[ProjectFinancial]:
