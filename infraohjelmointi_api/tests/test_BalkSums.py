@@ -1,3 +1,4 @@
+from datetime import date
 from django.test import TestCase
 from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.models import (
@@ -59,6 +60,8 @@ class BalkSumTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
+        year = date.today().year
+
         projectGroup_1 = ProjectGroup.objects.create(
             id=self.projectGroup_1_Id, name="Test Group 1 rain"
         )
@@ -208,119 +211,109 @@ class BalkSumTestCase(TestCase):
             projectClass=masterClass_2,
             costForecast=100,
         )
-        ProjectFinancial.objects.create(
-            project=project_1,
-            budgetProposalCurrentYearPlus0=10,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=0,
-            preliminaryCurrentYearPlus8=0,
-            preliminaryCurrentYearPlus9=0,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_2,
-            budgetProposalCurrentYearPlus0=50,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
+        # for project_1
+        ProjectFinancial.objects.create(project=project_1, year=year, value=10)
+        ProjectFinancial.objects.create(project=project_1, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_1, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_1, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_1, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_1, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 7, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 8, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 9, value=0)
+        ProjectFinancial.objects.create(project=project_1, year=year + 10, value=0)
 
-        ProjectFinancial.objects.create(
-            project=project_3,
-            budgetProposalCurrentYearPlus0=100,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_4,
-            budgetProposalCurrentYearPlus0=0,
-            budgetProposalCurrentYearPlus1=0,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_5,
-            budgetProposalCurrentYearPlus0=100,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_6,
-            budgetProposalCurrentYearPlus0=200,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_7,
-            budgetProposalCurrentYearPlus0=100,
-            budgetProposalCurrentYearPlus1=50,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=5,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
-        ProjectFinancial.objects.create(
-            project=project_8,
-            budgetProposalCurrentYearPlus0=0,
-            budgetProposalCurrentYearPlus1=0,
-            budgetProposalCurrentYearPlus2=50,
-            preliminaryCurrentYearPlus3=10,
-            preliminaryCurrentYearPlus4=5,
-            preliminaryCurrentYearPlus5=0,
-            preliminaryCurrentYearPlus6=0,
-            preliminaryCurrentYearPlus7=5,
-            preliminaryCurrentYearPlus8=9,
-            preliminaryCurrentYearPlus9=10,
-            preliminaryCurrentYearPlus10=0,
-        )
+        # for project_2
+        ProjectFinancial.objects.create(project=project_2, year=year, value=50)
+        ProjectFinancial.objects.create(project=project_2, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_2, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_2, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_2, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_2, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_2, year=year + 10, value=0)
+
+        # for project_3
+        ProjectFinancial.objects.create(project=project_3, year=year, value=100)
+        ProjectFinancial.objects.create(project=project_3, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_3, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_3, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_3, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_3, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_3, year=year + 10, value=0)
+
+        # for project_4
+        ProjectFinancial.objects.create(project=project_4, year=year, value=0)
+        ProjectFinancial.objects.create(project=project_4, year=year + 1, value=0)
+        ProjectFinancial.objects.create(project=project_4, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_4, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_4, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_4, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_4, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_4, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_4, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_4, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_4, year=year + 10, value=0)
+
+        # for project_5
+        ProjectFinancial.objects.create(project=project_5, year=year, value=100)
+        ProjectFinancial.objects.create(project=project_5, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_5, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_5, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_5, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_5, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_5, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_5, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_5, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_5, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_5, year=year + 10, value=0)
+
+        # for project_6
+        ProjectFinancial.objects.create(project=project_6, year=year, value=200)
+        ProjectFinancial.objects.create(project=project_6, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_6, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_6, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_6, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_6, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_6, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_6, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_6, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_6, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_6, year=year + 10, value=0)
+
+        # for project_7
+        ProjectFinancial.objects.create(project=project_7, year=year, value=100)
+        ProjectFinancial.objects.create(project=project_7, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_7, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_7, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_7, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_7, year=year + 5, value=5)
+        ProjectFinancial.objects.create(project=project_7, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_7, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_7, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_7, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_7, year=year + 10, value=0)
+
+        # for project_8
+        ProjectFinancial.objects.create(project=project_8, year=year, value=0)
+        ProjectFinancial.objects.create(project=project_8, year=year + 1, value=0)
+        ProjectFinancial.objects.create(project=project_8, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_8, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_8, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_8, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_8, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_8, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_8, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_8, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_8, year=year + 10, value=0)
 
     def test_GET_class_with_sums(self):
         response = self.client.get(
