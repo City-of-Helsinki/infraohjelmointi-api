@@ -236,19 +236,7 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
         year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
-        yearToFieldMapping = {
-            year: "budgetProposalCurrentYearPlus0",
-            year + 1: "budgetProposalCurrentYearPlus1",
-            year + 2: "budgetProposalCurrentYearPlus2",
-            year + 3: "preliminaryCurrentYearPlus3",
-            year + 4: "preliminaryCurrentYearPlus4",
-            year + 5: "preliminaryCurrentYearPlus5",
-            year + 6: "preliminaryCurrentYearPlus6",
-            year + 7: "preliminaryCurrentYearPlus7",
-            year + 8: "preliminaryCurrentYearPlus8",
-            year + 9: "preliminaryCurrentYearPlus9",
-            year + 10: "preliminaryCurrentYearPlus10",
-        }
+        yearToFieldMapping = ProjectFinancialService.get_year_to_financial_field_names_mapping(start_year=year)
         if hasattr(instance.project, "lock"):
             lockedFields = [
                 "value",
@@ -617,21 +605,13 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         if year is None:
             year = date.today().year
         year = int(year)
-        yearToFieldMapping = {
-            year: "budgetProposalCurrentYearPlus0",
-            year + 1: "budgetProposalCurrentYearPlus1",
-            year + 2: "budgetProposalCurrentYearPlus2",
-            year + 3: "preliminaryCurrentYearPlus3",
-            year + 4: "preliminaryCurrentYearPlus4",
-            year + 5: "preliminaryCurrentYearPlus5",
-            year + 6: "preliminaryCurrentYearPlus6",
-            year + 7: "preliminaryCurrentYearPlus7",
-            year + 8: "preliminaryCurrentYearPlus8",
-            year + 9: "preliminaryCurrentYearPlus9",
-            year + 10: "preliminaryCurrentYearPlus10",
-        }
-        queryset = ProjectFinancial.objects.filter(
-            project=project, year__in=range(year, year + 11)
+        yearToFieldMapping = (
+            ProjectFinancialService.get_year_to_financial_field_names_mapping(
+                start_year=year
+            )
+        )
+        queryset = ProjectFinancialService.find_by_project_id_and_year_range(
+            project_id=project.id, year_range=range(year, year + 11)
         )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {"year": year}
