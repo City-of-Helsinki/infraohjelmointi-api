@@ -92,7 +92,7 @@ class Command(BaseCommand):
             return
 
         if options["sync_project_from_pw"] != "":
-            ProjectWiseService().syn_project_from_pw(options["sync_project_from_pw"])
+            ProjectWiseService().sync_project_from_pw(options["sync_project_from_pw"])
             return
 
         if options["import_from_budget"] != "":
