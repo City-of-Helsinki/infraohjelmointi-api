@@ -104,7 +104,11 @@ class ProjectWiseService:
         except (PWProjectNotFoundError, PWProjectResponseError) as e:
             logger.error(e)
         except Exception as e:
-            logger.error(e)
+            logger.error(
+                "Error occurred while syncing project '{}' with PW id '{}'. \nError: {}".format(
+                    project.id, project.hkrId, e
+                )
+            )
 
     def sync_project_to_pw(self, data: dict, project: Project) -> None:
         """Method to synchronise given product field value to PW"""
