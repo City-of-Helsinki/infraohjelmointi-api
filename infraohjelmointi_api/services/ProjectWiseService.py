@@ -71,15 +71,15 @@ class ProjectWiseService:
 
         logger.debug(f"Synchronizing given projects '{len(projects)}' in DB with PW")
         for project in projects:
-            self.sync_project_from_pw(project=project)
+            self.__sync_project_from_pw(project=project)
 
-    def syn_project_from_pw(self, pw_id: str) -> None:
+    def sync_project_from_pw(self, pw_id: str) -> None:
         """Method to synchronise project with given PW id with PW project data.\n"""
 
         logger.debug(f"Synchronizing given project with PW Id '{pw_id}' with PW")
-        self.sync_project_from_pw(ProjectService.get_by_hkr_id(hkr_id=pw_id))
+        self.__sync_project_from_pw(ProjectService.get_by_hkr_id(hkr_id=pw_id))
 
-    def sync_project_from_pw(self, project: Project) -> None:
+    def __sync_project_from_pw(self, project: Project) -> None:
         """Method to synchronise given project from PW project data.\n
         Given project must have hkrId otherwise project will not be syncrhonized.
         """
@@ -102,6 +102,8 @@ class ProjectWiseService:
                 f"Project {project.id} with successully synchronized from PW in {handling_time}s"
             )
         except (PWProjectNotFoundError, PWProjectResponseError) as e:
+            logger.error(e)
+        except Exception as e:
             logger.error(e)
 
     def sync_project_to_pw(self, data: dict, project: Project) -> None:
