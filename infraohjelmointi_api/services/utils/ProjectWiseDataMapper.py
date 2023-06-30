@@ -317,7 +317,7 @@ class ProjectWiseDataMapper:
                 for key in mapped_value:
                     phases[key] = pph
             else:
-                phases[pph.value] = pph
+                phases[mapped_value] = pph
         return phases
 
     def load_and_transform_project_areas(self):
