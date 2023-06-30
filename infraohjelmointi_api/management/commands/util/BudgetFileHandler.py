@@ -145,20 +145,20 @@ class BudgetFileHandler(IExcelFileHandler):
         preliminaryCurrentYearPlus8 = row[27].value
         preliminaryCurrentYearPlus9 = row[28].value
 
-        budget_sum = sum(
-            [
-                budgetProposalCurrentYearPlus0 or 0,
-                budgetProposalCurrentYearPlus1 or 0,
-                budgetProposalCurrentYearPlus2 or 0,
-                preliminaryCurrentYearPlus3 or 0,
-                preliminaryCurrentYearPlus4 or 0,
-                preliminaryCurrentYearPlus5 or 0,
-                preliminaryCurrentYearPlus6 or 0,
-                preliminaryCurrentYearPlus7 or 0,
-                preliminaryCurrentYearPlus8 or 0,
-                preliminaryCurrentYearPlus9 or 0,
-            ]
-        )
+        budget_list = [
+            budgetProposalCurrentYearPlus0 or 0,
+            budgetProposalCurrentYearPlus1 or 0,
+            budgetProposalCurrentYearPlus2 or 0,
+            preliminaryCurrentYearPlus3 or 0,
+            preliminaryCurrentYearPlus4 or 0,
+            preliminaryCurrentYearPlus5 or 0,
+            preliminaryCurrentYearPlus6 or 0,
+            preliminaryCurrentYearPlus7 or 0,
+            preliminaryCurrentYearPlus8 or 0,
+            preliminaryCurrentYearPlus9 or 0,
+        ]
+
+        budget_sum = sum(budget_list)
 
         notes = str(row[29].value).strip()
         pwNumber = str(row[30].value).strip().lower()
@@ -186,65 +186,30 @@ class BudgetFileHandler(IExcelFileHandler):
             # if value already converted into float, convert it back to string to void validation error
             project.costForecast = str(costForecast) if costForecast != None else None
 
-            project_financial, created = ProjectFinancialService.get_or_create(
-                year=self.current_budget_year, project_id=project.id
-            )
+            fieldToYearMapping = {
+                "budgetProposalCurrentYearPlus0": self.current_budget_year,
+                "budgetProposalCurrentYearPlus1": self.current_budget_year + 1,
+                "budgetProposalCurrentYearPlus2": self.current_budget_year + 2,
+                "preliminaryCurrentYearPlus3": self.current_budget_year + 3,
+                "preliminaryCurrentYearPlus4": self.current_budget_year + 4,
+                "preliminaryCurrentYearPlus5": self.current_budget_year + 5,
+                "preliminaryCurrentYearPlus6": self.current_budget_year + 6,
+                "preliminaryCurrentYearPlus7": self.current_budget_year + 7,
+                "preliminaryCurrentYearPlus8": self.current_budget_year + 8,
+                "preliminaryCurrentYearPlus9": self.current_budget_year + 9,
+            }
+            for index, field in enumerate(fieldToYearMapping.keys()):
+                project_financial, created = ProjectFinancialService.update_or_create(
+                    year=fieldToYearMapping[field],
+                    project_id=project.id,
+                    updatedData={
+                        "value": str(budget_list[index])
+                        if budget_list[index] != None
+                        else None
+                    },
+                )
 
-            print(f"Project financial {project_financial.id} created {created}")
-
-            project_financial.budgetProposalCurrentYearPlus0 = (
-                str(budgetProposalCurrentYearPlus0)
-                if budgetProposalCurrentYearPlus0 != None
-                else None
-            )
-
-            project_financial.budgetProposalCurrentYearPlus1 = (
-                str(budgetProposalCurrentYearPlus1)
-                if budgetProposalCurrentYearPlus1 != None
-                else None
-            )
-            project_financial.budgetProposalCurrentYearPlus2 = (
-                str(budgetProposalCurrentYearPlus2)
-                if budgetProposalCurrentYearPlus2 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus3 = (
-                str(preliminaryCurrentYearPlus3)
-                if preliminaryCurrentYearPlus3 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus4 = (
-                str(preliminaryCurrentYearPlus4)
-                if preliminaryCurrentYearPlus4 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus5 = (
-                str(preliminaryCurrentYearPlus5)
-                if preliminaryCurrentYearPlus5 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus6 = (
-                str(preliminaryCurrentYearPlus6)
-                if preliminaryCurrentYearPlus6 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus7 = (
-                str(preliminaryCurrentYearPlus7)
-                if preliminaryCurrentYearPlus7 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus8 = (
-                str(preliminaryCurrentYearPlus8)
-                if preliminaryCurrentYearPlus8 != None
-                else None
-            )
-            project_financial.preliminaryCurrentYearPlus9 = (
-                str(preliminaryCurrentYearPlus9)
-                if preliminaryCurrentYearPlus9 != None
-                else None
-            )
-
-            project_financial.save()
+                print(f"Project financial {project_financial.id} created {created}")
 
             project.hkrId = (
                 pwNumber

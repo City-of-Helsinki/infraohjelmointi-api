@@ -8,6 +8,9 @@ from infraohjelmointi_api.models import (
     ProjectLocation,
     ProjectFinancial,
 )
+from infraohjelmointi_api.services.ProjectFinancialService import (
+    ProjectFinancialService,
+)
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 from django.dispatch import receiver
 import django_filters
@@ -306,28 +309,43 @@ class ProjectViewSet(BaseViewSet):
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
+        # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
+        year = (
+            finances.pop("year", date.today().year)
+            if finances is not None
+            else date.today().year
+        )
         if finances is not None:
-            financeObject, _ = ProjectFinancial.objects.get_or_create(
-                year=finances.get("year", date.today().year), project=project
+            fieldToYearMapping = (
+                ProjectFinancialService.get_financial_field_to_year_mapping(
+                    start_year=year
+                )
             )
-            financeSerializer = ProjectFinancialSerializer(
-                financeObject, data=finances, partial=True, many=False
-            )
-            financeSerializer.is_valid(raise_exception=True)
-            financeSerializer.save()
+            for field in finances.keys():
+                (
+                    projectFinancialObject,
+                    created,
+                ) = ProjectFinancialService.get_or_create(
+                    year=fieldToYearMapping[field], project_id=project.id
+                )
+                financeSerializer = ProjectFinancialSerializer(
+                    projectFinancialObject,
+                    data={"value": finances[field]},
+                    partial=True,
+                    many=False,
+                    context={"finance_year": year},
+                )
+                financeSerializer.is_valid(raise_exception=True)
+                financeSerializer.save()
 
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
             many=False,
             partial=True,
-            context={
-                "finance_year": finances.get("year", date.today().year)
-                if finances is not None
-                else None
-            },
+            context={"finance_year": year},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -367,6 +385,23 @@ class ProjectViewSet(BaseViewSet):
             "results": serializer.data,
         }
         return Response(response)
+
+    @action(methods=["get"], detail=True, url_path=r"financials/(?P<year>[0-9]{4})")
+    def get_project_with_specific_financial_year(self, request, pk, year):
+        """
+        Custom action to get a Project with finances from the year specified in url
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = ProjectGetSerializer(
+                instance, many=False, context={"finance_year": year}
+            ).data
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(
         methods=["get"],
@@ -708,18 +743,38 @@ class ProjectViewSet(BaseViewSet):
                     }
                     for projectData in data
                 ]
+
                 for financeData in financesData:
                     finances = financeData.get("finances", None)
                     if finances is not None:
-                        financeObject, _ = ProjectFinancial.objects.get_or_create(
-                            year=finances.get("year", date.today().year),
-                            project=Project(id=financeData["project"]),
+                        year = finances.get("year", date.today().year)
+                        if year is None:
+                            year = date.today().year
+                        fieldToYearMapping = (
+                            ProjectFinancialService.get_financial_field_to_year_mapping(
+                                start_year=year
+                            )
                         )
-                        financeSerializer = ProjectFinancialSerializer(
-                            financeObject, data=finances, partial=True, many=False
-                        )
-                        financeSerializer.is_valid(raise_exception=True)
-                        financeSerializer.save()
+                        for field in finances.keys():
+                            # skip the year field in finances
+                            if field == "year":
+                                continue
+                            (
+                                projectFinancialObject,
+                                created,
+                            ) = ProjectFinancialService.get_or_create(
+                                year=fieldToYearMapping[field],
+                                project_id=Project(id=financeData["project"]).id,
+                            )
+                            financeSerializer = ProjectFinancialSerializer(
+                                projectFinancialObject,
+                                data={"value": finances[field]},
+                                partial=True,
+                                many=False,
+                                context={"finance_year": year},
+                            )
+                            financeSerializer.is_valid(raise_exception=True)
+                            financeSerializer.save()
 
                 serializer = self.get_serializer(
                     qs,
@@ -814,19 +869,7 @@ class ProjectViewSet(BaseViewSet):
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
         currYear = datetime.date.today().year
-        yearToFieldMapping = {
-            currYear: "budgetProposalCurrentYearPlus0__gt",
-            currYear + 1: "budgetProposalCurrentYearPlus1__gt",
-            currYear + 2: "budgetProposalCurrentYearPlus2__gt",
-            currYear + 3: "preliminaryCurrentYearPlus3__gt",
-            currYear + 4: "preliminaryCurrentYearPlus4__gt",
-            currYear + 5: "preliminaryCurrentYearPlus5__gt",
-            currYear + 6: "preliminaryCurrentYearPlus6__gt",
-            currYear + 7: "preliminaryCurrentYearPlus7__gt",
-            currYear + 8: "preliminaryCurrentYearPlus8__gt",
-            currYear + 9: "preliminaryCurrentYearPlus9__gt",
-            currYear + 10: "preliminaryCurrentYearPlus10__gt",
-        }
+
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric():
                 raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
@@ -841,139 +884,43 @@ class ProjectViewSet(BaseViewSet):
                     code="prYearMin_gt_prYearMax",
                 )
 
-            if (
-                prYearMin in yearToFieldMapping.keys()
-                and prYearMax in yearToFieldMapping.keys()
-            ):
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
+            financialProjectIds = (
+                ProjectFinancialService.find_by_min_value_and_year_range(
+                    min_value=0, year_range=range(prYearMin, prYearMax + 1)
                 )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMin in yearToFieldMapping.keys():
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMax in yearToFieldMapping.keys():
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            else:
-                qs = qs.none()
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         elif prYearMin is not None:
             if not prYearMin.isnumeric():
                 raise ParseError(detail={"prYearMin": "Invalid value"}, code="invalid")
 
             prYearMin = int(prYearMin)
-            if prYearMin < currYear:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
+            financialProjectIds = (
+                ProjectFinancialService.find_by_min_value_and_min_year(
+                    min_value=0, min_year=prYearMin
                 )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            elif prYearMin > currYear + 10:
-                qs = qs.none()
-            else:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(prYearMin, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         elif prYearMax is not None:
             if not prYearMax.isnumeric():
                 raise ParseError(detail={"prYearMax": "Invalid value"}, code="invalid")
-
             prYearMax = int(prYearMax)
-            if prYearMax < currYear:
-                qs = qs.none()
-            elif prYearMax > currYear + 10:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, currYear + 11, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
+
+            financialProjectIds = (
+                ProjectFinancialService.find_by_min_value_and_max_year(
+                    min_value=0, max_year=prYearMax
                 )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
-            else:
-                financialProjectIds = (
-                    ProjectFinancial.objects.filter(
-                        Q(
-                            *[
-                                (yearToFieldMapping[year], 0)
-                                for year in range(currYear, prYearMax + 1, 1)
-                            ],
-                            _connector=Q.OR,
-                        )
-                        & Q(year=currYear)
-                    )
-                    .values_list("project", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+                .values_list("project", flat=True)
+                .distinct()
+            )
+            qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
+
         return qs
 
 
