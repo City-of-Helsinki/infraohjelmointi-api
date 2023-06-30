@@ -136,7 +136,10 @@ phase_map = {
     "proposal": "1. Hanke-ehdotus",
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
-    "draftInitiation": "3. Suunnittelun aloitus / Suunnitelmaluonnos",
+    "draftInitiation": [
+        "3. Suunnittelun aloitus / Suunnitelmaluonnos",
+        "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
+    ],
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
     "constructionWait": "6. Odottaa rakentamista",
@@ -307,7 +310,15 @@ class ProjectWiseDataMapper:
 
     def load_and_transform_phases(self):
         """Helper method to load phases from DB and transform to match PW format"""
-        return {phase_map[pph.value]: pph for pph in ProjectPhaseService.list_all()}
+        phases = {}
+        for pph in ProjectPhaseService.list_all():
+            mapped_value = phase_map[pph.value]
+            if isinstance(mapped_value, list):
+                for key in mapped_value:
+                    phases[key] = pph
+            else:
+                phases[pph.value] = pph
+        return phases
 
     def load_and_transform_project_areas(self):
         """Helper method to load project areas from DB and transform to match PW format"""
