@@ -281,9 +281,13 @@ class ProjectWiseService:
             project.address = project_properties["PROJECT_Kadun_tai_puiston_nimi"]
 
         if project_properties["PROJECT_Hankkeen_vaihe"]:
-            project.phase = self.project_phases[
-                project_properties["PROJECT_Hankkeen_vaihe"]
-            ]
+            project.phase = (
+                self.project_phases[project_properties["PROJECT_Hankkeen_vaihe"]]
+                if hasattr(
+                    self.project_phases, project_properties["PROJECT_Hankkeen_vaihe"]
+                )
+                else self.project_phases["2. Ohjelmointi"]
+            )
 
         if project_properties["PROJECT_Louheen"]:
             project.louhi = project_properties["PROJECT_Louheen"] != "Ei"
