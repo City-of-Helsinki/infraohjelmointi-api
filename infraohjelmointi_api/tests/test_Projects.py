@@ -3174,6 +3174,28 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            "projectClass must be populated if programmed is `True`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_4_Id,
+            "programmed": True,
+            "category": self.projectCategory_1_Id,
+            "projectClass": self.projectClass_1_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
             200,
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
