@@ -2095,13 +2095,13 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             response.json()["results"][0]["path"],
-            "{}/{}/{}/{}".format(
+            "masterClass={}&class={}&subClass={}&district={}".format(
                 self.projectMasterClass_2_Id,
                 self.projectClass_2_Id,
                 self.projectSubClass_2_Id,
                 self.projectDistrict_3_Id,
             ),
-            msg="Path does not follow the format masterClass/class/subClass/district",
+            msg="Path does not follow the format masterClass=&class=&subClass&district=",
         )
 
         response = self.client.get(
