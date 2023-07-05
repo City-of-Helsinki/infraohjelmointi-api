@@ -408,9 +408,9 @@ class ProjectViewSet(BaseViewSet):
         detail=False,
         url_path=r"search-results",
     )
-    def get_search_resuls(self, request):
+    def get_search_results(self, request):
         """
-        Custom action to get projects by financial year
+        Custom action to filter projects by params
         Usage: /projects/search-results/?<filter-params>
         """
 
