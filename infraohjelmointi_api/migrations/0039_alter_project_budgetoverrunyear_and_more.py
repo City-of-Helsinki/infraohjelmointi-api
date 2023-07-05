@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0034_remove_projectgroup_unique together constraint project group_and_more",
+            "0038_remove_old_financial_fields_project_financials",
         ),
     ]
 

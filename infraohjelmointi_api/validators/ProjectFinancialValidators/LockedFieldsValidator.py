@@ -1,3 +1,7 @@
+from datetime import date
+from infraohjelmointi_api.services.ProjectFinancialService import (
+    ProjectFinancialService,
+)
 from rest_framework.exceptions import ValidationError
 
 
@@ -5,30 +9,26 @@ class LockedFieldsValidator:
     requires_context = True
 
     def __call__(self, allFields, serializer) -> None:
-        project = serializer.instance
-        if hasattr(project, "lock"):
+        projectFinancialInstance = serializer.instance
+
+        # Check if project is locked and any locked fields are not being updated
+        year = serializer.context.get("finance_year", date.today().year)
+        if year is None:
+            year = date.today().year
+        yearToFieldMapping = (
+            ProjectFinancialService.get_year_to_financial_field_names_mapping(
+                start_year=year
+            )
+        )
+
+        if hasattr(projectFinancialInstance.project, "lock"):
             lockedFields = [
-                "budgetProposalCurrentYearPlus0",
-                "budgetProposalCurrentYearPlus1",
-                "budgetProposalCurrentYearPlus2",
-                "preliminaryCurrentYearPlus3",
-                "preliminaryCurrentYearPlus4",
-                "preliminaryCurrentYearPlus5",
-                "preliminaryCurrentYearPlus6",
-                "preliminaryCurrentYearPlus7",
-                "preliminaryCurrentYearPlus8",
-                "preliminaryCurrentYearPlus9",
-                "preliminaryCurrentYearPlus10",
+                "value",
             ]
             for field in lockedFields:
                 if allFields.get(field, None) is not None:
                     raise ValidationError(
-                        detail={
-                            "{}".format(
-                                field
-                            ): "The field {} cannot be modified when the project is locked".format(
-                                field
-                            )
-                        },
-                        code="project_locked",
+                        "The field {} cannot be modified when the project is locked".format(
+                            yearToFieldMapping[projectFinancialInstance.year]
+                        )
                     )
