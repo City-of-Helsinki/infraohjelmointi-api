@@ -13,11 +13,20 @@ class ProgrammedValidator(BaseValidator):
         projectId = allFields.get("projectId", None)
         project = self.getProjectInstance(projectId, serializer=serializer)
         programmed = allFields.get("programmed", None)
+        projectClass = allFields.get("projectClass", None)
 
         if programmed is None and project is not None and "programmed" not in allFields:
             programmed = project.programmed
+
         if programmed is None:
             return
+
+        if (
+            projectClass is None
+            and project is not None
+            and "projectClass" not in allFields
+        ):
+            projectClass = project.projectClass
 
         category = allFields.get("category", None)
         phase = allFields.get("phase", None)
@@ -50,5 +59,13 @@ class ProgrammedValidator(BaseValidator):
                     "programmed": "phase cannot be `proposal` or `design` if programmed is `True`"
                 },
                 code="programmed_true_missing_phase",
+            )
+
+        if programmed == True and projectClass is None:
+            raise ValidationError(
+                detail={
+                    "programmed": "projectClass must be populated if programmed is `True`"
+                },
+                code="programmed_true_missing_projectClass",
             )
         # programmed == True then check class and locations are filled in
