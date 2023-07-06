@@ -7,3 +7,11 @@ class ProjectPhase(models.Model):
     value = models.CharField(max_length=30)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["value"],
+                name="Unique constraint ProjectPhase",
+            )
+        ]

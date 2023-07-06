@@ -778,7 +778,10 @@ class ProjectViewSet(BaseViewSet):
 
                 serializer = self.get_serializer(
                     qs,
-                    data=[projectData["data"] for projectData in data],
+                    data=[
+                        {**projectData["data"], "projectId": projectData["id"]}
+                        for projectData in data
+                    ],
                     many=True,
                     partial=True,
                     context={

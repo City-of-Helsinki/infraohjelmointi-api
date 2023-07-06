@@ -4,23 +4,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('infraohjelmointi_api', '0033_forcoordinatoronly_and_more'),
+        (
+            "infraohjelmointi_api",
+            "0033_forcoordinatoronly_and_more",
+        ),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='projectgroup',
-            name='Unique together Constraint Project Group',
+            model_name="projectgroup",
+            name="Unique together Constraint Project Group",
         ),
         migrations.RenameField(
-            model_name='projectgroup',
-            old_name='districtRelation',
-            new_name='locationRelation',
+            model_name="projectgroup",
+            old_name="districtRelation",
+            new_name="locationRelation",
         ),
         migrations.AddConstraint(
-            model_name='projectgroup',
-            constraint=models.UniqueConstraint(fields=('name', 'locationRelation', 'classRelation'), name='Unique together Constraint Project Group'),
+            model_name="projectgroup",
+            constraint=models.UniqueConstraint(
+                fields=("name", "locationRelation", "classRelation"),
+                name="Unique together Constraint Project Group",
+            ),
         ),
     ]

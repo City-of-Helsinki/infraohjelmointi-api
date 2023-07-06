@@ -56,6 +56,11 @@ class ProjectTestCase(TestCase):
     projectAreaId = uuid.UUID("9acb1ac2-259e-4300-8cf0-f89c3adaf577")
     projectPhase_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
     projectPhase_2_Id = uuid.UUID("562e3d4f-77ac-4b0c-a82a-4b5bff8daa74")
+    projectPhase_3_Id = uuid.UUID("2887068f-011a-42bc-a917-d0256f967da0")
+    projectPhase_4_Id = uuid.UUID("5a97f844-fdd1-4d50-87a6-e90852a42b2b")
+    projectPhase_5_Id = uuid.UUID("644dcdc5-f12f-4cc2-b80f-f64ec649f23c")
+    projectPhase_6_Id = uuid.UUID("56fcb6f6-caa9-4d2e-b936-3a5d9261b665")
+    projectPhase_7_Id = uuid.UUID("7281620d-bbf1-4411-b541-c72927b39592")
     projectTypeId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectPriorityId = uuid.UUID("e7f471fb-6eac-4688-aa9b-908b0194a5dc")
     sapNetworkIds_1 = [uuid.UUID("1495aaf7-b0af-4847-a73b-7650145a73dc").__str__()]
@@ -66,7 +71,8 @@ class ProjectTestCase(TestCase):
     projectCategory_1_Id = uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c")
     projectCategory_2_Id = uuid.UUID("4124f82a-4d62-4f66-b021-c45c64ba750a")
     projectCategory_3_Id = uuid.UUID("8a19b04a-15f6-448d-95d3-70fdfa2d5cba")
-    conPhaseDetailId = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
+    conPhaseDetail_1_Id = uuid.UUID("a7517b59-40f2-4b7d-a146-eef1a3d08c03")
+    conPhaseDetail_2_Id = uuid.UUID("9db2b01c-8a1f-42ec-8c21-257b471ed2f5")
     projectQualityLevelId = uuid.UUID("05eb79f5-18c3-40a4-b5c4-22c68a216dec")
     planningPhaseId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     constructionPhaseId = uuid.UUID("c37576af-accf-46aa-8df2-5724ff8a06af")
@@ -181,8 +187,8 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail, _ = ConstructionPhaseDetail.objects.get_or_create(
-            id=self.conPhaseDetailId, value="preConstruction"
+        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
+            id=self.conPhaseDetail_1_Id, value="preConstruction"
         )
         self.person_3 = Person.objects.create(
             id=self.person_3_Id,
@@ -192,9 +198,8 @@ class ProjectTestCase(TestCase):
             title="Contractor",
             phone="0414853275",
         )
-        self.projectPhase, _ = ProjectPhase.objects.get_or_create(
-            id=self.projectPhase_1_Id, value="proposal"
-        )
+        self.projectPhase = ProjectPhase.objects.get(value="proposal")
+        self.projectPhase_1_Id = self.projectPhase.id
         self.projectSet = ProjectSet.objects.create(
             id=self.projectSetId,
             name="Project Set 1",
@@ -237,9 +242,9 @@ class ProjectTestCase(TestCase):
             personProgramming=self.person_1,
             personConstruction=self.person_3,
             phase=self.projectPhase,
-            programmed=True,
+            programmed=False,
             category=self.projectCategory,
-            constructionPhaseDetail=self.conPhaseDetail,
+            constructionPhaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -382,10 +387,10 @@ class ProjectTestCase(TestCase):
                 self.project_1_Id
             ),
         )
-        self.assertDictEqual(
-            self.conPhaseDetail.project_set.all().values()[0],
-            Project.objects.filter(id=self.project_1_Id).values()[0],
-            msg="conPhaseDetail foreign key does not exist in Project with id {}".format(
+        self.assertEqual(
+            len(self.conPhaseDetail.project_set.all()),
+            0,
+            msg="No foreign key should exist for constructionPhaseDetail in Project with id {}".format(
                 self.project_1_Id
             ),
         )
@@ -570,8 +575,6 @@ class ProjectTestCase(TestCase):
             "personPlanning": None,
             "personProgramming": None,
             "personConstruction": None,
-            "phase": None,
-            "programmed": True,
             "category": None,
             "constructionPhaseDetail": None,
             "estPlanningStart": None,
@@ -653,14 +656,12 @@ class ProjectTestCase(TestCase):
 
         res_data = response.json()
         new_createdId = res_data["id"]
-
         serializer = ProjectCreateSerializer(
             Project.objects.get(id=new_createdId), many=False
         )
 
         # convert the serialized data to JSON
         result_expected = JSONRenderer().render(serializer.data)
-
         self.assertEqual(
             response.content, result_expected, msg="Created object data != POST data"
         )
@@ -674,13 +675,14 @@ class ProjectTestCase(TestCase):
         data = {
             "name": "Test Project 1 patched",
             "favPersons": [self.person_1.id.__str__(), self.person_3.id.__str__()],
+            "phase": self.projectPhase_1_Id,
         }
         response = self.client.patch(
             "/projects/{}/".format(self.project_1_Id),
             data,
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, msg=response.json())
         self.assertEqual(
             response.json()["name"],
             data["name"],
@@ -722,7 +724,10 @@ class ProjectTestCase(TestCase):
         new_createdId = res_data["id"]
 
         data = [
-            {"id": self.project_1_Id.__str__(), "data": {"name": "new name"}},
+            {
+                "id": self.project_1_Id.__str__(),
+                "data": {"name": "new name"},
+            },
             {
                 "id": new_createdId,
                 "data": {
@@ -740,7 +745,7 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, msg=response.json())
         self.assertEqual(
             len(response.json()),
             2,
@@ -1192,29 +1197,29 @@ class ProjectTestCase(TestCase):
 
         # for project_2
         ProjectFinancial.objects.create(project=project_2, year=year, value=0)
-        ProjectFinancial.objects.create(project=project_2, year=year+1, value=0)
-        ProjectFinancial.objects.create(project=project_2, year=year+2, value=50)
-        ProjectFinancial.objects.create(project=project_2, year=year+3, value=40)
-        ProjectFinancial.objects.create(project=project_2, year=year+4, value=5)
-        ProjectFinancial.objects.create(project=project_2, year=year+5, value=0)
-        ProjectFinancial.objects.create(project=project_2, year=year+6, value=0)
-        ProjectFinancial.objects.create(project=project_2, year=year+7, value=5)
-        ProjectFinancial.objects.create(project=project_2, year=year+8, value=9)
-        ProjectFinancial.objects.create(project=project_2, year=year+9, value=10)
-        ProjectFinancial.objects.create(project=project_2, year=year+10, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 1, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_2, year=year + 3, value=40)
+        ProjectFinancial.objects.create(project=project_2, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_2, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_2, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_2, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_2, year=year + 10, value=0)
 
         # for project_3
         ProjectFinancial.objects.create(project=project_3, year=year, value=0)
-        ProjectFinancial.objects.create(project=project_3, year=year+1, value=0)
-        ProjectFinancial.objects.create(project=project_3, year=year+2, value=50)
-        ProjectFinancial.objects.create(project=project_3, year=year+3, value=40)
-        ProjectFinancial.objects.create(project=project_3, year=year+4, value=5)
-        ProjectFinancial.objects.create(project=project_3, year=year+5, value=0)
-        ProjectFinancial.objects.create(project=project_3, year=year+6, value=0)
-        ProjectFinancial.objects.create(project=project_3, year=year+7, value=5)
-        ProjectFinancial.objects.create(project=project_3, year=year+8, value=9)
-        ProjectFinancial.objects.create(project=project_3, year=year+9, value=10)
-        ProjectFinancial.objects.create(project=project_3, year=year+10, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 1, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_3, year=year + 3, value=40)
+        ProjectFinancial.objects.create(project=project_3, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year + 5, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_3, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_3, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_3, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_3, year=year + 10, value=0)
 
         response = self.client.get(
             "/projects/search-results/?prYearMin={}".format(2025),
@@ -1402,8 +1407,8 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             len(response.json()["results"]),
-            2,
-            msg="Filtered result should conresults with field programmed = false. Found: {}".format(
+            3,
+            msg="Filtered result should contain 3 results with field programmed = false. Found: {}".format(
                 len(response.json()["results"])
             ),
         )
@@ -2991,6 +2996,558 @@ class ProjectTestCase(TestCase):
             response.json()["results"][0]["finances"]["budgetProposalCurrentYearPlus0"],
             "200.00",
             msg="budgetProposalCurrentYearPlus0 != 200.00",
+        )
+
+    def test_other_field_validations(self):
+        self.projectPhase_2_Id = ProjectPhase.objects.get(
+            value="programming"
+        ).id.__str__()
+        self.projectPhase_3_Id = ProjectPhase.objects.get(
+            value="completed"
+        ).id.__str__()
+        self.projectPhase_4_Id = ProjectPhase.objects.get(
+            value="draftInitiation"
+        ).id.__str__()
+        self.projectPhase_5_Id = ProjectPhase.objects.get(
+            value="construction"
+        ).id.__str__()
+        self.projectPhase_6_Id = ProjectPhase.objects.get(
+            value="warrantyPeriod"
+        ).id.__str__()
+        ConstructionPhaseDetail.objects.create(
+            id=self.conPhaseDetail_2_Id, value="preConstruction"
+        )
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+            "programmed": True,
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "category must be populated if programmed is `True`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+            "programmed": False,
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "phase must be set to `proposal` or `design` if programmed is `False`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "name": "Testing fields",
+            "description": "Test Desc",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+        createdId = response.json()["id"]
+
+        data = {"phase": self.projectPhase_2_Id}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "planningStartYear and constructionEndYear must be populated if phase is `programming`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_2_Id,
+            "planningStartYear": 2015,
+            "constructionEndYear": 2020,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "category must be populated if phase is `programming`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_4_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_4_Id,
+            "estPlanningStart": "01.01.2023",
+            "estPlanningEnd": "01.01.2024",
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "personPlanning must be populated if phase is `draftInitiation`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "estPlanningStart": "01.01.2023",
+            "estPlanningEnd": "01.01.2024",
+            "personPlanning": self.person_1_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+        data = {
+            "phase": self.projectPhase_4_Id,
+            "programmed": True,
+            "category": self.projectCategory_1_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+
+        self.assertEqual(
+            "projectClass must be populated if programmed is `True`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_4_Id,
+            "programmed": True,
+            "category": self.projectCategory_1_Id,
+            "projectClass": self.projectClass_1_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {
+            "phase": self.projectPhase_5_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "estConstructionStart and estConstructionEnd must be populated if phase is `construction`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "phase": self.projectPhase_5_Id,
+            "estConstructionStart": "01.01.2023",
+            "estConstructionEnd": "01.01.2024",
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "personConstruction must be populated if phase is `construction`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "estConstructionStart": "01.01.2023",
+            "estConstructionEnd": "01.01.2024",
+            "personConstruction": self.person_2_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"phase": self.projectPhase_5_Id}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"phase": self.projectPhase_6_Id}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
+            "phase": self.projectPhase_2_Id,
+            "planningStartYear": 2021,
+            "constructionEndYear": 2022,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "constructionPhase detail cannot be populated if phase is not `construction`",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {
+            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
+            "phase": self.projectPhase_5_Id,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"programmed": False}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "phase must be set to `proposal` or `design` if programmed is `False`",
+            response.json()["errors"][0]["detail"],
+        )
+        # Getting proposal phase from the data that is populated when tests run the migrations
+        data = {
+            "programmed": False,
+            "phase": ProjectPhase.objects.get(value="proposal").id,
+            "constructionPhaseDetail": None,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"programmed": True}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "phase cannot be `proposal` or `design` if programmed is `True`",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {
+            "programmed": True,
+            "phase": self.projectPhase_2_Id,
+            "planningStartYear": 2021,
+            "constructionEndYear": 2022,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"planningStartYear": 2050}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Year cannot be earlier than planningStartYear",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {"planningStartYear": 2050, "constructionEndYear": 2060}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+        data = {"constructionEndYear": 2030}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Year cannot be earlier than planningStartYear",
+            response.json()["errors"][0]["detail"],
+        )
+
+        data = {"constructionEndYear": 2055}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"estPlanningStart": "01.01.2023", "estPlanningEnd": "01.01.2020"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Date cannot be later than estPlanningEnd",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {"estPlanningStart": "01.01.2023", "estPlanningEnd": "01.01.2025"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"presenceStart": "01.01.2023", "presenceEnd": "01.01.2020"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Date cannot be later than presenceEnd",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {"presenceStart": "01.01.2023", "presenceEnd": "01.01.2025"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {"visibilityStart": "01.01.2023", "visibilityEnd": "01.01.2020"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Date cannot be later than visibilityEnd",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {"visibilityStart": "01.01.2023", "visibilityEnd": "01.01.2025"}
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {
+            "estConstructionStart": "01.01.2023",
+            "estConstructionEnd": "01.01.2020",
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            "Date cannot be later than estConstructionEnd",
+            response.json()["errors"][0]["detail"],
+        )
+        data = {
+            "estConstructionStart": "01.01.2023",
+            "estConstructionEnd": "01.01.2025",
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
     def test_pw_folder_project(self):
