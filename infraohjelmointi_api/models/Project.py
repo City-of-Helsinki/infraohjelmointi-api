@@ -26,6 +26,12 @@ from overrides import override
 
 
 class Project(models.Model):
+    def get_default_projectPhase():
+        try:
+            return ProjectPhase.objects.get(value="proposal")
+        except ProjectPhase.DoesNotExist:
+            return None
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
@@ -83,7 +89,11 @@ class Project(models.Model):
         blank=True,
     )
     phase = models.ForeignKey(
-        ProjectPhase, on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectPhase,
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        default=get_default_projectPhase,
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", null=True, blank=True
@@ -96,19 +106,19 @@ class Project(models.Model):
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     constructionEndYear = models.PositiveIntegerField(
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     budgetOverrunYear = models.PositiveIntegerField(
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(3000)],
-        default=0,
+        default=None,
     )
     budgetOverrunAmount = models.PositiveIntegerField(blank=True, null=True, default=0)
     projectWorkQuantity = models.PositiveIntegerField(blank=True, null=True, default=0)
@@ -210,12 +220,12 @@ class Project(models.Model):
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
-    def projectReadiness(self):
+    def projectReadiness(self) -> int:
         # some calculation based on cost and stuff
         # returns percentage of readiness random.randint(0, 100)
         return 95
 
-    def _strip_whitespaces(self, inputString):
+    def _strip_whitespaces(self, inputString: str) -> str:
         return "\n".join(" ".join(line.split()) for line in inputString.split("\n"))
 
     @override
