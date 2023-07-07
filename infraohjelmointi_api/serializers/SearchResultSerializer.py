@@ -36,18 +36,18 @@ class SearchResultSerializer(serializers.Serializer):
             return path
 
         if classInstance.parent is not None and classInstance.parent.parent is not None:
-            path = "{}/{}/{}".format(
+            path = "masterClass={}&class={}&subClass={}".format(
                 str(classInstance.parent.parent.id),
                 str(classInstance.parent.id),
                 str(classInstance.id),
             )
         elif classInstance.parent is not None:
-            path = "{}/{}".format(
+            path = "masterClass={}&class={}".format(
                 str(classInstance.parent.id),
                 str(classInstance.id),
             )
         else:
-            path = str(classInstance.id)
+            path = "masterClass={}".format(str(classInstance.id))
 
         if "suurpiiri" in classInstance.name.lower():
             return path
@@ -56,17 +56,17 @@ class SearchResultSerializer(serializers.Serializer):
             return path
 
         if locationInstance.parent is None:
-            path = path + "/{}".format(str(locationInstance.id))
+            path = path + "&district={}".format(str(locationInstance.id))
         if (
             locationInstance.parent is not None
             and locationInstance.parent.parent is not None
         ):
-            path = path + "/{}".format(str(locationInstance.parent.parent.id))
+            path = path + "&district={}".format(str(locationInstance.parent.parent.id))
         if (
             locationInstance.parent is not None
             and locationInstance.parent.parent is None
         ):
-            path = path + "/{}".format(str(locationInstance.parent.id))
+            path = path + "&district={}".format(str(locationInstance.parent.id))
 
         return path
 
