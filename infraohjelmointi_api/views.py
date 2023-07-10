@@ -740,7 +740,7 @@ class ProjectViewSet(BaseViewSet):
                     for_coordinator=for_coordinator,
                 )
 
-            if len(collectiveSubLevel) > 0:
+            if for_coordinator == True and len(collectiveSubLevel) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
@@ -753,7 +753,7 @@ class ProjectViewSet(BaseViewSet):
                     for_coordinator=for_coordinator,
                 )
 
-            if len(otherClassification) > 0:
+            if for_coordinator == True and len(otherClassification) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
@@ -765,34 +765,33 @@ class ProjectViewSet(BaseViewSet):
                     direct=direct,
                     for_coordinator=for_coordinator,
                 )
-            if len(subLevelDistrict) > 0:
+            if for_coordinator == True and len(subLevelDistrict) > 0:
                 # edit filtering by sublevel district as its parent are not locations but classes
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=True,
                     has_parent_parent_parent=True,
-                    has_parent_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=True,
                     search_ids=subLevelDistrict,
                     model_class=ProjectLocation,
                     direct=direct,
                     for_coordinator=for_coordinator,
-                    is_subLevelDistrict=True,
                 )
 
             if len(district) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
-                    has_parent=False,
-                    has_parent_parent=False,
-                    has_parent_parent_parent=False,
+                    has_parent=True if for_coordinator == True else False,
+                    has_parent_parent=True if for_coordinator == True else False,
+                    has_parent_parent_parent=True if for_coordinator == True else False,
                     has_parent_parent_parent_parent=False,
                     search_ids=district,
                     model_class=ProjectLocation,
                     direct=direct,
                     for_coordinator=for_coordinator,
                 )
-            if len(division) > 0:
+            if for_coordinator == False and len(division) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
@@ -804,7 +803,7 @@ class ProjectViewSet(BaseViewSet):
                     direct=direct,
                     for_coordinator=for_coordinator,
                 )
-            if len(subDivision) > 0:
+            if for_coordinator == False and len(subDivision) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
@@ -964,7 +963,6 @@ class ProjectViewSet(BaseViewSet):
         model_class,
         direct=False,
         for_coordinator=False,
-        is_subLevelDistrict=False,
     ):
         if direct == True:
             if model_class.__name__ == "ProjectLocation":
@@ -980,7 +978,7 @@ class ProjectViewSet(BaseViewSet):
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
         paths = []
-        if is_subLevelDistrict == True:
+        if for_coordinator == True and model_class.__name__ == "ProjectLocation":
             paths = (
                 model_class.objects.filter(
                     id__in=search_ids,
@@ -993,7 +991,6 @@ class ProjectViewSet(BaseViewSet):
                 .distinct()
                 .values_list("path", flat=True)
             )
-            print("PATH IS :{}, and ID is {}".format(paths, search_ids))
         else:
             paths = (
                 model_class.objects.filter(
