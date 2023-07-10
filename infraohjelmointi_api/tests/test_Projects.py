@@ -44,6 +44,10 @@ class ProjectTestCase(TestCase):
     project_8_Id = uuid.UUID("3d438292-a7c1-4ef2-9d28-048d580ab2fc")
     project_9_Id = uuid.UUID("a5899694-c5b1-44af-949f-dad9bd06f1a4")
     project_10_Id = uuid.UUID("77da3264-12f2-4abd-a4cd-0992c8f270e6")
+    project_11_Id = uuid.UUID("fee6aebc-8840-4349-b2a6-3c37fa719a7f")
+    project_12_Id = uuid.UUID("acac7550-0f9a-497e-93e6-b39520b738f3")
+    project_13_Id = uuid.UUID("6039e277-382b-4dbe-9912-d152624d6524")
+    project_14_Id = uuid.UUID("9c33f268-2a3c-4f8f-99d0-797c25582c66")
     budgetItemId = uuid.UUID("5b1b127f-b4c4-4bea-b994-b2c5c04332f8")
     person_1_Id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     person_2_Id = uuid.UUID("7fe92cae-d866-4e12-b182-547c367efe12")
@@ -79,16 +83,26 @@ class ProjectTestCase(TestCase):
     projectClass_1_Id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
     projectClass_2_Id = uuid.UUID("c03b41d4-bb50-4bc5-ada1-496f399eb157")
     projectClass_3_Id = uuid.UUID("dacd6429-0f60-4ef9-8c9e-54e2a159c8da")
+    projectClass_4_Id = uuid.UUID("90fc9857-78b3-40df-a7eb-162f2f8d9fff")
+    projectCoordinatorClass_1_Id = uuid.UUID("74f1a8a0-7bf9-4d1d-9cf4-da58825fac4d")
     projectSubClass_1_Id = uuid.UUID("88006f5b-339d-4859-9903-25494deebeca")
     projectSubClass_2_Id = uuid.UUID("48e201a9-7579-42fe-9970-2c0704bd7257")
     projectSubClass_3_Id = uuid.UUID("fe77dce9-56ec-4642-a011-5b611ff879d6")
     projectSubClass_4_Id = uuid.UUID("bdcc6c20-6535-4cc2-9b7e-fa4756cb76e0")
     projectSubClass_5_Id = uuid.UUID("2e147a96-bfee-4a0e-9d44-4095b3c36bdf")
     projectSubClass_6_Id = uuid.UUID("718f7e0e-0dc9-4456-a071-29a8a99437ca")
+    projectSubClass_7_Id = uuid.UUID("2e147a96-bfee-4a0e-9d44-4095b3c36bdf")
+    projectCoordinatorSubClass_1_Id = uuid.UUID("ee223e27-8913-4194-82d9-6c6698d7c12c")
+    projectCollectiveSubLevel_1_Id = uuid.UUID("e195c3e3-ef17-4e3c-9dd5-345fce366a82")
+    projectOtherClassification_1_Id = uuid.UUID("acc2709e-95df-4e03-84ee-cfe1c63aa34c")
     projectMasterClass_1_Id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     projectMasterClass_2_Id = uuid.UUID("073e1dee-9e77-4ddd-8d0c-ad856c51e857")
     projectMasterClass_3_Id = uuid.UUID("a66db3fa-eb71-42dc-b618-9e4fae0db8bc")
     projectMasterClass_4_Id = uuid.UUID("b723201e-10c2-40f0-b031-c0e8c072ad7e")
+    projectMasterClass_5_Id = uuid.UUID("bc7eb464-1973-4f4e-8fa4-445923f50faf")
+    projectCoordinatorMasterClass_1_Id = uuid.UUID(
+        "0f0c982c-049f-4ec5-b6a4-bd43a5cf8f65"
+    )
     projectHashTag_1_Id = uuid.UUID("e4d7b4b0-830d-4310-8b29-3c7d1e3132ba")
     projectHashTag_2_Id = uuid.UUID("eb8635b3-4e83-45d9-a1af-6bc49bf2aeb7")
     projectHashTag_3_Id = uuid.UUID("aba0e241-0a02-48a0-8426-e4f034c5f527")
@@ -100,15 +114,20 @@ class ProjectTestCase(TestCase):
     projectDistrict_5_Id = uuid.UUID("1055e80a-9e2c-4a29-a76a-97528581ff11")
     projectDistrict_6_Id = uuid.UUID("17190fd9-9727-4f3e-a7de-74f682e26a33")
     projectDistrict_7_Id = uuid.UUID("b69e4208-83c6-40bb-854f-4519b3841f66")
+    projectDistrict_8_Id = uuid.UUID("fbdbb35a-9999-4881-8708-5bb5072be443")
+    projectCoordinationDistrict_1_Id = uuid.UUID("2b9e7879-09a5-4257-93c6-cd20b75e6904")
     projectDivision_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectDivision_2_Id = uuid.UUID("e8f68255-5111-4ab5-b346-016956c671d1")
     projectDivision_3_Id = uuid.UUID("e4864b42-0002-42c6-a0fb-113638810278")
     projectDivision_4_Id = uuid.UUID("0e9e1253-cfe2-405e-9cf4-832a5c5185ac")
     projectDivision_5_Id = uuid.UUID("070e480a-3a50-49dc-bc12-58651f2c7fa4")
     projectDivision_6_Id = uuid.UUID("8aea2fe2-0d74-49c1-a7a0-8a080755a8b8")
+    projectDivision_7_Id = uuid.UUID("f2080d26-16ea-4bcb-a986-db26f90e2178")
     projectSubDivision_1_Id = uuid.UUID("191f9acf-e387-4307-93db-b9f252ec18ff")
     projectSubDivision_2_Id = uuid.UUID("99c4a023-b246-4b1c-be49-848b82b12095")
     projectSubDivision_3_Id = uuid.UUID("b76b3107-628c-4f3e-a2e1-230439da090f")
+    projectSubDivision_4_Id = uuid.UUID("e65d7bc1-61f5-42f9-a52c-417cd1cf085b")
+    projectSubDivision_5_Id = uuid.UUID("06004dd7-5b27-43c8-85ef-34d2b5115749")
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
@@ -1216,7 +1235,7 @@ class ProjectTestCase(TestCase):
         ProjectFinancial.objects.create(project=project_3, year=year + 10, value=0)
 
         response = self.client.get(
-            "/projects/search-results/?prYearMin={}".format(2025),
+            "/projects/search-results/?prYearMin={}".format(year + 2),
         )
         self.assertEqual(
             response.status_code,
@@ -1226,13 +1245,13 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(response.json()["results"]),
             2,
-            msg="Filtered result should contain 2 projects with financial fields related to year >= 2025 with values > 0 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            msg="Filtered result should contain 2 projects with financial fields related to year >= {} with values > 0 and programmed = true. Found: {}".format(
+                year + 2, len(response.json()["results"])
             ),
         )
 
         response = self.client.get(
-            "/projects/search-results/?prYearMin={}".format(2030),
+            "/projects/search-results/?prYearMin={}".format(year + 7),
         )
         self.assertEqual(
             response.status_code,
@@ -1242,13 +1261,13 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(response.json()["results"]),
             1,
-            msg="Filtered result should contain 1 projects with financial fields related to year >= 2030 with values > 0 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            msg="Filtered result should contain 1 projects with financial fields related to year >= {} with values > 0 and programmed = true. Found: {}".format(
+                year + 7, len(response.json()["results"])
             ),
         )
 
         response = self.client.get(
-            "/projects/search-results/?prYearMax={}".format(2024),
+            "/projects/search-results/?prYearMax={}".format(year + 1),
         )
         self.assertEqual(
             response.status_code,
@@ -1258,13 +1277,15 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(response.json()["results"]),
             1,
-            msg="Filtered result should contain 1 projects with financial fields related to year <= 2024 with values > 0 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            msg="Filtered result should contain 1 projects with financial fields related to year <= {} with values > 0 and programmed = true. Found: {}".format(
+                year + 1, len(response.json()["results"])
             ),
         )
 
         response = self.client.get(
-            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2030, 2032),
+            "/projects/search-results/?prYearMin={}&prYearMax={}".format(
+                year + 7, year + 9
+            ),
         )
         self.assertEqual(
             response.status_code,
@@ -1274,29 +1295,15 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(response.json()["results"]),
             1,
-            msg="Filtered result should contain 1 project with financial fields > 0 for years in range 2030-2032 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            msg="Filtered result should contain 1 project with financial fields > 0 for years in range {}-{} and programmed = true. Found: {}".format(
+                year + 7, year + 9, len(response.json()["results"])
             ),
         )
 
         response = self.client.get(
-            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2030, 2032),
-        )
-        self.assertEqual(
-            response.status_code,
-            200,
-            msg="Status code != 200, Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            len(response.json()["results"]),
-            1,
-            msg="Filtered result should contain 1 project with financial fields > 0 for years in range 2030-2032 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            "/projects/search-results/?prYearMin={}&prYearMax={}".format(
+                year + 5, year + 6
             ),
-        )
-
-        response = self.client.get(
-            "/projects/search-results/?prYearMin={}&prYearMax={}".format(2028, 2029),
         )
         self.assertEqual(
             response.status_code,
@@ -1306,8 +1313,8 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(response.json()["results"]),
             0,
-            msg="Filtered result should contain 0 project with financial fields > 0 for years in range 2028-2029 and programmed = true. Found: {}".format(
-                len(response.json()["results"])
+            msg="Filtered result should contain 0 project with financial fields > 0 for years in range {}-{} and programmed = true. Found: {}".format(
+                year + 5, year + 6, len(response.json()["results"])
             ),
         )
 
@@ -3580,4 +3587,176 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["pwFolderLink"], self.pwInstanceId_hkrId_2_folder
+        )
+
+    def test_project_coordination_endpoint(self):
+        district_1 = ProjectLocation.objects.create(
+            id=self.projectDistrict_8_Id,
+            name="District 1",
+            parent=None,
+            path="District 1",
+            forCoordinatorOnly=False,
+        )
+
+        masterClass_1 = ProjectClass.objects.create(
+            id=self.projectMasterClass_5_Id,
+            name="Master Class 1",
+            parent=None,
+            path="Master Class 1",
+            forCoordinatorOnly=False,
+        )
+
+        _class = masterClass_1.childClass.create(
+            name="Test Class 1",
+            id=self.projectClass_4_Id,
+            path="Master Class 1/Test Class 1",
+            forCoordinatorOnly=False,
+        )
+        subClass_1 = _class.childClass.create(
+            id=self.projectSubClass_7_Id,
+            name="Sub class 1",
+            path="Master Class 1/Test Class 1/Sub class 1",
+            forCoordinatorOnly=False,
+        )
+
+        coordinatorMasterClass_1 = ProjectClass.objects.create(
+            id=self.projectCoordinatorMasterClass_1_Id,
+            name="Coordinator Master Class 1",
+            parent=None,
+            path="Coordinator Master Class 1",
+            forCoordinatorOnly=True,
+            relatedTo=masterClass_1,
+        )
+
+        coordinatorClass_1 = coordinatorMasterClass_1.childClass.create(
+            name="Coordinator Test Class 1",
+            id=self.projectCoordinatorClass_1_Id,
+            path="Coordinator Master Class 1/Coordinator Test Class 1",
+            forCoordinatorOnly=True,
+            relatedTo=_class,
+        )
+        coordinatorSubClass_1 = coordinatorClass_1.childClass.create(
+            id=self.projectCoordinatorSubClass_1_Id,
+            name="Coordinator Sub class 1",
+            path="Coordinator Master Class 1/Coordinator Test Class 1/Coordinator Sub class 1",
+            forCoordinatorOnly=True,
+            relatedTo=subClass_1,
+        )
+
+        ProjectLocation.objects.create(
+            id=self.projectCoordinationDistrict_1_Id,
+            name="Coordinator district 1",
+            parent=None,
+            path="Coordinator district 1",
+            forCoordinatorOnly=True,
+            parentClass=coordinatorSubClass_1,
+            relatedTo=district_1,
+        )
+
+        project_1 = Project.objects.create(
+            id=self.project_11_Id,
+            hkrId=2222,
+            name="Parking Helsinki",
+            description="Random desc",
+            programmed=True,
+            projectLocation=district_1,
+            projectClass=subClass_1,
+        )
+        project_2 = Project.objects.create(
+            id=self.project_12_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            projectLocation=None,
+            projectClass=_class,
+        )
+        project_3 = Project.objects.create(
+            id=self.project_13_Id,
+            hkrId=3333,
+            name="Train Train Bike",
+            description="Random desc",
+            programmed=False,
+            projectLocation=None,
+            projectClass=masterClass_1,
+        )
+
+        response = self.client.get(
+            "/projects/coordinator/",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 3)
+
+        response = self.client.get(
+            "/projects/coordinator/?district={}".format(
+                self.projectCoordinationDistrict_1_Id
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Number of projects under coordination district {} != 1".format(
+                self.projectCoordinationDistrict_1_Id
+            ),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["projectLocation"],
+            self.projectCoordinationDistrict_1_Id.__str__(),
+        )
+
+        response = self.client.get(
+            "/projects/coordinator/?subClass={}".format(
+                self.projectCoordinatorSubClass_1_Id
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["count"],
+            1,
+            msg="Number of projects under coordination subClass {} != 1".format(
+                self.projectCoordinatorSubClass_1_Id
+            ),
+        )
+        self.assertEqual(
+            response.json()["results"][0]["projectClass"],
+            self.projectCoordinatorSubClass_1_Id.__str__(),
+        )
+
+        response = self.client.get(
+            "/projects/coordinator/?masterClass={}".format(
+                self.projectCoordinatorMasterClass_1_Id
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["count"],
+            3,
+            msg="Number of projects under coordination masterClass {} != 3".format(
+                self.projectCoordinatorSubClass_1_Id
+            ),
+        )
+
+        response = self.client.get(
+            "/projects/coordinator/?masterClass={}&programmed={}".format(
+                self.projectCoordinatorMasterClass_1_Id, "true"
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["count"],
+            2,
+            msg="Number of projects under coordination masterClass and programmed set to True {} != 2".format(
+                self.projectCoordinatorSubClass_1_Id
+            ),
         )
