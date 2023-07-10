@@ -20,7 +20,11 @@ class ProjectLocation(models.Model):
     parentClass = models.ForeignKey(
         ProjectClass, blank=True, null=True, on_delete=models.DO_NOTHING
     )
-    relatedTo = models.ForeignKey(
-        "self", blank=True, null=True, on_delete=models.DO_NOTHING
+    relatedTo = models.OneToOneField(
+        "self",
+        on_delete=models.DO_NOTHING,
+        related_name="coordinatorLocation",
+        blank=True,
+        null=True,
     )
     forCoordinatorOnly = models.BooleanField(default=False)
