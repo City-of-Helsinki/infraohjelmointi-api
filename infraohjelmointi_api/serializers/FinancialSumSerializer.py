@@ -134,10 +134,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                             "finances",
                             "projectLocation__coordinatorLocation",
                         )
-                        .filter(
-                            projectLocation__coordinatorLocation=instance,
-                            projectLocation__forCoordinatorOnly=True,
-                        )
+                        .filter(projectLocation__coordinatorLocation=instance)
                     )
                 else:
                     return (

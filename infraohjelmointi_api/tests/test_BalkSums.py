@@ -56,6 +56,12 @@ class BalkSumTestCase(TestCase):
     projectGroup_1_Id = uuid.UUID("5740b0ae-d802-4785-bbc6-277a9853ecd8")
     projectGroup_2_Id = uuid.UUID("4b08bc44-3b94-44b4-8283-2b2ef07ed3fa")
     projectGroup_3_Id = uuid.UUID("661e8694-7840-43f2-b1c9-3dbed0c30cef")
+    projectCoordinationDistrict_1_Id = uuid.UUID("2b9e7879-09a5-4257-93c6-cd20b75e6904")
+    projectCoordinatorMasterClass_1_Id = uuid.UUID(
+        "0f0c982c-049f-4ec5-b6a4-bd43a5cf8f65"
+    )
+    projectCoordinatorClass_1_Id = uuid.UUID("74f1a8a0-7bf9-4d1d-9cf4-da58825fac4d")
+    projectCoordinatorSubClass_1_Id = uuid.UUID("ee223e27-8913-4194-82d9-6c6698d7c12c")
 
     @classmethod
     @override
@@ -315,6 +321,42 @@ class BalkSumTestCase(TestCase):
         ProjectFinancial.objects.create(project=project_8, year=year + 9, value=10)
         ProjectFinancial.objects.create(project=project_8, year=year + 10, value=0)
 
+        # Coordinator projects, classes/locations
+
+        coordinatorMasterClass_1 = ProjectClass.objects.create(
+            id=self.projectCoordinatorMasterClass_1_Id,
+            name="Coordinator Master Class 1",
+            parent=None,
+            path="Coordinator Master Class 1",
+            forCoordinatorOnly=True,
+            relatedTo=masterClass_1,
+        )
+
+        coordinatorClass_1 = coordinatorMasterClass_1.childClass.create(
+            name="Coordinator Test Class 1",
+            id=self.projectCoordinatorClass_1_Id,
+            path="Coordinator Master Class 1/Coordinator Test Class 1",
+            forCoordinatorOnly=True,
+            relatedTo=_class,
+        )
+        coordinatorSubClass_1 = coordinatorClass_1.childClass.create(
+            id=self.projectCoordinatorSubClass_1_Id,
+            name="Coordinator Sub class 1",
+            path="Coordinator Master Class 1/Coordinator Test Class 1/Coordinator Sub class 1",
+            forCoordinatorOnly=True,
+            relatedTo=subClass_1,
+        )
+
+        ProjectLocation.objects.create(
+            id=self.projectCoordinationDistrict_1_Id,
+            name="Coordinator district 1",
+            parent=None,
+            path="Coordinator district 1",
+            forCoordinatorOnly=True,
+            parentClass=coordinatorSubClass_1,
+            relatedTo=district_1,
+        )
+
     def test_GET_class_with_sums(self):
         response = self.client.get(
             "/project-classes/{}/".format(self.projectMasterClass_1_Id)
@@ -401,6 +443,59 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10)
         self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0)
 
+    def test_GET_coordinator_class_with_sums(self):
+        response = self.client.get("/project-classes/coordinator/")
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 3, msg="Number of coordinator classes != 3"
+        )
+        # Sum for coordinator masterClass, it will miss project 3 as it uses subClass 2 which has no coordination class
+        self.assertEqual(
+            response.json()[0]["id"], self.projectCoordinatorMasterClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 460)
+        self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 460)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 250)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["plannedBudget"], 250)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["plannedBudget"], 25)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["plannedBudget"], 20)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["plannedBudget"], 36)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 40)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
+
+        self.assertEqual(
+            response.json()[1]["id"], self.projectCoordinatorClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[1]["finances"]["year0"]["plannedBudget"], 160)
+        self.assertEqual(response.json()[1]["finances"]["year1"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[1]["finances"]["year2"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[1]["finances"]["year3"]["plannedBudget"], 30)
+        self.assertEqual(response.json()[1]["finances"]["year4"]["plannedBudget"], 15)
+        self.assertEqual(response.json()[1]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year7"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[1]["finances"]["year8"]["plannedBudget"], 18)
+        self.assertEqual(response.json()[1]["finances"]["year9"]["plannedBudget"], 20)
+        self.assertEqual(response.json()[1]["finances"]["year10"]["plannedBudget"], 0)
+
+        self.assertEqual(
+            response.json()[2]["id"], self.projectCoordinatorSubClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[2]["finances"]["year0"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[2]["finances"]["year1"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[2]["finances"]["year2"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[2]["finances"]["year3"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[2]["finances"]["year4"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[2]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year7"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year8"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year9"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year10"]["plannedBudget"], 0)
+
     def test_GET_location_with_sums(self):
         response = self.client.get(
             "/project-locations/{}/".format(self.projectDistrict_1_Id)
@@ -433,6 +528,28 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9)
         self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10)
         self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0)
+
+    def test_GET_coordinator_location_with_sums(self):
+        response = self.client.get("/project-locations/coordinator/")
+
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 1, msg="Number of coordinator locations != 1"
+        )
+        self.assertEqual(
+            response.json()[0]["id"], self.projectCoordinationDistrict_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
 
     def test_GET_group_with_sums(self):
         response = self.client.get("/project-groups/{}/".format(self.projectGroup_1_Id))
