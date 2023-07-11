@@ -33,14 +33,24 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
             project_id=project.id, year_range=range(year, year + 11)
         )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
-        serializedFinances = {"year": year}
+        serializedFinances = {
+            "year": year,
+            "budgetProposalCurrentYearPlus0": "0.00",
+            "budgetProposalCurrentYearPlus1": "0.00",
+            "budgetProposalCurrentYearPlus2": "0.00",
+            "preliminaryCurrentYearPlus3": "0.00",
+            "preliminaryCurrentYearPlus4": "0.00",
+            "preliminaryCurrentYearPlus5": "0.00",
+            "preliminaryCurrentYearPlus6": "0.00",
+            "preliminaryCurrentYearPlus7": "0.00",
+            "preliminaryCurrentYearPlus8": "0.00",
+            "preliminaryCurrentYearPlus9": "0.00",
+            "preliminaryCurrentYearPlus10": "0.00",
+        }
         for finance in allFinances:
             serializedFinances[yearToFieldMapping[finance["year"]]] = finance["value"]
             # pop out already mapped keys
             yearToFieldMapping.pop(finance["year"])
-        # remaining year keys which had no data in DB
-        for yearKey in yearToFieldMapping.keys():
-            serializedFinances[yearToFieldMapping[yearKey]] = "0.00"
 
         return serializedFinances
 
