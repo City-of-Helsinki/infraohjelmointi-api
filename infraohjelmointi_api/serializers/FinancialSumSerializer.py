@@ -123,18 +123,52 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         return summedFinances
 
     def get_related_projects(self, instance, _type) -> list[Project]:
+        # use context to check if coordinator class/locations are needed
+        for_coordinator = self.context.get("for_coordinator", False)
         if _type == "ProjectLocation":
             if instance.parent is None:
-                return Project.objects.filter(
-                    Q(projectLocation=instance)
-                    | Q(projectLocation__parent=instance)
-                    | Q(projectLocation__parent__parent=instance)
-                ).prefetch_related("finances")
+                if for_coordinator == True:
+                    return (
+                        Project.objects.select_related("projectLocation")
+                        .prefetch_related(
+                            "finances",
+                            "projectLocation__coordinatorLocation",
+                        )
+                        .filter(
+                            projectLocation__coordinatorLocation=instance,
+                            projectLocation__forCoordinatorOnly=True,
+                        )
+                    )
+                else:
+                    return (
+                        Project.objects.select_related("projectLocation")
+                        .prefetch_related(
+                            "finances",
+                            "projectLocation__parent",
+                            "projectLocation__parent__parent",
+                        )
+                        .filter(
+                            Q(projectLocation=instance)
+                            | Q(projectLocation__parent=instance)
+                            | Q(projectLocation__parent__parent=instance)
+                        )
+                    )
             return Project.objects.none()
         if _type == "ProjectClass":
-            return Project.objects.filter(
-                projectClass__path__startswith=instance.path
-            ).prefetch_related("finances")
+            if for_coordinator == True:
+                return (
+                    Project.objects.select_related("projectClass")
+                    .prefetch_related("finances", "projectClass__coordinatorClass")
+                    .filter(
+                        projectClass__coordinatorClass__path__startswith=instance.path
+                    )
+                )
+            else:
+                return (
+                    Project.objects.select_related("projectClass")
+                    .prefetch_related("finances")
+                    .filter(projectClass__path__startswith=instance.path)
+                )
 
         if _type == "ProjectGroup":
             return ProjectService.find_by_group_id(
