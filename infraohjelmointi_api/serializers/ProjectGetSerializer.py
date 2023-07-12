@@ -141,7 +141,8 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         # use context to check if coordinator class/locations are needed
         for_coordinator = self.context.get("for_coordinator", False)
         if for_coordinator == True:
-            # if class is suurpiri then goto instance.projectClass.parent__coordinatorClass
+            # if class is suurpiiri then goto its parent and check for coordinationClass since suurpiiri classes have no
+            # coordination class
             rep["projectClass"] = (
                 instance.projectClass.coordinatorClass.id
                 if hasattr(instance.projectClass, "coordinatorClass")
