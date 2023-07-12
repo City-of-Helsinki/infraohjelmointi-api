@@ -129,21 +129,29 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             if instance.parent is None:
                 if for_coordinator == True:
                     return (
-                        Project.objects.select_related("projectLocation")
-                        .prefetch_related(
-                            "finances",
+                        Project.objects.select_related(
+                            "projectLocation",
                             "projectLocation__coordinatorLocation",
+                            "projectLocation__parent__coordinatorLocation",
+                            "projectLocation__parent__parent__coordinatorLocation",
                         )
-                        .filter(projectLocation__coordinatorLocation=instance)
+                        .prefetch_related("finances")
+                        .filter(
+                            Q(projectLocation__coordinatorLocation=instance)
+                            | Q(projectLocation__parent__coordinatorLocation=instance)
+                            | Q(
+                                projectLocation__parent__parent__coordinatorLocation=instance
+                            )
+                        )
                     )
                 else:
                     return (
-                        Project.objects.select_related("projectLocation")
-                        .prefetch_related(
-                            "finances",
+                        Project.objects.select_related(
+                            "projectLocation",
                             "projectLocation__parent",
                             "projectLocation__parent__parent",
                         )
+                        .prefetch_related("finances")
                         .filter(
                             Q(projectLocation=instance)
                             | Q(projectLocation__parent=instance)
@@ -155,7 +163,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             if for_coordinator == True:
                 return (
                     Project.objects.select_related("projectClass")
-                    .prefetch_related("finances", "projectClass__coordinatorClass")
+                    .prefetch_related("projectClass__coordinatorClass", "finances")
                     .filter(
                         projectClass__coordinatorClass__path__startswith=instance.path
                     )
