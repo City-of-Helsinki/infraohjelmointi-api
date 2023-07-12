@@ -141,14 +141,38 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         # use context to check if coordinator class/locations are needed
         for_coordinator = self.context.get("for_coordinator", False)
         if for_coordinator == True:
+            # if class is suurpiri then goto instance.projectClass.parent__coordinatorClass
             rep["projectClass"] = (
                 instance.projectClass.coordinatorClass.id
                 if hasattr(instance.projectClass, "coordinatorClass")
+                else instance.projectClass.parent.coordinatorClass.id
+                if (
+                    instance.projectClass != None
+                    and "suurpiiri" in instance.projectClass.name.lower()
+                    and hasattr(instance.projectClass.parent, "coordinatorClass")
+                )
                 else None
             )
+            # if project location is division/subdivision then goto its district and get related coordination location else none
             rep["projectLocation"] = (
                 instance.projectLocation.coordinatorLocation.id
-                if hasattr(instance.projectLocation, "coordinatorLocation")
+                if (hasattr(instance.projectLocation, "coordinatorLocation"))
+                else instance.projectLocation.parent.coordinatorLocation.id
+                if (
+                    instance.projectLocation != None
+                    and instance.projectLocation.parent != None
+                    and instance.projectLocation.parent.parent == None
+                    and hasattr(instance.projectLocation.parent, "coordinatorLocation")
+                )
+                else instance.projectLocation.parent.parent.coordinatorLocation.id
+                if (
+                    instance.projectLocation != None
+                    and instance.projectLocation.parent != None
+                    and instance.projectLocation.parent.parent != None
+                    and hasattr(
+                        instance.projectLocation.parent.parent, "coordinatorLocation"
+                    )
+                )
                 else None
             )
         return rep

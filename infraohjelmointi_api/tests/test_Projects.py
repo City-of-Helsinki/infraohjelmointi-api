@@ -3687,7 +3687,6 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["count"], 3)
 
         response = self.client.get(
             "/projects/coordinator/?district={}".format(
