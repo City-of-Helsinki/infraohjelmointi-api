@@ -644,12 +644,16 @@ class ProjectViewSet(BaseViewSet):
                 super()
                 .get_queryset()
                 .select_related(
+                    "projectClass",
+                    "projectLocation",
                     "projectClass__coordinatorClass",
                     "projectLocation__coordinatorLocation",
+                    "projectClass__parent__coordinatorClass",
+                    "projectLocation__parent__coordinatorLocation",
+                    "projectLocation__parent__parent__coordinatorLocation",
                 )
                 .filter(
-                    Q(projectClass__coordinatorClass__isnull=False)
-                    or Q(projectLocation__coordinatorLocation__isnull=False)
+                    Q(projectClass__isnull=False) or Q(projectLocation__isnull=False)
                 )
             )
         else:
