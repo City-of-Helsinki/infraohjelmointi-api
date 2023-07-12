@@ -162,10 +162,22 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         if _type == "ProjectClass":
             if for_coordinator == True:
                 return (
-                    Project.objects.select_related("projectClass")
-                    .prefetch_related("projectClass__coordinatorClass", "finances")
+                    Project.objects.select_related(
+                        "projectClass",
+                        "projectClass__coordinatorClass",
+                        "projectClass__parent__coordinatorClass",
+                    )
+                    .prefetch_related("finances")
                     .filter(
-                        projectClass__coordinatorClass__path__startswith=instance.path
+                        (
+                            Q(projectClass__name__icontains="suurpiiri")
+                            & Q(
+                                projectClass__parent__coordinatorClass__path__startswith=instance.path
+                            )
+                        )
+                        | Q(
+                            projectClass__coordinatorClass__path__startswith=instance.path
+                        )
                     )
                 )
             else:
