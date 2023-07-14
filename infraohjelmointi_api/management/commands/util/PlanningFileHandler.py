@@ -84,12 +84,7 @@ class PlanningFileHandler(IExcelFileHandler):
                 if "vaihe" in str(cell.value).lower():
                     self.phaseColumnIndex = cellIndex
                     break
-            # self.planningYear1 = (
-            #     int(rows[0][9].value) if str(rows[0][9].value).isnumeric() else None
-            # )
-            # self.constructionYear = (
-            #     int(rows[0][21].value) if str(rows[0][21].value).isnumeric() else None
-            # )
+
             buildHierarchiesAndProjects(
                 wb=wb,
                 rows=rows,
