@@ -8,6 +8,7 @@ from ....services import (
     NoteService,
     ProjectCategoryService,
     ProjectFinancialService,
+    ProjectPhaseService,
 )
 
 from . import IExcelFileHandler
@@ -180,6 +181,61 @@ class BudgetFileHandler(IExcelFileHandler):
             )
 
         try:
+
+            def find_non_zero_budget_index(budget_list):
+                """
+                Helper function to find first and last non zero budget
+                """
+                first_non_zero_index = None
+                last_non_zero_index = None
+                for i, num in enumerate(budget_list):
+                    if num != 0:
+                        if first_non_zero_index is None:
+                            first_non_zero_index = i
+                        last_non_zero_index = i
+
+                return first_non_zero_index, last_non_zero_index
+
+            project.phase = (
+                ProjectPhaseService.get_by_value(value="programming")
+                if budget_sum > 0
+                else ProjectPhaseService.get_by_value(value="proposal")
+            )
+
+            firstBudgetIndex, lastBudgetIndex = find_non_zero_budget_index(
+                budget_list=budget_list
+            )
+
+            if firstBudgetIndex != None and lastBudgetIndex != None:
+                hasOneBudgetField = firstBudgetIndex == lastBudgetIndex
+                planningStartYear = self.current_budget_year + firstBudgetIndex
+                # set first budget year as planning start
+                project.planningStartYear = planningStartYear
+                # First date of the first month
+                project.estPlanningStart = datetime.datetime(planningStartYear, 1, 1)
+                # middle of year if only 1 budget in excel, else end of year
+                project.estPlanningEnd = (
+                    datetime.datetime(planningStartYear, 6, 30)
+                    if hasOneBudgetField
+                    else datetime.datetime(planningStartYear, 12, 31)
+                )
+                # same year as planning if 1 budget in excel, else the same year as last budget in excel
+                project.constructionEndYear = (
+                    (planningStartYear)
+                    if hasOneBudgetField
+                    else (self.current_budget_year + lastBudgetIndex)
+                )
+                # 1 month after planning ends if 1 budget field, else 1 year after planning
+                project.estConstructionStart = (
+                    datetime.datetime(planningStartYear, 7, 1)
+                    if hasOneBudgetField
+                    else datetime.datetime(planningStartYear + 1, 1, 1)
+                )
+
+                project.estConstructionEnd = datetime.datetime(
+                    project.constructionEndYear, 12, 31
+                )
+
             project.programmed = budget_sum > 0
             project.category = category
             project.effectHousing = effectHousing
