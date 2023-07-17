@@ -8,6 +8,7 @@ from ....services import (
     NoteService,
     ProjectCategoryService,
     ProjectFinancialService,
+    ProjectPhaseService,
 )
 
 from . import IExcelFileHandler
@@ -180,6 +181,85 @@ class BudgetFileHandler(IExcelFileHandler):
             )
 
         try:
+
+            def find_non_zero_budget_index(budget_list):
+                """
+                Helper function to find first and last non zero budget
+                """
+                first_non_zero_index = None
+                last_non_zero_index = None
+                for i, num in enumerate(budget_list):
+                    if num != 0:
+                        if first_non_zero_index is None:
+                            first_non_zero_index = i
+                        last_non_zero_index = i
+
+                return first_non_zero_index, last_non_zero_index
+
+            project.phase = (
+                ProjectPhaseService.get_by_value(value="programming")
+                if budget_sum > 0
+                else ProjectPhaseService.get_by_value(value="proposal")
+            )
+
+            firstBudgetIndex, lastBudgetIndex = find_non_zero_budget_index(
+                budget_list=budget_list
+            )
+
+            if firstBudgetIndex != None and lastBudgetIndex != None:
+                # only 1 budget value
+                if firstBudgetIndex == lastBudgetIndex:
+                    # set first budget year as planning start
+                    project.planningStartYear = (
+                        self.current_budget_year + firstBudgetIndex
+                    )
+                    # First date of the first month given an year
+                    project.estPlanningStart = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 1, 1
+                    )
+                    # middle of the year
+                    project.estPlanningEnd = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 6, 30
+                    )
+                    # set construction end as the same year as planning
+                    project.constructionEndYear = (
+                        self.current_budget_year + firstBudgetIndex
+                    )
+                    # First date of middle month
+                    project.estConstructionStart = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 7, 1
+                    )
+                    # Last date of last month given an year
+                    project.estConstructionEnd = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 12, 31
+                    )
+                else:
+                    # set first budget year as planning start
+                    project.planningStartYear = (
+                        self.current_budget_year + firstBudgetIndex
+                    )
+                    # First date of the first month given an year
+                    project.estPlanningStart = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 1, 1
+                    )
+                    # Last date of last month given an year
+                    project.estPlanningEnd = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex, 12, 31
+                    )
+                    # set last budget year as construction end
+                    project.constructionEndYear = (
+                        self.current_budget_year + lastBudgetIndex
+                    )
+                    # First date of First month given an year
+                    # The year after first planning year
+                    project.estConstructionStart = datetime.datetime(
+                        self.current_budget_year + firstBudgetIndex + 1, 1, 1
+                    )
+                    # Last date of last month given an year
+                    project.estConstructionEnd = datetime.datetime(
+                        self.current_budget_year + lastBudgetIndex, 12, 31
+                    )
+
             project.programmed = budget_sum > 0
             project.category = category
             project.effectHousing = effectHousing
