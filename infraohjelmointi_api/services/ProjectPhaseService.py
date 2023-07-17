@@ -9,3 +9,7 @@ class ProjectPhaseService:
     @staticmethod
     def get_by_id(id: str) -> ProjectPhase:
         return ProjectPhase.objects.get(id=id)
+
+    @staticmethod
+    def get_by_value(value: str) -> ProjectPhase:
+        return ProjectPhase.objects.get(value=value)
