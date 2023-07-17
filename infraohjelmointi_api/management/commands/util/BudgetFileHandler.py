@@ -207,58 +207,34 @@ class BudgetFileHandler(IExcelFileHandler):
             )
 
             if firstBudgetIndex != None and lastBudgetIndex != None:
-                # only 1 budget value
-                if firstBudgetIndex == lastBudgetIndex:
-                    # set first budget year as planning start
-                    project.planningStartYear = (
-                        self.current_budget_year + firstBudgetIndex
-                    )
-                    # First date of the first month given an year
-                    project.estPlanningStart = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 1, 1
-                    )
-                    # middle of the year
-                    project.estPlanningEnd = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 6, 30
-                    )
-                    # set construction end as the same year as planning
-                    project.constructionEndYear = (
-                        self.current_budget_year + firstBudgetIndex
-                    )
-                    # First date of middle month
-                    project.estConstructionStart = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 7, 1
-                    )
-                    # Last date of last month given an year
-                    project.estConstructionEnd = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 12, 31
-                    )
-                else:
-                    # set first budget year as planning start
-                    project.planningStartYear = (
-                        self.current_budget_year + firstBudgetIndex
-                    )
-                    # First date of the first month given an year
-                    project.estPlanningStart = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 1, 1
-                    )
-                    # Last date of last month given an year
-                    project.estPlanningEnd = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex, 12, 31
-                    )
-                    # set last budget year as construction end
-                    project.constructionEndYear = (
-                        self.current_budget_year + lastBudgetIndex
-                    )
-                    # First date of First month given an year
-                    # The year after first planning year
-                    project.estConstructionStart = datetime.datetime(
-                        self.current_budget_year + firstBudgetIndex + 1, 1, 1
-                    )
-                    # Last date of last month given an year
-                    project.estConstructionEnd = datetime.datetime(
-                        self.current_budget_year + lastBudgetIndex, 12, 31
-                    )
+                hasOneBudgetField = firstBudgetIndex == lastBudgetIndex
+                planningStartYear = self.current_budget_year + firstBudgetIndex
+                # set first budget year as planning start
+                project.planningStartYear = planningStartYear
+                # First date of the first month
+                project.estPlanningStart = datetime.datetime(planningStartYear, 1, 1)
+                # middle of year if only 1 budget in excel, else end of year
+                project.estPlanningEnd = (
+                    datetime.datetime(planningStartYear, 6, 30)
+                    if hasOneBudgetField
+                    else datetime.datetime(planningStartYear, 12, 31)
+                )
+                # same year as planning if 1 budget in excel, else the same year as last budget in excel
+                project.constructionEndYear = (
+                    (planningStartYear)
+                    if hasOneBudgetField
+                    else (self.current_budget_year + lastBudgetIndex)
+                )
+                # 1 month after planning ends if 1 budget field, else 1 year after planning
+                project.estConstructionStart = (
+                    datetime.datetime(planningStartYear, 7, 1)
+                    if hasOneBudgetField
+                    else datetime.datetime(planningStartYear + 1, 1, 1)
+                )
+
+                project.estConstructionEnd = datetime.datetime(
+                    project.constructionEndYear, 12, 31
+                )
 
             project.programmed = budget_sum > 0
             project.category = category
