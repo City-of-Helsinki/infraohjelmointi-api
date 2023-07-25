@@ -574,6 +574,7 @@ def buildHierarchiesAndProjects(
                 )[0]
             )
         elif cell_color_hex == SUBCLASS_COLOR:
+            location_stack.clear()  # clear location stack as subclass have no location stack
             class_stack = class_stack[0:2]  # remove sibling class
             type = "SUB CLASS"
             indention = 2
