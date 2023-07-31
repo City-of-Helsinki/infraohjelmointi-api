@@ -671,6 +671,7 @@ class ProjectViewSet(BaseViewSet):
         subDivision = self.request.query_params.getlist("subDivision", [])
 
         prYearMin = self.request.query_params.get("prYearMin", None)
+        overMillion = self.request.query_params.get("overMillion", False)
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
@@ -689,11 +690,15 @@ class ProjectViewSet(BaseViewSet):
                 direct = True
             elif direct in ["false", "False"]:
                 direct = False
+
             if inGroup is not None:
                 if inGroup in ["true", "True"]:
                     qs = qs.filter(projectGroup__isnull=False)
                 elif inGroup in ["false", "False"]:
                     qs = qs.filter(projectGroup__isnull=True)
+
+            if overMillion in ["true", "True", True]:
+                qs = qs.filter(costForecast__gte=1000)
 
             if len(projects) > 0:
                 qs = qs.filter(id__in=projects)
