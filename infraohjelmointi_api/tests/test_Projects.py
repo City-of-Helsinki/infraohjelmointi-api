@@ -698,8 +698,15 @@ class ProjectTestCase(TestCase):
         response = self.client.delete("/projects/{}/".format(self.project_1_Id))
         self.assertEqual(
             response.status_code,
-            204,
-            msg="Error deleting project with Id {}".format(self.project_1_Id),
+            200,
+            msg="Error deleting project with Id {}, status code: {}".format(
+                self.project_1_Id, response.status_code
+            ),
+        )
+        self.assertEqual(
+            response.json()["id"],
+            self.project_1_Id.__str__(),
+            msg="Response does not contain the deleted project id",
         )
         self.assertEqual(
             Project.objects.filter(id=self.project_1_Id).exists(),
@@ -779,19 +786,6 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             response.json()[1]["finances"]["budgetProposalCurrentYearPlus0"],
             "2.00",
-        )
-
-    def test_DELETE_project(self):
-        response = self.client.delete("/projects/{}/".format(self.project_1_Id))
-        self.assertEqual(
-            response.status_code,
-            204,
-            msg="Error deleting project with Id {}".format(self.project_1_Id),
-        )
-        self.assertEqual(
-            Project.objects.filter(id=self.project_1_Id).exists(),
-            False,
-            msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
     def test_notes_project(self):
