@@ -306,6 +306,16 @@ class ProjectViewSet(BaseViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
 
+    @override
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriding destroy action to get the deleted project id as a response
+        """
+        project = self.get_object()
+        project_id = project.id
+        project.delete()
+        return Response({"id": project_id})
+
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
