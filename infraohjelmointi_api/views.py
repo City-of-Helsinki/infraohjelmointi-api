@@ -312,9 +312,9 @@ class ProjectViewSet(BaseViewSet):
         Overriding destroy action to get the deleted project id as a response
         """
         project = self.get_object()
-        data = project.id
+        project_id = project.id
         project.delete()
-        return Response({"id": data})
+        return Response({"id": project_id})
 
     @transaction.atomic
     @override
