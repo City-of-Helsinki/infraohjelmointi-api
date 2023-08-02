@@ -36,9 +36,5 @@ class ClassFinancial(models.Model):
                     "year",
                 ],
                 name="Unique together Constraint Class Financial",
-            ),
-            CheckConstraint(
-                check=Q(classRelation__forCoordinatorOnly=False),
-                name="Planning class only foreign key constraint",
-            ),
+            )
         ]

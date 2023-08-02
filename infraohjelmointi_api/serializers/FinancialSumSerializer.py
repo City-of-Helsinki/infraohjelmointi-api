@@ -10,6 +10,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def get_finance_sums(self, instance):
         _type = instance._meta.model.__name__
+        for_coordinator = self.context.get("for_coordinator", False)
         year = int(self.context.get("finance_year", date.today().year))
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         summedFinances = relatedProjects.aggregate(
