@@ -97,6 +97,11 @@ router.register(
     views.ProjectFinancialViewSet,
     basename="projectFinancials",
 )
+router.register(
+    r"class-financials",
+    views.ClassFinancialViewSet,
+    basename="classFinancials",
+)
 
 urlpatterns = [
     path("", include(router.urls)),

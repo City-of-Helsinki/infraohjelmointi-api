@@ -13,3 +13,7 @@ class ClassFinancialService:
         return ClassFinancial.objects.update_or_create(
             year=year, classRelation__id=class_id, defaults=updatedData
         )
+
+    @staticmethod
+    def get(class_id: str, year: str) -> ClassFinancial:
+        return ClassFinancial.objects.get(classRelation__id=class_id, year=year)
