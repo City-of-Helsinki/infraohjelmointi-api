@@ -55,6 +55,7 @@ from .serializers import (
     ProjectLockSerializer,
     SearchResultSerializer,
     ProjectFinancialSerializer,
+    ClassFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from .services import ProjectClassService, ProjectLocationService, ProjectWiseService
@@ -215,7 +216,7 @@ class ProjectClassViewSet(BaseViewSet):
     @override
     def list(self, request, *args, **kwargs):
         year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset()
+        qs = self.get_queryset().prefetch_related("finances")
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
 
         return Response(serializer.data)
@@ -230,7 +231,7 @@ class ProjectClassViewSet(BaseViewSet):
         """List for coordinator view"""
         year = request.query_params.get("year", date.today().year)
         serializer = ProjectClassSerializer(
-            ProjectClassService.list_all_for_coordinator(),
+            ProjectClassService.list_all_for_coordinator().prefetch_related("finances"),
             many=True,
             context={
                 "finance_year": year,
@@ -1317,3 +1318,12 @@ class StreamView(APIView):
             stream_generator, status=200, content_type="text/event-stream"
         )
         return response
+
+
+class ClassFinancialViewSet(BaseViewSet):
+    """
+    API endpoint that allows Class Financials to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ClassFinancialSerializer
