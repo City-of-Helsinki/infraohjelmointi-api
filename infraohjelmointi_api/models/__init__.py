@@ -22,3 +22,4 @@ from .ProjectHashTag import ProjectHashTag
 from .ProjectGroup import ProjectGroup
 from .ProjectLock import ProjectLock
 from .ProjectFinancial import ProjectFinancial
+from .ClassFinancial import ClassFinancial
