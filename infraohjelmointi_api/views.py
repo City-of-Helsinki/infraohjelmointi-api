@@ -190,10 +190,16 @@ class ProjectLocationViewSet(BaseViewSet):
         return ProjectLocationService.list_all()
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
-    def list_for_coordinator(self, reqeust):
+    def list_for_coordinator(self, request):
         """List for coordinator view"""
+        year = request.query_params.get("year", date.today().year)
         serializer = ProjectLocationSerializer(
-            ProjectLocationService.list_all_for_coordinator(), many=True
+            ProjectLocationService.list_all_for_coordinator(),
+            many=True,
+            context={
+                "finance_year": year,
+                "for_coordinator": True,
+            },
         )
         return Response(serializer.data)
 
@@ -220,10 +226,16 @@ class ProjectClassViewSet(BaseViewSet):
         return ProjectClassService.list_all()
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
-    def list_for_coordinator(self, reqeust):
+    def list_for_coordinator(self, request):
         """List for coordinator view"""
+        year = request.query_params.get("year", date.today().year)
         serializer = ProjectClassSerializer(
-            ProjectClassService.list_all_for_coordinator(), many=True
+            ProjectClassService.list_all_for_coordinator(),
+            many=True,
+            context={
+                "finance_year": year,
+                "for_coordinator": True,
+            },
         )
         return Response(serializer.data)
 
