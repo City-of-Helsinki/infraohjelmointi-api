@@ -7,6 +7,9 @@ from infraohjelmointi_api.serializers import (
     PersonSerializer,
     ProjectLockSerializer,
 )
+from infraohjelmointi_api.serializers.ProjectClassSerializer import (
+    ProjectClassSerializer,
+)
 from infraohjelmointi_api.services import ProjectFinancialService
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
@@ -50,6 +53,7 @@ from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
 from django.db.models import Sum
 from rest_framework import serializers
 import environ
+from overrides import override
 
 env = environ.Env()
 env.escape_proxy = True
@@ -106,6 +110,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     def get_pw_folder_link(self, project: Project):
         if not self.context.get("get_pw_link", False) or project.hkrId is None:
             return None
+
         # Initializing the service here instead of when first defining the variable in the class body
         # Because on app startup, before DB tables are created, Serializer gets initialized and
         # causes the initialization of ProjectWiseService which calls the DB
@@ -129,3 +134,46 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
 
     def get_projectReadiness(self, project):
         return project.projectReadiness()
+
+    @override
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # use context to check if coordinator class/locations are needed
+        for_coordinator = self.context.get("for_coordinator", False)
+        if for_coordinator == True:
+            # if class is suurpiiri then goto its parent and check for coordinationClass since suurpiiri classes have no
+            # coordination class
+            rep["projectClass"] = (
+                instance.projectClass.coordinatorClass.id
+                if hasattr(instance.projectClass, "coordinatorClass")
+                else instance.projectClass.parent.coordinatorClass.id
+                if (
+                    instance.projectClass != None
+                    and "suurpiiri" in instance.projectClass.name.lower()
+                    and hasattr(instance.projectClass.parent, "coordinatorClass")
+                )
+                else None
+            )
+            # if project location is division/subdivision then goto its district and get related coordination location else none
+            rep["projectLocation"] = (
+                instance.projectLocation.coordinatorLocation.id
+                if (hasattr(instance.projectLocation, "coordinatorLocation"))
+                else instance.projectLocation.parent.coordinatorLocation.id
+                if (
+                    instance.projectLocation != None
+                    and instance.projectLocation.parent != None
+                    and instance.projectLocation.parent.parent == None
+                    and hasattr(instance.projectLocation.parent, "coordinatorLocation")
+                )
+                else instance.projectLocation.parent.parent.coordinatorLocation.id
+                if (
+                    instance.projectLocation != None
+                    and instance.projectLocation.parent != None
+                    and instance.projectLocation.parent.parent != None
+                    and hasattr(
+                        instance.projectLocation.parent.parent, "coordinatorLocation"
+                    )
+                )
+                else None
+            )
+        return rep

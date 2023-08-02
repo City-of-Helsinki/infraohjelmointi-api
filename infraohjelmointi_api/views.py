@@ -305,6 +305,7 @@ class ProjectViewSet(BaseViewSet):
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
+    serializer_class = ProjectGetSerializer
 
     @override
     def destroy(self, request, *args, **kwargs):
@@ -571,19 +572,21 @@ class ProjectViewSet(BaseViewSet):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
         """
-        if self.action == "list":
+        if self.action in ["list", "retrieve"]:
             return ProjectGetSerializer
-        if self.action == "retrieve":
-            return ProjectGetSerializer
-        return ProjectCreateSerializer
+        if self.action in ["create", "update", "partial_update"]:
+            return ProjectCreateSerializer
+        return super().get_serializer_class()
 
-    @override
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+    def get_projects(self, request, for_coordinator=False) -> ProjectGetSerializer:
+        queryset = self.filter_queryset(
+            self.get_queryset(for_coordinator=for_coordinator)
+        )
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
         if limit is None:
-            limit = queryset.count() if queryset.count() > 0 else 1
+            querySetCount = queryset.count()
+            limit = querySetCount if querySetCount > 0 else 1
 
         if financeYear is not None and not financeYear.isnumeric():
             raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
@@ -594,27 +597,81 @@ class ProjectViewSet(BaseViewSet):
         page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = self.get_serializer(
-                page, many=True, context={"finance_year": financeYear}
+                page,
+                many=True,
+                context={
+                    "finance_year": financeYear,
+                    "for_coordinator": for_coordinator,
+                },
             )
             return paginator.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(
-            queryset, many=True, context={"finance_year": financeYear}
+            queryset,
+            many=True,
+            context={
+                "finance_year": financeYear,
+                "for_coordinator": for_coordinator,
+            },
         )
-        return Response(serializer.data)
+
+        return serializer
 
     @override
-    def get_queryset(self):
-        qs = super().get_queryset()
+    def list(self, request, *args, **kwargs):
+        projects = self.get_projects(request, for_coordinator=False)
+        return Response(projects.data)
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"coordinator",
+        serializer_class=ProjectGetSerializer,
+    )
+    def get_projects_for_coordinator(self, request):
+        """
+        Custom action to get Projects with coordinator location and classes
+        """
+        projects = self.get_projects(request, for_coordinator=True)
+        return Response(projects.data)
+
+    @override
+    def get_queryset(self, for_coordinator=False):
+        qs = None
+        if for_coordinator == True:
+            # add select_related to the queryset to get in the same db query projectClass and projectLocation
+            qs = (
+                super()
+                .get_queryset()
+                .select_related(
+                    "projectClass",
+                    "projectLocation",
+                    "projectClass__coordinatorClass",
+                    "projectLocation__coordinatorLocation",
+                    "projectClass__parent__coordinatorClass",
+                    "projectLocation__parent__coordinatorLocation",
+                    "projectLocation__parent__parent__coordinatorLocation",
+                )
+                .filter(
+                    Q(projectClass__isnull=False) or Q(projectLocation__isnull=False)
+                )
+            )
+        else:
+            qs = super().get_queryset()
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
-
+        collectiveSubLevel = self.request.query_params.getlist("collectiveSubLevel", [])
+        otherClassification = self.request.query_params.getlist(
+            "otherClassification", []
+        )
+        subLevelDistrict = self.request.query_params.getlist("subLevelDistrict", [])
         district = self.request.query_params.getlist("district", [])
         division = self.request.query_params.getlist("division", [])
         subDivision = self.request.query_params.getlist("subDivision", [])
 
         prYearMin = self.request.query_params.get("prYearMin", None)
+        overMillion = self.request.query_params.get("overMillion", False)
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
@@ -633,11 +690,15 @@ class ProjectViewSet(BaseViewSet):
                 direct = True
             elif direct in ["false", "False"]:
                 direct = False
+
             if inGroup is not None:
                 if inGroup in ["true", "True"]:
                     qs = qs.filter(projectGroup__isnull=False)
                 elif inGroup in ["false", "False"]:
                     qs = qs.filter(projectGroup__isnull=True)
+
+            if overMillion in ["true", "True", True]:
+                qs = qs.filter(costForecast__gte=1000)
 
             if len(projects) > 0:
                 qs = qs.filter(id__in=projects)
@@ -651,9 +712,12 @@ class ProjectViewSet(BaseViewSet):
                     qs=qs,
                     has_parent=False,
                     has_parent_parent=False,
+                    has_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=masterClass,
                     model_class=ProjectClass,
                     direct=direct,
+                    for_coordinator=for_coordinator,
                 )
 
             if len(_class) > 0:
@@ -661,9 +725,12 @@ class ProjectViewSet(BaseViewSet):
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=False,
+                    has_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=_class,
                     model_class=ProjectClass,
                     direct=direct,
+                    for_coordinator=for_coordinator,
                 )
 
             if len(subClass) > 0:
@@ -672,39 +739,90 @@ class ProjectViewSet(BaseViewSet):
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=True,
+                    has_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=subClass,
                     model_class=ProjectClass,
                     direct=False
                     if len(subClass) == 1 and "suurpiiri" in subClassModel.name.lower()
                     else direct,
+                    for_coordinator=for_coordinator,
+                )
+
+            if for_coordinator == True and len(collectiveSubLevel) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=True,
+                    has_parent_parent_parent=True,
+                    has_parent_parent_parent_parent=False,
+                    search_ids=collectiveSubLevel,
+                    model_class=ProjectClass,
+                    direct=direct,
+                    for_coordinator=for_coordinator,
+                )
+
+            if for_coordinator == True and len(otherClassification) > 0:
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=True,
+                    has_parent_parent_parent=True,
+                    has_parent_parent_parent_parent=True,
+                    search_ids=otherClassification,
+                    model_class=ProjectClass,
+                    direct=direct,
+                    for_coordinator=for_coordinator,
+                )
+            if for_coordinator == True and len(subLevelDistrict) > 0:
+                # edit filtering by sublevel district as its parent are not locations but classes
+                qs = self._filter_projects_by_hierarchy(
+                    qs=qs,
+                    has_parent=True,
+                    has_parent_parent=True,
+                    has_parent_parent_parent=True,
+                    has_parent_parent_parent_parent=True,
+                    search_ids=subLevelDistrict,
+                    model_class=ProjectLocation,
+                    direct=direct,
+                    for_coordinator=for_coordinator,
                 )
 
             if len(district) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
-                    has_parent=False,
-                    has_parent_parent=False,
+                    has_parent=True if for_coordinator == True else False,
+                    has_parent_parent=True if for_coordinator == True else False,
+                    has_parent_parent_parent=True if for_coordinator == True else False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=district,
                     model_class=ProjectLocation,
                     direct=direct,
+                    for_coordinator=for_coordinator,
                 )
-            if len(division) > 0:
+            if for_coordinator == False and len(division) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=False,
+                    has_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=division,
                     model_class=ProjectLocation,
                     direct=direct,
+                    for_coordinator=for_coordinator,
                 )
-            if len(subDivision) > 0:
+            if for_coordinator == False and len(subDivision) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
                     has_parent_parent=True,
+                    has_parent_parent_parent=False,
+                    has_parent_parent_parent_parent=False,
                     search_ids=subDivision,
                     model_class=ProjectLocation,
                     direct=direct,
+                    for_coordinator=for_coordinator,
                 )
 
             return qs
@@ -729,7 +847,12 @@ class ProjectViewSet(BaseViewSet):
             )
 
     @transaction.atomic
-    @action(methods=["patch"], detail=False, url_path=r"bulk-update")
+    @action(
+        methods=["patch"],
+        detail=False,
+        url_path=r"bulk-update",
+        serializer_class=ProjectCreateSerializer,
+    )
     def patch_bulk_projects(self, request):
         """
         Custom action to bulk update projects
@@ -843,27 +966,53 @@ class ProjectViewSet(BaseViewSet):
         qs,
         has_parent: bool,
         has_parent_parent: bool,
+        has_parent_parent_parent: bool,
+        has_parent_parent_parent_parent: bool,
         search_ids,
         model_class,
         direct=False,
+        for_coordinator=False,
     ):
         if direct == True:
             if model_class.__name__ == "ProjectLocation":
+                if for_coordinator == True:
+                    return qs.filter(
+                        projectLocation__coordinatorLocation__in=search_ids
+                    )
                 return qs.filter(projectLocation__in=search_ids)
             elif model_class.__name__ == "ProjectClass":
+                if for_coordinator == True:
+                    return qs.filter(projectClass__coordinatorClass__in=search_ids)
                 return qs.filter(
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
-        paths = (
-            model_class.objects.filter(
-                id__in=search_ids,
-                parent__isnull=not has_parent,
-                parent__parent__isnull=not has_parent_parent,
-                forCoordinatorOnly=False,
+        paths = []
+        if for_coordinator == True and model_class.__name__ == "ProjectLocation":
+            paths = (
+                model_class.objects.filter(
+                    id__in=search_ids,
+                    parentClass__isnull=not has_parent,
+                    parentClass__parent__isnull=not has_parent_parent,
+                    parentClass__parent__parent__isnull=not has_parent_parent_parent,
+                    parentClass__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+                    forCoordinatorOnly=for_coordinator,
+                )
+                .distinct()
+                .values_list("path", flat=True)
             )
-            .distinct()
-            .values_list("path", flat=True)
-        )
+        else:
+            paths = (
+                model_class.objects.filter(
+                    id__in=search_ids,
+                    parent__isnull=not has_parent,
+                    parent__parent__isnull=not has_parent_parent,
+                    parent__parent__parent__isnull=not has_parent_parent_parent,
+                    parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+                    forCoordinatorOnly=for_coordinator,
+                )
+                .distinct()
+                .values_list("path", flat=True)
+            )
 
         ids = (
             model_class.objects.filter(
@@ -876,8 +1025,12 @@ class ProjectViewSet(BaseViewSet):
         )
 
         if model_class.__name__ == "ProjectLocation":
+            if for_coordinator == True:
+                return qs.filter(projectLocation__coordinatorLocation__in=ids)
             return qs.filter(projectLocation__in=ids)
         elif model_class.__name__ == "ProjectClass":
+            if for_coordinator == True:
+                return qs.filter(projectClass__coordinatorClass__in=ids)
             return qs.filter(projectClass__in=ids)
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
