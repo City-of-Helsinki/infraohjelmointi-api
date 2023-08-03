@@ -8,8 +8,9 @@ from django.db.models import Sum, Q
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def get_class_finances(self, instance, year: str, _type: str) -> int:
+    def get_class_finances(self, instance, year: str) -> int:
         for_coordinator = self.context.get("for_coordinator", False)
+        _type = instance._meta.model.__name__
 
         if for_coordinator == False and _type == "ProjectClass":
             # get coordinatorClass when planning classes are being fetched
@@ -100,47 +101,80 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )["projectBudgets"]
         summedFinances["year"] = year
         summedFinances["year0"] = {
-            **self.get_class_finances(instance=instance, year=year, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year,
+            ),
             "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
         }
         summedFinances["year1"] = {
-            **self.get_class_finances(instance=instance, year=year + 1, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 1,
+            ),
             "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
         }
         summedFinances["year2"] = {
-            **self.get_class_finances(instance=instance, year=year + 2, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 2,
+            ),
             "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
         }
         summedFinances["year3"] = {
-            **self.get_class_finances(instance=instance, year=year + 3, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 3,
+            ),
             "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
         }
         summedFinances["year4"] = {
-            **self.get_class_finances(instance=instance, year=year + 4, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 4,
+            ),
             "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
         }
         summedFinances["year5"] = {
-            **self.get_class_finances(instance=instance, year=year + 5, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 5,
+            ),
             "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
         }
         summedFinances["year6"] = {
-            **self.get_class_finances(instance=instance, year=year + 6, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 6,
+            ),
             "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
         }
         summedFinances["year7"] = {
-            **self.get_class_finances(instance=instance, year=year + 7, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 7,
+            ),
             "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
         }
         summedFinances["year8"] = {
-            **self.get_class_finances(instance=instance, year=year + 8, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 8,
+            ),
             "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
         }
         summedFinances["year9"] = {
-            **self.get_class_finances(instance=instance, year=year + 9, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 9,
+            ),
             "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
         }
         summedFinances["year10"] = {
-            **self.get_class_finances(instance=instance, year=year + 10, _type=_type),
+            **self.get_class_finances(
+                instance=instance,
+                year=year + 10,
+            ),
             "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
         }
 
