@@ -216,7 +216,7 @@ class ProjectClassViewSet(BaseViewSet):
     @override
     def list(self, request, *args, **kwargs):
         year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset().prefetch_related("finances")
+        qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
 
         return Response(serializer.data)
@@ -224,14 +224,20 @@ class ProjectClassViewSet(BaseViewSet):
     @override
     def get_queryset(self):
         """Default is programmer view"""
-        return ProjectClassService.list_all()
+        return (
+            ProjectClassService.list_all()
+            .select_related("coordinatorClass")
+            .prefetch_related("coordinatorClass__finances")
+        )
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, request):
         """List for coordinator view"""
         year = request.query_params.get("year", date.today().year)
         serializer = ProjectClassSerializer(
-            ProjectClassService.list_all_for_coordinator().prefetch_related("finances"),
+            ProjectClassService.list_all_for_coordinator()
+            .prefetch_related("coordinatorClass__finances")
+            .select_related("coordinatorClass"),
             many=True,
             context={
                 "finance_year": year,
