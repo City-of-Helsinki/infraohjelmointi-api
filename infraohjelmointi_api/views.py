@@ -7,9 +7,13 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectLocation,
     ProjectFinancial,
+    ClassFinancial,
 )
 from infraohjelmointi_api.services.ProjectFinancialService import (
     ProjectFinancialService,
+)
+from infraohjelmointi_api.services.ClassFinancialService import (
+    ClassFinancialService,
 )
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 from django.dispatch import receiver
@@ -245,6 +249,72 @@ class ProjectClassViewSet(BaseViewSet):
             },
         )
         return Response(serializer.data)
+
+    def is_patch_data_valid(self, data):
+        finances = data.get("finances", None)
+        if finances != None:
+            if "year" not in finances.keys():
+                return False
+            for key in finances.keys():
+                if key != "year":
+                    if (
+                        type(finances[key]) == dict
+                        and len(finances[key].keys()) > 0
+                        and len(finances[key].keys()) <= 2
+                    ):
+                        if (
+                            "frameBudget" in finances[key].keys()
+                            or "budgetChange" in finances[key].keys()
+                        ):
+                            pass
+                        else:
+                            return False
+                    else:
+                        return False
+        else:
+            return False
+
+        return True
+
+    @action(
+        methods=["patch"],
+        detail=False,
+        url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
+    )
+    def patch_coordinator_class(self, request, class_id):
+        """PATCH endpoint for coordinator classes finances ONLY"""
+        if ProjectClass.objects.filter(id=class_id, forCoordinatorOnly=True).exists():
+            finances = request.data.get("finances")
+            if self.is_patch_data_valid(request.data):
+                startYear = finances.get("year")
+                for key in finances.keys():
+                    if key != "year":
+                        patchData = finances[key]
+                        year = ClassFinancialService.get_request_field_to_year_mapping(
+                            start_year=startYear
+                        )[key]
+                        ClassFinancialService.update_or_create(
+                            year=year, class_id=class_id, updatedData=patchData
+                        )
+
+                return Response(
+                    ProjectClassSerializer(
+                        ProjectClassService.get_by_id(id=class_id),
+                        context={
+                            "finance_year": startYear,
+                            "for_coordinator": True,
+                        },
+                    ).data
+                )
+
+            else:
+                return Response(
+                    data={"message": "Invalid data format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 class ProjectQualityLevelViewSet(BaseViewSet):
