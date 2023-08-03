@@ -281,7 +281,7 @@ class ProjectClassViewSet(BaseViewSet):
         detail=False,
         url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
     )
-    def patch_coordinator_class(self, request, class_id):
+    def patch_coordinator_class_finances(self, request, class_id):
         """PATCH endpoint for coordinator classes finances ONLY"""
         if ProjectClass.objects.filter(id=class_id, forCoordinatorOnly=True).exists():
             finances = request.data.get("finances")
@@ -292,10 +292,16 @@ class ProjectClassViewSet(BaseViewSet):
                         patchData = finances[key]
                         year = ClassFinancialService.get_request_field_to_year_mapping(
                             start_year=startYear
-                        )[key]
-                        ClassFinancialService.update_or_create(
-                            year=year, class_id=class_id, updatedData=patchData
-                        )
+                        ).get(key, None)
+                        if year != None:
+                            ClassFinancialService.update_or_create(
+                                year=year, class_id=class_id, updatedData=patchData
+                            )
+                        else:
+                            return Response(
+                                data={"message": "Invalid data format"},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
 
                 return Response(
                     ProjectClassSerializer(
