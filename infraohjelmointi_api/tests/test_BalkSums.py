@@ -682,6 +682,34 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[0]["finances"]["year10"]["frameBudget"], 0)
         self.assertEqual(response.json()[0]["finances"]["year10"]["budgetChange"], 0)
 
+    def test_PATCH_coordinator_class_finances(self):
+        response = self.client.patch(
+            "/project-classes/coordinator/{}/".format(
+                self.projectCoordinatorMasterClass_1_Id.__str__()
+            ),
+            data={
+                "finances": {
+                    "year": 2023,
+                    "year0": {"frameBudget": 1000, "budgetChange": 50},
+                }
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+
+        # Chcek same finances reflect on the related planning class
+        response = self.client.get(
+            "/project-classes/{}/".format(self.projectMasterClass_1_Id)
+        )
+
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+
     def test_GET_location_with_sums(self):
         response = self.client.get(
             "/project-locations/{}/".format(self.projectDistrict_1_Id)
