@@ -122,6 +122,7 @@ class BalkSumTestCase(TestCase):
             id=self.projectClass_1_Id,
             path="Master Class 1/Test Class 1",
         )
+
         subClass_1 = _class.childClass.create(
             id=self.projectSubClass_1_Id,
             name="Sub class 1",
