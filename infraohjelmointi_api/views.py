@@ -283,7 +283,9 @@ class ProjectClassViewSet(BaseViewSet):
     )
     def patch_coordinator_class_finances(self, request, class_id):
         """PATCH endpoint for coordinator classes finances ONLY"""
-        if ProjectClass.objects.filter(id=class_id, forCoordinatorOnly=True).exists():
+        if ProjectClassService.instance_exists(
+            {"id": class_id, "forCoordinatorOnly": True}
+        ):
             finances = request.data.get("finances")
             if self.is_patch_data_valid(request.data):
                 startYear = finances.get("year")
