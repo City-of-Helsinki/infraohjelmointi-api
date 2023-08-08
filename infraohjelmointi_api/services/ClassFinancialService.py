@@ -20,16 +20,4 @@ class ClassFinancialService:
 
     @staticmethod
     def get_request_field_to_year_mapping(start_year: int):
-        return {
-            "year0": start_year,
-            "year1": start_year + 1,
-            "year2": start_year + 2,
-            "year3": start_year + 3,
-            "year4": start_year + 4,
-            "year5": start_year + 5,
-            "year6": start_year + 6,
-            "year7": start_year + 7,
-            "year8": start_year + 8,
-            "year9": start_year + 9,
-            "year10": start_year + 10,
-        }
+        return {"year{}".format(index): start_year + index for index in range(0, 11)}
