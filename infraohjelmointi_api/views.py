@@ -869,7 +869,6 @@ class ProjectViewSet(BaseViewSet):
                     for_coordinator=for_coordinator,
                 )
             if for_coordinator == True and len(subLevelDistrict) > 0:
-                # edit filtering by sublevel district as its parent are not locations but classes
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
