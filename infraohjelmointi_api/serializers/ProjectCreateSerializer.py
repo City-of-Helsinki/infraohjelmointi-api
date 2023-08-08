@@ -148,7 +148,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             ProjectClassValidator(),
             ProjectLocationValidator(),
             ProjectPhaseValidator(),
-            ConstructionPhaseDetailValidator(),
             ConstructionEndYearValidator(),
             PlanningStartYearValidator(),
             ProgrammedValidator(),
