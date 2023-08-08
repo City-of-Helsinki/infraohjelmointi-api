@@ -281,46 +281,44 @@ class ProjectClassViewSet(BaseViewSet):
     )
     def patch_coordinator_class_finances(self, request, class_id):
         """PATCH endpoint for coordinator classes finances ONLY"""
-        if ProjectClassService.instance_exists(
+        if not ProjectClassService.instance_exists(
             {"id": class_id, "forCoordinatorOnly": True}
         ):
-            finances = request.data.get("finances")
-            if self.is_patch_data_valid(request.data):
-                startYear = finances.get("year")
-                for key in finances.keys():
-                    if key != "year":
-                        patchData = finances[key]
-                        year = ClassFinancialService.get_request_field_to_year_mapping(
-                            start_year=startYear
-                        ).get(key, None)
-                        if year != None:
-                            ClassFinancialService.update_or_create(
-                                year=year, class_id=class_id, updatedData=patchData
-                            )
-                        else:
-                            return Response(
-                                data={"message": "Invalid data format"},
-                                status=status.HTTP_400_BAD_REQUEST,
-                            )
-
-                return Response(
-                    ProjectClassSerializer(
-                        ProjectClassService.get_by_id(id=class_id),
-                        context={
-                            "finance_year": startYear,
-                            "for_coordinator": True,
-                        },
-                    ).data
-                )
-
-            else:
-                return Response(
-                    data={"message": "Invalid data format"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not self.is_patch_data_valid(request.data):
+            return Response(
+                data={"message": "Invalid data format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        finances = request.data.get("finances")
+        startYear = finances.get("year")
+        for parameter in finances.keys():
+            if parameter != "year":
+                patchData = finances[parameter]
+                year = ClassFinancialService.get_request_field_to_year_mapping(
+                    start_year=startYear
+                ).get(parameter, None)
+                if year != None:
+                    ClassFinancialService.update_or_create(
+                        year=year, class_id=class_id, updatedData=patchData
+                    )
+                else:
+                    return Response(
+                        data={"message": "Invalid data format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        return Response(
+            ProjectClassSerializer(
+                ProjectClassService.get_by_id(id=class_id),
+                context={
+                    "finance_year": startYear,
+                    "for_coordinator": True,
+                },
+            ).data
+        )
 
 
 class ProjectQualityLevelViewSet(BaseViewSet):
