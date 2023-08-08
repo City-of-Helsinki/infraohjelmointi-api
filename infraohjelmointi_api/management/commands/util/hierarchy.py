@@ -196,7 +196,7 @@ def buildHierarchies(
                 )
                 pv_class_stack.append(pv_class)
                 # if subslcass is also a district
-                if "suurpiiri" in pv_name.lower():
+                if "suurpiiri" in pv_name.lower() or "östersundom" in pv_name.lower():
                     related_to_district = proceedWithDistrict(
                         name=pv_name,
                         parent_class=pv_class_stack[-1],
