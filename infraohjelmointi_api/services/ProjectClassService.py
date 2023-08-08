@@ -32,3 +32,10 @@ class ProjectClassService:
     def get_by_id(id: str) -> ProjectClass:
         """Get project class by id"""
         return ProjectClass.objects.get(id=id)
+
+    @staticmethod
+    def instance_exists(id: str, forCoordinatorOnly: bool = False) -> ProjectClass:
+        """Check if instance exists in DB"""
+        return ProjectClass.objects.filter(
+            id=id, forCoordinatorOnly=forCoordinatorOnly
+        ).exists()
