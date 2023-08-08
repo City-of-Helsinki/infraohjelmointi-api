@@ -1,12 +1,37 @@
 from datetime import date
-from infraohjelmointi_api.models import Project
-from infraohjelmointi_api.services import ProjectService
+from infraohjelmointi_api.models import Project, ClassFinancial
+from infraohjelmointi_api.services import ProjectService, ClassFinancialService
 from rest_framework import serializers
 from django.db.models import Sum, Q
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
+
+    def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
+        for_coordinator = self.context.get("for_coordinator", False)
+        _type = instance._meta.model.__name__
+
+        if for_coordinator == False and _type == "ProjectClass":
+            # get coordinatorClass when planning classes are being fetched
+            instance = getattr(instance, "coordinatorClass", None)
+
+        classFinanceObject: ClassFinancial = (
+            ClassFinancialService.get(class_id=instance.id, year=year)
+            if _type == "ProjectClass"
+            and instance != None
+            and instance.finances.filter(year=year).exists()
+            else None
+        )
+
+        return {
+            "frameBudget": classFinanceObject.frameBudget
+            if classFinanceObject != None
+            else 0,
+            "budgetChange": classFinanceObject.budgetChange
+            if classFinanceObject != None
+            else 0,
+        }
 
     def get_finance_sums(self, instance):
         _type = instance._meta.model.__name__
@@ -76,47 +101,80 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )["projectBudgets"]
         summedFinances["year"] = year
         summedFinances["year0"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year,
+            ),
             "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
         }
         summedFinances["year1"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 1,
+            ),
             "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
         }
         summedFinances["year2"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 2,
+            ),
             "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
         }
         summedFinances["year3"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 3,
+            ),
             "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
         }
         summedFinances["year4"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 4,
+            ),
             "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
         }
         summedFinances["year5"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 5,
+            ),
             "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
         }
         summedFinances["year6"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 6,
+            ),
             "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
         }
         summedFinances["year7"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 7,
+            ),
             "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
         }
         summedFinances["year8"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 8,
+            ),
             "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
         }
         summedFinances["year9"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 9,
+            ),
             "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
         }
         summedFinances["year10"] = {
-            "frameBudget": 0,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 10,
+            ),
             "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
         }
 

@@ -35,3 +35,4 @@ from .ProjectWithFinancesSerializer import ProjectWithFinancesSerializer
 from .UpdateListSerializer import UpdateListSerializer
 from .ProjectFinancialSerializer import ProjectFinancialSerializer
 from .FinancialSumSerializer import FinancialSumSerializer
+from .ClassFinancialSerializer import ClassFinancialSerializer

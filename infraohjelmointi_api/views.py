@@ -7,9 +7,13 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectLocation,
     ProjectFinancial,
+    ClassFinancial,
 )
 from infraohjelmointi_api.services.ProjectFinancialService import (
     ProjectFinancialService,
+)
+from infraohjelmointi_api.services.ClassFinancialService import (
+    ClassFinancialService,
 )
 from rest_framework.exceptions import APIException, ParseError, ValidationError
 from django.dispatch import receiver
@@ -55,6 +59,7 @@ from .serializers import (
     ProjectLockSerializer,
     SearchResultSerializer,
     ProjectFinancialSerializer,
+    ClassFinancialSerializer,
 )
 from .paginations import StandardResultsSetPagination
 from .services import ProjectClassService, ProjectLocationService, ProjectWiseService
@@ -223,14 +228,20 @@ class ProjectClassViewSet(BaseViewSet):
     @override
     def get_queryset(self):
         """Default is programmer view"""
-        return ProjectClassService.list_all()
+        return (
+            ProjectClassService.list_all()
+            .select_related("coordinatorClass")
+            .prefetch_related("coordinatorClass__finances")
+        )
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, request):
         """List for coordinator view"""
         year = request.query_params.get("year", date.today().year)
         serializer = ProjectClassSerializer(
-            ProjectClassService.list_all_for_coordinator(),
+            ProjectClassService.list_all_for_coordinator()
+            .prefetch_related("coordinatorClass__finances")
+            .select_related("coordinatorClass"),
             many=True,
             context={
                 "finance_year": year,
@@ -238,6 +249,77 @@ class ProjectClassViewSet(BaseViewSet):
             },
         )
         return Response(serializer.data)
+
+    def is_patch_data_valid(self, data):
+        finances = data.get("finances", None)
+        if finances == None:
+            return False
+
+        parameters = finances.keys()
+        if "year" not in parameters:
+            return False
+
+        for param in parameters:
+            if param == "year":
+                continue
+            values = finances[param]
+            values_length = len(values.keys())
+
+            if type(values) != dict:
+                return False
+            if values_length == 0 or values_length > 2:
+                return False
+            if not "frameBudget" in values and not "budgetChange" in values:
+                return False
+
+        return True
+
+    @action(
+        methods=["patch"],
+        detail=False,
+        url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
+    )
+    def patch_coordinator_class_finances(self, request, class_id):
+        """PATCH endpoint for coordinator classes finances ONLY"""
+        if not ProjectClassService.instance_exists(
+            id=class_id, forCoordinatorOnly=True
+        ):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not self.is_patch_data_valid(request.data):
+            return Response(
+                data={"message": "Invalid data format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        finances = request.data.get("finances")
+        startYear = finances.get("year")
+        for parameter in finances.keys():
+            if parameter == "year":
+                continue
+            patchData = finances[parameter]
+            year = ClassFinancialService.get_request_field_to_year_mapping(
+                start_year=startYear
+            ).get(parameter, None)
+
+            if year == None:
+                return Response(
+                    data={"message": "Invalid data format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        ClassFinancialService.update_or_create(
+            year=year, class_id=class_id, updatedData=patchData
+        )
+        return Response(
+            ProjectClassSerializer(
+                ProjectClassService.get_by_id(id=class_id),
+                context={
+                    "finance_year": startYear,
+                    "for_coordinator": True,
+                },
+            ).data
+        )
 
 
 class ProjectQualityLevelViewSet(BaseViewSet):
@@ -1317,3 +1399,12 @@ class StreamView(APIView):
             stream_generator, status=200, content_type="text/event-stream"
         )
         return response
+
+
+class ClassFinancialViewSet(BaseViewSet):
+    """
+    API endpoint that allows Class Financials to be viewed or edited.
+    """
+
+    permission_classes = []
+    serializer_class = ClassFinancialSerializer

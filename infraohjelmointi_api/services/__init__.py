@@ -12,3 +12,4 @@ from .ProjectTypeService import ProjectTypeService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
+from .ClassFinancialService import ClassFinancialService
