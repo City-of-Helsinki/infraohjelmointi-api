@@ -34,6 +34,8 @@ class ProjectClassService:
         return ProjectClass.objects.get(id=id)
 
     @staticmethod
-    def instance_exists(values: dict) -> ProjectClass:
+    def instance_exists(id: str, forCoordinatorOnly: bool = False) -> ProjectClass:
         """Check if instance exists in DB"""
-        return ProjectClass.objects.filter(**values).exists()
+        return ProjectClass.objects.filter(
+            id=id, forCoordinatorOnly=forCoordinatorOnly
+        ).exists()
