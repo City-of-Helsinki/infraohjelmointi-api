@@ -252,27 +252,25 @@ class ProjectClassViewSet(BaseViewSet):
 
     def is_patch_data_valid(self, data):
         finances = data.get("finances", None)
-        if finances != None:
-            if "year" not in finances.keys():
-                return False
-            for key in finances.keys():
-                if key != "year":
-                    if (
-                        type(finances[key]) == dict
-                        and len(finances[key].keys()) > 0
-                        and len(finances[key].keys()) <= 2
-                    ):
-                        if (
-                            "frameBudget" in finances[key].keys()
-                            or "budgetChange" in finances[key].keys()
-                        ):
-                            pass
-                        else:
-                            return False
-                    else:
-                        return False
-        else:
+        if finances == None:
             return False
+
+        parameters = finances.keys()
+        if "year" not in parameters:
+            return False
+
+        for param in parameters:
+            if param == "year":
+                continue
+            values = finances[param]
+            values_length = len(values.keys())
+
+            if type(values) != dict:
+                return False
+            if values_length == 0 or values_length > 2:
+                return False
+            if not "frameBudget" in values and not "budgetChange" in values:
+                return False
 
         return True
 
