@@ -304,6 +304,34 @@ def buildHierarchies(
                     row_number=cv_cell.row,
                 )
             )
+        elif DISTRICT_COLOR in cell_colors:
+            if pv_cell_color_hex in [DISTRICT_COLOR]:
+                related_to_district = proceedWithDistrict(
+                    name=pv_name,
+                    parent_class=pv_class_stack[-1],
+                    cell_color=str(DISTRICT_COLOR)[2:].upper(),
+                    row_number=pv_cell.row,
+                )
+            if cv_cell_color_hex in [DISTRICT_COLOR]:
+                end_index = getEndIndex(
+                    color_list=cv_color_stack,
+                    break_point=OTHER_CLASSIFICATION_COLOR,
+                    check_point=[
+                        AGGREGATING_SUB_LEVEL,
+                        SUBCLASS_COLOR,
+                    ],
+                )
+                cv_color_stack = cv_color_stack[0:end_index]
+                cv_color_stack.append(cv_cell_color_hex)
+                cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
+                proceedWithDistrict(
+                    name=pv_name,
+                    parent_class=cv_class_stack[-1],
+                    related_to=related_to_district,
+                    for_coordinator_only=True,
+                    cell_color=cv_cell_color,
+                    row_number=cv_cell.row,
+                )
 
 
 def getEndIndex(color_list: list, break_point: hex, check_point: list):
