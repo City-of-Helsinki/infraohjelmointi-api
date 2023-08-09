@@ -7,6 +7,7 @@ from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectGroup,
     ProjectLocation,
+    ClassFinancial,
 )
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
@@ -155,3 +156,67 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
             },
         )
         logger.debug("Signal Triggered: Project was updated")
+
+
+def get_class_financials(instance: ClassFinancial):
+    coordinatorClassInstance: ProjectClass = instance.classRelation
+    relatedPlanningClassInstance: ProjectClass | None = instance.classRelation.relatedTo
+
+    coordinatorClassIdentification = {
+        "coordinatorMasterClass": coordinatorClassInstance.parent == None,
+        "coordinatorClass": (
+            coordinatorClassInstance.parent != None
+            and coordinatorClassInstance.parent.parent == None
+        ),
+        "coordinatorSubClass": (
+            coordinatorClassInstance.parent != None
+            and coordinatorClassInstance.parent.parent != None
+            and coordinatorClassInstance.parent.parent.parent == None
+        ),
+    }
+
+    planningClassIdentification = {
+        "planningMasterClass": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent == None
+        ),
+        "planningClass": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent != None
+            and relatedPlanningClassInstance.parent.parent == None
+        ),
+        "planningSubClass": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent != None
+            and relatedPlanningClassInstance.parent.parent != None
+            and relatedPlanningClassInstance.parent.parent.parent == None
+        ),
+    }
+
+    return {
+        **{
+            classType: ProjectClassSerializer(
+                coordinatorClassInstance, context={"for_coordinator": True}
+            ).data
+            for classType, isInstanceOfClassType in coordinatorClassIdentification.items()
+            if isInstanceOfClassType == True
+        },
+        **{
+            classType: ProjectClassSerializer(
+                relatedPlanningClassInstance, context={"for_coordinator": False}
+            ).data
+            for classType, isInstanceOfClassType in planningClassIdentification.items()
+            if isInstanceOfClassType == True
+        },
+    }
+
+
+@receiver(post_save, sender=ClassFinancial)
+def get_notified_class_financial(sender, instance, created, update_fields, **kwargs):
+    if created:
+        logger.debug("Signal Triggered: Class Financial instance was created")
+
+    logger.debug("Signal Triggered: Class Financial instance was updated")
+    send_event(
+        "finance", "class-finance-update", get_class_financials(instance=instance)
+    )
