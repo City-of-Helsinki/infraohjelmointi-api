@@ -747,7 +747,7 @@ class ProjectViewSet(BaseViewSet):
                     "projectLocation__parent__parent__coordinatorLocation",
                 )
                 .filter(
-                    Q(projectClass__isnull=False) or Q(projectLocation__isnull=False)
+                    Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
                 )
             )
         else:
@@ -869,7 +869,6 @@ class ProjectViewSet(BaseViewSet):
                     for_coordinator=for_coordinator,
                 )
             if for_coordinator == True and len(subLevelDistrict) > 0:
-                # edit filtering by sublevel district as its parent are not locations but classes
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
                     has_parent=True,
@@ -878,7 +877,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent_parent_parent=True,
                     search_ids=subLevelDistrict,
                     model_class=ProjectLocation,
-                    direct=direct,
+                    direct=for_coordinator,
                     for_coordinator=for_coordinator,
                 )
 
@@ -891,7 +890,7 @@ class ProjectViewSet(BaseViewSet):
                     has_parent_parent_parent_parent=False,
                     search_ids=district,
                     model_class=ProjectLocation,
-                    direct=direct,
+                    direct=direct if for_coordinator == False else for_coordinator,
                     for_coordinator=for_coordinator,
                 )
             if for_coordinator == False and len(division) > 0:
@@ -1067,11 +1066,16 @@ class ProjectViewSet(BaseViewSet):
         direct=False,
         for_coordinator=False,
     ):
+        # All coordinator locations are fetched with direct=True since only districts exist in coordinator view without any further location children
         if direct == True:
             if model_class.__name__ == "ProjectLocation":
                 if for_coordinator == True:
                     return qs.filter(
-                        projectLocation__coordinatorLocation__in=search_ids
+                        Q(projectLocation__coordinatorLocation__in=search_ids)
+                        | Q(projectLocation__parent__coordinatorLocation__in=search_ids)
+                        | Q(
+                            projectLocation__parent__parent__coordinatorLocation__in=search_ids
+                        )
                     )
                 return qs.filter(projectLocation__in=search_ids)
             elif model_class.__name__ == "ProjectClass":
@@ -1081,36 +1085,24 @@ class ProjectViewSet(BaseViewSet):
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
         paths = []
-        if for_coordinator == True and model_class.__name__ == "ProjectLocation":
-            paths = (
-                model_class.objects.filter(
-                    id__in=search_ids,
-                    parentClass__isnull=not has_parent,
-                    parentClass__parent__isnull=not has_parent_parent,
-                    parentClass__parent__parent__isnull=not has_parent_parent_parent,
-                    parentClass__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
-                    forCoordinatorOnly=for_coordinator,
-                )
-                .distinct()
-                .values_list("path", flat=True)
+
+        paths = (
+            model_class.objects.filter(
+                id__in=search_ids,
+                parent__isnull=not has_parent,
+                parent__parent__isnull=not has_parent_parent,
+                parent__parent__parent__isnull=not has_parent_parent_parent,
+                parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+                forCoordinatorOnly=for_coordinator,
             )
-        else:
-            paths = (
-                model_class.objects.filter(
-                    id__in=search_ids,
-                    parent__isnull=not has_parent,
-                    parent__parent__isnull=not has_parent_parent,
-                    parent__parent__parent__isnull=not has_parent_parent_parent,
-                    parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
-                    forCoordinatorOnly=for_coordinator,
-                )
-                .distinct()
-                .values_list("path", flat=True)
-            )
+            .distinct()
+            .values_list("path", flat=True)
+        )
 
         ids = (
             model_class.objects.filter(
-                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR)
+                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
+                forCoordinatorOnly=for_coordinator,
             )
             .distinct()
             .values_list("id", flat=True)
@@ -1119,8 +1111,6 @@ class ProjectViewSet(BaseViewSet):
         )
 
         if model_class.__name__ == "ProjectLocation":
-            if for_coordinator == True:
-                return qs.filter(projectLocation__coordinatorLocation__in=ids)
             return qs.filter(projectLocation__in=ids)
         elif model_class.__name__ == "ProjectClass":
             if for_coordinator == True:

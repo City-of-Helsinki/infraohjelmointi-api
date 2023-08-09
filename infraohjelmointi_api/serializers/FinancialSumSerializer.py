@@ -199,7 +199,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                             | Q(projectLocation__parent__coordinatorLocation=instance)
                             | Q(
                                 projectLocation__parent__parent__coordinatorLocation=instance
-                            )
+                            ),
+                            programmed=True,
                         )
                     )
                 else:
@@ -213,7 +214,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         .filter(
                             Q(projectLocation=instance)
                             | Q(projectLocation__parent=instance)
-                            | Q(projectLocation__parent__parent=instance)
+                            | Q(projectLocation__parent__parent=instance),
+                            programmed=True,
                         )
                     )
             return Project.objects.none()
@@ -235,14 +237,17 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         )
                         | Q(
                             projectClass__coordinatorClass__path__startswith=instance.path
-                        )
+                        ),
+                        programmed=True,
                     )
                 )
             else:
                 return (
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
-                    .filter(projectClass__path__startswith=instance.path)
+                    .filter(
+                        projectClass__path__startswith=instance.path, programmed=True
+                    )
                 )
 
         if _type == "ProjectGroup":
