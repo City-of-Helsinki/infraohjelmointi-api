@@ -403,7 +403,8 @@ def proceedWithClass(
         .strip()
     )
     name = "{} {}".format(
-        code if code else "",
+        # replace multiply spaces with one
+        re.sub("\s\s+", " ", code).strip() if code else "",
         name,
     ).strip()
 
@@ -444,7 +445,8 @@ def proceedWithSubClass(
         .strip()
     )
     name = "{} {}".format(
-        code if code else "",
+        # replace multiply spaces with one
+        re.sub("\s\s+", " ", code).strip() if code else "",
         name,
     ).strip()
     print_with_bg_color(
