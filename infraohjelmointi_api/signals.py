@@ -140,7 +140,7 @@ def get_coordinator_class_and_related_class_sums(instance: ClassFinancial):
     }
 
     return {
-        "coordinator": {
+        "coordination": {
             classType: ProjectClassSerializer(
                 coordinatorClassInstance, context={"for_coordinator": True}
             ).data
@@ -166,7 +166,7 @@ def get_financial_sums(
     """
 
     sums = {
-        "coordinator": {
+        "coordination": {
             "masterClass": None,
             "class": None,
             "subClass": None,
@@ -192,7 +192,7 @@ def get_financial_sums(
 
         if pMasterClass:
             sums["planning"]["masterClass"] = ProjectClassSerializer(pMasterClass).data
-            sums["coordinator"]["masterClass"] = (
+            sums["coordination"]["masterClass"] = (
                 ProjectClassSerializer(
                     pMasterClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
@@ -202,7 +202,7 @@ def get_financial_sums(
 
         if pClass:
             sums["planning"]["class"] = ProjectClassSerializer(pClass).data
-            sums["coordinator"]["class"] = (
+            sums["coordination"]["class"] = (
                 ProjectClassSerializer(
                     pClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
@@ -211,7 +211,7 @@ def get_financial_sums(
             )
         if pSubClass:
             sums["planning"]["subClass"] = ProjectClassSerializer(pSubClass).data
-            sums["coordinator"]["subClass"] = (
+            sums["coordination"]["subClass"] = (
                 ProjectClassSerializer(
                     pSubClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
@@ -222,7 +222,7 @@ def get_financial_sums(
             sums["planning"]["group"] = ProjectGroupSerializer(pGroup).data
         if pDistrict:
             sums["planning"]["district"] = ProjectLocationSerializer(pDistrict).data
-            sums["coordinator"]["district"] = (
+            sums["coordination"]["district"] = (
                 ProjectClassSerializer(
                     pDistrict.coordinatorLocation, context={"for_coordinator": True}
                 ).data
