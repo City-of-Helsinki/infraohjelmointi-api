@@ -101,6 +101,38 @@ def get_project_class_location_group_relations(project: Project) -> tuple:
     )
 
 
+def identify_class_type(classInstance: ProjectClass) -> str:
+    """
+    returns the type of coordinator/planning class. masterClass | class | subClass
+    """
+    if classInstance != None and classInstance.parent == None:
+        return "masterClass"
+
+    if (
+        classInstance != None
+        and classInstance.parent != None
+        and classInstance.parent.parent == None
+    ):
+        return "class"
+
+    if (
+        classInstance != None
+        and classInstance.parent != None
+        and classInstance.parent.parent != None
+        and classInstance.parent.parent.parent == None
+    ):
+        return "subClass"
+
+    if (
+        classInstance != None
+        and classInstance.parent != None
+        and classInstance.parent.parent != None
+        and classInstance.parent.parent.parent != None
+        and classInstance.parent.parent.parent.parent == None
+    ):
+        return "collectiveSubLevel"
+
+
 def get_coordinator_class_and_related_class_sums(instance: ClassFinancial):
     """
     get sums for coordination class and the related planning class
@@ -108,51 +140,24 @@ def get_coordinator_class_and_related_class_sums(instance: ClassFinancial):
     coordinatorClassInstance: ProjectClass = instance.classRelation
     relatedPlanningClassInstance: ProjectClass | None = instance.classRelation.relatedTo
 
-    coordinatorClassIdentification = {
-        "masterClass": coordinatorClassInstance.parent == None,
-        "class": (
-            coordinatorClassInstance.parent != None
-            and coordinatorClassInstance.parent.parent == None
-        ),
-        "subClass": (
-            coordinatorClassInstance.parent != None
-            and coordinatorClassInstance.parent.parent != None
-            and coordinatorClassInstance.parent.parent.parent == None
-        ),
-    }
+    coordinatorClassIdentification = identify_class_type(
+        classInstance=coordinatorClassInstance
+    )
 
-    planningClassIdentification = {
-        "masterClass": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent == None
-        ),
-        "class": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent != None
-            and relatedPlanningClassInstance.parent.parent == None
-        ),
-        "subClass": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent != None
-            and relatedPlanningClassInstance.parent.parent != None
-            and relatedPlanningClassInstance.parent.parent.parent == None
-        ),
-    }
+    planningClassIdentification = identify_class_type(
+        classInstance=relatedPlanningClassInstance
+    )
 
     return {
         "coordination": {
-            classType: ProjectClassSerializer(
+            coordinatorClassIdentification: ProjectClassSerializer(
                 coordinatorClassInstance, context={"for_coordinator": True}
             ).data
-            for classType, isInstanceOfClassType in coordinatorClassIdentification.items()
-            if isInstanceOfClassType == True
         },
         "planning": {
-            classType: ProjectClassSerializer(
+            planningClassIdentification: ProjectClassSerializer(
                 relatedPlanningClassInstance, context={"for_coordinator": False}
             ).data
-            for classType, isInstanceOfClassType in planningClassIdentification.items()
-            if isInstanceOfClassType == True
         },
     }
 
@@ -170,6 +175,7 @@ def get_financial_sums(
             "masterClass": None,
             "class": None,
             "subClass": None,
+            "collectiveSubLevel": None,
             "district": None,
         },
         "planning": {
@@ -192,32 +198,29 @@ def get_financial_sums(
 
         if pMasterClass:
             sums["planning"]["masterClass"] = ProjectClassSerializer(pMasterClass).data
-            sums["coordination"]["masterClass"] = (
-                ProjectClassSerializer(
+            if hasattr(pMasterClass, "coordinatorClass"):
+                sums["coordination"][
+                    identify_class_type(classInstance=pMasterClass.coordinatorClass)
+                ] = ProjectClassSerializer(
                     pMasterClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
-                if hasattr(pMasterClass, "coordinatorClass")
-                else None
-            )
 
         if pClass:
             sums["planning"]["class"] = ProjectClassSerializer(pClass).data
-            sums["coordination"]["class"] = (
-                ProjectClassSerializer(
+            if hasattr(pClass, "coordinatorClass"):
+                sums["coordination"][
+                    identify_class_type(classInstance=pClass.coordinatorClass)
+                ] = ProjectClassSerializer(
                     pClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
-                if hasattr(pClass, "coordinatorClass")
-                else None
-            )
         if pSubClass:
             sums["planning"]["subClass"] = ProjectClassSerializer(pSubClass).data
-            sums["coordination"]["subClass"] = (
-                ProjectClassSerializer(
+            if hasattr(pSubClass, "coordinatorClass"):
+                sums["coordination"][
+                    identify_class_type(classInstance=pSubClass.coordinatorClass)
+                ] = ProjectClassSerializer(
                     pSubClass.coordinatorClass, context={"for_coordinator": True}
                 ).data
-                if hasattr(pSubClass, "coordinatorClass")
-                else None
-            )
         if pGroup:
             sums["planning"]["group"] = ProjectGroupSerializer(pGroup).data
         if pDistrict:
