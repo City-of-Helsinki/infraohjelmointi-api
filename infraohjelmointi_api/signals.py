@@ -29,113 +29,229 @@ def on_transaction_commit(func):
     return inner
 
 
-def get_sums(
-    projectMasterClass: ProjectClass,
-    projectClass: ProjectClass,
-    projectSubClass: ProjectClass,
-    projectDistrict: ProjectLocation,
-    projectGroup: ProjectGroup,
-):
-    sums = {
-        "masterClass": None,
-        "class": None,
-        "subClass": None,
-        "district": None,
-        "group": None,
+def get_project_class_location_group_relations(project: Project) -> tuple:
+    """
+    get all levels of class/location and group relations linked to the provided project
+
+    :arg Project | None project: project instance to get related information from
+    """
+
+    projectMasterClass = (
+        (
+            project.projectClass
+            if project.projectClass.parent is None
+            else project.projectClass.parent
+            if project.projectClass.parent.parent is None
+            and project.projectClass.parent is not None
+            else project.projectClass.parent.parent
+            if project.projectClass.parent.parent is not None
+            and project.projectClass.parent is not None
+            else None
+        )
+        if project.projectClass is not None
+        else None
+    )
+    projectClass = (
+        (
+            project.projectClass
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is None
+            else project.projectClass.parent
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is not None
+            else None
+        )
+        if project.projectClass is not None
+        else None
+    )
+    projectSubClass = (
+        (
+            project.projectClass
+            if project.projectClass.parent is not None
+            and project.projectClass.parent.parent is not None
+            else None
+        )
+        if project.projectClass is not None
+        else None
+    )
+    projectDistrict = (
+        (
+            project.projectLocation
+            if project.projectLocation.parent is None
+            else project.projectLocation.parent
+            if project.projectLocation.parent.parent is None
+            and project.projectLocation.parent is not None
+            else project.projectLocation.parent.parent
+            if project.projectLocation.parent.parent is not None
+            and project.projectLocation.parent is not None
+            else None
+        )
+        if project.projectLocation is not None
+        else None
+    )
+
+    projectGroup = project.projectGroup if project.projectGroup is not None else None
+
+    return (
+        projectMasterClass,
+        projectClass,
+        projectSubClass,
+        projectDistrict,
+        projectGroup,
+    )
+
+
+def get_coordinator_class_and_related_class_sums(instance: ClassFinancial):
+    """
+    get sums for coordination class and the related planning class
+    """
+    coordinatorClassInstance: ProjectClass = instance.classRelation
+    relatedPlanningClassInstance: ProjectClass | None = instance.classRelation.relatedTo
+
+    coordinatorClassIdentification = {
+        "masterClass": coordinatorClassInstance.parent == None,
+        "class": (
+            coordinatorClassInstance.parent != None
+            and coordinatorClassInstance.parent.parent == None
+        ),
+        "subClass": (
+            coordinatorClassInstance.parent != None
+            and coordinatorClassInstance.parent.parent != None
+            and coordinatorClassInstance.parent.parent.parent == None
+        ),
     }
-    if projectMasterClass:
-        sums["masterClass"] = ProjectClassSerializer(projectMasterClass).data
-    if projectClass:
-        sums["class"] = ProjectClassSerializer(projectClass).data
-    if projectSubClass:
-        sums["subClass"] = ProjectClassSerializer(projectSubClass).data
-    if projectGroup:
-        sums["group"] = ProjectGroupSerializer(projectGroup).data
-    if projectDistrict:
-        sums["district"] = ProjectLocationSerializer(projectDistrict).data
+
+    planningClassIdentification = {
+        "masterClass": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent == None
+        ),
+        "class": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent != None
+            and relatedPlanningClassInstance.parent.parent == None
+        ),
+        "subClass": (
+            relatedPlanningClassInstance != None
+            and relatedPlanningClassInstance.parent != None
+            and relatedPlanningClassInstance.parent.parent != None
+            and relatedPlanningClassInstance.parent.parent.parent == None
+        ),
+    }
+
+    return {
+        "coordinator": {
+            classType: ProjectClassSerializer(
+                coordinatorClassInstance, context={"for_coordinator": True}
+            ).data
+            for classType, isInstanceOfClassType in coordinatorClassIdentification.items()
+            if isInstanceOfClassType == True
+        },
+        "planning": {
+            classType: ProjectClassSerializer(
+                relatedPlanningClassInstance, context={"for_coordinator": False}
+            ).data
+            for classType, isInstanceOfClassType in planningClassIdentification.items()
+            if isInstanceOfClassType == True
+        },
+    }
+
+
+def get_financial_sums(
+    _type: str,
+    instance: ClassFinancial | ProjectFinancial,
+):
+    """
+    Get class/location financial sums for both coordinator and planning
+    """
+
+    sums = {
+        "coordinator": {
+            "masterClass": None,
+            "class": None,
+            "subClass": None,
+            "district": None,
+        },
+        "planning": {
+            "masterClass": None,
+            "class": None,
+            "subClass": None,
+            "district": None,
+            "group": None,
+        },
+    }
+    if _type == "ProjectFinancial":
+        project = instance.project
+        (
+            pMasterClass,
+            pClass,
+            pSubClass,
+            pDistrict,
+            pGroup,
+        ) = get_project_class_location_group_relations(project=project)
+
+        if pMasterClass:
+            sums["planning"]["masterClass"] = ProjectClassSerializer(pMasterClass).data
+            sums["coordinator"]["masterClass"] = (
+                ProjectClassSerializer(
+                    pMasterClass.coordinatorClass, context={"for_coordinator": True}
+                ).data
+                if hasattr(pMasterClass, "coordinatorClass")
+                else None
+            )
+
+        if pClass:
+            sums["planning"]["class"] = ProjectClassSerializer(pClass).data
+            sums["coordinator"]["class"] = (
+                ProjectClassSerializer(
+                    pClass.coordinatorClass, context={"for_coordinator": True}
+                ).data
+                if hasattr(pClass, "coordinatorClass")
+                else None
+            )
+        if pSubClass:
+            sums["planning"]["subClass"] = ProjectClassSerializer(pSubClass).data
+            sums["coordinator"]["subClass"] = (
+                ProjectClassSerializer(
+                    pSubClass.coordinatorClass, context={"for_coordinator": True}
+                ).data
+                if hasattr(pSubClass, "coordinatorClass")
+                else None
+            )
+        if pGroup:
+            sums["planning"]["group"] = ProjectGroupSerializer(pGroup).data
+        if pDistrict:
+            sums["planning"]["district"] = ProjectLocationSerializer(pDistrict).data
+            sums["coordinator"]["district"] = (
+                ProjectClassSerializer(
+                    pDistrict.coordinatorLocation, context={"for_coordinator": True}
+                ).data
+                if hasattr(pDistrict, "coordinatorLocation")
+                else None
+            )
+
+    if _type == "ClassFinancial":
+        classSums = get_coordinator_class_and_related_class_sums(instance=instance)
+        for sumType, sumValues in classSums.items():
+            for classType, classSum in sumValues.items():
+                sums[sumType][classType] = classSum
 
     return sums
 
 
 @receiver(post_save, sender=ProjectFinancial)
-def get_notified_project_financial(sender, instance, created, **kwargs):
-    project = instance.project
-
+@receiver(post_save, sender=ClassFinancial)
+def get_notified_financial_sums(sender, instance, created, **kwargs):
+    _type = instance._meta.model.__name__
     if created:
-        logger.debug("Signal Triggered: ProjectFinance Object was created")
-    else:
-        projectMasterClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is None
-                else project.projectClass.parent
-                if project.projectClass.parent.parent is None
-                and project.projectClass.parent is not None
-                else project.projectClass.parent.parent
-                if project.projectClass.parent.parent is not None
-                and project.projectClass.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is None
-                else project.projectClass.parent
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectSubClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectDistrict = (
-            (
-                project.projectLocation
-                if project.projectLocation.parent is None
-                else project.projectLocation.parent
-                if project.projectLocation.parent.parent is None
-                and project.projectLocation.parent is not None
-                else project.projectLocation.parent.parent
-                if project.projectLocation.parent.parent is not None
-                and project.projectLocation.parent is not None
-                else None
-            )
-            if project.projectLocation is not None
-            else None
-        )
+        logger.debug("Signal Triggered: {} Object was created".format(_type))
+    logger.debug("Signal Triggered: {} Object was updated".format(_type))
 
-        projectGroup = (
-            project.projectGroup if project.projectGroup is not None else None
-        )
-        send_event(
-            "finance",
-            "finance-update",
-            {
-                "project": instance.project.id,
-                **get_sums(
-                    projectMasterClass=projectMasterClass,
-                    projectClass=projectClass,
-                    projectSubClass=projectSubClass,
-                    projectDistrict=projectDistrict,
-                    projectGroup=projectGroup,
-                ),
-            },
-        )
-        logger.debug("Signal Triggered: ProjectFinance Object was updated")
+    send_event(
+        "finance",
+        "finance-update",
+        get_financial_sums(instance=instance, _type=_type),
+    )
 
 
 @receiver(post_save, sender=Project)
@@ -158,65 +274,12 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         logger.debug("Signal Triggered: Project was updated")
 
 
-def get_class_financials(instance: ClassFinancial):
-    coordinatorClassInstance: ProjectClass = instance.classRelation
-    relatedPlanningClassInstance: ProjectClass | None = instance.classRelation.relatedTo
+# @receiver(post_save, sender=ClassFinancial)
+# def get_notified_class_financial(sender, instance, created, update_fields, **kwargs):
+#     if created:
+#         logger.debug("Signal Triggered: Class Financial instance was created")
 
-    coordinatorClassIdentification = {
-        "coordinatorMasterClass": coordinatorClassInstance.parent == None,
-        "coordinatorClass": (
-            coordinatorClassInstance.parent != None
-            and coordinatorClassInstance.parent.parent == None
-        ),
-        "coordinatorSubClass": (
-            coordinatorClassInstance.parent != None
-            and coordinatorClassInstance.parent.parent != None
-            and coordinatorClassInstance.parent.parent.parent == None
-        ),
-    }
-
-    planningClassIdentification = {
-        "planningMasterClass": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent == None
-        ),
-        "planningClass": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent != None
-            and relatedPlanningClassInstance.parent.parent == None
-        ),
-        "planningSubClass": (
-            relatedPlanningClassInstance != None
-            and relatedPlanningClassInstance.parent != None
-            and relatedPlanningClassInstance.parent.parent != None
-            and relatedPlanningClassInstance.parent.parent.parent == None
-        ),
-    }
-
-    return {
-        **{
-            classType: ProjectClassSerializer(
-                coordinatorClassInstance, context={"for_coordinator": True}
-            ).data
-            for classType, isInstanceOfClassType in coordinatorClassIdentification.items()
-            if isInstanceOfClassType == True
-        },
-        **{
-            classType: ProjectClassSerializer(
-                relatedPlanningClassInstance, context={"for_coordinator": False}
-            ).data
-            for classType, isInstanceOfClassType in planningClassIdentification.items()
-            if isInstanceOfClassType == True
-        },
-    }
-
-
-@receiver(post_save, sender=ClassFinancial)
-def get_notified_class_financial(sender, instance, created, update_fields, **kwargs):
-    if created:
-        logger.debug("Signal Triggered: Class Financial instance was created")
-
-    logger.debug("Signal Triggered: Class Financial instance was updated")
-    send_event(
-        "finance", "class-finance-update", get_class_financials(instance=instance)
-    )
+#     logger.debug("Signal Triggered: Class Financial instance was updated")
+#     send_event(
+#         "finance", "class-finance-update", get_class_financials(instance=instance)
+#     )
