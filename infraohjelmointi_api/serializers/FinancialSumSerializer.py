@@ -22,25 +22,28 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         if instance == None:
             return False
-
-        parent_frame_budget_sum = (
-            ClassFinancial.objects.filter(
-                classRelation=instance, year__gte=year, year__lte=year + 10
-            ).aggregate(parent_sum=Sum("frameBudget"))["parent_sum"]
-            or 0
+        frameBudgetSums = ClassFinancial.objects.aggregate(
+            parentFrameBudgetSum=Sum(
+                "frameBudget",
+                default=0,
+                filter=Q(classRelation=instance)
+                & Q(year__gte=year)
+                & Q(year__lte=year + 10),
+            ),
+            childFrameBudgetSum=Sum(
+                "frameBudget",
+                default=0,
+                filter=Q(classRelation__path__startswith=instance.path)
+                & Q(classRelation__path__gt=instance.path)
+                & Q(year__gte=year)
+                & Q(year__lte=year + 10),
+            ),
         )
 
-        child_frame_budget_sum = (
-            ClassFinancial.objects.filter(
-                classRelation__path__startswith=instance.path,
-                classRelation__path__gt=instance.path,
-                year__gte=year,
-                year__lte=year + 10,
-            ).aggregate(child_sum=Sum("frameBudget"))["child_sum"]
-            or 0
+        return (
+            frameBudgetSums["childFrameBudgetSum"]
+            > frameBudgetSums["parentFrameBudgetSum"]
         )
-
-        return child_frame_budget_sum > parent_frame_budget_sum
 
     def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
         for_coordinator = self.context.get("for_coordinator", False)
