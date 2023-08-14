@@ -18,6 +18,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             # get coordinatorClass when planning classes are being fetched
             instance = getattr(instance, "coordinatorClass", None)
 
+        if instance == None:
+            return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
+
         classFinanceObject: ClassFinancial = (
             ClassFinancialService.get(class_id=instance.id, year=year)
             if _type == "ProjectClass"
