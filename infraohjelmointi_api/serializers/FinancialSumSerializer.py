@@ -28,7 +28,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             else None
         )
 
-        childClassFrameBudgetSum = ClassFinancial.objects.aggregate(
+        childClassFrameBudgetSum = ClassFinancial.objects.select_related(
+            "classRelation", "classRelation__path", "classRelation__forCoordinatorOnly"
+        ).aggregate(
             childFrameBudgetSum=Sum(
                 "frameBudget",
                 default=0,
@@ -37,7 +39,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 & Q(year=year)
                 & Q(classRelation__forCoordinatorOnly=True),
             ),
-        )["childFrameBudgetSum"]
+        )[
+            "childFrameBudgetSum"
+        ]
 
         return {
             "frameBudget": classFinanceObject.frameBudget
