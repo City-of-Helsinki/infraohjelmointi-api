@@ -12,13 +12,12 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
-        if _type != "ProjectClass":
-            return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
+
         if for_coordinator == False:
             # get coordinatorClass when planning classes are being fetched
             instance = getattr(instance, "coordinatorClass", None)
 
-        if instance == None:
+        if instance == None or _type != "ProjectClass":
             return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
 
         classFinanceObject: ClassFinancial = (
