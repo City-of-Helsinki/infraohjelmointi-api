@@ -4,9 +4,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from infraohjelmointi_api.models import (
     Project,
-    ProjectClass,
-    ProjectGroup,
-    ProjectLocation,
     ClassFinancial,
 )
 from infraohjelmointi_api.serializers import (
@@ -15,7 +12,7 @@ from infraohjelmointi_api.serializers import (
     ProjectGroupSerializer,
     ProjectLocationSerializer,
 )
-from .services import ProjectClassService, ClassFinancialService, ProjectService
+from .services import ClassFinancialService, ProjectService
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
@@ -142,12 +139,14 @@ def get_financial_sums(
             ).data
 
     if _type == "ClassFinancial":
-        classSums = ClassFinancialService.get_coordinator_class_and_related_class_sums(
+        classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
             instance=instance
         )
-        for sumType, sumValues in classSums.items():
-            for classType, classSum in sumValues.items():
-                sums[sumType][classType] = classSum
+        for viewType, classValues in classRelations.items():
+            for classType, classInstance in classValues.items():
+                sums[viewType][classType] = ProjectClassSerializer(
+                    classInstance, context={"for_coordinator": True}
+                ).data
 
     return sums
 

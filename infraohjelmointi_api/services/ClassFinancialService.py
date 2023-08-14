@@ -1,6 +1,5 @@
-from ..models import ClassFinancial, ProjectClass
-from ..serializers import ProjectClassSerializer
 from .ProjectClassService import ProjectClassService
+from ..models import ClassFinancial, ProjectClass
 
 
 class ClassFinancialService:
@@ -25,24 +24,24 @@ class ClassFinancialService:
         return {"year{}".format(index): start_year + index for index in range(0, 11)}
 
     @staticmethod
-    def get_coordinator_class_and_related_class_sums(instance: ClassFinancial) -> dict:
+    def get_coordinator_class_and_related_class(instance: ClassFinancial) -> dict:
         """
-        Returns the financial sums for coordinator class linked to the ClassFinancial object and the related planning class linked to the coordinator Class.
+        Returns the class instances for coordinator class linked to the ClassFinancial object and the related planning class linked to the coordinator Class.
 
             Parameters
             ----------
             instance : ClassFinancial
-                instance of ClassFinancial to get relations and calculate sums
+                instance of ClassFinancial to get relations
 
             Returns
             -------
             dict
                 {
                 "coordination": {
-                    "<type_of_class>": <ProjectClass instance with sums>,
+                    "<type_of_class>": <ProjectClass instance>,
                     },
                 "planning": {
-                    "<type_of_class>": <ProjectClass instance with sums>,
+                    "<type_of_class>": <ProjectClass instance>,
                     },
                 }
         """
@@ -60,16 +59,6 @@ class ClassFinancialService:
         )
 
         return {
-            "coordination": {
-                coordinatorClassIdentification: ProjectClassSerializer(
-                    coordinatorClassInstance,
-                    context={"for_coordinator": True},
-                ).data
-            },
-            "planning": {
-                planningClassIdentification: ProjectClassSerializer(
-                    relatedPlanningClassInstance,
-                    context={"for_coordinator": False},
-                ).data
-            },
+            "coordination": {coordinatorClassIdentification: coordinatorClassInstance},
+            "planning": {planningClassIdentification: relatedPlanningClassInstance},
         }
