@@ -145,7 +145,8 @@ def get_financial_sums(
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
                 sums[viewType][classType] = ProjectClassSerializer(
-                    classInstance, context={"for_coordinator": True}
+                    classInstance,
+                    context={"for_coordinator": viewType == "coordination"},
                 ).data
 
     return sums
