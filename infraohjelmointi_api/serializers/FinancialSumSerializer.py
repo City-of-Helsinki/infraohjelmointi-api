@@ -36,7 +36,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 filter=Q(classRelation__path__startswith=instance.path)
                 & Q(classRelation__path__gt=instance.path)
                 & Q(year__gte=year)
-                & Q(year__lte=year + 10),
+                & Q(year__lte=year + 10)
+                & Q(classRelation__forCoordinatorOnly=True),
             ),
         )
 
