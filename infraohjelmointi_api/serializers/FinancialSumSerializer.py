@@ -9,51 +9,11 @@ from django.db.models.functions import Coalesce
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def is_frameBudget_overlap(self, instance):
-        for_coordinator = self.context.get("for_coordinator", False)
-        _type = instance._meta.model.__name__
-        year = int(self.context.get("finance_year", date.today().year))
-        if _type != "ProjectClass":
-            return False
-
-        if for_coordinator == False:
-            # get coordinatorClass when planning classes are being fetched
-            instance = getattr(instance, "coordinatorClass", None)
-
-        if instance == None:
-            return False
-        frameBudgetSums = ClassFinancial.objects.aggregate(
-            parentFrameBudgetSum=Sum(
-                "frameBudget",
-                default=0,
-                filter=Q(classRelation=instance)
-                & Q(year__gte=year)
-                & Q(year__lte=year + 10),
-            ),
-            childFrameBudgetSum=Sum(
-                "frameBudget",
-                default=0,
-                filter=Q(classRelation__path__startswith=instance.path)
-                & Q(classRelation__path__gt=instance.path)
-                & Q(year__gte=year)
-                & Q(year__lte=year + 10)
-                & Q(classRelation__forCoordinatorOnly=True),
-            ),
-        )
-
-        return (
-            frameBudgetSums["childFrameBudgetSum"]
-            > frameBudgetSums["parentFrameBudgetSum"]
-        )
-
     def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
         if _type != "ProjectClass":
-            return {
-                "frameBudget": 0,
-                "budgetChange": 0,
-            }
+            return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
         if for_coordinator == False:
             # get coordinatorClass when planning classes are being fetched
             instance = getattr(instance, "coordinatorClass", None)
@@ -66,6 +26,17 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             else None
         )
 
+        childClassFrameBudgetSum = ClassFinancial.objects.aggregate(
+            childFrameBudgetSum=Sum(
+                "frameBudget",
+                default=0,
+                filter=Q(classRelation__path__startswith=instance.path)
+                & Q(classRelation__path__gt=instance.path)
+                & Q(year=year)
+                & Q(classRelation__forCoordinatorOnly=True),
+            ),
+        )["childFrameBudgetSum"]
+
         return {
             "frameBudget": classFinanceObject.frameBudget
             if classFinanceObject != None
@@ -73,6 +44,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "budgetChange": classFinanceObject.budgetChange
             if classFinanceObject != None
             else 0,
+            "isFrameBudgetOverlap": childClassFrameBudgetSum
+            > classFinanceObject.frameBudget
+            if classFinanceObject != None
+            else False,
         }
 
     def get_finance_sums(self, instance):
@@ -220,9 +195,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
         }
 
-        summedFinances["isFrameBudgetOverlap"] = self.is_frameBudget_overlap(
-            instance=instance
-        )
         return summedFinances
 
     def get_related_projects(self, instance, _type) -> list[Project]:
