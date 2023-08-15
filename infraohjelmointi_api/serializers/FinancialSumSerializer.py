@@ -2,8 +2,19 @@ from datetime import date
 from infraohjelmointi_api.models import Project, ClassFinancial, ProjectClass
 from infraohjelmointi_api.services import ProjectService, ClassFinancialService
 from rest_framework import serializers
-from django.db.models import Sum, F, Case, When, Value, BooleanField, Q
-from django.db.models.functions import Coalesce
+from django.db.models import (
+    Sum,
+    F,
+    Case,
+    When,
+    Value,
+    BooleanField,
+    Q,
+    Count,
+    PositiveIntegerField,
+    IntegerField,
+)
+from django.db.models.functions import Coalesce, Cast
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -28,20 +39,44 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             else None
         )
 
-        childClassFrameBudgetSum = ClassFinancial.objects.select_related(
-            "classRelation", "classRelation__path", "classRelation__forCoordinatorOnly"
-        ).aggregate(
-            childFrameBudgetSum=Sum(
-                "frameBudget",
-                default=0,
-                filter=Q(classRelation__path__startswith=instance.path)
-                & Q(classRelation__path__gt=instance.path)
-                & Q(year=year)
-                & Q(classRelation__forCoordinatorOnly=True),
-            ),
-        )[
-            "childFrameBudgetSum"
-        ]
+        childClassQueryResult = (
+            ProjectClass.objects.filter(
+                path__startswith=instance.path,
+                path__gt=instance.path,
+                forCoordinatorOnly=True,
+            )
+            .select_related(
+                "parent__finances", "parent", "parent__finances__frameBudget"
+            )
+            .values("parent")
+            .annotate(
+                childSum=Sum(
+                    "finances__frameBudget",
+                    default=0,
+                    filter=Q(finances__year=year),
+                ),
+                parent_frameBudget=Sum(
+                    "parent__finances__frameBudget",
+                    default=0,
+                    filter=Q(finances__year=year),
+                ),
+                isOverlap=Case(
+                    When(childSum__gt=F("parent_frameBudget"), then=True),
+                    default=False,
+                    output_field=BooleanField(),
+                ),
+            )
+            .aggregate(
+                childSums=Sum("parent_frameBudget", default=0),
+                subChildrenOverlapCount=Count(
+                    Case(
+                        When(isOverlap=True, then=Value(1)),
+                        default=None,
+                        output_field=PositiveIntegerField(),
+                    )
+                ),
+            )
+        )
 
         return {
             "frameBudget": classFinanceObject.frameBudget
@@ -50,10 +85,11 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "budgetChange": classFinanceObject.budgetChange
             if classFinanceObject != None
             else 0,
-            "isFrameBudgetOverlap": childClassFrameBudgetSum
-            > classFinanceObject.frameBudget
-            if classFinanceObject != None
-            else False,
+            "isFrameBudgetOverlap": childClassQueryResult["subChildrenOverlapCount"] > 0
+            or (
+                classFinanceObject != None
+                and childClassQueryResult["childSums"] > classFinanceObject.frameBudget
+            ),
         }
 
     def get_finance_sums(self, instance):
