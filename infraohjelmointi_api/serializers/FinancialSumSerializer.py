@@ -38,7 +38,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             and instance.finances.filter(year=year).exists()
             else None
         )
-
+        # Querying child classes to check if frameBudgets
         childClassQueryResult = (
             ProjectClass.objects.filter(
                 path__startswith=instance.path,
@@ -46,8 +46,11 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 forCoordinatorOnly=True,
             )
             .select_related(
-                "parent__finances", "parent", "parent__finances__frameBudget"
+                "parent__finances",
+                "parent",
+                "parent__finances__frameBudget",
             )
+            .prefetch_related("finances")
             .values("parent")
             .annotate(
                 childSum=Sum(
