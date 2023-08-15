@@ -76,7 +76,7 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
         # use context to check if coordinator class/locations are needed
         for_coordinator = self.context.get("for_coordinator", False)
         if for_coordinator == True:
-            # if class is suurpiiri then goto its parent and check for coordinationClass since suurpiiri classes have no
+            # if class is suurpiiri or ostersundomin then goto its parent and check for coordinationClass since suurpiiri classes have no
             # coordination class
             rep["classRelation"] = (
                 instance.classRelation.coordinatorClass.id
@@ -84,7 +84,10 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
                 else instance.classRelation.parent.coordinatorClass.id
                 if (
                     instance.classRelation != None
-                    and "suurpiiri" in instance.classRelation.name.lower()
+                    and (
+                        "suurpiiri" in instance.classRelation.name.lower()
+                        or "östersundom" in instance.classRelation.name.lower()
+                    )
                     and hasattr(instance.classRelation.parent, "coordinatorClass")
                 )
                 else None
