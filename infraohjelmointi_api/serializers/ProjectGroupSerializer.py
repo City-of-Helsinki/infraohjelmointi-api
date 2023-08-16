@@ -69,3 +69,49 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
                 project.save()
 
         return projectGroup
+
+    @override
+    def to_representation(self, instance: ProjectGroup):
+        rep = super().to_representation(instance)
+        # use context to check if coordinator class/locations are needed
+        for_coordinator = self.context.get("for_coordinator", False)
+        if for_coordinator == True:
+            # if class is suurpiiri or ostersundomin then goto its parent and check for coordinationClass since suurpiiri classes have no
+            # coordination class
+            rep["classRelation"] = (
+                instance.classRelation.coordinatorClass.id
+                if hasattr(instance.classRelation, "coordinatorClass")
+                else instance.classRelation.parent.coordinatorClass.id
+                if (
+                    instance.classRelation != None
+                    and (
+                        "suurpiiri" in instance.classRelation.name.lower()
+                        or "östersundom" in instance.classRelation.name.lower()
+                    )
+                    and hasattr(instance.classRelation.parent, "coordinatorClass")
+                )
+                else None
+            )
+            # if project location is division/subdivision then goto its district and get related coordination location else none
+            rep["locationRelation"] = (
+                instance.locationRelation.coordinatorLocation.id
+                if (hasattr(instance.locationRelation, "coordinatorLocation"))
+                else instance.locationRelation.parent.coordinatorLocation.id
+                if (
+                    instance.locationRelation != None
+                    and instance.locationRelation.parent != None
+                    and instance.locationRelation.parent.parent == None
+                    and hasattr(instance.locationRelation.parent, "coordinatorLocation")
+                )
+                else instance.locationRelation.parent.parent.coordinatorLocation.id
+                if (
+                    instance.locationRelation != None
+                    and instance.locationRelation.parent != None
+                    and instance.locationRelation.parent.parent != None
+                    and hasattr(
+                        instance.locationRelation.parent.parent, "coordinatorLocation"
+                    )
+                )
+                else None
+            )
+        return rep

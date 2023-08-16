@@ -15,28 +15,33 @@ class projectGroupTestCase(TestCase):
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
-    projectClassId = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
-    projectMasterClassId = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
-    projectDistrictId = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-    projectLocationId = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
+    projectGroup_4_Id = uuid.UUID("a115b2a7-6d86-4344-ade1-9b1cd8b5e493")
+    class_1_Id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
+    masterClass_1_Id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
+    masterClass_2_Id = uuid.UUID("f3054b12-fccd-4937-988a-08830e3f1858")
+    coordinationMasterClass_1_Id = uuid.UUID("40811add-3855-40c8-9064-b6805921688f")
+    district_1_Id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
+    district_2_Id = uuid.UUID("435790c1-fba6-4252-8e9c-f14eb06f856e")
+    coordinationDistrict_1_Id = uuid.UUID("c3217cd5-3149-45d7-b7de-ddc31a659917")
+    division_1_Id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     projectId = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
 
     @classmethod
     @override
     def setUpTestData(self):
         self.projectMasterClass = ProjectClass.objects.create(
-            id=self.projectMasterClassId, name="Test Master Class", parent=None
+            id=self.masterClass_1_Id, name="Test Master Class", parent=None
         )
         self.projectClass = self.projectMasterClass.childClass.create(
-            name="Test Class", id=self.projectClassId
+            name="Test Class", id=self.class_1_Id
         )
         self.district = ProjectLocation.objects.create(
-            id=self.projectDistrictId,
+            id=self.district_1_Id,
             name="Test district",
             parent=None,
         )
         self.projectLocation = self.district.childLocation.create(
-            id=self.projectLocationId, name="Test division"
+            id=self.division_1_Id, name="Test division"
         )
 
         self.project = Project.objects.create(
@@ -218,4 +223,72 @@ class projectGroupTestCase(TestCase):
             msg="projectGroup with Id {} still exists in DB".format(
                 self.projectGroup_1_Id
             ),
+        )
+
+    def test_group_coordination_endpoint(self):
+        district_1 = ProjectLocation.objects.create(
+            id=self.district_2_Id,
+            name="District 1",
+            parent=None,
+            path="District 1",
+            forCoordinatorOnly=False,
+        )
+
+        masterClass_1 = ProjectClass.objects.create(
+            id=self.masterClass_2_Id,
+            name="Master Class 1",
+            parent=None,
+            path="Master Class 1",
+            forCoordinatorOnly=False,
+        )
+
+        ProjectClass.objects.create(
+            id=self.coordinationMasterClass_1_Id,
+            name="Coordinator Master Class 1",
+            parent=None,
+            path="Coordinator Master Class 1",
+            forCoordinatorOnly=True,
+            relatedTo=masterClass_1,
+        )
+
+        ProjectLocation.objects.create(
+            id=self.coordinationDistrict_1_Id,
+            name="Coordinator district 1",
+            parent=None,
+            path="Coordinator district 1",
+            forCoordinatorOnly=True,
+            parentClass=None,
+            relatedTo=district_1,
+        )
+
+        group_1 = ProjectGroup.objects.create(
+            id=self.projectGroup_4_Id,
+            name="Parking Helsinki",
+            locationRelation=district_1,
+            classRelation=masterClass_1,
+        )
+
+        response = self.client.get(
+            "/project-groups/coordinator/",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # one group already exists before this test case was run so we find 2 groups
+        self.assertEqual(len(response.json()), 2)
+        # get the group we just created
+        filteredGroups = list(
+            filter(
+                lambda group: group["id"] == self.projectGroup_4_Id.__str__(),
+                response.json(),
+            )
+        )
+        self.assertEqual(
+            filteredGroups[0]["classRelation"],
+            self.coordinationMasterClass_1_Id.__str__(),
+        )
+        self.assertEqual(
+            filteredGroups[0]["locationRelation"],
+            self.coordinationDistrict_1_Id.__str__(),
         )
