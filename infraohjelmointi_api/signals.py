@@ -83,60 +83,24 @@ def get_financial_sums(
             project=project
         )
 
-        if projectRelations["planning"]["subClass"]:
-            sums["planning"]["subClass"] = ProjectClassSerializer(
-                projectRelations["planning"]["subClass"]
-            ).data
+        for viewType, instances in projectRelations.items():
+            for instanceType, instance in instances.items():
+                if instanceType == "group":
+                    sums[viewType][instanceType] = ProjectGroupSerializer(
+                        instance,
+                        context={"for_coordinator": viewType == "coordination"},
+                    ).data
 
-        if projectRelations["planning"]["class"]:
-            sums["planning"]["class"] = ProjectClassSerializer(
-                projectRelations["planning"]["class"]
-            ).data
+                if instanceType == "district":
+                    sums[viewType][instanceType] = ProjectLocationSerializer(
+                        instance,
+                        context={"for_coordinator": viewType == "coordination"},
+                    ).data
 
-        if projectRelations["planning"]["masterClass"]:
-            sums["planning"]["masterClass"] = ProjectClassSerializer(
-                projectRelations["planning"]["masterClass"]
-            ).data
-
-        if projectRelations["planning"]["group"]:
-            sums["planning"]["group"] = ProjectGroupSerializer(
-                projectRelations["planning"]["group"]
-            ).data
-
-        if projectRelations["planning"]["district"]:
-            sums["planning"]["district"] = ProjectLocationSerializer(
-                projectRelations["planning"]["district"]
-            ).data
-
-        if projectRelations["coordination"]["district"]:
-            sums["coordination"]["district"] = ProjectLocationSerializer(
-                projectRelations["coordination"]["district"],
-                context={"for_coordinator": True},
-            ).data
-
-        if projectRelations["coordination"]["masterClass"]:
-            sums["coordination"]["masterClass"] = ProjectClassSerializer(
-                projectRelations["coordination"]["masterClass"],
-                context={"for_coordinator": True},
-            ).data
-
-        if projectRelations["coordination"]["class"]:
-            sums["coordination"]["class"] = ProjectClassSerializer(
-                projectRelations["coordination"]["class"],
-                context={"for_coordinator": True},
-            ).data
-
-        if projectRelations["coordination"]["subClass"]:
-            sums["coordination"]["subClass"] = ProjectClassSerializer(
-                projectRelations["coordination"]["subClass"],
-                context={"for_coordinator": True},
-            ).data
-
-        if projectRelations["coordination"]["collectiveSubLevel"]:
-            sums["coordination"]["collectiveSubLevel"] = ProjectClassSerializer(
-                projectRelations["coordination"]["collectiveSubLevel"],
-                context={"for_coordinator": True},
-            ).data
+                sums[viewType][instanceType] = ProjectClassSerializer(
+                    instance,
+                    context={"for_coordinator": viewType == "coordination"},
+                ).data
 
     if _type == "ClassFinancial":
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
