@@ -45,20 +45,38 @@ class ClassFinancialService:
                     },
                 }
         """
+        classInstances = {"coordination": {}, "planning": {}}
+
         coordinatorClassInstance: ProjectClass = instance.classRelation
-        relatedPlanningClassInstance: ProjectClass | None = (
-            instance.classRelation.relatedTo
-        )
 
-        coordinatorClassIdentification = ProjectClassService.identify_class_type(
-            classInstance=coordinatorClassInstance
-        )
+        classInstances["coordination"][
+            ProjectClassService.identify_class_type(
+                classInstance=coordinatorClassInstance
+            )
+        ] = coordinatorClassInstance
 
-        planningClassIdentification = ProjectClassService.identify_class_type(
-            classInstance=relatedPlanningClassInstance
-        )
+        classInstances["planning"][
+            ProjectClassService.identify_class_type(
+                classInstance=coordinatorClassInstance.relatedTo
+            )
+        ] = coordinatorClassInstance.relatedTo
 
-        return {
-            "coordination": {coordinatorClassIdentification: coordinatorClassInstance},
-            "planning": {planningClassIdentification: relatedPlanningClassInstance},
-        }
+        # Traverse backwards from current Coordination Class to get parent classes
+        # Get related planning classes along the way
+        currCoordinationClass = coordinatorClassInstance.parent
+        while currCoordinationClass != None:
+            classInstances["coordination"][
+                ProjectClassService.identify_class_type(
+                    classInstance=currCoordinationClass
+                )
+            ] = currCoordinationClass
+
+            classInstances["planning"][
+                ProjectClassService.identify_class_type(
+                    classInstance=currCoordinationClass.relatedTo
+                )
+            ] = currCoordinationClass.relatedTo
+
+            currCoordinationClass = currCoordinationClass.parent
+
+        return classInstances

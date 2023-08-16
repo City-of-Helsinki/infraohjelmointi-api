@@ -58,22 +58,25 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             .annotate(
                 childSum=Sum(
                     "finances__frameBudget",
-                    default=0,
-                    filter=Q(finances__year=year, parent=F("parent")),
+                    default=Value(0),
+                    filter=Q(finances__year=year) & Q(parent=F("parent")),
                 ),
-                parent_frameBudget=Max(
-                    "parent__finances__frameBudget",
-                    default=0,
-                    filter=Q(parent__finances__year=year),
+                parentFrameBudget=Coalesce(
+                    Subquery(
+                        ClassFinancial.objects.filter(
+                            classRelation=OuterRef("parent"), year=year
+                        ).values_list("frameBudget", flat=True)[:1]
+                    ),
+                    Value(0),
                 ),
                 isOverlap=Case(
-                    When(childSum__gt=F("parent_frameBudget"), then=Value(True)),
+                    When(childSum__gt=F("parentFrameBudget"), then=Value(True)),
                     default=Value(False),
                     output_field=BooleanField(),
                 ),
             )
             .aggregate(
-                childSums=Sum("childSum", default=0),
+                childSums=Sum("childSum", default=Value(0)),
                 subChildrenOverlapCount=Count(
                     Case(
                         When(isOverlap=True, then=Value(1)),
