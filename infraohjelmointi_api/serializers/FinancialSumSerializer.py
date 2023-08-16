@@ -13,6 +13,9 @@ from django.db.models import (
     Count,
     PositiveIntegerField,
     IntegerField,
+    OuterRef,
+    Max,
+    Subquery,
 )
 from django.db.models.functions import Coalesce, Cast
 
@@ -38,7 +41,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             and instance.finances.filter(year=year).exists()
             else None
         )
-        # Querying child classes to check if frameBudgets
+
         childClassQueryResult = (
             ProjectClass.objects.filter(
                 path__startswith=instance.path,
@@ -56,25 +59,25 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 childSum=Sum(
                     "finances__frameBudget",
                     default=0,
-                    filter=Q(finances__year=year),
+                    filter=Q(finances__year=year, parent=F("parent")),
                 ),
-                parent_frameBudget=Sum(
+                parent_frameBudget=Max(
                     "parent__finances__frameBudget",
                     default=0,
-                    filter=Q(finances__year=year),
+                    filter=Q(parent__finances__year=year),
                 ),
                 isOverlap=Case(
-                    When(childSum__gt=F("parent_frameBudget"), then=True),
-                    default=False,
+                    When(childSum__gt=F("parent_frameBudget"), then=Value(True)),
+                    default=Value(False),
                     output_field=BooleanField(),
                 ),
             )
             .aggregate(
-                childSums=Sum("parent_frameBudget", default=0),
+                childSums=Sum("childSum", default=0),
                 subChildrenOverlapCount=Count(
                     Case(
                         When(isOverlap=True, then=Value(1)),
-                        default=None,
+                        default=Value(None),
                         output_field=PositiveIntegerField(),
                     )
                 ),
