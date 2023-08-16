@@ -152,6 +152,8 @@ class ProjectGroupViewSet(BaseViewSet):
     API endpoint that allows Project Groups to be viewed or edited.
     """
 
+    serializer_class = ProjectGroupSerializer
+
     @override
     def list(self, request, *args, **kwargs):
         year = request.query_params.get("year", date.today().year)
@@ -169,6 +171,30 @@ class ProjectGroupViewSet(BaseViewSet):
         data = group.id
         group.delete()
         return Response({"id": data})
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"coordinator",
+    )
+    def get_groups_for_coordinator(self, request):
+        """
+        Custom action to get Groups with coordinator location and classes
+        """
+        year = request.query_params.get("year", date.today().year)
+        qs = self.get_queryset().select_related(
+                    "classRelation",
+                    "locationRelation",
+                    "classRelation__coordinatorClass",
+                    "locationRelation__coordinatorLocation",
+                    "classRelation__parent__coordinatorClass",
+                    "locationRelation__parent__coordinatorLocation",
+                    "locationRelation__parent__parent__coordinatorLocation",
+                )
+        serializer = self.get_serializer(
+            qs, many=True, context={"finance_year": year, "for_coordinator": True}
+        )
+        return Response(serializer.data)
 
     permission_classes = []
     serializer_class = ProjectGroupSerializer
