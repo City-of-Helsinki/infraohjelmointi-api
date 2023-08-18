@@ -29,7 +29,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             # get coordinatorClass when planning classes are being fetched
             instance = getattr(instance, "coordinatorClass", None)
 
-        if instance == None or _type != "ProjectClass":
+        if _type != "ProjectClass" or instance == None:
             return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
 
         classFinanceObject: ClassFinancial = (
