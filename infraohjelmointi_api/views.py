@@ -133,7 +133,7 @@ class ProjectHashtagViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
+        qs = self.get_queryset().prefetch_related("relatedProject")
         popularQs = (
             qs.annotate(usage_count=Count("relatedProject"))
             .filter(usage_count__gt=0)
@@ -183,14 +183,14 @@ class ProjectGroupViewSet(BaseViewSet):
         """
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset().select_related(
-                    "classRelation",
-                    "locationRelation",
-                    "classRelation__coordinatorClass",
-                    "locationRelation__coordinatorLocation",
-                    "classRelation__parent__coordinatorClass",
-                    "locationRelation__parent__coordinatorLocation",
-                    "locationRelation__parent__parent__coordinatorLocation",
-                )
+            "classRelation",
+            "locationRelation",
+            "classRelation__coordinatorClass",
+            "locationRelation__coordinatorLocation",
+            "classRelation__parent__coordinatorClass",
+            "locationRelation__parent__coordinatorLocation",
+            "locationRelation__parent__parent__coordinatorLocation",
+        )
         serializer = self.get_serializer(
             qs, many=True, context={"finance_year": year, "for_coordinator": True}
         )
