@@ -12,12 +12,10 @@ from django.db.models import (
     Q,
     Count,
     PositiveIntegerField,
-    IntegerField,
     OuterRef,
-    Max,
     Subquery,
 )
-from django.db.models.functions import Coalesce, Cast
+from django.db.models.functions import Coalesce
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
