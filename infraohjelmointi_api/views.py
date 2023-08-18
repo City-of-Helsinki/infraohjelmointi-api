@@ -106,8 +106,24 @@ class ProjectFinancialViewSet(BaseViewSet):
     )
     def get_finances_by_year(self, request, project, year):
         """
-        Custom action to get finances of a project by year
-        Usage: /project-financials/<project_id>/<year>/
+        Custom action to get finances of a project for an year.
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+            year : Int
+
+            Usage
+            ----------
+
+            project-financials/<project_id>/<year>
+
+            Returns
+            -------
+
+            JSON
+                ProjectFinancial instance for the given year and project id
         """
         queryFilter = {"project": project, "year": year}
         finance_object = get_object_or_404(ProjectFinancial, **queryFilter)
@@ -133,6 +149,22 @@ class ProjectHashtagViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action to get custom response for a GET request to hashtags endpoint
+
+            Usage
+            ----------
+
+            project-hashtags/
+
+            Returns
+            -------
+
+            List of ProjectHashtag and top 15 most used hash tags
+
+            JSON
+                { "hashTags": [ProjectHashTag], "popularHashTags": [ProjectHashTag] }
+        """
         qs = self.get_queryset().prefetch_related("relatedProject")
         popularQs = (
             qs.annotate(usage_count=Count("relatedProject"))
@@ -156,6 +188,28 @@ class ProjectGroupViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action to get a list of ProjectGroup
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Groups with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-groups/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectGroup instances with financial sums for projects under each group
+        """
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
@@ -179,7 +233,26 @@ class ProjectGroupViewSet(BaseViewSet):
     )
     def get_groups_for_coordinator(self, request):
         """
-        Custom action to get Groups with coordinator location and classes
+        Custom action to get ProjectGroup instances with coordinator location/classes
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Groups with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-groups/coordinator/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectGroup instances with financial sums for projects under each group
         """
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset().select_related(
@@ -210,6 +283,28 @@ class ProjectLocationViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action to get a list of ProjectLocation
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Locations with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-locations/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectLocation instances with financial sums for projects under each location
+        """
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
@@ -222,7 +317,28 @@ class ProjectLocationViewSet(BaseViewSet):
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, request):
-        """List for coordinator view"""
+        """
+        Overriden list action to get a list of coordinator ProjectLocations
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Locations with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-locations/coordinator/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectLocation instances with financial sums for projects under each location
+        """
         year = request.query_params.get("year", date.today().year)
         serializer = ProjectLocationSerializer(
             ProjectLocationService.list_all_for_coordinator(),
@@ -245,6 +361,28 @@ class ProjectClassViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action to get a list of ProjectClass
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Class with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-classes/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectClass instances with financial sums for projects under each class
+        """
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
@@ -262,7 +400,28 @@ class ProjectClassViewSet(BaseViewSet):
 
     @action(methods=["get"], detail=False, url_path=r"coordinator")
     def list_for_coordinator(self, request):
-        """List for coordinator view"""
+        """
+        Overriden list action to get a list of coordinator ProjectClass
+
+            URL Query Parameters
+            ----------
+
+            year (optional) : Int
+
+            Year number to fetch Project Class with finances starting from this year.
+            Defaults to current year.
+
+            Usage
+            ----------
+
+            project-classes/?year=<year>
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectClass instances with financial sums for projects under each class
+        """
         year = request.query_params.get("year", date.today().year)
         serializer = ProjectClassSerializer(
             ProjectClassService.list_all_for_coordinator()
@@ -277,6 +436,9 @@ class ProjectClassViewSet(BaseViewSet):
         return Response(serializer.data)
 
     def is_patch_data_valid(self, data):
+        """
+        Utility function to validate patch data sent to the custom PATCH endpoint for coordinator class finances
+        """
         finances = data.get("finances", None)
         if finances == None:
             return False
@@ -306,7 +468,27 @@ class ProjectClassViewSet(BaseViewSet):
         url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
     )
     def patch_coordinator_class_finances(self, request, class_id):
-        """PATCH endpoint for coordinator classes finances ONLY"""
+        """
+        Custom PATCH endpoint for coordinator classes **finances ONLY**
+
+            URL Parameters
+            ----------
+
+            class_id : UUID string
+
+            Coordinator class Id
+
+            Usage
+            ----------
+
+            project-classes/coordinator/<class_id>/
+
+            Returns
+            -------
+
+            JSON
+                Patched coordinator ProjectClass Instance
+        """
         if not ProjectClassService.instance_exists(
             id=class_id, forCoordinatorOnly=True
         ):
@@ -440,6 +622,20 @@ class ProjectViewSet(BaseViewSet):
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
+        """
+        Overriden partial_update (PATCH) action to accomodate ProjectFinancial update from this endpoint
+
+            Usage
+            ----------
+
+            projects/<project_id>/
+
+            Returns
+            -------
+
+            JSON
+                Patched Project Instance
+        """
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
@@ -498,8 +694,25 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_projects_by_financial_year(self, request, year):
         """
-        Custom action to get projects by financial year
-        Usage: /projects/<year>/
+        Custom action to get projects with financials starting from the year provided
+
+            URL Parameters
+            ----------
+
+            year : int
+
+            Starting year for financials
+
+            Usage
+            ----------
+
+            projects/<year>/
+
+            Returns
+            -------
+
+            JSON
+                List of projects with finances starting from the year provided
         """
         projectQuerySet = self.get_queryset()
         searchPaginator = PageNumberPagination()
@@ -520,7 +733,25 @@ class ProjectViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"financials/(?P<year>[0-9]{4})")
     def get_project_with_specific_financial_year(self, request, pk, year):
         """
-        Custom action to get a Project with finances from the year specified in url
+        Custom action to get a project with financials starting from the year provided
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            year : int
+
+            Usage
+            ----------
+
+            projects/<project_id>/financials/<year>/
+
+            Returns
+            -------
+
+            JSON
+                Project instance with finances starting from the year provided
         """
         try:
             uuid.UUID(str(pk))  # validating UUID
