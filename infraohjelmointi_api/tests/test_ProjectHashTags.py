@@ -22,17 +22,16 @@ class ProjectHashTagTestCase(TestCase):
     @override
     def setUpTestData(self):
         self.projectHashTag_1 = ProjectHashTag.objects.create(
-            id=self.projectHashTag_1_Id, value="Hashtag 1"
+            id=self.projectHashTag_1_Id, value="Hashtag 1", archived=False
         )
         self.projectHashTag_2 = ProjectHashTag.objects.create(
-            id=self.projectHashTag_2_Id, value="Hashtag 2"
+            id=self.projectHashTag_2_Id, value="Hashtag 2", archived=False
         )
         self.projectHashTag_3 = ProjectHashTag.objects.create(
-            id=self.projectHashTag_3_Id, value="Hashtag 3"
+            id=self.projectHashTag_3_Id, value="Hashtag 3", archived=False
         )
 
     def test_HashTag_is_created(self):
-
         self.assertEqual(
             ProjectHashTag.objects.filter(id=self.projectHashTag_1_Id).exists(),
             True,
@@ -163,6 +162,17 @@ class ProjectHashTagTestCase(TestCase):
             msg="HashTag with Id {} is not the most popular hashTag but is used the most".format(
                 self.projectHashTag_1_Id
             ),
+        )
+
+        response = self.client.get(
+            "/project-hashtags/{}/".format(self.projectHashTag_1_Id.__str__())
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(
+            response.json()["usageCount"],
+            2,
+            msg="HashTag usageCount != 2",
         )
 
         project_2.hashTags.remove(self.projectHashTag_1)
