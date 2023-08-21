@@ -772,8 +772,117 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_search_results(self, request):
         """
-        Custom action to filter projects by params
-        Usage: /projects/search-results/?<filter-params>
+        Custom action to get filtered project related results. Response contains filtered projects and class,location, groups instances.
+
+            URL Query Parameters (All Optional)
+            ----------
+
+            freeSearch : string
+
+            Searches the provided string against project, groups and hashtag names and returns 3 lists.\n
+            Defaults to empty lists if query param is empty.\n
+            Usage: projects/search-results/?freeSearch=<string>
+
+
+            group: UUID
+
+            Filters the groups in response with the ids provided. Multiple group ids can be provided with the query.\n
+            Usage: projects/search-results/?group=<uuid>&group=<uuid>
+
+            masterClass : UUID
+
+            Filters the projects related to the masterClass ids provided. Also responds with the masterClass instances.\n
+            Usage: projects/search-results/?masterClass=<uuid>&masterClass=<uuid>
+
+            class : UUID
+
+            Filters the projects related to the Class ids provided. Also responds with the Class instances.\n
+            Usage: projects/search-results/?class=<uuid>&class=<uuid>
+
+            subclass : UUID
+
+            Filters the projects related to the subClass ids provided. Also responds with the subClass instances.\n
+            Usage: projects/search-results/?subClass=<uuid>&subClass=<uuid>
+
+            district : UUID
+
+            Filters the projects related to the district ids provided. Also responds with the district instances.\n
+            Usage: projects/search-results/?district=<uuid>&district=<uuid>
+
+            division : UUID
+
+            Filters the projects related to the division ids provided. Also responds with the division instances.\n
+            Usage: projects/search-results/?division=<uuid>&division=<uuid>
+
+            subDivision : UUID
+
+            Filters the projects related to the subDivision ids provided. Also responds with the subDivision instances.\n
+            Usage: projects/search-results/?subDivision=<uuid>&subDivision=<uuid>
+
+            hashtag : UUID
+
+            Hashtag ids provided here are used to filter the hashtags related to the project instances in response.\n
+            Only the hashtag ids provided using this query param are allowed in response if provided.\n
+            Usage: projects/search-results/?hashtag=<uuid>&hashtag=<uuid>
+
+            order : string [new | old | project | group | phase]
+
+            Orders the instances in response according to the query param.
+            Usage: projects/search-results/?order=<string>
+
+            prYearMin : int
+
+            Filters projects by minimum programming year.\n
+            Projects with finances > 0 starting from the year provided are returned.\n
+            Usage: projects/search-results/?prYearMin=<int>
+
+            prYearMax : int
+
+            Filters projects by maximum programming year.\n
+            Projects with finances > 0 and before the provided year are returned.\n
+            Usage: projects/search-results/?prYearMax=<int>
+
+            inGroup : bool
+
+            Filters projects by if they belong to a group or not.\n
+            Usage: projects/search-results/?inGroup=<bool>
+
+            projectName : string
+
+            Filters project name by string provided.\n
+            Usage: projects/search-results/?projectName=<string>
+
+            limit : int [10 | 20 | 30]
+
+            Limits the number of results in response and enables paginates the rest.\n
+            Defaults to 10.
+            Usage: projects/search-results/?limit=<int>
+
+            Usage
+            ----------
+
+            projects/search-results/?<query_params>
+
+            Returns
+            -------
+            List of mixed instances, ProjectGroup, ProjectClass, ProjectLocation, Project
+            JSON
+                [{
+                name: <name of instance>,
+                id: <uuid>,
+                type: <type of instance>,
+                hashtags: [] <list of hashtags associated with the Project instance>,
+                phase: <ProjectPhase instance linked to the Project instance>,
+                path: <Class and location path under which a Project instance falls>,
+                programmed: <Boolean value stating if a Project instance is programmed>
+                }]\n
+
+                IF freeSearch in query params\n
+                {
+                    "projects": <list of project instances>,
+                    "hashtags": <list of hashtag instances>,
+                    "groups": <list of group instances>,
+                }
         """
 
         response = {}
@@ -930,6 +1039,23 @@ class ProjectViewSet(BaseViewSet):
         return super().get_serializer_class()
 
     def get_projects(self, request, for_coordinator=False) -> ProjectGetSerializer:
+        """
+        Utility function to get a filtered project queryset
+
+            Parameters
+            ----------
+
+            request : HttpRequest
+            request object
+
+            for_coordinator : Bool
+            Paramter stating if the projects are needed for coordinator
+
+            Returns
+            -------
+
+            Project Queryset
+        """
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
@@ -970,6 +1096,10 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action for projects to make use of the utility function and get projects for planning by default.\n
+        All search result url query paramters can be used to filter projects here.
+        """
         projects = self.get_projects(request, for_coordinator=False)
         return Response(projects.data)
 
@@ -981,13 +1111,18 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_projects_for_coordinator(self, request):
         """
-        Custom action to get Projects with coordinator location and classes
+        Custom action to get Projects with coordinator location and classes.\n
+        All search result url query paramters can be used to filter projects here.
         """
         projects = self.get_projects(request, for_coordinator=True)
         return Response(projects.data)
 
     @override
     def get_queryset(self, for_coordinator=False):
+        """
+        Overriden the default get_queryset method to apply filtering by URL query params.\n
+        Provided url query params filter out the queryset before returning it.
+        """
         qs = None
         if for_coordinator == True:
             # add select_related to the queryset to get in the same db query projectClass and projectLocation
@@ -1182,7 +1317,23 @@ class ProjectViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
         """
-        Custom action to get Notes linked with a Project
+        Custom action to get notes related to a project
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Usage
+            ----------
+
+            projects/<project_id>/notes/
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectNote instances
         """
         try:
             uuid.UUID(str(pk))  # validating UUID
@@ -1205,9 +1356,19 @@ class ProjectViewSet(BaseViewSet):
     )
     def patch_bulk_projects(self, request):
         """
-        Custom action to bulk update projects
-        Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+        Custom action to get allow bulk project updates in one PATCH request
 
+            Usage
+            ----------
+
+            projects/bulk-update/
+            Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+
+            Returns
+            -------
+
+            JSON
+                List of updated Project instances
         """
         try:
             data = json.loads(request.body.decode("utf-8"))
@@ -1323,6 +1484,46 @@ class ProjectViewSet(BaseViewSet):
         direct=False,
         for_coordinator=False,
     ):
+        """
+        Utility function to filter the provided Project queryset by the model_class instance and other paramters provided.\n
+        Hierarchy includes location or class.
+
+            Parameters
+            ----------
+
+            qs : Project Queryset
+
+            model_class : ProjectLocation | ProjectClass
+
+            The type of hierarchy being used to filter projects.
+
+            search_ids : list[UUID]
+
+            list of ids belonging to the model_class
+
+            has_parent : bool
+            has_parent_parent : bool
+            has_parent_parent_parent : bool
+            has_parent_parent_parent_parent : bool
+
+            Constraint parameters used to enforce that the search_ids have a parent instance or not.\n
+            Used to differentiate between masterClass/class/subClass/collectiveSubLevel or district/division/subDivision
+
+            direct : bool
+
+            True if projects must be directly under the provided search_ids, else projects under child class/locations of search_ids will also be included.\n
+            Defaults to False
+
+            for_coordinator : bool
+
+            search_ids provided belong to coordinator or not. Defaults to False.
+
+            Returns
+            -------
+
+            Queryset
+                Filtered Project Queryset
+        """
         # All coordinator locations are fetched with direct=True since only districts exist in coordinator view without any further location children
         if direct == True:
             if model_class.__name__ == "ProjectLocation":
@@ -1375,7 +1576,28 @@ class ProjectViewSet(BaseViewSet):
             return qs.filter(projectClass__in=ids)
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
-        currYear = datetime.date.today().year
+        """
+        Utility function to filter Project Queryset by financial years.\n
+
+            Parameters
+            ----------
+
+            qs : Project Queryset
+
+            prYearMin : int
+
+            Used to filter for projects with financials starting from prYearMin and financials value > 0.
+
+            prYearMax : int
+
+            Used to filter for projects with financials before prYearMax and financials value > 0.
+
+            Returns
+            -------
+
+            Queryset
+                Filtered Project Queryset
+        """
 
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric():
@@ -1576,9 +1798,7 @@ class NoteViewSet(BaseViewSet):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
         """
-        if self.action == "list":
-            return NoteGetSerializer
-        if self.action == "retrieve":
+        if self.action in ["list", "retrieve"]:
             return NoteGetSerializer
         if self.action == "create":
             return NoteCreateSerializer
@@ -1587,7 +1807,23 @@ class NoteViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"history")
     def history(self, request, pk):
         """
-        Custom action to get history of a specific Note
+        Custom action to get edit history of a note
+
+            URL Parameters
+            ----------
+
+            note_id : UUID string
+
+            Usage
+            ----------
+
+            notes/<note_id>/history/
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectNote instances
         """
         try:
             uuid.UUID(str(pk))  # validating UUID
@@ -1614,7 +1850,24 @@ class NoteViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
     def history_user(self, request, pk, userId):
         """
-        Custom action to get history of a specific Note filtered by a specific User
+        Custom action to get edit history of a note edited by a specific user
+            URL Parameters
+            ----------
+
+            note_id : UUID string
+
+            user_id : UUID string
+
+            Usage
+            ----------
+
+            notes/<note_id>/history/<user_id>/
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectNote instances
         """
         try:
             uuid.UUID(str(userId))
