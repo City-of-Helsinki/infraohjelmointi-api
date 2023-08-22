@@ -1,20 +1,14 @@
 from infraohjelmointi_api.models import ProjectHashTag
 from infraohjelmointi_api.serializers import BaseMeta, DynamicFieldsModelSerializer
-from infraohjelmointi_api.services.ProjectHashTagService import ProjectHashTagService
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
+from infraohjelmointi_api.validators.ProjectHashtagValidators import (
+    HashtagNameValidator,
+)
 
 
 class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
     usageCount = serializers.SerializerMethodField(read_only=True)
-    value = serializers.CharField(
-        validators=[
-            UniqueValidator(
-                queryset=ProjectHashTagService.list_all(),
-                message=("HashTag with this name already exists"),
-            )
-        ]
-    )
+    value = serializers.CharField(validators=[HashtagNameValidator()])
 
     class Meta(BaseMeta):
         exclude = ["updatedDate"]
