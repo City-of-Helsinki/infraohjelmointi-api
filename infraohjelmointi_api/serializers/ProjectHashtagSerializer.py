@@ -1,5 +1,6 @@
 from infraohjelmointi_api.models import ProjectHashTag
 from infraohjelmointi_api.serializers import BaseMeta, DynamicFieldsModelSerializer
+from infraohjelmointi_api.services.ProjectHashTagService import ProjectHashTagService
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -9,7 +10,7 @@ class ProjectHashtagSerializer(DynamicFieldsModelSerializer):
     value = serializers.CharField(
         validators=[
             UniqueValidator(
-                queryset=ProjectHashTag.objects.all(),
+                queryset=ProjectHashTagService.list_all(),
                 message=("HashTag with this name already exists"),
             )
         ]
