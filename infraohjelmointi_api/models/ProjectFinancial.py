@@ -25,6 +25,7 @@ class ProjectFinancial(models.Model):
     value = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
+    forFrameView = models.BooleanField(default=False)
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
@@ -32,10 +33,7 @@ class ProjectFinancial(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=[
-                    "project",
-                    "year",
-                ],
+                fields=["project", "year", "forFrameView"],
                 name="Unique together Constraint Project Financial",
             )
         ]

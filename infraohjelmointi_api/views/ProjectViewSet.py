@@ -115,6 +115,10 @@ class ProjectViewSet(BaseViewSet):
             if finances is not None
             else date.today().year
         )
+        forFrameView = (
+            finances.pop("forFrameView", False) if finances is not None else False
+        )
+
         if finances is not None:
             fieldToYearMapping = (
                 ProjectFinancialService.get_financial_field_to_year_mapping(
@@ -126,7 +130,9 @@ class ProjectViewSet(BaseViewSet):
                     projectFinancialObject,
                     created,
                 ) = ProjectFinancialService.get_or_create(
-                    year=fieldToYearMapping[field], project_id=project.id
+                    year=fieldToYearMapping[field],
+                    project_id=project.id,
+                    forFrameView=forFrameView,
                 )
                 financeSerializer = ProjectFinancialSerializer(
                     projectFinancialObject,
@@ -143,7 +149,7 @@ class ProjectViewSet(BaseViewSet):
             data=request.data,
             many=False,
             partial=True,
-            context={"finance_year": year},
+            context={"finance_year": year, "forFrameView": forFrameView},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -509,7 +515,9 @@ class ProjectViewSet(BaseViewSet):
             return ProjectCreateSerializer
         return super().get_serializer_class()
 
-    def get_projects(self, request, for_coordinator=False) -> ProjectGetSerializer:
+    def get_projects(
+        self, request, for_coordinator=False, forFrameView=False
+    ) -> ProjectGetSerializer:
         """
         Utility function to get a filtered project queryset
 
@@ -527,6 +535,7 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
+
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
@@ -543,24 +552,23 @@ class ProjectViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
+        serializerContext = {
+            "finance_year": financeYear,
+            "for_coordinator": for_coordinator,
+            "forFrameView": forFrameView,
+        }
         if page is not None:
             serializer = self.get_serializer(
                 page,
                 many=True,
-                context={
-                    "finance_year": financeYear,
-                    "for_coordinator": for_coordinator,
-                },
+                context=serializerContext,
             )
             return paginator.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(
             queryset,
             many=True,
-            context={
-                "finance_year": financeYear,
-                "for_coordinator": for_coordinator,
-            },
+            context=serializerContext,
         )
 
         return serializer
@@ -585,7 +593,21 @@ class ProjectViewSet(BaseViewSet):
         Custom action to get Projects with coordinator location and classes.\n
         All search result url query paramters can be used to filter projects here.
         """
-        projects = self.get_projects(request, for_coordinator=True)
+        forFrameView = request.query_params.get("forFrameView", False)
+        if forFrameView in ["False", "false"]:
+            forFrameView = False
+
+        if forFrameView in ["true", "True"]:
+            forFrameView = True
+
+        if forFrameView not in [True, False]:
+            raise ParseError(
+                detail={"forFrameView": "Value must be a boolean"}, code="invalid"
+            )
+
+        projects = self.get_projects(
+            request, for_coordinator=True, forFrameView=forFrameView
+        )
         return Response(projects.data)
 
     @override
