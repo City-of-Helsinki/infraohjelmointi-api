@@ -15,7 +15,7 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectFinancial.objects.all(),
-                fields=["year", "project"],
+                fields=["year", "project", "forFrameView"],
             ),
             LockedFieldsValidator(),
         ]
