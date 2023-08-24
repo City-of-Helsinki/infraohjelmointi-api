@@ -22,6 +22,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
     def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
+        """
+        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class instance.\n
+        isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
+        """
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
 
@@ -110,6 +114,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         }
 
     def get_finance_sums(self, instance):
+        """
+        Calculates financial sums for 10 years given a group | location | class instance.
+        """
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
@@ -257,6 +264,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         return summedFinances
 
     def get_related_projects(self, instance, _type) -> list[Project]:
+        """
+        Returns projects under the provided class | location | group instance.
+        """
         # use context to check if coordinator class/locations are needed
         for_coordinator = self.context.get("for_coordinator", False)
         if _type == "ProjectLocation":
