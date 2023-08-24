@@ -5,7 +5,7 @@ from infraohjelmointi_api.services.ProjectHashTagService import ProjectHashTagSe
 
 class HashtagNameValidator:
     """
-    Validator for checking if project already exists to a group
+    Validator for checking if hashtag already exists with the same name
     """
 
     def __call__(self, hashtagName) -> None:
