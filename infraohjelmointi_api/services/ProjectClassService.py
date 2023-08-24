@@ -39,3 +39,46 @@ class ProjectClassService:
         return ProjectClass.objects.filter(
             id=id, forCoordinatorOnly=forCoordinatorOnly
         ).exists()
+
+    @staticmethod
+    def identify_class_type(classInstance: ProjectClass) -> str:
+        """
+        Returns the type of class instance provided.
+
+            Parameters
+            ----------
+            classInstance : ProjectClass
+                Class instance used to identify type
+
+            Returns
+            -------
+            str
+                Type of class instance. Types: [masterClass | class | subClass | collectiveSubLevel]
+        """
+        if classInstance != None and classInstance.parent == None:
+            return "masterClass"
+
+        if (
+            classInstance != None
+            and classInstance.parent != None
+            and classInstance.parent.parent == None
+        ):
+            return "class"
+
+        if (
+            classInstance != None
+            and classInstance.parent != None
+            and classInstance.parent.parent != None
+            and classInstance.parent.parent.parent == None
+        ):
+            return "subClass"
+
+        if (
+            classInstance != None
+            and classInstance.parent != None
+            and classInstance.parent.parent != None
+            and classInstance.parent.parent.parent != None
+            and classInstance.parent.parent.parent.parent == None
+        ):
+            return "collectiveSubLevel"
+        return None
