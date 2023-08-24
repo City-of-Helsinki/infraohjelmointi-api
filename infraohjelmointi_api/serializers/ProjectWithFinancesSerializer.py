@@ -47,6 +47,7 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
             "preliminaryCurrentYearPlus9": "0.00",
             "preliminaryCurrentYearPlus10": "0.00",
         }
+
         for finance in allFinances:
             serializedFinances[yearToFieldMapping[finance["year"]]] = finance["value"]
             # pop out already mapped keys
