@@ -4,9 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from infraohjelmointi_api.models import (
     Project,
-    ProjectClass,
-    ProjectGroup,
-    ProjectLocation,
+    ClassFinancial,
 )
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
@@ -14,6 +12,7 @@ from infraohjelmointi_api.serializers import (
     ProjectGroupSerializer,
     ProjectLocationSerializer,
 )
+from .services import ClassFinancialService, ProjectService
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
@@ -28,113 +27,122 @@ def on_transaction_commit(func):
     return inner
 
 
-def get_sums(
-    projectMasterClass: ProjectClass,
-    projectClass: ProjectClass,
-    projectSubClass: ProjectClass,
-    projectDistrict: ProjectLocation,
-    projectGroup: ProjectGroup,
+def get_financial_sums(
+    _type: str,
+    instance: ClassFinancial | ProjectFinancial,
 ):
+    """
+    Returns a dictionary of coordination and planning class instances with financial sum values.
+    Related class instances are fetched from the provided financial instance.
+
+        Parameters
+        ----------
+        instance : ClassFinancial | ProjectFinancial
+            Updated Financial instance used to get related classes and calculate financial sums
+
+        Returns
+        -------
+        dict
+            {
+            "coordination": {
+                "masterClass": <ProjectClass instance with sums>,
+                "class": <ProjectClass instance with sums>,
+                "subClass": <ProjectClass instance with sums>,
+                "collectiveSubLevel": <ProjectClass instance with sums>,
+                "district": <ProjectLocation instance with sums>,
+                },
+            "planning": {
+                "masterClass": <ProjectClass instance with sums>,
+                "class": <ProjectClass instance with sums>,
+                "subClass": <ProjectClass instance with sums>,
+                "district": <ProjectLocation instance with sums>,
+                "group": <ProjectGroup instance with sums>,
+                },
+            }
+    """
+
     sums = {
-        "masterClass": None,
-        "class": None,
-        "subClass": None,
-        "district": None,
-        "group": None,
+        "coordination": {
+            "masterClass": None,
+            "class": None,
+            "subClass": None,
+            "collectiveSubLevel": None,
+            "district": None,
+        },
+        "planning": {
+            "masterClass": None,
+            "class": None,
+            "subClass": None,
+            "district": None,
+            "group": None,
+        },
     }
-    if projectMasterClass:
-        sums["masterClass"] = ProjectClassSerializer(projectMasterClass).data
-    if projectClass:
-        sums["class"] = ProjectClassSerializer(projectClass).data
-    if projectSubClass:
-        sums["subClass"] = ProjectClassSerializer(projectSubClass).data
-    if projectGroup:
-        sums["group"] = ProjectGroupSerializer(projectGroup).data
-    if projectDistrict:
-        sums["district"] = ProjectLocationSerializer(projectDistrict).data
+    if _type == "ProjectFinancial":
+        project = instance.project
+        projectRelations = ProjectService.get_project_class_location_group_relations(
+            project=project
+        )
+
+        for viewType, instances in projectRelations.items():
+            for instanceType, instance in instances.items():
+                if instanceType == "group":
+                    sums[viewType][instanceType] = ProjectGroupSerializer(
+                        instance,
+                        context={"for_coordinator": viewType == "coordination"},
+                    ).data
+
+                if instanceType == "district":
+                    sums[viewType][instanceType] = ProjectLocationSerializer(
+                        instance,
+                        context={"for_coordinator": viewType == "coordination"},
+                    ).data
+
+                sums[viewType][instanceType] = ProjectClassSerializer(
+                    instance,
+                    context={"for_coordinator": viewType == "coordination"},
+                ).data
+
+    if _type == "ClassFinancial":
+        classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
+            instance=instance
+        )
+        for viewType, classValues in classRelations.items():
+            for classType, classInstance in classValues.items():
+                sums[viewType][classType] = ProjectClassSerializer(
+                    classInstance,
+                    context={"for_coordinator": viewType == "coordination"},
+                ).data
 
     return sums
 
 
 @receiver(post_save, sender=ProjectFinancial)
-def get_notified_project_financial(sender, instance, created, **kwargs):
-    project = instance.project
+@receiver(post_save, sender=ClassFinancial)
+def get_notified_financial_sums(sender, instance, created, **kwargs):
+    """
+    Sends a django event stream event with all financial sums effected by a save on ProjectFinancial or ClassFinancial table.
 
+        Parameters
+        ----------
+        sender
+            name of the sender table.
+
+        instance : ProjectFinancial | ClassFinancial
+            instance of the object which triggered the signal
+
+        created : bool
+            True if the save was caused by a new row creation, else False
+    """
+    _type = instance._meta.model.__name__
     if created:
-        logger.debug("Signal Triggered: ProjectFinance Object was created")
-    else:
-        projectMasterClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is None
-                else project.projectClass.parent
-                if project.projectClass.parent.parent is None
-                and project.projectClass.parent is not None
-                else project.projectClass.parent.parent
-                if project.projectClass.parent.parent is not None
-                and project.projectClass.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is None
-                else project.projectClass.parent
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectSubClass = (
-            (
-                project.projectClass
-                if project.projectClass.parent is not None
-                and project.projectClass.parent.parent is not None
-                else None
-            )
-            if project.projectClass is not None
-            else None
-        )
-        projectDistrict = (
-            (
-                project.projectLocation
-                if project.projectLocation.parent is None
-                else project.projectLocation.parent
-                if project.projectLocation.parent.parent is None
-                and project.projectLocation.parent is not None
-                else project.projectLocation.parent.parent
-                if project.projectLocation.parent.parent is not None
-                and project.projectLocation.parent is not None
-                else None
-            )
-            if project.projectLocation is not None
-            else None
-        )
+        logger.debug("Signal Triggered: {} Object was created".format(_type))
+    logger.debug("Signal Triggered: {} Object was updated".format(_type))
 
-        projectGroup = (
-            project.projectGroup if project.projectGroup is not None else None
-        )
-        send_event(
-            "finance",
-            "finance-update",
-            {
-                "project": instance.project.id,
-                **get_sums(
-                    projectMasterClass=projectMasterClass,
-                    projectClass=projectClass,
-                    projectSubClass=projectSubClass,
-                    projectDistrict=projectDistrict,
-                    projectGroup=projectGroup,
-                ),
-            },
-        )
-        logger.debug("Signal Triggered: ProjectFinance Object was updated")
+    send_event(
+        "finance",
+        "finance-update",
+        get_financial_sums(instance=instance, _type=_type),
+    )
 
 
 @receiver(post_save, sender=Project)

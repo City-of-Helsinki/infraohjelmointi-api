@@ -1,8 +1,21 @@
 from datetime import date
-from infraohjelmointi_api.models import Project, ClassFinancial
+from infraohjelmointi_api.models import Project, ClassFinancial, ProjectClass
 from infraohjelmointi_api.services import ProjectService, ClassFinancialService
 from rest_framework import serializers
-from django.db.models import Sum, Q
+from django.db.models import (
+    Sum,
+    F,
+    Case,
+    When,
+    Value,
+    BooleanField,
+    Q,
+    Count,
+    PositiveIntegerField,
+    OuterRef,
+    Subquery,
+)
+from django.db.models.functions import Coalesce
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -12,9 +25,12 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
 
-        if for_coordinator == False and _type == "ProjectClass":
+        if for_coordinator == False:
             # get coordinatorClass when planning classes are being fetched
             instance = getattr(instance, "coordinatorClass", None)
+
+        if _type != "ProjectClass" or instance == None:
+            return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
 
         classFinanceObject: ClassFinancial = (
             ClassFinancialService.get(class_id=instance.id, year=year)
@@ -22,6 +38,59 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             and instance != None
             and instance.finances.filter(year=year).exists()
             else None
+        )
+        # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
+        childClassQueryResult = (
+            # First filter to get all children classes of the current class instance
+            ProjectClass.objects.filter(
+                path__startswith=instance.path,
+                path__gt=instance.path,
+                forCoordinatorOnly=True,
+            )
+            .select_related(
+                "parent__finances",
+                "parent",
+                "parent__finances__frameBudget",
+            )
+            .prefetch_related("finances")
+            # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
+            .values("parent")
+            .annotate(
+                # calculate frameBudget sums for each level for a given year
+                childSum=Sum(
+                    "finances__frameBudget",
+                    default=Value(0),
+                    filter=Q(finances__year=year) & Q(parent=F("parent")),
+                ),
+                # Use subquery to get frameBudget for each levels parent for a given year
+                # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
+                parentFrameBudget=Coalesce(
+                    Subquery(
+                        ClassFinancial.objects.filter(
+                            classRelation=OuterRef("parent"), year=year
+                        ).values_list("frameBudget", flat=True)[:1]
+                    ),
+                    Value(0),
+                ),
+                # Calculate if there frameBudgets for each level sums exceed their parents frameBudget
+                isOverlap=Case(
+                    When(childSum__gt=F("parentFrameBudget"), then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField(),
+                ),
+            )
+            .aggregate(
+                #  Sum all level frameBudgets to get the total frameBudget sums of all the levels under the current Class
+                childSums=Sum("childSum", default=Value(0)),
+                # mapping boolean for frameBudget overlap in each level to a number and count all of them
+                subChildrenOverlapCount=Count(
+                    Case(
+                        When(isOverlap=True, then=Value(1)),
+                        default=Value(None),
+                        output_field=PositiveIntegerField(),
+                    )
+                ),
+            )
         )
 
         return {
@@ -31,6 +100,13 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "budgetChange": classFinanceObject.budgetChange
             if classFinanceObject != None
             else 0,
+            # check if overlapCount > 0, means there is some level under this class which has frameBudget exceeding its parent
+            # or the frameBudget sums for all child levels exceeds the frameBudget of this level
+            "isFrameBudgetOverlap": childClassQueryResult["subChildrenOverlapCount"] > 0
+            or (
+                classFinanceObject != None
+                and childClassQueryResult["childSums"] > classFinanceObject.frameBudget
+            ),
         }
 
     def get_finance_sums(self, instance):
