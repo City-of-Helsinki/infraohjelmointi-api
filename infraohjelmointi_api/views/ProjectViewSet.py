@@ -143,7 +143,7 @@ class ProjectViewSet(BaseViewSet):
                 )
                 financeSerializer.is_valid(raise_exception=True)
                 financeSerializer.save()
-
+        project.forcedToFrame = forcedToFrame
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
