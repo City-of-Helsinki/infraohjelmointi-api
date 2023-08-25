@@ -115,8 +115,8 @@ class ProjectViewSet(BaseViewSet):
             if finances is not None
             else date.today().year
         )
-        forFrameView = (
-            finances.pop("forFrameView", False) if finances is not None else False
+        forcedToFrame = (
+            finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
         if finances is not None:
@@ -132,7 +132,7 @@ class ProjectViewSet(BaseViewSet):
                 ) = ProjectFinancialService.get_or_create(
                     year=fieldToYearMapping[field],
                     project_id=project.id,
-                    forFrameView=forFrameView,
+                    forcedToFrame=forcedToFrame,
                 )
                 financeSerializer = ProjectFinancialSerializer(
                     projectFinancialObject,
@@ -149,7 +149,7 @@ class ProjectViewSet(BaseViewSet):
             data=request.data,
             many=False,
             partial=True,
-            context={"finance_year": year, "forFrameView": forFrameView},
+            context={"finance_year": year, "forcedToFrame": forcedToFrame},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -516,7 +516,7 @@ class ProjectViewSet(BaseViewSet):
         return super().get_serializer_class()
 
     def get_projects(
-        self, request, for_coordinator=False, forFrameView=False
+        self, request, for_coordinator=False, forcedToFrame=False
     ) -> ProjectGetSerializer:
         """
         Utility function to get a filtered project queryset
@@ -555,7 +555,7 @@ class ProjectViewSet(BaseViewSet):
         serializerContext = {
             "finance_year": financeYear,
             "for_coordinator": for_coordinator,
-            "forFrameView": forFrameView,
+            "forcedToFrame": forcedToFrame,
         }
         if page is not None:
             serializer = self.get_serializer(
@@ -579,7 +579,10 @@ class ProjectViewSet(BaseViewSet):
         Overriden list action for projects to make use of the utility function and get projects for planning by default.\n
         All search result url query paramters can be used to filter projects here.
         """
-        projects = self.get_projects(request, for_coordinator=False)
+
+        projects = self.get_projects(
+            request, for_coordinator=False, forcedToFrame=False
+        )
         return Response(projects.data)
 
     @action(
@@ -593,20 +596,20 @@ class ProjectViewSet(BaseViewSet):
         Custom action to get Projects with coordinator location and classes.\n
         All search result url query paramters can be used to filter projects here.
         """
-        forFrameView = request.query_params.get("forFrameView", False)
-        if forFrameView in ["False", "false"]:
-            forFrameView = False
+        forcedToFrame = request.query_params.get("forcedToFrame", False)
+        if forcedToFrame in ["False", "false"]:
+            forcedToFrame = False
 
-        if forFrameView in ["true", "True"]:
-            forFrameView = True
+        if forcedToFrame in ["true", "True"]:
+            forcedToFrame = True
 
-        if forFrameView not in [True, False]:
+        if forcedToFrame not in [True, False]:
             raise ParseError(
-                detail={"forFrameView": "Value must be a boolean"}, code="invalid"
+                detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
             )
 
         projects = self.get_projects(
-            request, for_coordinator=True, forFrameView=forFrameView
+            request, for_coordinator=True, forcedToFrame=forcedToFrame
         )
         return Response(projects.data)
 
@@ -885,6 +888,8 @@ class ProjectViewSet(BaseViewSet):
                     finances = financeData.get("finances", None)
                     if finances is not None:
                         year = finances.get("year", date.today().year)
+                        forcedToFrame = finances.pop("forcedToFrame", False)
+
                         if year is None:
                             year = date.today().year
                         fieldToYearMapping = (
@@ -902,6 +907,7 @@ class ProjectViewSet(BaseViewSet):
                             ) = ProjectFinancialService.get_or_create(
                                 year=fieldToYearMapping[field],
                                 project_id=Project(id=financeData["project"]).id,
+                                forcedToFrame=forcedToFrame,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,
