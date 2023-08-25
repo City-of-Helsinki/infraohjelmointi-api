@@ -32,7 +32,7 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         queryset = ProjectFinancialService.find_by_project_id_and_year_range(
             project_id=project.id,
             year_range=range(year, year + 11),
-            forcedToFrame=forcedToFrame,
+            forFrameView=forcedToFrame,
         )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {

@@ -132,7 +132,7 @@ class ProjectViewSet(BaseViewSet):
                 ) = ProjectFinancialService.get_or_create(
                     year=fieldToYearMapping[field],
                     project_id=project.id,
-                    forcedToFrame=forcedToFrame,
+                    forFrameView=forcedToFrame,
                 )
                 financeSerializer = ProjectFinancialSerializer(
                     projectFinancialObject,
@@ -516,7 +516,7 @@ class ProjectViewSet(BaseViewSet):
         return super().get_serializer_class()
 
     def get_projects(
-        self, request, for_coordinator=False, forcedToFrame=False
+        self, request, for_coordinator=False, forFrameView=False
     ) -> ProjectGetSerializer:
         """
         Utility function to get a filtered project queryset
@@ -555,7 +555,7 @@ class ProjectViewSet(BaseViewSet):
         serializerContext = {
             "finance_year": financeYear,
             "for_coordinator": for_coordinator,
-            "forcedToFrame": forcedToFrame,
+            "forcedToFrame": forFrameView,
         }
         if page is not None:
             serializer = self.get_serializer(
@@ -580,9 +580,7 @@ class ProjectViewSet(BaseViewSet):
         All search result url query paramters can be used to filter projects here.
         """
 
-        projects = self.get_projects(
-            request, for_coordinator=False, forcedToFrame=False
-        )
+        projects = self.get_projects(request, for_coordinator=False, forFrameView=False)
         return Response(projects.data)
 
     @action(
@@ -609,7 +607,7 @@ class ProjectViewSet(BaseViewSet):
             )
 
         projects = self.get_projects(
-            request, for_coordinator=True, forcedToFrame=forcedToFrame
+            request, for_coordinator=True, forFrameView=forcedToFrame
         )
         return Response(projects.data)
 
@@ -907,7 +905,7 @@ class ProjectViewSet(BaseViewSet):
                             ) = ProjectFinancialService.get_or_create(
                                 year=fieldToYearMapping[field],
                                 project_id=Project(id=financeData["project"]).id,
-                                forcedToFrame=forcedToFrame,
+                                forFrameView=forcedToFrame,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,
