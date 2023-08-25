@@ -218,6 +218,8 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
     if created:
         logger.debug("Signal Triggered: Project was created")
     else:
+        # This comes from partial_update action which is overriden in project view set
+        # It gets added to the project instance before .save() is called
         forcedToFrame = getattr(instance, "forcedToFrame", False)
         send_event(
             "project",

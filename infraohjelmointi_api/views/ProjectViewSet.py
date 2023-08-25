@@ -143,6 +143,7 @@ class ProjectViewSet(BaseViewSet):
                 )
                 financeSerializer.is_valid(raise_exception=True)
                 financeSerializer.save()
+        # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
         project.forcedToFrame = forcedToFrame
         projectSerializer = self.get_serializer(
             project,
