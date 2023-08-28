@@ -1,387 +1,41 @@
-import time
-import uuid
 from datetime import date
+from django_filters.rest_framework import DjangoFilterBackend
+import django_filters
+from infraohjelmointi_api.serializers import (
+    ProjectHashtagSerializer,
+    ProjectPhaseSerializer,
+    ProjectGetSerializer,
+    ProjectCreateSerializer,
+    ProjectFinancialSerializer,
+    ProjectGroupSerializer,
+    SearchResultSerializer,
+    ProjectNoteGetSerializer,
+)
 from infraohjelmointi_api.models import (
     Project,
-    ProjectClass,
     ProjectGroup,
+    ProjectClass,
     ProjectLocation,
-    ProjectFinancial,
-    ClassFinancial,
 )
-from infraohjelmointi_api.services.ProjectFinancialService import (
+from infraohjelmointi_api.services import (
+    ProjectWiseService,
     ProjectFinancialService,
+    ProjectClassService,
 )
-from infraohjelmointi_api.services.ClassFinancialService import (
-    ClassFinancialService,
-)
-from rest_framework.exceptions import APIException, ParseError, ValidationError
-from django.dispatch import receiver
-import django_filters
-from django.db.models import Q
-from django.db.models.expressions import RawSQL
-from distutils.util import strtobool
-import datetime
-from rest_framework.pagination import PageNumberPagination
-from itertools import chain
-from django.http.response import StreamingHttpResponse
-from django.db.models.signals import post_save
-from rest_framework import viewsets
-from .serializers import (
-    NoteCreateSerializer,
-    NoteHistorySerializer,
-    ProjectCreateSerializer,
-    ProjectGetSerializer,
-    ProjectNoteGetSerializer,
-    ProjectSetGetSerializer,
-    ProjectSetCreateSerializer,
-    ProjectTypeSerializer,
-    PersonSerializer,
-    ProjectAreaSerializer,
-    BudgetItemSerializer,
-    TaskSerializer,
-    ProjectPhaseSerializer,
-    ProjectPrioritySerializer,
-    TaskStatusSerializer,
-    ConstructionPhaseDetailSerializer,
-    ProjectCategorySerializer,
-    ProjectRiskSerializer,
-    NoteGetSerializer,
-    ConstructionPhaseSerializer,
-    PlanningPhaseSerializer,
-    NoteUpdateSerializer,
-    ProjectQualityLevelSerializer,
-    ProjectLocationSerializer,
-    ProjectClassSerializer,
-    ProjectResponsibleZoneSerializer,
-    ProjectHashtagSerializer,
-    ProjectGroupSerializer,
-    ProjectLockSerializer,
-    SearchResultSerializer,
-    ProjectFinancialSerializer,
-    ClassFinancialSerializer,
-)
-from .paginations import StandardResultsSetPagination
-from .services import ProjectClassService, ProjectLocationService, ProjectWiseService
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
 import json
-from rest_framework import status
-from rest_framework.decorators import action
-
-from django.db import transaction
+from .BaseViewSet import BaseViewSet
+from distutils.util import strtobool
+from ..paginations import StandardResultsSetPagination
 from overrides import override
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Count, Case, When
-from django.shortcuts import get_object_or_404
+from rest_framework.response import Response
 from django.db import transaction
-import logging
-
-
-logger = logging.getLogger("infraohjelmointi_api")
-
-
-class BaseViewSet(viewsets.ModelViewSet):
-    @override
-    def get_queryset(self):
-        """
-        Overriden ModelViewSet class method to get appropriate queryset using serializer class
-        """
-        return self.get_serializer_class().Meta.model.objects.all()
-
-
-class ProjectFinancialViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Finances to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectFinancialSerializer
-
-    @action(
-        methods=["get"],
-        detail=False,
-        url_path=r"(?P<project>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})/(?P<year>[0-9]{4})",
-    )
-    def get_finances_by_year(self, request, project, year):
-        """
-        Custom action to get finances of a project by year
-        Usage: /project-financials/<project_id>/<year>/
-        """
-        queryFilter = {"project": project, "year": year}
-        finance_object = get_object_or_404(ProjectFinancial, **queryFilter)
-        return Response(ProjectFinancialSerializer(finance_object).data)
-
-
-class ProjectLockViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Lock status to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectLockSerializer
-
-
-class ProjectHashtagViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Hashtags to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectHashtagSerializer
-
-    @override
-    def list(self, request, *args, **kwargs):
-        qs = self.get_queryset().prefetch_related("relatedProject")
-        popularQs = (
-            qs.annotate(usage_count=Count("relatedProject"))
-            .filter(usage_count__gt=0)
-            .order_by("-usage_count")[:15]
-        )
-
-        serializer = self.get_serializer(qs, many=True)
-        popularSerializer = self.get_serializer(popularQs, many=True)
-        return Response(
-            {"hashTags": serializer.data, "popularHashTags": popularSerializer.data}
-        )
-
-
-class ProjectGroupViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Groups to be viewed or edited.
-    """
-
-    serializer_class = ProjectGroupSerializer
-
-    @override
-    def list(self, request, *args, **kwargs):
-        year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset()
-        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
-
-        return Response(serializer.data)
-
-    @override
-    def destroy(self, request, *args, **kwargs):
-        """
-        Overriding destroy action to get the deleted group id as a response
-        """
-        group = self.get_object()
-        data = group.id
-        group.delete()
-        return Response({"id": data})
-
-    @action(
-        methods=["get"],
-        detail=False,
-        url_path=r"coordinator",
-    )
-    def get_groups_for_coordinator(self, request):
-        """
-        Custom action to get Groups with coordinator location and classes
-        """
-        year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset().select_related(
-            "classRelation",
-            "locationRelation",
-            "classRelation__coordinatorClass",
-            "locationRelation__coordinatorLocation",
-            "classRelation__parent__coordinatorClass",
-            "locationRelation__parent__coordinatorLocation",
-            "locationRelation__parent__parent__coordinatorLocation",
-        )
-        serializer = self.get_serializer(
-            qs, many=True, context={"finance_year": year, "for_coordinator": True}
-        )
-        return Response(serializer.data)
-
-    permission_classes = []
-    serializer_class = ProjectGroupSerializer
-
-
-class ProjectLocationViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Locations to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectLocationSerializer
-
-    @override
-    def list(self, request, *args, **kwargs):
-        year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset()
-        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
-
-        return Response(serializer.data)
-
-    def get_queryset(self):
-        """Default is programmer view"""
-        return ProjectLocationService.list_all()
-
-    @action(methods=["get"], detail=False, url_path=r"coordinator")
-    def list_for_coordinator(self, request):
-        """List for coordinator view"""
-        year = request.query_params.get("year", date.today().year)
-        serializer = ProjectLocationSerializer(
-            ProjectLocationService.list_all_for_coordinator(),
-            many=True,
-            context={
-                "finance_year": year,
-                "for_coordinator": True,
-            },
-        )
-        return Response(serializer.data)
-
-
-class ProjectClassViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Classes to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectClassSerializer
-
-    @override
-    def list(self, request, *args, **kwargs):
-        year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset()
-        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
-
-        return Response(serializer.data)
-
-    @override
-    def get_queryset(self):
-        """Default is programmer view"""
-        return (
-            ProjectClassService.list_all()
-            .select_related("coordinatorClass")
-            .prefetch_related("coordinatorClass__finances")
-        )
-
-    @action(methods=["get"], detail=False, url_path=r"coordinator")
-    def list_for_coordinator(self, request):
-        """List for coordinator view"""
-        year = request.query_params.get("year", date.today().year)
-        serializer = ProjectClassSerializer(
-            ProjectClassService.list_all_for_coordinator()
-            .prefetch_related("coordinatorClass__finances")
-            .select_related("coordinatorClass"),
-            many=True,
-            context={
-                "finance_year": year,
-                "for_coordinator": True,
-            },
-        )
-        return Response(serializer.data)
-
-    def is_patch_data_valid(self, data):
-        finances = data.get("finances", None)
-        if finances == None:
-            return False
-
-        parameters = finances.keys()
-        if "year" not in parameters:
-            return False
-
-        for param in parameters:
-            if param == "year":
-                continue
-            values = finances[param]
-            values_length = len(values.keys())
-
-            if type(values) != dict:
-                return False
-            if values_length == 0 or values_length > 2:
-                return False
-            if not "frameBudget" in values and not "budgetChange" in values:
-                return False
-
-        return True
-
-    @action(
-        methods=["patch"],
-        detail=False,
-        url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
-    )
-    def patch_coordinator_class_finances(self, request, class_id):
-        """PATCH endpoint for coordinator classes finances ONLY"""
-        if not ProjectClassService.instance_exists(
-            id=class_id, forCoordinatorOnly=True
-        ):
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        if not self.is_patch_data_valid(request.data):
-            return Response(
-                data={"message": "Invalid data format"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        finances = request.data.get("finances")
-        startYear = finances.get("year")
-        for parameter in finances.keys():
-            if parameter == "year":
-                continue
-            patchData = finances[parameter]
-            year = ClassFinancialService.get_request_field_to_year_mapping(
-                start_year=startYear
-            ).get(parameter, None)
-
-            if year == None:
-                return Response(
-                    data={"message": "Invalid data format"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        ClassFinancialService.update_or_create(
-            year=year, class_id=class_id, updatedData=patchData
-        )
-        return Response(
-            ProjectClassSerializer(
-                ProjectClassService.get_by_id(id=class_id),
-                context={
-                    "finance_year": startYear,
-                    "for_coordinator": True,
-                },
-            ).data
-        )
-
-
-class ProjectQualityLevelViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project quality levels to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectQualityLevelSerializer
-
-
-class PlanningPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows Planning phases to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = PlanningPhaseSerializer
-
-
-class ProjectResponsibleZoneViewSet(BaseViewSet):
-    """
-    API endpoint that allows Planning responsible zones to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectResponsibleZoneSerializer
-
-
-class ConstructionPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows Construction phases to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ConstructionPhaseSerializer
+from rest_framework.decorators import action
+from rest_framework.exceptions import APIException, ParseError, ValidationError
+from rest_framework.pagination import PageNumberPagination
+import uuid
+from rest_framework import status
+from itertools import chain
+from django.db.models import Count, Case, When, Q
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -440,6 +94,20 @@ class ProjectViewSet(BaseViewSet):
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
+        """
+        Overriden partial_update (PATCH) action to accomodate ProjectFinancial update from this endpoint
+
+            Usage
+            ----------
+
+            projects/<project_id>/
+
+            Returns
+            -------
+
+            JSON
+                Patched Project Instance
+        """
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
@@ -498,8 +166,25 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_projects_by_financial_year(self, request, year):
         """
-        Custom action to get projects by financial year
-        Usage: /projects/<year>/
+        Custom action to get projects with financials starting from the year provided
+
+            URL Parameters
+            ----------
+
+            year : int
+
+            Starting year for financials
+
+            Usage
+            ----------
+
+            projects/<year>/
+
+            Returns
+            -------
+
+            JSON
+                List of projects with finances starting from the year provided
         """
         projectQuerySet = self.get_queryset()
         searchPaginator = PageNumberPagination()
@@ -520,7 +205,25 @@ class ProjectViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"financials/(?P<year>[0-9]{4})")
     def get_project_with_specific_financial_year(self, request, pk, year):
         """
-        Custom action to get a Project with finances from the year specified in url
+        Custom action to get a project with financials starting from the year provided
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            year : int
+
+            Usage
+            ----------
+
+            projects/<project_id>/financials/<year>/
+
+            Returns
+            -------
+
+            JSON
+                Project instance with finances starting from the year provided
         """
         try:
             uuid.UUID(str(pk))  # validating UUID
@@ -541,8 +244,117 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_search_results(self, request):
         """
-        Custom action to filter projects by params
-        Usage: /projects/search-results/?<filter-params>
+        Custom action to get filtered project related results. Response contains filtered projects and class,location, groups instances.
+
+            URL Query Parameters (All Optional)
+            ----------
+
+            freeSearch : string
+
+            Searches the provided string against project, groups and hashtag names and returns 3 lists.\n
+            Defaults to empty lists if query param is empty.\n
+            Usage: projects/search-results/?freeSearch=<string>
+
+
+            group: UUID
+
+            Filters the groups in response with the ids provided. Multiple group ids can be provided with the query.\n
+            Usage: projects/search-results/?group=<uuid>&group=<uuid>
+
+            masterClass : UUID
+
+            Filters the projects related to the masterClass ids provided. Also responds with the masterClass instances.\n
+            Usage: projects/search-results/?masterClass=<uuid>&masterClass=<uuid>
+
+            class : UUID
+
+            Filters the projects related to the Class ids provided. Also responds with the Class instances.\n
+            Usage: projects/search-results/?class=<uuid>&class=<uuid>
+
+            subclass : UUID
+
+            Filters the projects related to the subClass ids provided. Also responds with the subClass instances.\n
+            Usage: projects/search-results/?subClass=<uuid>&subClass=<uuid>
+
+            district : UUID
+
+            Filters the projects related to the district ids provided. Also responds with the district instances.\n
+            Usage: projects/search-results/?district=<uuid>&district=<uuid>
+
+            division : UUID
+
+            Filters the projects related to the division ids provided. Also responds with the division instances.\n
+            Usage: projects/search-results/?division=<uuid>&division=<uuid>
+
+            subDivision : UUID
+
+            Filters the projects related to the subDivision ids provided. Also responds with the subDivision instances.\n
+            Usage: projects/search-results/?subDivision=<uuid>&subDivision=<uuid>
+
+            hashtag : UUID
+
+            Hashtag ids provided here are used to filter the hashtags related to the project instances in response.\n
+            Only the hashtag ids provided using this query param are allowed in response if provided.\n
+            Usage: projects/search-results/?hashtag=<uuid>&hashtag=<uuid>
+
+            order : string [new | old | project | group | phase]
+
+            Orders the instances in response according to the query param.
+            Usage: projects/search-results/?order=<string>
+
+            prYearMin : int
+
+            Filters projects by minimum programming year.\n
+            Projects with finances > 0 starting from the year provided are returned.\n
+            Usage: projects/search-results/?prYearMin=<int>
+
+            prYearMax : int
+
+            Filters projects by maximum programming year.\n
+            Projects with finances > 0 and before the provided year are returned.\n
+            Usage: projects/search-results/?prYearMax=<int>
+
+            inGroup : bool
+
+            Filters projects by if they belong to a group or not.\n
+            Usage: projects/search-results/?inGroup=<bool>
+
+            projectName : string
+
+            Filters project name by string provided.\n
+            Usage: projects/search-results/?projectName=<string>
+
+            limit : int [10 | 20 | 30]
+
+            Limits the number of results in response and enables paginates the rest.\n
+            Defaults to 10.
+            Usage: projects/search-results/?limit=<int>
+
+            Usage
+            ----------
+
+            projects/search-results/?<query_params>
+
+            Returns
+            -------
+            List of mixed instances, ProjectGroup, ProjectClass, ProjectLocation, Project
+            JSON
+                [{
+                name: <name of instance>,
+                id: <uuid>,
+                type: <type of instance>,
+                hashtags: [] <list of hashtags associated with the Project instance>,
+                phase: <ProjectPhase instance linked to the Project instance>,
+                path: <Class and location path under which a Project instance falls>,
+                programmed: <Boolean value stating if a Project instance is programmed>
+                }]\n
+
+                IF freeSearch in query params\n
+                {
+                    "projects": <list of project instances>,
+                    "hashtags": <list of hashtag instances>,
+                    "groups": <list of group instances>,
+                }
         """
 
         response = {}
@@ -699,6 +511,23 @@ class ProjectViewSet(BaseViewSet):
         return super().get_serializer_class()
 
     def get_projects(self, request, for_coordinator=False) -> ProjectGetSerializer:
+        """
+        Utility function to get a filtered project queryset
+
+            Parameters
+            ----------
+
+            request : HttpRequest
+            request object
+
+            for_coordinator : Bool
+            Paramter stating if the projects are needed for coordinator
+
+            Returns
+            -------
+
+            Project Queryset
+        """
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
@@ -739,6 +568,10 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
+        """
+        Overriden list action for projects to make use of the utility function and get projects for planning by default.\n
+        All search result url query paramters can be used to filter projects here.
+        """
         projects = self.get_projects(request, for_coordinator=False)
         return Response(projects.data)
 
@@ -750,13 +583,18 @@ class ProjectViewSet(BaseViewSet):
     )
     def get_projects_for_coordinator(self, request):
         """
-        Custom action to get Projects with coordinator location and classes
+        Custom action to get Projects with coordinator location and classes.\n
+        All search result url query paramters can be used to filter projects here.
         """
         projects = self.get_projects(request, for_coordinator=True)
         return Response(projects.data)
 
     @override
     def get_queryset(self, for_coordinator=False):
+        """
+        Overriden the default get_queryset method to apply filtering by URL query params.\n
+        Provided url query params filter out the queryset before returning it.
+        """
         qs = None
         if for_coordinator == True:
             # add select_related to the queryset to get in the same db query projectClass and projectLocation
@@ -951,7 +789,23 @@ class ProjectViewSet(BaseViewSet):
     @action(methods=["get"], detail=True, url_path=r"notes")
     def get_project_notes(self, request, pk):
         """
-        Custom action to get Notes linked with a Project
+        Custom action to get notes related to a project
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Usage
+            ----------
+
+            projects/<project_id>/notes/
+
+            Returns
+            -------
+
+            JSON
+                List of ProjectNote instances
         """
         try:
             uuid.UUID(str(pk))  # validating UUID
@@ -974,9 +828,19 @@ class ProjectViewSet(BaseViewSet):
     )
     def patch_bulk_projects(self, request):
         """
-        Custom action to bulk update projects
-        Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+        Custom action to get allow bulk project updates in one PATCH request
 
+            Usage
+            ----------
+
+            projects/bulk-update/
+            Request body format: [{id: project_id, data: {fields to be updated} }, ..]
+
+            Returns
+            -------
+
+            JSON
+                List of updated Project instances
         """
         try:
             data = json.loads(request.body.decode("utf-8"))
@@ -1092,6 +956,46 @@ class ProjectViewSet(BaseViewSet):
         direct=False,
         for_coordinator=False,
     ):
+        """
+        Utility function to filter the provided Project queryset by the model_class instance and other paramters provided.\n
+        Hierarchy includes location or class.
+
+            Parameters
+            ----------
+
+            qs : Project Queryset
+
+            model_class : ProjectLocation | ProjectClass
+
+            The type of hierarchy being used to filter projects.
+
+            search_ids : list[UUID]
+
+            list of ids belonging to the model_class
+
+            has_parent : bool
+            has_parent_parent : bool
+            has_parent_parent_parent : bool
+            has_parent_parent_parent_parent : bool
+
+            Constraint parameters used to enforce that the search_ids have a parent instance or not.\n
+            Used to differentiate between masterClass/class/subClass/collectiveSubLevel or district/division/subDivision
+
+            direct : bool
+
+            True if projects must be directly under the provided search_ids, else projects under child class/locations of search_ids will also be included.\n
+            Defaults to False
+
+            for_coordinator : bool
+
+            search_ids provided belong to coordinator or not. Defaults to False.
+
+            Returns
+            -------
+
+            Queryset
+                Filtered Project Queryset
+        """
         # All coordinator locations are fetched with direct=True since only districts exist in coordinator view without any further location children
         if direct == True:
             if model_class.__name__ == "ProjectLocation":
@@ -1144,7 +1048,28 @@ class ProjectViewSet(BaseViewSet):
             return qs.filter(projectClass__in=ids)
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
-        currYear = datetime.date.today().year
+        """
+        Utility function to filter Project Queryset by financial years.\n
+
+            Parameters
+            ----------
+
+            qs : Project Queryset
+
+            prYearMin : int
+
+            Used to filter for projects with financials starting from prYearMin and financials value > 0.
+
+            prYearMax : int
+
+            Used to filter for projects with financials before prYearMax and financials value > 0.
+
+            Returns
+            -------
+
+            Queryset
+                Filtered Project Queryset
+        """
 
         if prYearMin is not None and prYearMax is not None:
             if not prYearMax.isnumeric():
@@ -1198,229 +1123,3 @@ class ProjectViewSet(BaseViewSet):
             qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         return qs
-
-
-class TaskStatusViewSet(BaseViewSet):
-    """
-    API endpoint that allows project types to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = TaskStatusSerializer
-
-
-class ProjectTypeViewSet(BaseViewSet):
-    """
-    API endpoint that allows project types to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectTypeSerializer
-
-
-class ConstructionPhaseDetailViewSet(BaseViewSet):
-    """
-    API endpoint that allows construction phase details to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ConstructionPhaseDetailSerializer
-
-
-class ProjectCategoryViewSet(BaseViewSet):
-    """
-    API endpoint that allows project cetagories to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectCategorySerializer
-
-
-class ProjectRiskViewSet(BaseViewSet):
-    """
-    API endpoint that allows project risk assessments to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectRiskSerializer
-
-
-class ProjectPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows project phase to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectPhaseSerializer
-
-
-class ProjectPriorityViewSet(BaseViewSet):
-    """
-    API endpoint that allows project Priority to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectPrioritySerializer
-
-
-class MockProjectViewSet(viewsets.ViewSet):
-    """
-    API endpoint that returns mock project data.
-    """
-
-    mock_data = json.load(
-        open("./infraohjelmointi_api/mock_data/hankekortti.json", "r")
-    )
-
-    def list(self, request):
-        queryset = self.mock_data
-        return Response(queryset)
-
-
-class PersonViewSet(BaseViewSet):
-    """
-    API endpoint that allows persons to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = PersonSerializer
-
-
-class ProjectSetViewSet(BaseViewSet):
-    """
-    API endpoint that allows project sets to be viewed or edited.
-    """
-
-    permission_classes = []
-
-    @override
-    def get_serializer_class(self):
-        """
-        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
-        """
-        if self.action == "list":
-            return ProjectSetGetSerializer
-        if self.action == "retrieve":
-            return ProjectSetGetSerializer
-        return ProjectSetCreateSerializer
-
-
-class ProjectAreaViewSet(BaseViewSet):
-    """
-    API endpoint that allows project areas to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ProjectAreaSerializer
-
-
-class BudgetItemViewSet(BaseViewSet):
-    """
-    API endpoint that allows Budgets to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = BudgetItemSerializer
-
-
-class TaskViewSet(BaseViewSet):
-    """
-    API endpoint that allows Tasks to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = TaskSerializer
-
-
-class NoteViewSet(BaseViewSet):
-
-    """
-    API endpoint that allows notes to be viewed or edited.
-    """
-
-    permission_classes = []
-
-    @override
-    def get_serializer_class(self):
-        """
-        Overriden ModelViewSet class method to get appropriate serializer depending on the request action
-        """
-        if self.action == "list":
-            return NoteGetSerializer
-        if self.action == "retrieve":
-            return NoteGetSerializer
-        if self.action == "create":
-            return NoteCreateSerializer
-        return NoteUpdateSerializer
-
-    @action(methods=["get"], detail=True, url_path=r"history")
-    def history(self, request, pk):
-        """
-        Custom action to get history of a specific Note
-        """
-        try:
-            uuid.UUID(str(pk))  # validating UUID
-            instance = self.get_object()
-            qs = instance.history.all()
-            serializer = NoteHistorySerializer(qs, many=True)
-            return Response(serializer.data)
-        except ValueError:
-            return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-    @override
-    def destroy(self, request, *args, **kwargs):
-        """
-        Overriding destroy action to soft delete note on DELETE request
-        """
-        note = self.get_object()
-        data = note.id
-        note.deleted = True
-        note.save()
-        return Response({"id": data})
-
-    @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
-    def history_user(self, request, pk, userId):
-        """
-        Custom action to get history of a specific Note filtered by a specific User
-        """
-        try:
-            uuid.UUID(str(userId))
-            uuid.UUID(str(pk))
-            instance = self.get_object()
-            qs = instance.history.all().filter(updatedBy_id=userId)
-            serializer = NoteHistorySerializer(qs, many=True)
-            return Response(serializer.data)
-
-        except ValueError:
-            return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-
-def stream_data():
-    while True:
-        time.sleep(1)
-        yield "Signal"
-
-
-class StreamView(APIView):
-    def get(self, request, format=None):
-        """
-        Return a stream response on signal change
-        """
-        stream_generator = stream_data()
-        response = StreamingHttpResponse(
-            stream_generator, status=200, content_type="text/event-stream"
-        )
-        return response
-
-
-class ClassFinancialViewSet(BaseViewSet):
-    """
-    API endpoint that allows Class Financials to be viewed or edited.
-    """
-
-    permission_classes = []
-    serializer_class = ClassFinancialSerializer
