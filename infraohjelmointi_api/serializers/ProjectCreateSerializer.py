@@ -136,6 +136,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
+        # removed constructionPhaseDetail validator due to inconsistencies in imported data
         validators = [
             EstPlanningStartValidator(),
             EstPlanningEndValidator(),
@@ -148,7 +149,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             ProjectClassValidator(),
             ProjectLocationValidator(),
             ProjectPhaseValidator(),
-            ConstructionPhaseDetailValidator(),
             ConstructionEndYearValidator(),
             PlanningStartYearValidator(),
             ProgrammedValidator(),

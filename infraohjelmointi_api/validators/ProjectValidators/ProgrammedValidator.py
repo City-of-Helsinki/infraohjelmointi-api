@@ -52,7 +52,7 @@ class ProgrammedValidator(BaseValidator):
                 code="programmed_true_missing_category",
             )
         if programmed == False and (
-            phase is None or (phase.value not in ["proposal", "design"])
+            phase != None and (phase.value not in ["proposal", "design"])
         ):
             raise ValidationError(
                 detail={
