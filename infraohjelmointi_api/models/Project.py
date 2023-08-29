@@ -155,6 +155,11 @@ class Project(models.Model):
     estPlanningEnd = models.DateField(blank=True, null=True)
     estConstructionStart = models.DateField(blank=True, null=True)
     estConstructionEnd = models.DateField(blank=True, null=True)
+    frameEstPlanningStart = models.DateField(blank=True, null=True)
+    frameEstPlanningEnd = models.DateField(blank=True, null=True)
+    frameEstConstructionStart = models.DateField(blank=True, null=True)
+    frameEstConstructionEnd = models.DateField(blank=True, null=True)
+
     presenceStart = models.DateField(blank=True, null=True)
     presenceEnd = models.DateField(blank=True, null=True)
     visibilityStart = models.DateField(blank=True, null=True)
