@@ -103,6 +103,30 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
+    frameEstPlanningStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    frameEstPlanningEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    frameEstConstructionStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    frameEstConstructionEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
     presenceStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
