@@ -161,6 +161,30 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden retrieve action to get PW link with a single project and allow frame view financials retrieval.\n
+
+            URL Query Parameters
+            ----------
+
+            project_id : UUID string
+
+            forcedToFrame (optional) : Bool
+
+            Query parameter to state if project returned should contain frame view financial values.
+            Defaults to False.
+
+            Usage
+            ----------
+
+            projects/<project_id>/?forcedToFrame=<bool>
+
+            Returns
+            -------
+
+            JSON
+                Project instance with financial values.
+        """
         instance = self.get_object()
         forcedToFrame = request.query_params.get("forcedToFrame", False)
         if forcedToFrame in ["False", "false"]:
@@ -544,6 +568,9 @@ class ProjectViewSet(BaseViewSet):
             for_coordinator : Bool
             Paramter stating if the projects are needed for coordinator
 
+            forFrameView : Bool
+            Paramter to identify if projects being returned should have frame view finances.
+
             Returns
             -------
 
@@ -607,6 +634,25 @@ class ProjectViewSet(BaseViewSet):
         """
         Custom action to get Projects with coordinator location and classes.\n
         All search result url query paramters can be used to filter projects here.
+
+            URL Query Parameters
+            ----------
+
+            forcedToFrame (optional) : Bool
+
+            Query parameter to state if projects returned should contain frame view financial values.
+            Defaults to False.
+
+            Usage
+            ----------
+
+            projects/coordinator/?forcedToFrame=<bool>
+
+            Returns
+            -------
+
+            JSON
+                List of Project Instances with coordinator class/locations and normal/frameView financial values.
         """
         forcedToFrame = request.query_params.get("forcedToFrame", False)
         if forcedToFrame in ["False", "false"]:
