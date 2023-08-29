@@ -40,10 +40,15 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             Year number to fetch Project Class with finances starting from this year.
             Defaults to current year.
 
+            forcedToFrame (optional) : bool
+
+            Query param to fetch coordinator classes with frameView project sums.
+            Defaults to False.
+
             Usage
             ----------
 
-            project-classes/?year=<year>
+            project-classes/?year=<year>&forcedToframe=<bool>
 
             Returns
             -------
