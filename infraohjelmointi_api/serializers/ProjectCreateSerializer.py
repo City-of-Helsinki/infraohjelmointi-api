@@ -133,6 +133,13 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     # helps during validation
     projectId = serializers.UUIDField(write_only=True, required=False)
 
+    estFieldsRelations = [
+        ("estPlanningStart", "frameEstPlanningStart"),
+        ("estPlanningEnd", "frameEstPlanningEnd"),
+        ("estConstructionStart", "frameEstConstructionStart"),
+        ("estConstructionEnd", "frameEstConstructionEnd"),
+    ]
+
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
@@ -193,6 +200,13 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         ):
             validated_data["programmed"] = False
 
+        for estDate, frameEstDate in self.estFieldsRelations:
+            if (
+                validated_data.get(estDate, None) != None
+                and validated_data.get(frameEstDate, None) == None
+            ):
+                validated_data[frameEstDate] = validated_data.get(estDate)
+
         project = super(ProjectCreateSerializer, self).create(validated_data)
 
         return project
@@ -213,6 +227,13 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             or phase.value == "proposal"
         ):
             validated_data["programmed"] = False
+
+        for estDate, frameEstDate in self.estFieldsRelations:
+            if (
+                validated_data.get(estDate, None) != None
+                and validated_data.get(frameEstDate, None) == None
+            ):
+                validated_data[frameEstDate] = validated_data.get(estDate)
 
         # Commented out logic for automatic locking of project if phase updated to construction
         # else:
