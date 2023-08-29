@@ -227,7 +227,11 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
             {
                 "project": ProjectGetSerializer(
                     instance,
-                    context={"get_pw_link": True, "forcedToFrame": forcedToFrame},
+                    context={
+                        "get_pw_link": True,
+                        "forcedToFrame": forcedToFrame,
+                        "for_coordinator": forcedToFrame == True,
+                    },
                 ).data,
             },
         )
