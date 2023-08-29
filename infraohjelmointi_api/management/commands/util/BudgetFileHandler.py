@@ -214,28 +214,33 @@ class BudgetFileHandler(IExcelFileHandler):
                 project.planningStartYear = planningStartYear
                 # First date of the first month
                 project.estPlanningStart = datetime.datetime(planningStartYear, 1, 1)
+                project.frameEstPlanningStart = project.estPlanningStart
                 # middle of year if only 1 budget in excel, else end of year
                 project.estPlanningEnd = (
                     datetime.datetime(planningStartYear, 6, 30)
                     if hasOneBudgetField
                     else datetime.datetime(planningStartYear, 12, 31)
                 )
+                project.frameEstPlanningEnd = project.estPlanningEnd
                 # same year as planning if 1 budget in excel, else the same year as last budget in excel
                 project.constructionEndYear = (
                     (planningStartYear)
                     if hasOneBudgetField
                     else (self.current_budget_year + lastBudgetIndex)
                 )
+
                 # 1 month after planning ends if 1 budget field, else 1 year after planning
                 project.estConstructionStart = (
                     datetime.datetime(planningStartYear, 7, 1)
                     if hasOneBudgetField
                     else datetime.datetime(planningStartYear + 1, 1, 1)
                 )
+                project.frameEstConstructionStart = project.estConstructionStart
 
                 project.estConstructionEnd = datetime.datetime(
                     project.constructionEndYear, 12, 31
                 )
+                project.frameEstConstructionEnd = project.estConstructionEnd
 
             project.programmed = budget_sum > 0
             project.category = category
