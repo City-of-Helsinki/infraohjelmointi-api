@@ -1200,6 +1200,28 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 10)
         self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
 
+        #### Frame view financial sums ####
+        response = self.client.get("/project-locations/coordinator/?forcedToFrame=true")
+
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 1, msg="Number of coordinator locations != 1"
+        )
+        self.assertEqual(
+            response.json()[0]["id"], self.projectCoordinationDistrict_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 100)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 100)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["plannedBudget"], 100)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 100)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["plannedBudget"], 9)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
+
     def test_PATCH_coordinator_location_finances(self):
         response = self.client.patch(
             "/project-locations/coordinator/{}/".format(
