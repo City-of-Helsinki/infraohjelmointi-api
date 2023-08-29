@@ -329,6 +329,287 @@ class BalkSumTestCase(TestCase):
         ProjectFinancial.objects.create(project=project_8, year=year + 9, value=10)
         ProjectFinancial.objects.create(project=project_8, year=year + 10, value=0)
 
+        ##### Frame Financials #####
+        # for project_1
+        ProjectFinancial.objects.create(
+            project=project_1, year=year, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 7, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 8, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 9, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_1, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_2
+        ProjectFinancial.objects.create(
+            project=project_2, year=year, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_2, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_3
+        ProjectFinancial.objects.create(
+            project=project_3, year=year, value=500, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_3, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_4
+        ProjectFinancial.objects.create(
+            project=project_4, year=year, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 1, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_4, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_5
+        ProjectFinancial.objects.create(
+            project=project_5, year=year, value=500, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_5, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_6
+        ProjectFinancial.objects.create(
+            project=project_6, year=year, value=200, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_6, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_7
+        ProjectFinancial.objects.create(
+            project=project_7, year=year, value=500, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 1, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 5, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_7, year=year + 10, value=0, forFrameView=True
+        )
+
+        # for project_8
+        ProjectFinancial.objects.create(
+            project=project_8, year=year, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 1, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 2, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 3, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 4, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 5, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 6, value=0, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 7, value=5, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 8, value=9, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 9, value=50, forFrameView=True
+        )
+        ProjectFinancial.objects.create(
+            project=project_8, year=year + 10, value=0, forFrameView=True
+        )
+
         # Coordinator projects, classes/locations
 
         coordinatorMasterClass_1 = ProjectClass.objects.create(
@@ -689,6 +970,127 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[0]["finances"]["year2"]["frameBudget"], 0)
         self.assertEqual(response.json()[0]["finances"]["year2"]["budgetChange"], 0)
         self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year4"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year5"]["budgetChange"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year6"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year7"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year8"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year9"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year10"]["budgetChange"], 0)
+
+        #### with frame view financial sums ####
+        response = self.client.get("/project-classes/coordinator/?forcedToFrame=true")
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(
+            len(response.json()), 3, msg="Number of coordinator classes != 3"
+        )
+        # Sum for coordinator masterClass, it will miss project 3 as it uses subClass 2 which has no coordination class
+        self.assertEqual(
+            response.json()[1]["id"], self.projectCoordinatorMasterClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[1]["finances"]["year0"]["plannedBudget"], 1300)
+        self.assertEqual(response.json()[1]["finances"]["year0"]["frameBudget"], 100)
+        self.assertEqual(
+            response.json()[1]["finances"]["year0"]["isFrameBudgetOverlap"], True
+        )
+        self.assertEqual(response.json()[1]["finances"]["year0"]["budgetChange"], 100)
+        self.assertEqual(response.json()[1]["finances"]["year1"]["plannedBudget"], 250)
+        self.assertEqual(response.json()[1]["finances"]["year1"]["frameBudget"], 50)
+        self.assertEqual(response.json()[1]["finances"]["year1"]["budgetChange"], 50)
+        self.assertEqual(response.json()[1]["finances"]["year2"]["plannedBudget"], 250)
+        self.assertEqual(response.json()[1]["finances"]["year2"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year2"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year3"]["plannedBudget"], 250)
+        self.assertEqual(response.json()[1]["finances"]["year3"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year3"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year4"]["plannedBudget"], 25)
+        self.assertEqual(response.json()[1]["finances"]["year4"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year4"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year5"]["plannedBudget"], 5)
+        self.assertEqual(response.json()[1]["finances"]["year5"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year5"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year6"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year6"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year7"]["plannedBudget"], 20)
+        self.assertEqual(response.json()[1]["finances"]["year7"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year7"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year8"]["plannedBudget"], 36)
+        self.assertEqual(response.json()[1]["finances"]["year8"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year8"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year9"]["plannedBudget"], 200)
+        self.assertEqual(response.json()[1]["finances"]["year9"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year9"]["budgetChange"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year10"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year10"]["frameBudget"], 0)
+        self.assertEqual(response.json()[1]["finances"]["year10"]["budgetChange"], 0)
+
+        self.assertEqual(
+            response.json()[2]["id"], self.projectCoordinatorClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[2]["finances"]["year0"]["plannedBudget"], 600)
+        self.assertEqual(response.json()[2]["finances"]["year0"]["frameBudget"], 2000)
+        self.assertEqual(response.json()[2]["finances"]["year0"]["budgetChange"], 50)
+        self.assertEqual(response.json()[2]["finances"]["year1"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[2]["finances"]["year1"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year1"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year2"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[2]["finances"]["year2"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year2"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year3"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[2]["finances"]["year3"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year3"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year4"]["plannedBudget"], 15)
+        self.assertEqual(response.json()[2]["finances"]["year4"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year4"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year5"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year5"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year6"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year6"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year7"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[2]["finances"]["year7"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year7"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year8"]["plannedBudget"], 18)
+        self.assertEqual(response.json()[2]["finances"]["year8"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year8"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year9"]["plannedBudget"], 100)
+        self.assertEqual(response.json()[2]["finances"]["year9"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year9"]["budgetChange"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year10"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year10"]["frameBudget"], 0)
+        self.assertEqual(response.json()[2]["finances"]["year10"]["budgetChange"], 0)
+
+        self.assertEqual(
+            response.json()[0]["id"], self.projectCoordinatorSubClass_1_Id.__str__()
+        )
+        self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year0"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year0"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year1"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["plannedBudget"], 50)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["frameBudget"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year2"]["budgetChange"], 0)
+        self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 50)
         self.assertEqual(response.json()[0]["finances"]["year3"]["frameBudget"], 0)
         self.assertEqual(response.json()[0]["finances"]["year3"]["budgetChange"], 0)
         self.assertEqual(response.json()[0]["finances"]["year4"]["plannedBudget"], 5)
