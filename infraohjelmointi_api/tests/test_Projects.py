@@ -3612,6 +3612,7 @@ class ProjectTestCase(TestCase):
             projectLocation=district_1,
             projectClass=subClass_1,
         )
+
         project_2 = Project.objects.create(
             id=self.project_12_Id,
             hkrId=1111,
@@ -3708,4 +3709,141 @@ class ProjectTestCase(TestCase):
             msg="Number of projects under coordination masterClass and programmed set to True {} != 2".format(
                 self.projectCoordinatorSubClass_1_Id
             ),
+        )
+
+    def test_estDates_to_frameEstDates(self):
+        data = {
+            "name": "Test frame estDates copy Project",
+            "description": "Test description",
+            "estPlanningStart": "14.01.2022",
+            "estPlanningEnd": "14.05.2022",
+            "estConstructionStart": "20.05.2022",
+            "estConstructionEnd": "01.06.2022",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+        self.assertEqual(
+            response.json()["estPlanningStart"],
+            response.json()["frameEstPlanningStart"],
+        )
+        self.assertEqual(
+            response.json()["estPlanningEnd"], response.json()["frameEstPlanningEnd"]
+        )
+        self.assertEqual(
+            response.json()["estConstructionStart"],
+            response.json()["frameEstConstructionStart"],
+        )
+        self.assertEqual(
+            response.json()["estConstructionEnd"],
+            response.json()["frameEstConstructionEnd"],
+        )
+
+    def test_planning_finances_to_frame_finances(self):
+        data = {
+            "name": "Test frame estDates copy Project",
+            "description": "Test description",
+        }
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            msg="Status code != 201 , Error: {}".format(response.json()),
+        )
+        new_createdId = response.json()["id"]
+        patchData = {
+            "finances": {
+                "year": 2023,
+                "budgetProposalCurrentYearPlus0": "0.00",
+                "budgetProposalCurrentYearPlus1": "200.00",
+                "budgetProposalCurrentYearPlus2": "0.00",
+                "preliminaryCurrentYearPlus3": "100.00",
+                "preliminaryCurrentYearPlus4": "0.00",
+                "preliminaryCurrentYearPlus5": "0.00",
+                "preliminaryCurrentYearPlus6": "0.00",
+                "preliminaryCurrentYearPlus7": "500.00",
+                "preliminaryCurrentYearPlus8": "0.00",
+                "preliminaryCurrentYearPlus9": "0.00",
+                "preliminaryCurrentYearPlus10": "0.00",
+            }
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(new_createdId),
+            patchData,
+            content_type="application/json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+        # get project with frame finances
+        # check if finances patched initially to normal project finances have been also duplicated for frame view
+        response = self.client.get(
+            "/projects/{}/?forcedToFrame=true".format(new_createdId),
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.json()["finances"],
+            patchData["finances"],
+        )
+
+        frameFinancesPatchData = {
+            "finances": {
+                "forcedToFrame": True,
+                "year": 2023,
+                "budgetProposalCurrentYearPlus0": "100.00",
+                "budgetProposalCurrentYearPlus1": "200.00",
+                "budgetProposalCurrentYearPlus2": "0.00",
+                "preliminaryCurrentYearPlus3": "0.00",
+                "preliminaryCurrentYearPlus4": "0.00",
+                "preliminaryCurrentYearPlus5": "0.00",
+                "preliminaryCurrentYearPlus6": "0.00",
+                "preliminaryCurrentYearPlus7": "0.00",
+                "preliminaryCurrentYearPlus8": "0.00",
+                "preliminaryCurrentYearPlus9": "0.00",
+                "preliminaryCurrentYearPlus10": "0.00",
+            }
+        }
+        # Once project frame finances have been initialized, any changes to it will not show on planning/coordinator project finances and vice versa
+        response = self.client.patch(
+            "/projects/{}/".format(new_createdId),
+            frameFinancesPatchData,
+            content_type="application/json",
+        )
+        frameFinancesPatchData["finances"].pop("forcedToFrame")
+        self.assertEqual(
+            response.json()["finances"],
+            frameFinancesPatchData["finances"],
+        )
+
+        response = self.client.get(
+            "/projects/{}/".format(new_createdId),
+            content_type="application/json",
+        )
+        # Planning/coordinator finances are now different to frame finances since frame finances have been patched above
+        self.assertNotEqual(
+            response.json()["finances"],
+            frameFinancesPatchData,
+        )
+
+        response = self.client.get(
+            "/projects/{}/?forcedToFrame=true".format(new_createdId),
+            content_type="application/json",
+        )
+        self.assertNotEqual(
+            response.json()["finances"],
+            frameFinancesPatchData,
         )

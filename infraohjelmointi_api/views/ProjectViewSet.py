@@ -162,7 +162,20 @@ class ProjectViewSet(BaseViewSet):
     @override
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance, context={"get_pw_link": True})
+        forcedToFrame = request.query_params.get("forcedToFrame", False)
+        if forcedToFrame in ["False", "false"]:
+            forcedToFrame = False
+
+        if forcedToFrame in ["true", "True"]:
+            forcedToFrame = True
+
+        if forcedToFrame not in [True, False]:
+            raise ParseError(
+                detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
+            )
+        serializer = self.get_serializer(
+            instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
+        )
         return Response(serializer.data)
 
     @action(
