@@ -9,5 +9,4 @@ class ProjectPhaseViewSet(BaseViewSet):
     API endpoint that allows project phase to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectPhaseSerializer

@@ -7,5 +7,4 @@ class ProjectLockViewSet(BaseViewSet):
     API endpoint that allows Project Lock status to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectLockSerializer

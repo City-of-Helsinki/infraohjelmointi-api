@@ -37,11 +37,13 @@ env = environ.Env(
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
     LOG_LEVEL=(str, "INFO"),
-    TUNNISTAMO_ISSUER=(
+    HELSINKI_TUNNISTUS_ISSUER=(
         str,
         "https://tunnistus.test.hel.ninja/auth/realms/helsinki-tunnistus",
     ),
-    TUNNISTAMO_AUDIENCE=(str, "infraohjelmointi-api-dev"),
+    HELSINKI_TUNNISTUS_AUDIENCE=(str, "infraohjelmointi-api-dev"),
+    HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED=(bool, False),
+    SOCIAL_AUTH_TUNNISTAMO_SCOPE=(str, "ad_group"),
 )
 
 if path.exists(".env"):
@@ -82,11 +84,12 @@ AUTHENTICATION_BACKENDS = [
     "helusers.tunnistamo_oidc.TunnistamoOIDCAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/admin/"
 
-SOCIAL_AUTH_TUNNISTAMO_SCOPE = "ad_groups"
+SOCIAL_AUTH_TUNNISTAMO_SCOPE = env("SOCIAL_AUTH_TUNNISTAMO_SCOPE")
 SESSION_SERIALIZER = "django.contrib.sessions.serializers.PickleSerializer"
+
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 
 MIDDLEWARE = [
@@ -134,7 +137,7 @@ WSGI_APPLICATION = "project.wsgi.application"
 
 DATABASES = {"default": dj_database_url.parse(env("DATABASE_URL"))}
 
-HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED = True
+HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED = env("HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED")
 
 # These settings specify which authentication server(s) are trusted
 # to send back channel logout requests.
@@ -143,14 +146,14 @@ OIDC_API_TOKEN_AUTH = {
     # the public signature keys from standard locations below this URL.
     # Multiple issuers are supported, so this setting can also be a list
     # of strings. Default is https://tunnistamo.hel.fi.
-    "ISSUER": env("TUNNISTAMO_ISSUER"),
+    "ISSUER": env("HELSINKI_TUNNISTUS_ISSUER"),
     # Audience that must be present in the logout token for it to
     # be accepted. Value must be agreed between your SSO service
     # and your application instance. Essentially this allows your
     # application to know that the token is meant to be used with
     # it. Multiple acceptable audiences are supported, so this
     # setting can also be a list of strings. This setting is required.
-    "AUDIENCE": env("TUNNISTAMO_AUDIENCE"),
+    "AUDIENCE": env("HELSINKI_TUNNISTUS_AUDIENCE"),
 }
 
 from helusers.defaults import SOCIAL_AUTH_PIPELINE
@@ -225,11 +228,6 @@ LOGGING = {
     },
     "loggers": {
         "infraohjelmointi_api": {
-            "handlers": ["console"],
-            "level": 1,
-            "propagate": False,
-        },
-        "ApiTokenAuthentication": {
             "handlers": ["console"],
             "level": 1,
             "propagate": False,

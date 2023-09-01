@@ -1,8 +1,17 @@
 from rest_framework import viewsets
+
 from overrides import override
+from helusers.oidc import ApiTokenAuthentication
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
+
+from ..permissions import IsSameUser
 
 
 class BaseViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsSameUser]
+    authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
+
     @override
     def get_queryset(self):
         """

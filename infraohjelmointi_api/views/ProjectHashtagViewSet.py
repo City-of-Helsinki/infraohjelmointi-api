@@ -12,7 +12,6 @@ class ProjectHashtagViewSet(BaseViewSet):
     API endpoint that allows Project Hashtags to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectHashtagSerializer
 
     @override

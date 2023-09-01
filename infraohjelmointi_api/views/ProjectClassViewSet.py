@@ -15,7 +15,6 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
     API endpoint that allows Project Classes to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectClassSerializer
 
     @override

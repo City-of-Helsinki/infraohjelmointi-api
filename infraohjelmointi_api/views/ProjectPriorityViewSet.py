@@ -9,5 +9,4 @@ class ProjectPriorityViewSet(BaseViewSet):
     API endpoint that allows project Priority to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectPrioritySerializer

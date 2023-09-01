@@ -9,5 +9,4 @@ class ProjectCategoryViewSet(BaseViewSet):
     API endpoint that allows project cetagories to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectCategorySerializer
