@@ -12,8 +12,6 @@ class ProjectSetViewSet(BaseViewSet):
     API endpoint that allows project sets to be viewed or edited.
     """
 
-    permission_classes = []
-
     @override
     def get_serializer_class(self):
         """

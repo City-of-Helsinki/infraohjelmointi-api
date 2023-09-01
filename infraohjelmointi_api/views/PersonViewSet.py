@@ -7,5 +7,4 @@ class PersonViewSet(BaseViewSet):
     API endpoint that allows persons to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = PersonSerializer

@@ -98,5 +98,4 @@ class ProjectGroupViewSet(BaseViewSet):
         )
         return Response(serializer.data)
 
-    permission_classes = []
     serializer_class = ProjectGroupSerializer

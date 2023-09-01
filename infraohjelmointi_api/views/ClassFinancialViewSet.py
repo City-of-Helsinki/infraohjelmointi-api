@@ -9,5 +9,4 @@ class ClassFinancialViewSet(BaseViewSet):
     API endpoint that allows Class Financials to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ClassFinancialSerializer

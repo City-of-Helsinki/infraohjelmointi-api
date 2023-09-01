@@ -2,6 +2,7 @@ from openpyxl import load_workbook
 import datetime
 
 from .hierarchy import buildHierarchiesAndProjects, getColor, MAIN_CLASS_COLOR
+from ....models.ProjectFinancial import ProjectFinancial
 from ....services import (
     PersonService,
     ProjectService,
@@ -242,31 +243,61 @@ class BudgetFileHandler(IExcelFileHandler):
             # if value already converted into float, convert it back to string to void validation error
             project.costForecast = str(costForecast) if costForecast != None else None
 
-            fieldToYearMapping = {
-                "budgetProposalCurrentYearPlus0": self.current_budget_year,
-                "budgetProposalCurrentYearPlus1": self.current_budget_year + 1,
-                "budgetProposalCurrentYearPlus2": self.current_budget_year + 2,
-                "preliminaryCurrentYearPlus3": self.current_budget_year + 3,
-                "preliminaryCurrentYearPlus4": self.current_budget_year + 4,
-                "preliminaryCurrentYearPlus5": self.current_budget_year + 5,
-                "preliminaryCurrentYearPlus6": self.current_budget_year + 6,
-                "preliminaryCurrentYearPlus7": self.current_budget_year + 7,
-                "preliminaryCurrentYearPlus8": self.current_budget_year + 8,
-                "preliminaryCurrentYearPlus9": self.current_budget_year + 9,
-            }
-            for index, field in enumerate(fieldToYearMapping.keys()):
-                project_financial, created = ProjectFinancialService.update_or_create(
-                    year=fieldToYearMapping[field],
+            project_financials = [
+                ProjectFinancial(
+                    year=self.current_budget_year,
                     project_id=project.id,
-                    updatedData={
-                        "value": str(budget_list[index])
-                        if budget_list[index] != None
-                        else None
-                    },
-                )
-
-                print(f"Project financial {project_financial.id} created {created}")
-
+                    value=str(budget_list[0]) if budget_list[0] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 1,
+                    project_id=project.id,
+                    value=str(budget_list[1]) if budget_list[1] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 2,
+                    project_id=project.id,
+                    value=str(budget_list[2]) if budget_list[2] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 3,
+                    project_id=project.id,
+                    value=str(budget_list[3]) if budget_list[3] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 4,
+                    project_id=project.id,
+                    value=str(budget_list[4]) if budget_list[4] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 5,
+                    project_id=project.id,
+                    value=str(budget_list[5]) if budget_list[5] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 6,
+                    project_id=project.id,
+                    value=str(budget_list[6]) if budget_list[6] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 7,
+                    project_id=project.id,
+                    value=str(budget_list[7]) if budget_list[7] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 8,
+                    project_id=project.id,
+                    value=str(budget_list[8]) if budget_list[8] != None else None,
+                ),
+                ProjectFinancial(
+                    year=self.current_budget_year + 9,
+                    project_id=project.id,
+                    value=str(budget_list[9]) if budget_list[9] != None else None,
+                ),
+            ]
+            ProjectFinancialService.update_or_create_bulk(
+                project_financials=project_financials
+            )
             project.hkrId = (
                 pwNumber
                 if pwNumber != "none" and pwNumber != "?" and pwNumber != "x"
