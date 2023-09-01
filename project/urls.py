@@ -114,4 +114,6 @@ urlpatterns = [
     path("admin/budget-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/class-location-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/", admin.site.urls),
+    path("pysocial/", include("social_django.urls", namespace="social")),
+    path("helauth/", include("helusers.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

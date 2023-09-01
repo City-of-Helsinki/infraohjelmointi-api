@@ -24,3 +24,4 @@ from .ProjectLock import ProjectLock
 from .ProjectFinancial import ProjectFinancial
 from .ClassFinancial import ClassFinancial
 from .LocationFinancial import LocationFinancial
+from .User import User
