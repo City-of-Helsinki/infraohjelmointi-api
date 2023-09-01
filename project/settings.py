@@ -37,6 +37,11 @@ env = environ.Env(
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
     LOG_LEVEL=(str, "INFO"),
+    TUNNISTAMO_ISSUER=(
+        str,
+        "https://tunnistus.test.hel.ninja/auth/realms/helsinki-tunnistus",
+    ),
+    TUNNISTAMO_AUDIENCE=(str, "infraohjelmointi-api-dev"),
 )
 
 if path.exists(".env"):
@@ -47,10 +52,10 @@ DEBUG = env("DEBUG")
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
-# Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "helusers.apps.HelusersConfig",
+    "helusers.apps.HelusersAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -62,12 +67,27 @@ INSTALLED_APPS = [
     "overrides",
     "corsheaders",
     "rest_framework",
-    "infraohjelmointi_api",
     "django_filters",
     "drf_standardized_errors",
     "channels",
     "django_eventstream",
+    "social_django",
+    "infraohjelmointi_api",
 ]
+
+# Application definition
+AUTH_USER_MODEL = "infraohjelmointi_api.User"
+
+AUTHENTICATION_BACKENDS = [
+    "helusers.tunnistamo_oidc.TunnistamoOIDCAuth",
+    "django.contrib.auth.backends.ModelBackend",
+]
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/admin/"
+
+SOCIAL_AUTH_TUNNISTAMO_SCOPE = "ad_groups"
+SESSION_SERIALIZER = "django.contrib.sessions.serializers.PickleSerializer"
+
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -113,6 +133,27 @@ WSGI_APPLICATION = "project.wsgi.application"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {"default": dj_database_url.parse(env("DATABASE_URL"))}
+
+HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED = True
+
+# These settings specify which authentication server(s) are trusted
+# to send back channel logout requests.
+OIDC_API_TOKEN_AUTH = {
+    # Who we trust to sign the logout tokens. The library will request
+    # the public signature keys from standard locations below this URL.
+    # Multiple issuers are supported, so this setting can also be a list
+    # of strings. Default is https://tunnistamo.hel.fi.
+    "ISSUER": env("TUNNISTAMO_ISSUER"),
+    # Audience that must be present in the logout token for it to
+    # be accepted. Value must be agreed between your SSO service
+    # and your application instance. Essentially this allows your
+    # application to know that the token is meant to be used with
+    # it. Multiple acceptable audiences are supported, so this
+    # setting can also be a list of strings. This setting is required.
+    "AUDIENCE": env("TUNNISTAMO_AUDIENCE"),
+}
+
+from helusers.defaults import SOCIAL_AUTH_PIPELINE
 
 
 # Password validation
@@ -160,12 +201,9 @@ STATIC_ROOT = env("STATIC_ROOT")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ),
-    "EXCEPTION_HANDLER": "drf_standardized_errors.handler.exception_handler",
+    "DEFAULT_AUTHENTICATION_CLASSES": ("helusers.oidc.ApiTokenAuthentication",),
 }
+
 DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": False}
 
 LOGGING = {
@@ -187,6 +225,11 @@ LOGGING = {
     },
     "loggers": {
         "infraohjelmointi_api": {
+            "handlers": ["console"],
+            "level": 1,
+            "propagate": False,
+        },
+        "ApiTokenAuthentication": {
             "handlers": ["console"],
             "level": 1,
             "propagate": False,
