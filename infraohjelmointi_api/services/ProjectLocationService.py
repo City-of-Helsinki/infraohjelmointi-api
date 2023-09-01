@@ -41,3 +41,10 @@ class ProjectLocationService:
     def get_by_id(id: str) -> ProjectLocation:
         """Get project location by id"""
         return ProjectLocation.objects.get(id=id)
+
+    @staticmethod
+    def instance_exists(id: str, forCoordinatorOnly: bool = False) -> bool:
+        """Check if instance exists in DB"""
+        return ProjectLocation.objects.filter(
+            id=id, forCoordinatorOnly=forCoordinatorOnly
+        ).exists()
