@@ -1,3 +1,4 @@
+from .ProjectLocationService import ProjectLocationService
 from .ProjectClassService import ProjectClassService
 from ..models import LocationFinancial, ProjectLocation
 
@@ -26,11 +27,11 @@ class LocationFinancialService:
         return {"year{}".format(index): start_year + index for index in range(0, 11)}
 
     @staticmethod
-    def get_coordinator_location_and_related_location(
+    def get_coordinator_location_and_related_classes(
         instance: LocationFinancial,
     ) -> dict:
         """
-        Returns the location instances for coordinator location linked to the LocationFinancial object and the related planning location linked to the coordinator Location.
+        Returns the location instances for coordinator/planning location linked to the LocationFinancial object and the related planning classes which are above the coordinator location.
 
             Parameters
             ----------
@@ -43,44 +44,45 @@ class LocationFinancialService:
                 {
                 "coordination": {
                     "<type_of_location>": <ProjectLocation instance>,
+                    "<type_of_class>": <ProjectClass instance>
                     },
                 "planning": {
                     "<type_of_location>": <ProjectLocation instance>,
+                    "<type_of_class>": <ProjectClass instance>
                     },
                 }
         """
-        locationInstances = {"coordination": {}, "planning": {}}
+        locationFinancialRelations = {"coordination": {}, "planning": {}}
 
         coordinatorLocationInstance: ProjectLocation = instance.locationRelation
 
-        locationInstances["coordination"][
-            ProjectClassService.identify_class_type(
-                classInstance=coordinatorLocationInstance
+        locationFinancialRelations["coordination"][
+            ProjectLocationService.identify_location_type(
+                locationInstance=coordinatorLocationInstance
             )
         ] = coordinatorLocationInstance
 
-        locationInstances["planning"][
-            ProjectClassService.identify_class_type(
-                classInstance=coordinatorLocationInstance.relatedTo
+        locationFinancialRelations["planning"][
+            ProjectLocationService.identify_location_type(
+                locationInstance=coordinatorLocationInstance.relatedTo
             )
         ] = coordinatorLocationInstance.relatedTo
 
-        # Traverse backwards from current Coordination location to get parent locations
-        # Get related planning locations along the way
-        currCoordinationLocation = coordinatorLocationInstance.parent
-        while currCoordinationLocation != None:
-            locationInstances["coordination"][
+        # Traverse backwards from current Coordination Location to get parent classes
+        currCoordinationClass = coordinatorLocationInstance.parentClass
+        while currCoordinationClass != None:
+            locationFinancialRelations["coordination"][
                 ProjectClassService.identify_class_type(
-                    classInstance=currCoordinationLocation
+                    classInstance=currCoordinationClass
                 )
-            ] = currCoordinationLocation
+            ] = currCoordinationClass
 
-            locationInstances["planning"][
+            locationFinancialRelations["planning"][
                 ProjectClassService.identify_class_type(
-                    classInstance=currCoordinationLocation.relatedTo
+                    classInstance=currCoordinationClass.relatedTo
                 )
-            ] = currCoordinationLocation.relatedTo
+            ] = currCoordinationClass.relatedTo
 
-            currCoordinationLocation = currCoordinationLocation.parent
+            currCoordinationClass = currCoordinationClass.parent
 
-        return locationInstances
+        return locationFinancialRelations

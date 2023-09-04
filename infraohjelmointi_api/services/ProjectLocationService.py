@@ -1,4 +1,5 @@
 from ..models import ProjectClass, ProjectLocation
+from .ProjectClassService import ProjectClassService
 
 
 class ProjectLocationService:
@@ -48,3 +49,57 @@ class ProjectLocationService:
         return ProjectLocation.objects.filter(
             id=id, forCoordinatorOnly=forCoordinatorOnly
         ).exists()
+
+    @staticmethod
+    def identify_location_type(locationInstance: ProjectLocation) -> str:
+        """
+        Returns the type of location instance provided.
+
+            Parameters
+            ----------
+            locationInstance : ProjectLocation
+                Location instance used to identify type
+
+            Returns
+            -------
+            str
+                Type of location instance. Types: [district | division | subDivision | subLevelDistrict]
+        """
+        if (
+            locationInstance != None
+            and locationInstance.parent == None
+            and locationInstance.forCoordinatorOnly == False
+        ) or (
+            locationInstance != None
+            and locationInstance.parent == None
+            and locationInstance.forCoordinatorOnly == True
+            and ProjectClassService.identify_class_type(locationInstance.parentClass)
+            != "collectiveSubLevel"
+        ):
+            return "district"
+
+        if (
+            locationInstance != None
+            and locationInstance.parent == None
+            and locationInstance.forCoordinatorOnly == True
+            and ProjectClassService.identify_class_type(locationInstance.parentClass)
+            == "collectiveSubLevel"
+        ):
+            return "subLevelDistrict"
+
+        if (
+            locationInstance != None
+            and locationInstance.parent != None
+            and locationInstance.parent.parent == None
+        ):
+            return "division"
+
+        if (
+            locationInstance != None
+            and locationInstance.parent != None
+            and locationInstance.parent.parent != None
+            and locationInstance.parent.parent.parent == None
+        ):
+            return "subDivision"
+
+        return None
