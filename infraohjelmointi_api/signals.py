@@ -2,17 +2,14 @@ import logging
 from django.db.models.signals import post_save, m2m_changed
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from infraohjelmointi_api.models import (
-    Project,
-    ClassFinancial,
-)
+from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
     ProjectGroupSerializer,
     ProjectLocationSerializer,
 )
-from .services import ClassFinancialService, ProjectService
+from .services import ClassFinancialService, ProjectService, LocationFinancialService
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
@@ -29,7 +26,7 @@ def on_transaction_commit(func):
 
 def get_financial_sums(
     _type: str,
-    instance: ClassFinancial | ProjectFinancial,
+    instance: ClassFinancial | ProjectFinancial | LocationFinancial,
 ):
     """
     Returns a dictionary of coordination and planning class instances with financial sum values.
@@ -48,8 +45,10 @@ def get_financial_sums(
                 "masterClass": <ProjectClass instance with sums>,
                 "class": <ProjectClass instance with sums>,
                 "subClass": <ProjectClass instance with sums>,
+                "otherClassification": <ProjectClass instance with sums>,
                 "collectiveSubLevel": <ProjectClass instance with sums>,
                 "district": <ProjectLocation instance with sums>,
+                "subLevelDistrict": <ProjectLocation instance with sums>,
                 },
             "planning": {
                 "masterClass": <ProjectClass instance with sums>,
@@ -67,6 +66,8 @@ def get_financial_sums(
             "class": None,
             "subClass": None,
             "collectiveSubLevel": None,
+            "otherClassification": None,
+            "subLevelDistrict": None,
             "district": None,
         },
         "planning": {
@@ -85,22 +86,23 @@ def get_financial_sums(
 
         for viewType, instances in projectRelations.items():
             for instanceType, instance in instances.items():
-                if instanceType == "group":
-                    sums[viewType][instanceType] = ProjectGroupSerializer(
-                        instance,
-                        context={"for_coordinator": viewType == "coordination"},
-                    ).data
+                if instance != None:
+                    if instanceType == "group":
+                        sums[viewType][instanceType] = ProjectGroupSerializer(
+                            instance,
+                            context={"for_coordinator": viewType == "coordination"},
+                        ).data
 
-                if instanceType == "district":
-                    sums[viewType][instanceType] = ProjectLocationSerializer(
-                        instance,
-                        context={"for_coordinator": viewType == "coordination"},
-                    ).data
-
-                sums[viewType][instanceType] = ProjectClassSerializer(
-                    instance,
-                    context={"for_coordinator": viewType == "coordination"},
-                ).data
+                    elif instanceType in ["district", "subLevelDistrict"]:
+                        sums[viewType][instanceType] = ProjectLocationSerializer(
+                            instance,
+                            context={"for_coordinator": viewType == "coordination"},
+                        ).data
+                    else:
+                        sums[viewType][instanceType] = ProjectClassSerializer(
+                            instance,
+                            context={"for_coordinator": viewType == "coordination"},
+                        ).data
 
     if _type == "ClassFinancial":
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
@@ -108,26 +110,48 @@ def get_financial_sums(
         )
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
-                sums[viewType][classType] = ProjectClassSerializer(
-                    classInstance,
-                    context={"for_coordinator": viewType == "coordination"},
-                ).data
+                if classInstance != None:
+                    sums[viewType][classType] = ProjectClassSerializer(
+                        classInstance,
+                        context={"for_coordinator": viewType == "coordination"},
+                    ).data
+
+    if _type == "LocationFinancial":
+        locationFinancialRelations = (
+            LocationFinancialService.get_coordinator_location_and_related_classes(
+                instance=instance
+            )
+        )
+        for viewType, instances in locationFinancialRelations.items():
+            for instanceType, instance in instances.items():
+                if instance != None:
+                    if instanceType in ["district", "subLevelDistrict"]:
+                        sums[viewType][instanceType] = ProjectLocationSerializer(
+                            instance,
+                            context={"for_coordinator": viewType == "coordination"},
+                        ).data
+                    else:
+                        sums[viewType][instanceType] = ProjectClassSerializer(
+                            instance,
+                            context={"for_coordinator": viewType == "coordination"},
+                        ).data
 
     return sums
 
 
 @receiver(post_save, sender=ProjectFinancial)
 @receiver(post_save, sender=ClassFinancial)
+@receiver(post_save, sender=LocationFinancial)
 def get_notified_financial_sums(sender, instance, created, **kwargs):
     """
-    Sends a django event stream event with all financial sums effected by a save on ProjectFinancial or ClassFinancial table.
+    Sends a django event stream event with all financial sums effected by a save on ProjectFinancial, ClassFinancial or LocationFinancial table.
 
         Parameters
         ----------
         sender
             name of the sender table.
 
-        instance : ProjectFinancial | ClassFinancial
+        instance : ProjectFinancial | ClassFinancial | LocationFinancial
             instance of the object which triggered the signal
 
         created : bool

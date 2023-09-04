@@ -38,7 +38,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
 
-        if for_coordinator == False or instance.forCoordinatorOnly == False:
+        if (
+            for_coordinator == False
+            or getattr(instance, "forCoordinatorOnly", False) == False
+        ):
             # get coordinatorClass when planning classes/locations are being fetched
             if _type == "ProjectClass":
                 instance = getattr(instance, "coordinatorClass", None)
@@ -364,8 +367,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 )
 
         if _type == "ProjectGroup":
-            return ProjectService.find_by_group_id(
-                group_id=instance.id
-            ).prefetch_related("finances")
+            return (
+                ProjectService.find_by_group_id(group_id=instance.id)
+                .filter(programmed=True)
+                .prefetch_related("finances")
+            )
 
         return Project.objects.none()

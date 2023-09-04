@@ -1,5 +1,6 @@
 from ..models import ProjectClass, ProjectLocation, ProjectGroup, Project
 from .ProjectClassService import ProjectClassService
+from .ProjectLocationService import ProjectLocationService
 
 
 class ProjectService:
@@ -64,7 +65,10 @@ class ProjectService:
                     "class": <ProjectClass instance>,
                     "subClass": <ProjectClass instance>,
                     "collectiveSubLevel": <ProjectClass instance>,
+                    "otherClassification": <ProjectClass instance>,
                     "district": <ProjectLocation instance>,
+                    "subLevelDistrict": <ProjectLocation instance>,
+                    "group": <ProjectGroup instance>,
                 },
                 "planning": {
                     "masterClass": <ProjectClass instance>,
@@ -88,7 +92,10 @@ class ProjectService:
                 "class": None,
                 "subClass": None,
                 "collectiveSubLevel": None,
+                "otherClassification": None,
                 "district": None,
+                "subLevelDistrict": None,
+                "group": None,
             },
         }
 
@@ -149,8 +156,20 @@ class ProjectService:
         projectRelations["planning"]["group"] = (
             project.projectGroup if project.projectGroup is not None else None
         )
+        projectRelations["coordination"]["group"] = projectRelations["planning"][
+            "group"
+        ]
+
         if projectRelations["planning"]["district"]:
-            projectRelations["coordination"]["district"] = (
+            projectRelations["coordination"][
+                ProjectLocationService.identify_location_type(
+                    getattr(
+                        projectRelations["planning"]["district"],
+                        "coordinatorLocation",
+                        None,
+                    )
+                )
+            ] = (
                 projectRelations["planning"]["district"].coordinatorLocation
                 if hasattr(
                     projectRelations["planning"]["district"], "coordinatorLocation"
