@@ -33,7 +33,7 @@ from django.db.models.functions import Coalesce
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
+    def get_frameBudget_and_budgetChange(self, instance, year: int) -> dict:
         """
         Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
         isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
