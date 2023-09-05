@@ -112,11 +112,11 @@ class ProjectClassViewSet(BaseViewSet):
             values = finances[param]
             values_length = len(values.keys())
 
-            if type(values) != dict:
+            if not isinstance(values, dict):
                 return False
             if values_length == 0 or values_length > 2:
                 return False
-            if not "frameBudget" in values and not "budgetChange" in values:
+            if "frameBudget" not in values and "budgetChange" not in values:
                 return False
 
         return True
