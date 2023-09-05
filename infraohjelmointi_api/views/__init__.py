@@ -26,3 +26,4 @@ from .TaskViewSet import *
 from .NoteViewSet import *
 from .ClassFinancialViewSet import *
 from .LocationFinancialViewSet import *
+from .BaseClassLocationViewSet import *
