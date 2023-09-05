@@ -108,6 +108,12 @@ router.register(
     views.LocationFinancialViewSet,
     basename="locationFinancials",
 )
+router.register(
+    r"who-am-i",
+    views.WhoAmIViewSet,
+    basename="whoAmI",
+)
+
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),
