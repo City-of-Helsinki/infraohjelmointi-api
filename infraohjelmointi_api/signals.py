@@ -49,6 +49,7 @@ def get_financial_sums(
                 "collectiveSubLevel": <ProjectClass instance with sums>,
                 "district": <ProjectLocation instance with sums>,
                 "subLevelDistrict": <ProjectLocation instance with sums>,
+                "group": <ProjectGroup instance with sums>
                 },
             "planning": {
                 "masterClass": <ProjectClass instance with sums>,
