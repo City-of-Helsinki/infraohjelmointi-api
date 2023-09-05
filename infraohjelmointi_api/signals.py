@@ -69,6 +69,7 @@ def get_financial_sums(
             "otherClassification": None,
             "subLevelDistrict": None,
             "district": None,
+            "group": None,
         },
         "planning": {
             "masterClass": None,
