@@ -79,7 +79,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 .select_related(
                     "parent__finances",
                     "parent",
-                    "parent__finances__frameBudget" "parent__projectlocation__finances",
+                    "parent__finances__frameBudget",
+                    "parent__projectlocation__finances",
                 )
                 .prefetch_related("finances")
                 # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
@@ -142,7 +143,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             else childClassQueryResult["subChildrenOverlapCount"] > 0
             or (
                 financeInstance != None
-                and ((childClassQueryResult["childSums"] > financeInstance.frameBudget))
+                and (childClassQueryResult["childSums"] > financeInstance.frameBudget)
             ),
         }
 
