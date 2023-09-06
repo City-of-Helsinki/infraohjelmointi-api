@@ -53,7 +53,7 @@ class ProjectClassService:
             Returns
             -------
             str
-                Type of class instance. Types: [masterClass | class | subClass | collectiveSubLevel]
+                Type of class instance. Types: [masterClass | class | subClass | collectiveSubLevel | otherClassification]
         """
         if classInstance != None and classInstance.parent == None:
             return "masterClass"
@@ -81,4 +81,14 @@ class ProjectClassService:
             and classInstance.parent.parent.parent.parent == None
         ):
             return "collectiveSubLevel"
+
+        if (
+            classInstance != None
+            and classInstance.parent != None
+            and classInstance.parent.parent != None
+            and classInstance.parent.parent.parent != None
+            and classInstance.parent.parent.parent.parent != None
+            and classInstance.parent.parent.parent.parent.parent == None
+        ):
+            return "otherClassification"
         return None

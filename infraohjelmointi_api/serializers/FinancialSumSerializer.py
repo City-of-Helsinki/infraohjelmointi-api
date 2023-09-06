@@ -1,6 +1,18 @@
 from datetime import date
-from infraohjelmointi_api.models import Project, ClassFinancial, ProjectClass
-from infraohjelmointi_api.services import ProjectService, ClassFinancialService
+from infraohjelmointi_api.models import (
+    Project,
+    ClassFinancial,
+    ProjectClass,
+    LocationFinancial,
+    ProjectLocation,
+)
+
+
+from infraohjelmointi_api.services import (
+    ProjectService,
+    ClassFinancialService,
+    LocationFinancialService,
+)
 from rest_framework import serializers
 from django.db.models import (
     Sum,
@@ -21,95 +33,117 @@ from django.db.models.functions import Coalesce
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def get_frameBudget_and_budgetChange(self, instance, year: str) -> int:
+    def get_frameBudget_and_budgetChange(self, instance, year: int) -> dict:
         """
-        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class instance.\n
+        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
         isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
         """
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
 
-        if for_coordinator == False:
-            # get coordinatorClass when planning classes are being fetched
-            instance = getattr(instance, "coordinatorClass", None)
+        if (
+            for_coordinator == False
+            or getattr(instance, "forCoordinatorOnly", False) == False
+        ):
+            # get coordinatorClass when planning classes/locations are being fetched
+            if _type == "ProjectClass":
+                instance = getattr(instance, "coordinatorClass", None)
+            if _type == "ProjectLocation":
+                instance = getattr(instance, "coordinatorLocation", None)
 
-        if _type != "ProjectClass" or instance == None:
+        if _type not in ["ProjectClass", "ProjectLocation"] or instance == None:
             return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
 
-        classFinanceObject: ClassFinancial = (
-            ClassFinancialService.get(class_id=instance.id, year=year)
-            if _type == "ProjectClass"
-            and instance != None
-            and instance.finances.filter(year=year).exists()
-            else None
-        )
-        # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
-        childClassQueryResult = (
-            # First filter to get all children classes of the current class instance
-            ProjectClass.objects.filter(
-                path__startswith=instance.path,
-                path__gt=instance.path,
-                forCoordinatorOnly=True,
-            )
-            .select_related(
-                "parent__finances",
-                "parent",
-                "parent__finances__frameBudget",
-            )
-            .prefetch_related("finances")
-            # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
-            .values("parent")
-            .annotate(
-                # calculate frameBudget sums for each level for a given year
-                childSum=Sum(
-                    "finances__frameBudget",
-                    default=Value(0),
-                    filter=Q(finances__year=year) & Q(parent=F("parent")),
-                ),
-                # Use subquery to get frameBudget for each levels parent for a given year
-                # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
-                parentFrameBudget=Coalesce(
-                    Subquery(
-                        ClassFinancial.objects.filter(
-                            classRelation=OuterRef("parent"), year=year
-                        ).values_list("frameBudget", flat=True)[:1]
-                    ),
-                    Value(0),
-                ),
-                # Calculate if there frameBudgets for each level sums exceed their parents frameBudget
-                isOverlap=Case(
-                    When(childSum__gt=F("parentFrameBudget"), then=Value(True)),
-                    default=Value(False),
-                    output_field=BooleanField(),
-                ),
-            )
-            .aggregate(
-                #  Sum all level frameBudgets to get the total frameBudget sums of all the levels under the current Class
-                childSums=Sum("childSum", default=Value(0)),
-                # mapping boolean for frameBudget overlap in each level to a number and count all of them
-                subChildrenOverlapCount=Count(
-                    Case(
-                        When(isOverlap=True, then=Value(1)),
-                        default=Value(None),
-                        output_field=PositiveIntegerField(),
+        financeInstance = None
+        if instance.finances.filter(year=year).exists():
+            if _type == "ProjectClass":
+                financeInstance = ClassFinancialService.get(
+                    class_id=instance.id, year=year
+                )
+            if _type == "ProjectLocation":
+                financeInstance = LocationFinancialService.get(
+                    location_id=instance.id, year=year
+                )
+
+        childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
+        # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
+        if _type == "ProjectClass":
+            # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
+            childClassQueryResult = (
+                # First filter to get all children classes of the current class instance
+                ProjectClass.objects.filter(
+                    path__startswith=instance.path,
+                    path__gt=instance.path,
+                    forCoordinatorOnly=True,
+                )
+                .select_related(
+                    "parent__finances",
+                    "parent",
+                    "parent__finances__frameBudget",
+                    "parent__projectlocation__finances",
+                )
+                .prefetch_related("finances")
+                # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
+                .values("parent")
+                .annotate(
+                    # calculate frameBudget sums for each level for a given year
+                    childSum=Sum(
+                        "finances__frameBudget",
+                        default=Value(0),
+                        filter=Q(finances__year=year) & Q(parent=F("parent")),
                     )
-                ),
+                    # Add frameBudgets for locations under the level
+                    + Sum(
+                        "parent__projectlocation__finances__frameBudget",
+                        default=Value(0),
+                        filter=Q(parent__projectlocation__finances__year=year),
+                    ),
+                    # Use subquery to get frameBudget for each levels parent for a given year
+                    # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
+                    parentFrameBudget=Coalesce(
+                        Subquery(
+                            ClassFinancial.objects.filter(
+                                classRelation=OuterRef("parent"), year=year
+                            ).values_list("frameBudget", flat=True)[:1]
+                        ),
+                        Value(0),
+                    ),
+                    # Calculate if there frameBudgets for each level sums exceed their parents frameBudget
+                    isOverlap=Case(
+                        When(childSum__gt=F("parentFrameBudget"), then=Value(True)),
+                        default=Value(False),
+                        output_field=BooleanField(),
+                    ),
+                )
+                .aggregate(
+                    #  Sum all level frameBudgets to get the total frameBudget sums of all the levels under the current Class
+                    childSums=Sum("childSum", default=Value(0)),
+                    # mapping boolean for frameBudget overlap in each level to a number and count all of them
+                    subChildrenOverlapCount=Count(
+                        Case(
+                            When(isOverlap=True, then=Value(1)),
+                            default=Value(None),
+                            output_field=PositiveIntegerField(),
+                        )
+                    ),
+                )
             )
-        )
 
         return {
-            "frameBudget": classFinanceObject.frameBudget
-            if classFinanceObject != None
+            "frameBudget": financeInstance.frameBudget
+            if financeInstance != None
             else 0,
-            "budgetChange": classFinanceObject.budgetChange
-            if classFinanceObject != None
+            "budgetChange": financeInstance.budgetChange
+            if financeInstance != None
             else 0,
             # check if overlapCount > 0, means there is some level under this class which has frameBudget exceeding its parent
             # or the frameBudget sums for all child levels exceeds the frameBudget of this level
-            "isFrameBudgetOverlap": childClassQueryResult["subChildrenOverlapCount"] > 0
+            "isFrameBudgetOverlap": False
+            if _type == "ProjectLocation"
+            else childClassQueryResult["subChildrenOverlapCount"] > 0
             or (
-                classFinanceObject != None
-                and childClassQueryResult["childSums"] > classFinanceObject.frameBudget
+                financeInstance != None
+                and (childClassQueryResult["childSums"] > financeInstance.frameBudget)
             ),
         }
 
@@ -337,8 +371,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 )
 
         if _type == "ProjectGroup":
-            return ProjectService.find_by_group_id(
-                group_id=instance.id
-            ).prefetch_related("finances")
+            return (
+                ProjectService.find_by_group_id(group_id=instance.id)
+                .filter(programmed=True)
+                .prefetch_related("finances")
+            )
 
         return Project.objects.none()

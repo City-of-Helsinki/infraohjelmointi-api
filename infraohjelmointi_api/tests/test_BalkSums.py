@@ -62,6 +62,9 @@ class BalkSumTestCase(TestCase):
     )
     projectCoordinatorClass_1_Id = uuid.UUID("74f1a8a0-7bf9-4d1d-9cf4-da58825fac4d")
     projectCoordinatorSubClass_1_Id = uuid.UUID("ee223e27-8913-4194-82d9-6c6698d7c12c")
+    coordinatorCollectiveSubLevel_1_Id = uuid.UUID(
+        "b7b88072-d6c7-4831-9c0c-25cd84307a08"
+    )
 
     @classmethod
     @override
@@ -354,11 +357,19 @@ class BalkSumTestCase(TestCase):
             forCoordinatorOnly=True,
             relatedTo=subClass_1,
         )
+        coordinatorSubClass_1.childClass.create(
+            id=self.coordinatorCollectiveSubLevel_1_Id,
+            name="collective sub level",
+            path="Coordinator Master Class 1/Coordinator Test Class 1/Coordinator Sub class 1/collective sub level",
+            forCoordinatorOnly=True,
+            relatedTo=None,
+        )
+
         coordinatorSubClass_1.finances.create(
             frameBudget=0, budgetChange=50, year=year + 5
         )
 
-        ProjectLocation.objects.create(
+        projectCoordinationDistrict_1 = ProjectLocation.objects.create(
             id=self.projectCoordinationDistrict_1_Id,
             name="Coordinator district 1",
             parent=None,
@@ -366,6 +377,9 @@ class BalkSumTestCase(TestCase):
             forCoordinatorOnly=True,
             parentClass=coordinatorSubClass_1,
             relatedTo=district_1,
+        )
+        projectCoordinationDistrict_1.finances.create(
+            frameBudget=200, budgetChange=0, year=year
         )
 
     def test_GET_class_with_sums(self):
@@ -571,15 +585,18 @@ class BalkSumTestCase(TestCase):
         response = self.client.get("/project-classes/coordinator/")
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(
-            len(response.json()), 3, msg="Number of coordinator classes != 3"
+            len(response.json()), 4, msg="Number of coordinator classes != 4"
         )
+
         # Sum for coordinator masterClass, it will miss project 3 as it uses subClass 2 which has no coordination class
         self.assertEqual(
             response.json()[1]["id"], self.projectCoordinatorMasterClass_1_Id.__str__()
         )
         self.assertEqual(response.json()[1]["finances"]["year0"]["plannedBudget"], 460)
         self.assertEqual(response.json()[1]["finances"]["year0"]["frameBudget"], 100)
-        self.assertEqual(response.json()[1]["finances"]["year0"]["isFrameBudgetOverlap"], True)
+        self.assertEqual(
+            response.json()[1]["finances"]["year0"]["isFrameBudgetOverlap"], True
+        )
         self.assertEqual(response.json()[1]["finances"]["year0"]["budgetChange"], 100)
         self.assertEqual(response.json()[1]["finances"]["year1"]["plannedBudget"], 250)
         self.assertEqual(response.json()[1]["finances"]["year1"]["frameBudget"], 50)
@@ -613,41 +630,44 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[1]["finances"]["year10"]["budgetChange"], 0)
 
         self.assertEqual(
-            response.json()[2]["id"], self.projectCoordinatorClass_1_Id.__str__()
+            response.json()[3]["id"], self.projectCoordinatorClass_1_Id.__str__()
         )
-        self.assertEqual(response.json()[2]["finances"]["year0"]["plannedBudget"], 160)
-        self.assertEqual(response.json()[2]["finances"]["year0"]["frameBudget"], 2000)
-        self.assertEqual(response.json()[2]["finances"]["year0"]["budgetChange"], 50)
-        self.assertEqual(response.json()[2]["finances"]["year1"]["plannedBudget"], 150)
-        self.assertEqual(response.json()[2]["finances"]["year1"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year1"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year2"]["plannedBudget"], 150)
-        self.assertEqual(response.json()[2]["finances"]["year2"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year2"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year3"]["plannedBudget"], 30)
-        self.assertEqual(response.json()[2]["finances"]["year3"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year3"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year4"]["plannedBudget"], 15)
-        self.assertEqual(response.json()[2]["finances"]["year4"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year4"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year5"]["plannedBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year5"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year5"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year6"]["plannedBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year6"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year6"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year7"]["plannedBudget"], 10)
-        self.assertEqual(response.json()[2]["finances"]["year7"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year7"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year8"]["plannedBudget"], 18)
-        self.assertEqual(response.json()[2]["finances"]["year8"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year8"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year9"]["plannedBudget"], 20)
-        self.assertEqual(response.json()[2]["finances"]["year9"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year9"]["budgetChange"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year10"]["plannedBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year10"]["frameBudget"], 0)
-        self.assertEqual(response.json()[2]["finances"]["year10"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year0"]["plannedBudget"], 160)
+        self.assertEqual(response.json()[3]["finances"]["year0"]["frameBudget"], 2000)
+        self.assertEqual(
+            response.json()[3]["finances"]["year0"]["isFrameBudgetOverlap"], True
+        )
+        self.assertEqual(response.json()[3]["finances"]["year0"]["budgetChange"], 50)
+        self.assertEqual(response.json()[3]["finances"]["year1"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[3]["finances"]["year1"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year1"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year2"]["plannedBudget"], 150)
+        self.assertEqual(response.json()[3]["finances"]["year2"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year2"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year3"]["plannedBudget"], 30)
+        self.assertEqual(response.json()[3]["finances"]["year3"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year3"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year4"]["plannedBudget"], 15)
+        self.assertEqual(response.json()[3]["finances"]["year4"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year4"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year5"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year5"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year5"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year6"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year6"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year6"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year7"]["plannedBudget"], 10)
+        self.assertEqual(response.json()[3]["finances"]["year7"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year7"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year8"]["plannedBudget"], 18)
+        self.assertEqual(response.json()[3]["finances"]["year8"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year8"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year9"]["plannedBudget"], 20)
+        self.assertEqual(response.json()[3]["finances"]["year9"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year9"]["budgetChange"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year10"]["plannedBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year10"]["frameBudget"], 0)
+        self.assertEqual(response.json()[3]["finances"]["year10"]["budgetChange"], 0)
 
         self.assertEqual(
             response.json()[0]["id"], self.projectCoordinatorSubClass_1_Id.__str__()
@@ -655,6 +675,9 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 10)
         self.assertEqual(response.json()[0]["finances"]["year0"]["frameBudget"], 0)
         self.assertEqual(response.json()[0]["finances"]["year0"]["budgetChange"], 0)
+        self.assertEqual(
+            response.json()[0]["finances"]["year0"]["isFrameBudgetOverlap"], True
+        )
         self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 50)
         self.assertEqual(response.json()[0]["finances"]["year1"]["frameBudget"], 0)
         self.assertEqual(response.json()[0]["finances"]["year1"]["budgetChange"], 0)
@@ -720,6 +743,7 @@ class BalkSumTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 60)
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 200)
         self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 100)
         self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 100)
         self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 20)
@@ -758,6 +782,7 @@ class BalkSumTestCase(TestCase):
             response.json()[0]["id"], self.projectCoordinationDistrict_1_Id.__str__()
         )
         self.assertEqual(response.json()[0]["finances"]["year0"]["plannedBudget"], 60)
+        self.assertEqual(response.json()[0]["finances"]["year0"]["frameBudget"], 200)
         self.assertEqual(response.json()[0]["finances"]["year1"]["plannedBudget"], 100)
         self.assertEqual(response.json()[0]["finances"]["year2"]["plannedBudget"], 100)
         self.assertEqual(response.json()[0]["finances"]["year3"]["plannedBudget"], 20)
@@ -768,6 +793,34 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()[0]["finances"]["year8"]["plannedBudget"], 9)
         self.assertEqual(response.json()[0]["finances"]["year9"]["plannedBudget"], 10)
         self.assertEqual(response.json()[0]["finances"]["year10"]["plannedBudget"], 0)
+
+    def test_PATCH_coordinator_location_finances(self):
+        response = self.client.patch(
+            "/project-locations/coordinator/{}/".format(
+                self.projectCoordinationDistrict_1_Id.__str__()
+            ),
+            data={
+                "finances": {
+                    "year": 2023,
+                    "year0": {"frameBudget": 1000, "budgetChange": 50},
+                }
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+
+        # Chcek same finances reflect on the related planning class
+        response = self.client.get(
+            "/project-locations/{}/".format(self.projectDistrict_1_Id)
+        )
+
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
 
     def test_GET_group_with_sums(self):
         response = self.client.get("/project-groups/{}/".format(self.projectGroup_1_Id))
@@ -785,32 +838,33 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 20)
         self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0)
 
+        # Projects under projectGroup 3 and 2 are not programmed hence all sums are 0
         response = self.client.get("/project-groups/{}/".format(self.projectGroup_2_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        self.assertEqual(response.json()["finances"]["projectBudgets"], 100)
-        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 100)
-        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 50)
-        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50)
-        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10)
-        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5)
+        self.assertEqual(response.json()["finances"]["projectBudgets"], 0)
+        self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5)
-        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9)
-        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0)
 
         response = self.client.get("/project-groups/{}/".format(self.projectGroup_3_Id))
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
-        self.assertEqual(response.json()["finances"]["projectBudgets"], 100)
+        self.assertEqual(response.json()["finances"]["projectBudgets"], 0)
         self.assertEqual(response.json()["finances"]["year0"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year1"]["plannedBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 50)
-        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 10)
-        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 5)
+        self.assertEqual(response.json()["finances"]["year2"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year3"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year4"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year5"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year6"]["plannedBudget"], 0)
-        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 5)
-        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 9)
-        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 10)
+        self.assertEqual(response.json()["finances"]["year7"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year8"]["plannedBudget"], 0)
+        self.assertEqual(response.json()["finances"]["year9"]["plannedBudget"], 0)
         self.assertEqual(response.json()["finances"]["year10"]["plannedBudget"], 0)
