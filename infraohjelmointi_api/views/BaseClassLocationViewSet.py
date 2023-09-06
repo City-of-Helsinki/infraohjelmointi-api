@@ -51,13 +51,12 @@ class BaseClassLocationViewSet(BaseViewSet):
         if finances == None:
             return False
 
-        parameters = finances.keys()
+        parameters = list(finances.keys())
         if "year" not in parameters:
             return False
+        parameters.remove("year")
 
         for param in parameters:
-            if param == "year":
-                continue
             values = finances[param]
             values_length = len(values.keys())
 
