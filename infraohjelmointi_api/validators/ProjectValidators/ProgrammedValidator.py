@@ -32,6 +32,15 @@ class ProgrammedValidator(BaseValidator):
         phase = allFields.get("phase", None)
         if phase is None and project is not None and "phase" not in allFields:
             phase = project.phase
+
+        if programmed == True and (
+            phase is None or (phase.value in ["proposal", "design"])
+        ):
+            # Set programmed to false if phase is proposal or design
+            # Since phase is changed from the planning view and field validations are not in effect on the view
+            allFields["programmed"] = False
+            programmed = False
+
         if category is None and project is not None and "category" not in allFields:
             category = project.category
 
@@ -43,22 +52,13 @@ class ProgrammedValidator(BaseValidator):
                 code="programmed_true_missing_category",
             )
         if programmed == False and (
-            phase is None or (phase.value not in ["proposal", "design"])
+            phase != None and (phase.value not in ["proposal", "design"])
         ):
             raise ValidationError(
                 detail={
                     "programmed": "phase must be set to `proposal` or `design` if programmed is `False`"
                 },
                 code="programmed_false_missing_phase",
-            )
-        if programmed == True and (
-            phase is None or (phase.value in ["proposal", "design"])
-        ):
-            raise ValidationError(
-                detail={
-                    "programmed": "phase cannot be `proposal` or `design` if programmed is `True`"
-                },
-                code="programmed_true_missing_phase",
             )
 
         if programmed == True and projectClass is None:
@@ -68,4 +68,3 @@ class ProgrammedValidator(BaseValidator):
                 },
                 code="programmed_true_missing_projectClass",
             )
-        # programmed == True then check class and locations are filled in
