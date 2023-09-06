@@ -90,13 +90,6 @@ class ProjectPhaseValidator(BaseValidator):
                     },
                     code="draftInitiation_phase_missing_dates",
                 )
-            if personPlanning is None:
-                raise ValidationError(
-                    detail={
-                        "phase": "personPlanning must be populated if phase is `draftInitiation`"
-                    },
-                    code="draftInitiation_phase_missing_personPlanning",
-                )
 
         if phase.value == "construction":
             estConstructionStart = allFields.get("estConstructionStart", None)
@@ -129,13 +122,7 @@ class ProjectPhaseValidator(BaseValidator):
                     },
                     code="construction_phase_missing_dates",
                 )
-            if personConstruction is None:
-                raise ValidationError(
-                    detail={
-                        "phase": "personConstruction must be populated if phase is `construction`"
-                    },
-                    code="construction_phase_missing_personConstruction",
-                )
+
         if phase.value == "warrantyPeriod":
             estConstructionEnd = allFields.get("estConstructionEnd", None)
 

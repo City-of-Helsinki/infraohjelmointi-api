@@ -3028,14 +3028,11 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+        # Project is created and programmed is automaticlly set to False since phase is not proposal or design.
         self.assertEqual(
             response.status_code,
-            400,
+            201,
             msg="Status code != 400 , Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            "category must be populated if programmed is `True`",
-            response.json()["errors"][0]["detail"],
         )
 
         data = {
@@ -3048,14 +3045,11 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+        # project created since it can be programmed=False with no phase information
         self.assertEqual(
             response.status_code,
-            400,
+            201,
             msg="Status code != 400 , Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            "phase must be set to `proposal` or `design` if programmed is `False`",
-            response.json()["errors"][0]["detail"],
         )
 
         data = {
@@ -3125,26 +3119,6 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
-            response.json()["errors"][0]["detail"],
-        )
-
-        data = {
-            "phase": self.projectPhase_4_Id,
-            "estPlanningStart": "01.01.2023",
-            "estPlanningEnd": "01.01.2024",
-        }
-        response = self.client.patch(
-            "/projects/{}/".format(createdId),
-            data,
-            content_type="application/json",
-        )
-        self.assertEqual(
-            response.status_code,
-            400,
-            msg="Status code != 400 , Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            "personPlanning must be populated if phase is `draftInitiation`",
             response.json()["errors"][0]["detail"],
         )
 
@@ -3220,26 +3194,6 @@ class ProjectTestCase(TestCase):
         )
 
         data = {
-            "phase": self.projectPhase_5_Id,
-            "estConstructionStart": "01.01.2023",
-            "estConstructionEnd": "01.01.2024",
-        }
-        response = self.client.patch(
-            "/projects/{}/".format(createdId),
-            data,
-            content_type="application/json",
-        )
-        self.assertEqual(
-            response.status_code,
-            400,
-            msg="Status code != 400 , Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            "personConstruction must be populated if phase is `construction`",
-            response.json()["errors"][0]["detail"],
-        )
-
-        data = {
             "estConstructionStart": "01.01.2023",
             "estConstructionEnd": "01.01.2024",
             "personConstruction": self.person_2_Id,
@@ -3280,27 +3234,6 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-            response.json()["errors"][0]["detail"],
-        )
-
-        data = {
-            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
-            "phase": self.projectPhase_2_Id,
-            "planningStartYear": 2021,
-            "constructionEndYear": 2022,
-        }
-        response = self.client.patch(
-            "/projects/{}/".format(createdId),
-            data,
-            content_type="application/json",
-        )
-        self.assertEqual(
-            response.status_code,
-            400,
-            msg="Status code != 400 , Error: {}".format(response.json()),
-        )
-        self.assertEqual(
-            "constructionPhase detail cannot be populated if phase is not `construction`",
             response.json()["errors"][0]["detail"],
         )
 
@@ -3359,13 +3292,10 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             response.status_code,
-            400,
+            200,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
-        self.assertEqual(
-            "phase cannot be `proposal` or `design` if programmed is `True`",
-            response.json()["errors"][0]["detail"],
-        )
+
         data = {
             "programmed": True,
             "phase": self.projectPhase_2_Id,
