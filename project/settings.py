@@ -36,7 +36,7 @@ env = environ.Env(
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
-    LOG_LEVEL=(str, "INFO"),
+    DJANGO_LOG_LEVEL=(str, "INFO"),
     HELSINKI_TUNNISTUS_ISSUER=(
         str,
         "https://tunnistus.test.hel.ninja/auth/realms/helsinki-tunnistus",
@@ -50,6 +50,7 @@ if path.exists(".env"):
     environ.Env().read_env(".env")
 
 DEBUG = env("DEBUG")
+DJANGO_LOG_LEVEL = env("DJANGO_LOG_LEVEL")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
@@ -224,10 +225,15 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": env("LOG_LEVEL"),
+        "level": env("DJANGO_LOG_LEVEL"),
     },
     "loggers": {
         "infraohjelmointi_api": {
+            "handlers": ["console"],
+            "level": 1,
+            "propagate": False,
+        },
+        "helusers._oidc_auth_impl": {
             "handlers": ["console"],
             "level": 1,
             "propagate": False,
