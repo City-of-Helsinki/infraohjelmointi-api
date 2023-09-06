@@ -1240,7 +1240,7 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
         self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
 
-        # Chcek same finances reflect on the related planning class
+        # Chcek same finances reflect on the related planning district
         response = self.client.get(
             "/project-locations/{}/".format(self.projectDistrict_1_Id)
         )
