@@ -18,10 +18,7 @@ class WhoAmIViewSet(BaseViewSet):
 
     @override
     def list(self, request, *args, **kwargs):
-        logger.debug("Current user {}".format(request.user.username))
-
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        return self.retrieve(request=request, args=args, kwargs=kwargs)
 
     @override
     def retrieve(self, request, *args, **kwargs):
