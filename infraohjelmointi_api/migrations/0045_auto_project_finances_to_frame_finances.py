@@ -8,11 +8,13 @@ def copy_project_finances_to_frame(apps, schema_editor):
     ProjectFinancial = apps.get_model("infraohjelmointi_api", "ProjectFinancial")
     Project = apps.get_model("infraohjelmointi_api", "Project")
     # id=None copies all the fields and performs an insert
-
+    frameProjectFinances = []
     for projectFinancial in ProjectFinancial.objects.all():
         projectFinancial.id = None
         projectFinancial.forFrameView = True
-        projectFinancial.save()
+        frameProjectFinances.append(projectFinancial)
+
+    ProjectFinancial.objects.bulk_create(frameProjectFinances)
 
     Project.objects.filter(
         estPlanningStart__isnull=False,
@@ -31,7 +33,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0043_remove_projectfinancial_unique together constraint project financial_and_more",
+            "0044_remove_projectfinancial_unique together constraint project financial_and_more",
         ),
     ]
 
