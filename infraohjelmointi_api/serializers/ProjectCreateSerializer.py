@@ -209,55 +209,36 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
 
-    @override
-    def create(self, validated_data):
+    def run_pre_create_update_validation(self, data: dict):
         # remove projectId as it doesn not exist on the Project model
-        validated_data.pop("projectId", None)
-        phase = validated_data.get("phase", None)
+        data.pop("projectId", None)
+        phase = data.get("phase", None)
         if phase is not None and phase.value == "programming":
-            validated_data["programmed"] = True
+            data["programmed"] = True
 
         if phase is not None and (
             phase.value == "completed"
             or phase.value == "warrantyPeriod"
             or phase.value == "proposal"
         ):
-            validated_data["programmed"] = False
+            data["programmed"] = False
 
         for estDate, frameEstDate in self.estFieldsRelations:
-            if (
-                validated_data.get(estDate, None) != None
-                and validated_data.get(frameEstDate, None) == None
-            ):
-                validated_data[frameEstDate] = validated_data.get(estDate)
+            if data.get(estDate, None) != None and data.get(frameEstDate, None) == None:
+                data[frameEstDate] = data.get(estDate)
 
+        return data
+
+    @override
+    def create(self, validated_data):
+        validated_data = self.run_pre_create_update_validation(data=validated_data)
         project = super(ProjectCreateSerializer, self).create(validated_data)
 
         return project
 
     @override
     def update(self, instance, validated_data):
-        # remove projectId as it doesn not exist on the Project model
-        validated_data.pop("projectId", None)
-
-        phase = validated_data.get("phase", None)
-
-        if phase is not None and phase.value == "programming":
-            validated_data["programmed"] = True
-
-        if phase is not None and (
-            phase.value == "completed"
-            or phase.value == "warrantyPeriod"
-            or phase.value == "proposal"
-        ):
-            validated_data["programmed"] = False
-
-        for estDate, frameEstDate in self.estFieldsRelations:
-            if (
-                validated_data.get(estDate, None) != None
-                and validated_data.get(frameEstDate, None) == None
-            ):
-                validated_data[frameEstDate] = validated_data.get(estDate)
+        validated_data = self.run_pre_create_update_validation(data=validated_data)
 
         # Commented out logic for automatic locking of project if phase updated to construction
         # else:
