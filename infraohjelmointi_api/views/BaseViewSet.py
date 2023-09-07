@@ -9,7 +9,7 @@ from ..permissions import IsSameUser
 
 
 class BaseViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsSameUser]
+    permission_classes = [IsAuthenticated]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
 
     @override
