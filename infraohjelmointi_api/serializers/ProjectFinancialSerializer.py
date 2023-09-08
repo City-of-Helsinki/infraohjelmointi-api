@@ -3,6 +3,9 @@ from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.validators.ProjectFinancialValidators import (
     LockedFieldsValidator,
 )
+from infraohjelmointi_api.services.ProjectFinancialService import (
+    ProjectFinancialService,
+)
 from rest_framework import serializers
 from overrides import override
 from rest_framework.validators import UniqueTogetherValidator
@@ -24,13 +27,13 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Check if a non frame view project financial is created and the related frameview financial does not exist
         if validated_data.get("forframeView", False) == False:
-            if not ProjectFinancial.objects.filter(
-                project=validated_data.get("project"),
+            if not ProjectFinancialService.instance_exists(
+                project_id=validated_data.get("project").id,
                 year=validated_data.get("year"),
                 forFrameView=True,
-            ).exists():
-                ProjectFinancial.objects.create(
-                    project=validated_data.get("project"),
+            ):
+                ProjectFinancialService.create(
+                    project_id=validated_data.get("project").id,
                     year=validated_data.get("year"),
                     forFrameView=True,
                     value=validated_data.get("value", 0),
@@ -46,13 +49,13 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
     def update(self, instance: ProjectFinancial, validated_data):
         # Check if a non frame view project financial is updated and the related frameview financial does not exist
         if instance.forFrameView == False:
-            if not ProjectFinancial.objects.filter(
-                project=instance.project,
+            if not ProjectFinancialService.instance_exists(
+                project_id=instance.project.id,
                 year=instance.year,
                 forFrameView=True,
-            ).exists():
-                ProjectFinancial.objects.create(
-                    project=instance.project,
+            ):
+                ProjectFinancialService.create(
+                    project_id=instance.project.id,
                     year=instance.year,
                     forFrameView=True,
                     value=validated_data.get("value", 0),
