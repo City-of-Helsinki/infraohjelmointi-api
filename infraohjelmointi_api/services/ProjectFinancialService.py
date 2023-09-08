@@ -11,6 +11,14 @@ class ProjectFinancialService:
         )
 
     @staticmethod
+    def create(
+        year: str, project_id: str, forFrameView: bool = False, value: int = 0
+    ) -> ProjectFinancial:
+        return ProjectFinancial.objects.create(
+            year=year, project_id=project_id, forFrameView=forFrameView, value=value
+        )
+
+    @staticmethod
     def update_or_create(
         year: str,
         project_id: str,
@@ -105,3 +113,10 @@ class ProjectFinancialService:
             "preliminaryCurrentYearPlus9": start_year + 9,
             "preliminaryCurrentYearPlus10": start_year + 10,
         }
+
+    @staticmethod
+    def instance_exists(project_id: str, year: int, forFrameView: bool = False) -> bool:
+        """Check if instance exists in DB"""
+        return ProjectFinancial.objects.filter(
+            project_id=project_id, year=year, forFrameView=forFrameView
+        ).exists()
