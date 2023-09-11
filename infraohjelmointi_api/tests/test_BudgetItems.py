@@ -5,7 +5,12 @@ from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.serializers import BudgetItemSerializer
 from overrides import override
 
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class BudgetItemTestCase(TestCase):
     budgetItemId = uuid.uuid4()
 
@@ -23,7 +28,6 @@ class BudgetItemTestCase(TestCase):
         )
 
     def test_budgetItem_is_created(self):
-
         self.assertEqual(
             BudgetItem.objects.filter(id=self.budgetItemId).exists(),
             True,

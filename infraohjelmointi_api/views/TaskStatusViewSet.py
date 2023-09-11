@@ -7,5 +7,4 @@ class TaskStatusViewSet(BaseViewSet):
     API endpoint that allows project types to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = TaskStatusSerializer

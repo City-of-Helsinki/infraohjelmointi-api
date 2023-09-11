@@ -15,6 +15,16 @@ class ProjectFinancialService:
         )
 
     @staticmethod
+    def update_or_create_bulk(
+        project_financials: list[ProjectFinancial],
+    ) -> list[ProjectFinancial]:
+        return ProjectFinancial.objects.bulk_create(
+            objs=project_financials,
+            update_conflicts=True,
+            unique_fields=["year", "project"],
+        )
+
+    @staticmethod
     def find_by_project_id_and_max_year(
         project_id: str, max_year=int
     ) -> list[ProjectFinancial]:

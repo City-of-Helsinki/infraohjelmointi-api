@@ -75,7 +75,6 @@ class ProjectViewSet(BaseViewSet):
         super().__init__(**kwargs)
         self.projectWiseService = ProjectWiseService()
 
-    permission_classes = []
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
