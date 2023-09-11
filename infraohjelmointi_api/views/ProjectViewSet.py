@@ -115,6 +115,10 @@ class ProjectViewSet(BaseViewSet):
             if finances is not None
             else date.today().year
         )
+        forcedToFrame = (
+            finances.pop("forcedToFrame", False) if finances is not None else False
+        )
+
         if finances is not None:
             fieldToYearMapping = (
                 ProjectFinancialService.get_financial_field_to_year_mapping(
@@ -126,7 +130,9 @@ class ProjectViewSet(BaseViewSet):
                     projectFinancialObject,
                     created,
                 ) = ProjectFinancialService.get_or_create(
-                    year=fieldToYearMapping[field], project_id=project.id
+                    year=fieldToYearMapping[field],
+                    project_id=project.id,
+                    forFrameView=forcedToFrame,
                 )
                 financeSerializer = ProjectFinancialSerializer(
                     projectFinancialObject,
@@ -137,13 +143,14 @@ class ProjectViewSet(BaseViewSet):
                 )
                 financeSerializer.is_valid(raise_exception=True)
                 financeSerializer.save()
-
+        # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
+        project.forcedToFrame = forcedToFrame
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
             many=False,
             partial=True,
-            context={"finance_year": year},
+            context={"finance_year": year, "forcedToFrame": forcedToFrame},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -154,8 +161,45 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden retrieve action to get PW link with a single project and allow frame view financials retrieval.\n
+
+            URL Query Parameters
+            ----------
+
+            project_id : UUID string
+
+            forcedToFrame (optional) : Bool
+
+            Query parameter to state if project returned should contain frame view financial values.
+            Defaults to False.
+
+            Usage
+            ----------
+
+            projects/<project_id>/?forcedToFrame=<bool>
+
+            Returns
+            -------
+
+            JSON
+                Project instance with financial values.
+        """
         instance = self.get_object()
-        serializer = self.get_serializer(instance, context={"get_pw_link": True})
+        forcedToFrame = request.query_params.get("forcedToFrame", False)
+        if forcedToFrame in ["False", "false"]:
+            forcedToFrame = False
+
+        if forcedToFrame in ["true", "True"]:
+            forcedToFrame = True
+
+        if forcedToFrame not in [True, False]:
+            raise ParseError(
+                detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
+            )
+        serializer = self.get_serializer(
+            instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
+        )
         return Response(serializer.data)
 
     @action(
@@ -509,7 +553,9 @@ class ProjectViewSet(BaseViewSet):
             return ProjectCreateSerializer
         return super().get_serializer_class()
 
-    def get_projects(self, request, for_coordinator=False) -> ProjectGetSerializer:
+    def get_projects(
+        self, request, for_coordinator=False, forFrameView=False
+    ) -> ProjectGetSerializer:
         """
         Utility function to get a filtered project queryset
 
@@ -522,11 +568,15 @@ class ProjectViewSet(BaseViewSet):
             for_coordinator : Bool
             Paramter stating if the projects are needed for coordinator
 
+            forFrameView : Bool
+            Paramter to identify if projects being returned should have frame view finances.
+
             Returns
             -------
 
             Project Queryset
         """
+
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
@@ -543,24 +593,23 @@ class ProjectViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
+        serializerContext = {
+            "finance_year": financeYear,
+            "for_coordinator": for_coordinator,
+            "forcedToFrame": forFrameView,
+        }
         if page is not None:
             serializer = self.get_serializer(
                 page,
                 many=True,
-                context={
-                    "finance_year": financeYear,
-                    "for_coordinator": for_coordinator,
-                },
+                context=serializerContext,
             )
             return paginator.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(
             queryset,
             many=True,
-            context={
-                "finance_year": financeYear,
-                "for_coordinator": for_coordinator,
-            },
+            context=serializerContext,
         )
 
         return serializer
@@ -571,7 +620,8 @@ class ProjectViewSet(BaseViewSet):
         Overriden list action for projects to make use of the utility function and get projects for planning by default.\n
         All search result url query paramters can be used to filter projects here.
         """
-        projects = self.get_projects(request, for_coordinator=False)
+
+        projects = self.get_projects(request, for_coordinator=False, forFrameView=False)
         return Response(projects.data)
 
     @action(
@@ -584,8 +634,41 @@ class ProjectViewSet(BaseViewSet):
         """
         Custom action to get Projects with coordinator location and classes.\n
         All search result url query paramters can be used to filter projects here.
+
+            URL Query Parameters
+            ----------
+
+            forcedToFrame (optional) : Bool
+
+            Query parameter to state if projects returned should contain frame view financial values.
+            Defaults to False.
+
+            Usage
+            ----------
+
+            projects/coordinator/?forcedToFrame=<bool>
+
+            Returns
+            -------
+
+            JSON
+                List of Project Instances with coordinator class/locations and normal/frameView financial values.
         """
-        projects = self.get_projects(request, for_coordinator=True)
+        forcedToFrame = request.query_params.get("forcedToFrame", False)
+        if forcedToFrame in ["False", "false"]:
+            forcedToFrame = False
+
+        if forcedToFrame in ["true", "True"]:
+            forcedToFrame = True
+
+        if forcedToFrame not in [True, False]:
+            raise ParseError(
+                detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
+            )
+
+        projects = self.get_projects(
+            request, for_coordinator=True, forFrameView=forcedToFrame
+        )
         return Response(projects.data)
 
     @override
@@ -863,6 +946,8 @@ class ProjectViewSet(BaseViewSet):
                     finances = financeData.get("finances", None)
                     if finances is not None:
                         year = finances.get("year", date.today().year)
+                        forcedToFrame = finances.pop("forcedToFrame", False)
+
                         if year is None:
                             year = date.today().year
                         fieldToYearMapping = (
@@ -880,6 +965,7 @@ class ProjectViewSet(BaseViewSet):
                             ) = ProjectFinancialService.get_or_create(
                                 year=fieldToYearMapping[field],
                                 project_id=Project(id=financeData["project"]).id,
+                                forFrameView=forcedToFrame,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,

@@ -153,62 +153,73 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         """
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
+        forcedToFrame = self.context.get("forcedToFrame", False)
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
         summedFinances = relatedProjects.aggregate(
             year0_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year),
+                filter=Q(finances__forFrameView=forcedToFrame) & Q(finances__year=year),
             ),
             year1_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 1),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 1),
             ),
             year2_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 2),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 2),
             ),
             year3_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 3),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 3),
             ),
             year4_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 4),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 4),
             ),
             year5_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 5),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 5),
             ),
             year6_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 6),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 6),
             ),
             year7_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 7),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 7),
             ),
             year8_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 8),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 8),
             ),
             year9_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 9),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 9),
             ),
             year10_plannedBudget=Sum(
                 "finances__value",
                 default=0,
-                filter=Q(finances__year=year + 10),
+                filter=Q(finances__forFrameView=forcedToFrame)
+                & Q(finances__year=year + 10),
             ),
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )

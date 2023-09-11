@@ -58,7 +58,14 @@ def get_financial_sums(
                 "district": <ProjectLocation instance with sums>,
                 "group": <ProjectGroup instance with sums>,
                 },
-            }
+            },
+            "forcedToFrame": {
+                "masterClass": <ProjectClass instance with sums>,
+                "class": <ProjectClass instance with sums>,
+                "subClass": <ProjectClass instance with sums>,
+                "collectiveSubLevel": <ProjectClass instance with sums>,
+                "district": <ProjectLocation instance with sums>,
+                }
     """
 
     sums = {
@@ -79,32 +86,64 @@ def get_financial_sums(
             "district": None,
             "group": None,
         },
+        "forcedToFrame": {
+            "masterClass": None,
+            "class": None,
+            "subClass": None,
+            "collectiveSubLevel": None,
+            "otherClassification": None,
+            "subLevelDistrict": None,
+            "district": None,
+            "group": None,
+        },
     }
     if _type == "ProjectFinancial":
         project = instance.project
+        forFrameView = instance.forFrameView
         projectRelations = ProjectService.get_project_class_location_group_relations(
             project=project
         )
 
         for viewType, instances in projectRelations.items():
+            if viewType == "planning" and forFrameView == True:
+                continue
             for instanceType, instance in instances.items():
-                if instance != None:
-                    if instanceType == "group":
-                        sums[viewType][instanceType] = ProjectGroupSerializer(
-                            instance,
-                            context={"for_coordinator": viewType == "coordination"},
-                        ).data
+                if instance == None:
+                    continue
+                if instanceType == "group":
+                    sums[viewType if forFrameView != True else "forcedToFrame"][
+                        instanceType
+                    ] = ProjectGroupSerializer(
+                        instance,
+                        context={
+                            "for_coordinator": viewType == "coordination"
+                            or forFrameView,
+                            "forcedToFrame": forFrameView,
+                        },
+                    ).data
 
-                    elif instanceType in ["district", "subLevelDistrict"]:
-                        sums[viewType][instanceType] = ProjectLocationSerializer(
-                            instance,
-                            context={"for_coordinator": viewType == "coordination"},
-                        ).data
-                    else:
-                        sums[viewType][instanceType] = ProjectClassSerializer(
-                            instance,
-                            context={"for_coordinator": viewType == "coordination"},
-                        ).data
+                elif instanceType in ["district", "subLevelDistrict"]:
+                    sums[viewType if forFrameView != True else "forcedToFrame"][
+                        instanceType
+                    ] = ProjectLocationSerializer(
+                        instance,
+                        context={
+                            "for_coordinator": viewType == "coordination"
+                            or forFrameView,
+                            "forcedToFrame": forFrameView,
+                        },
+                    ).data
+                else:
+                    sums[viewType if forFrameView != True else "forcedToFrame"][
+                        instanceType
+                    ] = ProjectClassSerializer(
+                        instance,
+                        context={
+                            "for_coordinator": viewType == "coordination"
+                            or forFrameView,
+                            "forcedToFrame": forFrameView,
+                        },
+                    ).data
 
     if _type == "ClassFinancial":
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
@@ -179,12 +218,20 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
     if created:
         logger.debug("Signal Triggered: Project was created")
     else:
+        # This comes from partial_update action which is overriden in project view set
+        # It gets added to the project instance before .save() is called
+        forcedToFrame = getattr(instance, "forcedToFrame", False)
         send_event(
             "project",
             "project-update",
             {
                 "project": ProjectGetSerializer(
-                    instance, context={"get_pw_link": True}
+                    instance,
+                    context={
+                        "get_pw_link": True,
+                        "forcedToFrame": forcedToFrame,
+                        "for_coordinator": forcedToFrame == True,
+                    },
                 ).data,
             },
         )
