@@ -8,6 +8,7 @@ from overrides import override
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework import status
+from rest_framework.exceptions import ParseError
 
 
 class ProjectClassViewSet(BaseClassLocationViewSet):
@@ -39,10 +40,15 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             Year number to fetch Project Class with finances starting from this year.
             Defaults to current year.
 
+            forcedToFrame (optional) : bool
+
+            Query param to fetch coordinator classes with frameView project sums.
+            Defaults to False.
+
             Usage
             ----------
 
-            project-classes/?year=<year>
+            project-classes/?year=<year>&forcedToframe=<bool>
 
             Returns
             -------
@@ -51,6 +57,17 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                 List of ProjectClass instances with financial sums for projects under each class
         """
         year = request.query_params.get("year", date.today().year)
+        forcedToFrame = request.query_params.get("forcedToFrame", False)
+        if forcedToFrame in ["False", "false"]:
+            forcedToFrame = False
+
+        if forcedToFrame in ["true", "True"]:
+            forcedToFrame = True
+
+        if forcedToFrame not in [True, False]:
+            raise ParseError(
+                detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
+            )
         serializer = ProjectClassSerializer(
             ProjectClassService.list_all_for_coordinator()
             .prefetch_related("coordinatorClass__finances")
@@ -59,6 +76,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             context={
                 "finance_year": year,
                 "for_coordinator": True,
+                "forcedToFrame": forcedToFrame,
             },
         )
         return Response(serializer.data)

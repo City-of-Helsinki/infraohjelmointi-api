@@ -214,87 +214,58 @@ class BudgetFileHandler(IExcelFileHandler):
                 project.planningStartYear = planningStartYear
                 # First date of the first month
                 project.estPlanningStart = datetime.datetime(planningStartYear, 1, 1)
+                project.frameEstPlanningStart = project.estPlanningStart
                 # middle of year if only 1 budget in excel, else end of year
                 project.estPlanningEnd = (
                     datetime.datetime(planningStartYear, 6, 30)
                     if hasOneBudgetField
                     else datetime.datetime(planningStartYear, 12, 31)
                 )
+                project.frameEstPlanningEnd = project.estPlanningEnd
                 # same year as planning if 1 budget in excel, else the same year as last budget in excel
                 project.constructionEndYear = (
                     (planningStartYear)
                     if hasOneBudgetField
                     else (self.current_budget_year + lastBudgetIndex)
                 )
+
                 # 1 month after planning ends if 1 budget field, else 1 year after planning
                 project.estConstructionStart = (
                     datetime.datetime(planningStartYear, 7, 1)
                     if hasOneBudgetField
                     else datetime.datetime(planningStartYear + 1, 1, 1)
                 )
+                project.frameEstConstructionStart = project.estConstructionStart
 
                 project.estConstructionEnd = datetime.datetime(
                     project.constructionEndYear, 12, 31
                 )
+                project.frameEstConstructionEnd = project.estConstructionEnd
 
             project.programmed = budget_sum > 0
             project.category = category
             project.effectHousing = effectHousing
             # if value already converted into float, convert it back to string to void validation error
             project.costForecast = str(costForecast) if costForecast != None else None
+            project_financials = []
+            for index, budgetValue in enumerate(budget_list):
+                project_financials.append(
+                    ProjectFinancial(
+                        year=self.current_budget_year + index,
+                        project_id=project.id,
+                        value=str(budgetValue) if budgetValue != None else None,
+                        forFrameView=False,
+                    )
+                )
+                project_financials.append(
+                    ProjectFinancial(
+                        year=self.current_budget_year + index,
+                        project_id=project.id,
+                        value=str(budgetValue) if budgetValue != None else None,
+                        forFrameView=True,
+                    )
+                )
 
-            project_financials = [
-                ProjectFinancial(
-                    year=self.current_budget_year,
-                    project_id=project.id,
-                    value=str(budget_list[0]) if budget_list[0] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 1,
-                    project_id=project.id,
-                    value=str(budget_list[1]) if budget_list[1] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 2,
-                    project_id=project.id,
-                    value=str(budget_list[2]) if budget_list[2] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 3,
-                    project_id=project.id,
-                    value=str(budget_list[3]) if budget_list[3] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 4,
-                    project_id=project.id,
-                    value=str(budget_list[4]) if budget_list[4] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 5,
-                    project_id=project.id,
-                    value=str(budget_list[5]) if budget_list[5] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 6,
-                    project_id=project.id,
-                    value=str(budget_list[6]) if budget_list[6] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 7,
-                    project_id=project.id,
-                    value=str(budget_list[7]) if budget_list[7] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 8,
-                    project_id=project.id,
-                    value=str(budget_list[8]) if budget_list[8] != None else None,
-                ),
-                ProjectFinancial(
-                    year=self.current_budget_year + 9,
-                    project_id=project.id,
-                    value=str(budget_list[9]) if budget_list[9] != None else None,
-                ),
-            ]
             ProjectFinancialService.update_or_create_bulk(
                 project_financials=project_financials
             )
