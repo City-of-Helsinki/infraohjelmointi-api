@@ -6,7 +6,12 @@ from ..models import Task
 import uuid
 from overrides import override
 
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class TaskTestCase(TestCase):
     TaskId = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     TaskId2 = uuid.UUID("be923535-0b96-4cb5-b357-5e62a145281f")
@@ -89,7 +94,6 @@ class TaskTestCase(TestCase):
         )
 
     def test_Task_is_created(self):
-
         self.assertEqual(
             Task.objects.filter(id=self.TaskId).exists(),
             True,

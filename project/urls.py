@@ -108,10 +108,18 @@ router.register(
     views.LocationFinancialViewSet,
     basename="locationFinancials",
 )
+router.register(
+    r"who-am-i",
+    views.WhoAmIViewSet,
+    basename="whoAmI",
+)
+
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/budget-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/class-location-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/", admin.site.urls),
+    path("pysocial/", include("social_django.urls", namespace="social")),
+    path("helauth/", include("helusers.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

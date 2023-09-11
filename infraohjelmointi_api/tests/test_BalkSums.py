@@ -12,7 +12,11 @@ from infraohjelmointi_api.models import (
 import uuid
 from overrides import override
 
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
+@patch.object(BaseViewSet, 'authentication_classes', new = [])
+@patch.object(BaseViewSet, 'permission_classes', new = [])
 class BalkSumTestCase(TestCase):
     project_1_Id = uuid.UUID("d6e03aa6-1ffa-4603-86ff-0d22dccf702d")
     project_2_Id = uuid.UUID("d27bbbcc-22de-48c6-b96a-899d8cf3e3da")

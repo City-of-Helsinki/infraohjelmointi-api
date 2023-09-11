@@ -18,8 +18,6 @@ class NoteViewSet(BaseViewSet):
     API endpoint that allows notes to be viewed or edited.
     """
 
-    permission_classes = []
-
     @override
     def get_serializer_class(self):
         """

@@ -13,7 +13,6 @@ class ProjectFinancialViewSet(BaseViewSet):
     API endpoint that allows Project Finances to be viewed or edited.
     """
 
-    permission_classes = []
     serializer_class = ProjectFinancialSerializer
 
     @action(
