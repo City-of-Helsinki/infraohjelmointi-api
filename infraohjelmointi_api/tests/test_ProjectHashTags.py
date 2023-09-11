@@ -4,8 +4,12 @@ from infraohjelmointi_api.models import ProjectHashTag, Project
 from infraohjelmointi_api.serializers import ProjectHashtagSerializer
 import uuid
 from overrides import override
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
 
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class ProjectHashTagTestCase(TestCase):
     project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")

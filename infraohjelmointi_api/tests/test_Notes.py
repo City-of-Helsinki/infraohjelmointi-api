@@ -6,7 +6,12 @@ from ..serializers import NoteGetSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
 
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class NoteTestCase(TestCase):
     note_1_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     note_2_Id = uuid.UUID("da4a46f1-2939-43e2-8f92-40e94417813b")
@@ -19,7 +24,6 @@ class NoteTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
-
         self.projectType = ProjectType.objects.create(
             id=self.projectTypeId, value="projectComplex"
         )
