@@ -37,9 +37,10 @@ class ProjectFinancialService:
         project_financials: list[ProjectFinancial],
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.bulk_create(
-            objs=project_financials,
+            project_financials,
             update_conflicts=True,
-            unique_fields=["year", "project"],
+            update_fields=["value"],
+            unique_fields=["year", "project_id", "forFrameView"],
         )
 
     @staticmethod
