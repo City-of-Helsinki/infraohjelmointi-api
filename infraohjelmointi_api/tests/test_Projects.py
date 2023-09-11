@@ -31,8 +31,12 @@ from datetime import date
 
 from rest_framework.renderers import JSONRenderer
 from overrides import override
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
 
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class ProjectTestCase(TestCase):
     project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
@@ -2234,9 +2238,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "The field phase cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {"planningStartYear": 2023}
@@ -2252,7 +2257,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field planningStartYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["planningStartYear"][0],
         )
 
         data = {"constructionEndYear": 2023}
@@ -2268,7 +2273,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field constructionEndYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["constructionEndYear"][0],
         )
 
         data = {"programmed": False}
@@ -2284,7 +2289,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field programmed cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["programmed"][0],
         )
 
         data = {"projectClass": self.projectClass_1_Id.__str__()}
@@ -2300,7 +2305,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field projectClass cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["projectClass"][0],
         )
 
         data = {"projectLocation": self.projectDivision_1_Id.__str__()}
@@ -2316,7 +2321,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field projectLocation cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["projectLocation"][0],
         )
 
         data = {"siteId": self.budgetItemId.__str__()}
@@ -2332,7 +2337,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field siteId cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["siteId"][0],
         )
 
         data = {"realizedCost": 200}
@@ -2348,7 +2353,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field realizedCost cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["realizedCost"][0],
         )
 
         data = {"budgetOverrunAmount": 200}
@@ -2364,7 +2369,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetOverrunAmount cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["budgetOverrunAmount"][0],
         )
 
         data = {"budgetForecast1CurrentYear": 200}
@@ -2380,7 +2385,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetForecast1CurrentYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["budgetForecast1CurrentYear"][0],
         )
 
         data = {"budgetForecast2CurrentYear": 200}
@@ -2396,7 +2401,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetForecast2CurrentYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["budgetForecast2CurrentYear"][0],
         )
 
         data = {"budgetForecast3CurrentYear": 200}
@@ -2412,7 +2417,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetForecast3CurrentYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["budgetForecast3CurrentYear"][0],
         )
 
         data = {"budgetForecast4CurrentYear": 200}
@@ -2428,7 +2433,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetForecast4CurrentYear cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["budgetForecast4CurrentYear"][0],
         )
 
         data = {"finances": {"budgetProposalCurrentYearPlus0": 200}}
@@ -2442,9 +2447,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus0 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"budgetProposalCurrentYearPlus1": 200}}
@@ -2460,7 +2466,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus1 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"budgetProposalCurrentYearPlus2": 200}}
@@ -2476,7 +2482,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus2 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus3": 200}}
@@ -2492,7 +2498,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus3 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus4": 200}}
@@ -2508,7 +2514,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus4 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus5": 200}}
@@ -2524,7 +2530,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus5 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus6": 200}}
@@ -2540,7 +2546,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus6 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus7": 200}}
@@ -2556,7 +2562,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus7 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus8": 200}}
@@ -2572,7 +2578,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus8 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus9": 200}}
@@ -2588,7 +2594,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus9 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus10": 200}}
@@ -2604,7 +2610,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus10 cannot be modified when the project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["non_field_errors"][0],
         )
 
     def test_locking_project_twice(self):
@@ -2699,9 +2705,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["estPlanningStart"][0],
         )
 
         data = {"estConstructionEnd": "05.05.2030"}
@@ -2717,7 +2724,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
-            response.json()["errors"][0]["detail"],
+            response.json()["estConstructionEnd"][0],
         )
 
     def test_class_location_validation(self):
@@ -3079,9 +3086,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "planningStartYear and constructionEndYear must be populated if phase is `programming`",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {
@@ -3094,14 +3102,16 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
         self.assertEqual(
             response.status_code,
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "category must be populated if phase is `programming`",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {
@@ -3119,7 +3129,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {
@@ -3132,6 +3142,7 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
         self.assertEqual(
             response.status_code,
             200,
@@ -3147,6 +3158,7 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
         self.assertEqual(
             response.status_code,
             400,
@@ -3155,7 +3167,7 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(
             "projectClass must be populated if programmed is `True`",
-            response.json()["errors"][0]["detail"],
+            response.json()["programmed"][0],
         )
 
         data = {
@@ -3183,6 +3195,7 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
         self.assertEqual(
             response.status_code,
             400,
@@ -3190,7 +3203,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "estConstructionStart and estConstructionEnd must be populated if phase is `construction`",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {
@@ -3203,6 +3216,7 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
         self.assertEqual(
             response.status_code,
             200,
@@ -3232,9 +3246,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-            response.json()["errors"][0]["detail"],
+            response.json()["phase"][0],
         )
 
         data = {
@@ -3263,9 +3278,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "phase must be set to `proposal` or `design` if programmed is `False`",
-            response.json()["errors"][0]["detail"],
+            response.json()["programmed"][0],
         )
         # Getting proposal phase from the data that is populated when tests run the migrations
         data = {
@@ -3324,9 +3340,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "Year cannot be earlier than planningStartYear",
-            response.json()["errors"][0]["detail"],
+            response.json()["constructionEndYear"][0],
         )
         data = {"planningStartYear": 2050, "constructionEndYear": 2060}
         response = self.client.patch(
@@ -3350,9 +3367,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "Year cannot be earlier than planningStartYear",
-            response.json()["errors"][0]["detail"],
+            response.json()["constructionEndYear"][0],
         )
 
         data = {"constructionEndYear": 2055}
@@ -3378,9 +3396,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "Date cannot be later than estPlanningEnd",
-            response.json()["errors"][0]["detail"],
+            response.json()["estPlanningStart"][0],
         )
         data = {"estPlanningStart": "01.01.2023", "estPlanningEnd": "01.01.2025"}
         response = self.client.patch(
@@ -3407,7 +3426,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "Date cannot be later than presenceEnd",
-            response.json()["errors"][0]["detail"],
+            response.json()["presenceStart"][0],
         )
         data = {"presenceStart": "01.01.2023", "presenceEnd": "01.01.2025"}
         response = self.client.patch(
@@ -3432,9 +3451,10 @@ class ProjectTestCase(TestCase):
             400,
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
+
         self.assertEqual(
             "Date cannot be later than visibilityEnd",
-            response.json()["errors"][0]["detail"],
+            response.json()["visibilityStart"][0],
         )
         data = {"visibilityStart": "01.01.2023", "visibilityEnd": "01.01.2025"}
         response = self.client.patch(
@@ -3464,7 +3484,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "Date cannot be later than estConstructionEnd",
-            response.json()["errors"][0]["detail"],
+            response.json()["estConstructionStart"][0],
         )
         data = {
             "estConstructionStart": "01.01.2023",

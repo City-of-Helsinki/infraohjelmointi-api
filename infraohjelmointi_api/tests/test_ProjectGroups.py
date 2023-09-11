@@ -10,8 +10,13 @@ from infraohjelmointi_api.serializers import ProjectGroupSerializer
 import uuid
 from overrides import override
 
+from infraohjelmointi_api.views import BaseViewSet
+from unittest.mock import patch
 
-class projectGroupTestCase(TestCase):
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectGroupTestCase(TestCase):
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
@@ -156,12 +161,13 @@ class projectGroupTestCase(TestCase):
         response = self.client.post(
             "/project-groups/", data, content_type="application/json"
         )
+
         self.assertEqual(
             response.status_code,
             400,
             msg="Status code != 400",
         )
-        errorMessage = response.json()["errors"][0]["detail"]
+        errorMessage = response.json()["non_field_errors"][0]
         self.assertEqual(
             errorMessage,
             "Project: {} cannot be assigned to this group. It already belongs to group: {} with groupId: {}".format(
@@ -180,7 +186,8 @@ class projectGroupTestCase(TestCase):
             404,
             msg="Status code != 404",
         )
-        errorMessage = response.json()["errors"][0]["detail"]
+
+        errorMessage = response.json()["detail"]
         self.assertEqual(
             errorMessage,
             "Not found.",
