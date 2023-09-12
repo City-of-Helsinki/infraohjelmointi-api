@@ -57,15 +57,11 @@ class LocationFinancialService:
         coordinatorLocationInstance: ProjectLocation = instance.locationRelation
 
         locationFinancialRelations["coordination"][
-            ProjectLocationService.identify_location_type(
-                locationInstance=coordinatorLocationInstance
-            )
+            "district"
         ] = coordinatorLocationInstance
 
         locationFinancialRelations["planning"][
-            ProjectLocationService.identify_location_type(
-                locationInstance=coordinatorLocationInstance.relatedTo
-            )
+            "district"
         ] = coordinatorLocationInstance.relatedTo
 
         # Traverse backwards from current Coordination Location to get parent classes
