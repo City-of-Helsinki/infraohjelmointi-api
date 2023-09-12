@@ -209,7 +209,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
 
-    def run_pre_create_update_validation(self, data: dict):
+    def run_pre_create_update_validation(self, data: dict, instance=None):
         # remove projectId as it doesn not exist on the Project model
         data.pop("projectId", None)
         phase = data.get("phase", None)
@@ -224,7 +224,13 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             data["programmed"] = False
 
         for estDate, frameEstDate in self.estFieldsRelations:
-            if data.get(estDate, None) != None and data.get(frameEstDate, None) == None:
+            if data.get(estDate, None) != None and (
+                instance == None
+                or (
+                    getattr(instance, frameEstDate, None) == None
+                    and data.get(frameEstDate, None) != None
+                )
+            ):
                 data[frameEstDate] = data.get(estDate)
 
         return data
@@ -238,7 +244,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     @override
     def update(self, instance, validated_data):
-        validated_data = self.run_pre_create_update_validation(data=validated_data)
+        validated_data = self.run_pre_create_update_validation(
+            data=validated_data, instance=instance
+        )
 
         # Commented out logic for automatic locking of project if phase updated to construction
         # else:
