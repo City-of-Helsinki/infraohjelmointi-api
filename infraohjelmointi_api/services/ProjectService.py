@@ -67,7 +67,6 @@ class ProjectService:
                     "collectiveSubLevel": <ProjectClass instance>,
                     "otherClassification": <ProjectClass instance>,
                     "district": <ProjectLocation instance>,
-                    "subLevelDistrict": <ProjectLocation instance>,
                     "group": <ProjectGroup instance>,
                 },
                 "planning": {
@@ -94,7 +93,6 @@ class ProjectService:
                 "collectiveSubLevel": None,
                 "otherClassification": None,
                 "district": None,
-                "subLevelDistrict": None,
                 "group": None,
             },
         }
@@ -161,15 +159,7 @@ class ProjectService:
         ]
 
         if projectRelations["planning"]["district"]:
-            projectRelations["coordination"][
-                ProjectLocationService.identify_location_type(
-                    getattr(
-                        projectRelations["planning"]["district"],
-                        "coordinatorLocation",
-                        None,
-                    )
-                )
-            ] = (
+            projectRelations["coordination"]["district"] = (
                 projectRelations["planning"]["district"].coordinatorLocation
                 if hasattr(
                     projectRelations["planning"]["district"], "coordinatorLocation"
