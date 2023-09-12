@@ -7,6 +7,7 @@ from ....services import (
 )
 import re
 from .openpyxl_theme_and_tint_to_rgb import theme_and_tint_to_hex
+import string
 
 MAIN_CLASS_COLOR = hex(int("ffff0000", 16))
 CLASS_COLOR = hex(int("ffffc000", 16))
@@ -360,6 +361,7 @@ def proceedWithMainClass(
         .capitalize()
         .strip()
     )
+    name = string.capwords(name, "-")
     name = "{} {}".format(
         re.sub(
             "(?<=\d) (?=\d)", "", str(code).lower()
@@ -402,6 +404,7 @@ def proceedWithClass(
         .capitalize()
         .strip()
     )
+    name = string.capwords(name, "-")
     name = "{} {}".format(
         # replace multiply spaces with one
         re.sub("\s\s+", " ", code).strip() if code else "",
@@ -444,6 +447,7 @@ def proceedWithSubClass(
         .capitalize()
         .strip()
     )
+    name = string.capwords(name, "-")
     name = "{} {}".format(
         # replace multiply spaces with one
         re.sub("\s\s+", " ", code).strip() if code else "",
@@ -529,7 +533,7 @@ def buildHierarchiesAndProjects(
         main_class = "{} {}".format(
             class_code, re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
         ).strip()
-
+        main_class = string.capwords(main_class, "-")
         class_stack.append(
             ProjectClassService.get_or_create(
                 name=main_class,
@@ -571,6 +575,7 @@ def buildHierarchiesAndProjects(
             .capitalize()
             .strip()
         )
+        name = string.capwords(name, "-")
         name = "{} {}".format(
             class_code,
             name,
