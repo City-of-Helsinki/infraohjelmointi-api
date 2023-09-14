@@ -347,6 +347,19 @@ def getEndIndex(color_list: list, break_point: hex, check_point: list):
     return end_index
 
 
+def sanitizeString(data: str = None):
+    if data != None and isinstance(data, str):
+        data = (
+            # remove first spaces between numbers and then remove all numbers from name
+            re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower()))
+            .capitalize()
+            .strip()
+        )
+        data = string.capwords(data, "-")
+
+    return data
+
+
 def proceedWithMainClass(
     code: str,
     name: str,
@@ -355,13 +368,7 @@ def proceedWithMainClass(
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
 ) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = string.capwords(name, "-")
+    name = sanitizeString(data=name)
     name = "{} {}".format(
         re.sub(
             "(?<=\d) (?=\d)", "", str(code).lower()
@@ -398,13 +405,7 @@ def proceedWithClass(
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
 ) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = string.capwords(name, "-")
+    name = sanitizeString(data=name)
     name = "{} {}".format(
         # replace multiply spaces with one
         re.sub("\s\s+", " ", code).strip() if code else "",
@@ -441,13 +442,7 @@ def proceedWithSubClass(
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
 ) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = string.capwords(name, "-")
+    name = sanitizeString(data=name)
     name = "{} {}".format(
         # replace multiply spaces with one
         re.sub("\s\s+", " ", code).strip() if code else "",
