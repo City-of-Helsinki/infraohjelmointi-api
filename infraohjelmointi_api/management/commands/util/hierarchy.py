@@ -360,6 +360,35 @@ def sanitizeString(data: str = None):
     return data
 
 
+def get_or_create_class_instance(
+    name: str,
+    cell_color: str,
+    row_number: int,
+    for_coordinator_only: bool = False,
+    related_to: ProjectClass = None,
+    parent: ProjectClass = None,
+):
+    print_with_bg_color(
+        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
+            name,
+            color_map[cell_color],
+            cell_color,
+            row_number,
+            name if parent == None else "/".join([parent.path, name]),
+            related_to.id if related_to else None,
+            for_coordinator_only,
+        ),
+        cell_color,
+    )
+    return ProjectClassService.get_or_create(
+        name=name,
+        parent=parent,
+        path=name if parent == None else "/".join([parent.path, name]),
+        forCoordinatorOnly=for_coordinator_only,
+        relatedTo=related_to,
+    )[0]
+
+
 def proceedWithMainClass(
     code: str,
     name: str,
@@ -375,25 +404,14 @@ def proceedWithMainClass(
         ),  # remove spaces between numbers
         name,
     ).strip()
-    print_with_bg_color(
-        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
-            name,
-            color_map[cell_color],
-            cell_color,
-            row_number,
-            name,
-            related_to.id if related_to else None,
-            for_coordinator_only,
-        ),
-        cell_color,
-    )
-    return ProjectClassService.get_or_create(
+    return get_or_create_class_instance(
         name=name,
+        cell_color=cell_color,
+        row_number=row_number,
+        for_coordinator_only=for_coordinator_only,
+        related_to=related_to,
         parent=None,
-        path=name,
-        forCoordinatorOnly=for_coordinator_only,
-        relatedTo=related_to,
-    )[0]
+    )
 
 
 def proceedWithClass(
@@ -412,25 +430,14 @@ def proceedWithClass(
         name,
     ).strip()
 
-    print_with_bg_color(
-        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
-            name,
-            color_map[cell_color],
-            cell_color,
-            row_number,
-            "/".join([parent.path, name]),
-            related_to.id if related_to else None,
-            for_coordinator_only,
-        ),
-        cell_color,
-    )
-    return ProjectClassService.get_or_create(
+    return get_or_create_class_instance(
         name=name,
+        cell_color=cell_color,
+        row_number=row_number,
+        for_coordinator_only=for_coordinator_only,
+        related_to=related_to,
         parent=parent,
-        path="/".join([parent.path, name]),
-        forCoordinatorOnly=for_coordinator_only,
-        relatedTo=related_to,
-    )[0]
+    )
 
 
 def proceedWithSubClass(
@@ -448,25 +455,14 @@ def proceedWithSubClass(
         re.sub("\s\s+", " ", code).strip() if code else "",
         name,
     ).strip()
-    print_with_bg_color(
-        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
-            name,
-            color_map[cell_color],
-            cell_color,
-            row_number,
-            "/".join([parent.path, name]),
-            related_to.id if related_to else None,
-            for_coordinator_only,
-        ),
-        cell_color,
-    )
-    return ProjectClassService.get_or_create(
+    return get_or_create_class_instance(
         name=name,
+        cell_color=cell_color,
+        row_number=row_number,
+        for_coordinator_only=for_coordinator_only,
+        related_to=related_to,
         parent=parent,
-        path="/".join([parent.path, name]),
-        forCoordinatorOnly=for_coordinator_only,
-        relatedTo=related_to,
-    )[0]
+    )
 
 
 def proceedWithDistrict(
