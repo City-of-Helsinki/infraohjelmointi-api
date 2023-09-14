@@ -75,7 +75,6 @@ def get_financial_sums(
             "subClass": None,
             "collectiveSubLevel": None,
             "otherClassification": None,
-            "subLevelDistrict": None,
             "district": None,
             "group": None,
         },
@@ -92,7 +91,6 @@ def get_financial_sums(
             "subClass": None,
             "collectiveSubLevel": None,
             "otherClassification": None,
-            "subLevelDistrict": None,
             "district": None,
             "group": None,
         },
@@ -122,7 +120,7 @@ def get_financial_sums(
                         },
                     ).data
 
-                elif instanceType in ["district", "subLevelDistrict"]:
+                elif instanceType in ["district"]:
                     sums[viewType if forFrameView != True else "forcedToFrame"][
                         instanceType
                     ] = ProjectLocationSerializer(
@@ -166,7 +164,7 @@ def get_financial_sums(
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
                 if instance != None:
-                    if instanceType in ["district", "subLevelDistrict"]:
+                    if instanceType in ["district"]:
                         sums[viewType][instanceType] = ProjectLocationSerializer(
                             instance,
                             context={"for_coordinator": viewType == "coordination"},
