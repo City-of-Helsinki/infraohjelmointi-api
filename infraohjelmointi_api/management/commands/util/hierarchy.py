@@ -7,6 +7,7 @@ from ....services import (
 )
 import re
 from .openpyxl_theme_and_tint_to_rgb import theme_and_tint_to_hex
+import string
 
 MAIN_CLASS_COLOR = hex(int("ffff0000", 16))
 CLASS_COLOR = hex(int("ffffc000", 16))
@@ -90,7 +91,7 @@ def buildHierarchies(
             pv_main_class = None
             if pv_cell_color_hex == MAIN_CLASS_COLOR:
                 pv_class_stack.clear()
-                pv_main_class = proceedWithMainClass(
+                pv_main_class = proceedWithClass(
                     code=pv_code,
                     name=pv_name,
                     cell_color=pv_cell_color,
@@ -103,7 +104,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack.clear()
                 cv_class_stack.append(
-                    proceedWithMainClass(
+                    proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         for_coordinator_only=True,
@@ -187,7 +188,7 @@ def buildHierarchies(
             pv_class = None
             if pv_cell_color_hex == SUBCLASS_COLOR:
                 pv_class_stack = pv_class_stack[0:2]  # remove siblings
-                pv_class = proceedWithSubClass(
+                pv_class = proceedWithClass(
                     code=None,
                     name=pv_name,
                     parent=pv_class_stack[-1],
@@ -258,7 +259,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
                 cv_class_stack.append(
-                    proceedWithSubClass(
+                    proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         parent=cv_class_stack[-1],
@@ -295,7 +296,7 @@ def buildHierarchies(
             cv_color_stack.append(cv_cell_color_hex)
             cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
             cv_class_stack.append(
-                proceedWithSubClass(
+                proceedWithClass(
                     code=cv_code,
                     name=cv_name,
                     parent=cv_class_stack[-1],
@@ -346,45 +347,19 @@ def getEndIndex(color_list: list, break_point: hex, check_point: list):
     return end_index
 
 
-def proceedWithMainClass(
-    code: str,
-    name: str,
-    cell_color: str,
-    row_number: int,
-    for_coordinator_only: bool = False,
-    related_to: ProjectClass = None,
-) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = "{} {}".format(
-        re.sub(
-            "(?<=\d) (?=\d)", "", str(code).lower()
-        ),  # remove spaces between numbers
-        name,
-    ).strip()
-    print_with_bg_color(
-        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
-            name,
-            color_map[cell_color],
-            cell_color,
-            row_number,
-            name,
-            related_to.id if related_to else None,
-            for_coordinator_only,
-        ),
-        cell_color,
-    )
-    return ProjectClassService.get_or_create(
-        name=name,
-        parent=None,
-        path=name,
-        forCoordinatorOnly=for_coordinator_only,
-        relatedTo=related_to,
-    )[0]
+def sanitizeString(data: str = None):
+    if data != None and isinstance(data, str):
+        data = (
+            # remove first spaces between numbers and then remove all numbers from name
+            re.sub(
+                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower())
+            )
+            .capitalize()
+            .strip()
+        )
+        data = string.capwords(data, "-")
+
+    return data
 
 
 def proceedWithClass(
@@ -392,21 +367,26 @@ def proceedWithClass(
     name: str,
     cell_color: str,
     row_number: int,
-    parent: ProjectClass,
+    parent: ProjectClass = None,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
 ) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = "{} {}".format(
-        # replace multiply spaces with one
-        re.sub("\s\s+", " ", code).strip() if code else "",
-        name,
-    ).strip()
+    name = sanitizeString(data=name)
+
+    if parent == None:
+        # Main Classes need different formatting
+        name = "{} {}".format(
+            re.sub(
+                "(?<=\d) (?=\d)", "", str(code).lower()
+            ),  # remove spaces between numbers
+            name,
+        ).strip()
+    else:
+        name = "{} {}".format(
+            # replace multiply spaces with one
+            re.sub("\s\s+", " ", code).strip() if code else "",
+            name,
+        ).strip()
 
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
@@ -414,7 +394,7 @@ def proceedWithClass(
             color_map[cell_color],
             cell_color,
             row_number,
-            "/".join([parent.path, name]),
+            name if parent == None else "/".join([parent.path, name]),
             related_to.id if related_to else None,
             for_coordinator_only,
         ),
@@ -423,48 +403,7 @@ def proceedWithClass(
     return ProjectClassService.get_or_create(
         name=name,
         parent=parent,
-        path="/".join([parent.path, name]),
-        forCoordinatorOnly=for_coordinator_only,
-        relatedTo=related_to,
-    )[0]
-
-
-def proceedWithSubClass(
-    code: str,
-    name: str,
-    cell_color: str,
-    row_number: int,
-    parent: ProjectClass,
-    for_coordinator_only: bool = False,
-    related_to: ProjectClass = None,
-) -> ProjectClass:
-    name = (
-        # remove first spaces between numbers and then remove all numbers from name
-        re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(name).lower()))
-        .capitalize()
-        .strip()
-    )
-    name = "{} {}".format(
-        # replace multiply spaces with one
-        re.sub("\s\s+", " ", code).strip() if code else "",
-        name,
-    ).strip()
-    print_with_bg_color(
-        "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
-            name,
-            color_map[cell_color],
-            cell_color,
-            row_number,
-            "/".join([parent.path, name]),
-            related_to.id if related_to else None,
-            for_coordinator_only,
-        ),
-        cell_color,
-    )
-    return ProjectClassService.get_or_create(
-        name=name,
-        parent=parent,
-        path="/".join([parent.path, name]),
+        path=name if parent == None else "/".join([parent.path, name]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
     )[0]
@@ -529,7 +468,7 @@ def buildHierarchiesAndProjects(
         main_class = "{} {}".format(
             class_code, re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
         ).strip()
-
+        main_class = string.capwords(main_class, "-")
         class_stack.append(
             ProjectClassService.get_or_create(
                 name=main_class,
@@ -571,6 +510,7 @@ def buildHierarchiesAndProjects(
             .capitalize()
             .strip()
         )
+        name = string.capwords(name, "-")
         name = "{} {}".format(
             class_code,
             name,

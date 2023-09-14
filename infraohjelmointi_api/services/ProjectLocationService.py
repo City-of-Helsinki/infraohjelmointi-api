@@ -24,12 +24,20 @@ class ProjectLocationService:
     @staticmethod
     def list_all() -> list[ProjectLocation]:
         """List all project locations for programmer view"""
-        return ProjectLocation.objects.all().filter(forCoordinatorOnly=False)
+        return (
+            ProjectLocation.objects.all()
+            .filter(forCoordinatorOnly=False)
+            .order_by("createdDate")
+        )
 
     @staticmethod
     def list_all_for_coordinator() -> list[ProjectLocation]:
         """List all project locations for coordinator view"""
-        return ProjectLocation.objects.all().filter(forCoordinatorOnly=True)
+        return (
+            ProjectLocation.objects.all()
+            .filter(forCoordinatorOnly=True)
+            .order_by("createdDate")
+        )
 
     @staticmethod
     def find_by_path(path: str) -> list[ProjectLocation]:
