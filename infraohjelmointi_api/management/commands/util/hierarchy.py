@@ -91,7 +91,7 @@ def buildHierarchies(
             pv_main_class = None
             if pv_cell_color_hex == MAIN_CLASS_COLOR:
                 pv_class_stack.clear()
-                pv_main_class = proceedWithMainClass(
+                pv_main_class = proceedWithClass(
                     code=pv_code,
                     name=pv_name,
                     cell_color=pv_cell_color,
@@ -104,7 +104,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack.clear()
                 cv_class_stack.append(
-                    proceedWithMainClass(
+                    proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         for_coordinator_only=True,
@@ -188,7 +188,7 @@ def buildHierarchies(
             pv_class = None
             if pv_cell_color_hex == SUBCLASS_COLOR:
                 pv_class_stack = pv_class_stack[0:2]  # remove siblings
-                pv_class = proceedWithSubClass(
+                pv_class = proceedWithClass(
                     code=None,
                     name=pv_name,
                     parent=pv_class_stack[-1],
@@ -259,7 +259,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
                 cv_class_stack.append(
-                    proceedWithSubClass(
+                    proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         parent=cv_class_stack[-1],
@@ -296,7 +296,7 @@ def buildHierarchies(
             cv_color_stack.append(cv_cell_color_hex)
             cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
             cv_class_stack.append(
-                proceedWithSubClass(
+                proceedWithClass(
                     code=cv_code,
                     name=cv_name,
                     parent=cv_class_stack[-1],
@@ -360,14 +360,32 @@ def sanitizeString(data: str = None):
     return data
 
 
-def get_or_create_class_instance(
+def proceedWithClass(
+    code: str,
     name: str,
     cell_color: str,
     row_number: int,
+    parent: ProjectClass = None,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
-    parent: ProjectClass = None,
-):
+) -> ProjectClass:
+    name = sanitizeString(data=name)
+
+    if parent == None:
+        # Main Classes need different formatting
+        name = "{} {}".format(
+            re.sub(
+                "(?<=\d) (?=\d)", "", str(code).lower()
+            ),  # remove spaces between numbers
+            name,
+        ).strip()
+    else:
+        name = "{} {}".format(
+            # replace multiply spaces with one
+            re.sub("\s\s+", " ", code).strip() if code else "",
+            name,
+        ).strip()
+
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             name,
@@ -387,82 +405,6 @@ def get_or_create_class_instance(
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
     )[0]
-
-
-def proceedWithMainClass(
-    code: str,
-    name: str,
-    cell_color: str,
-    row_number: int,
-    for_coordinator_only: bool = False,
-    related_to: ProjectClass = None,
-) -> ProjectClass:
-    name = sanitizeString(data=name)
-    name = "{} {}".format(
-        re.sub(
-            "(?<=\d) (?=\d)", "", str(code).lower()
-        ),  # remove spaces between numbers
-        name,
-    ).strip()
-    return get_or_create_class_instance(
-        name=name,
-        cell_color=cell_color,
-        row_number=row_number,
-        for_coordinator_only=for_coordinator_only,
-        related_to=related_to,
-        parent=None,
-    )
-
-
-def proceedWithClass(
-    code: str,
-    name: str,
-    cell_color: str,
-    row_number: int,
-    parent: ProjectClass,
-    for_coordinator_only: bool = False,
-    related_to: ProjectClass = None,
-) -> ProjectClass:
-    name = sanitizeString(data=name)
-    name = "{} {}".format(
-        # replace multiply spaces with one
-        re.sub("\s\s+", " ", code).strip() if code else "",
-        name,
-    ).strip()
-
-    return get_or_create_class_instance(
-        name=name,
-        cell_color=cell_color,
-        row_number=row_number,
-        for_coordinator_only=for_coordinator_only,
-        related_to=related_to,
-        parent=parent,
-    )
-
-
-def proceedWithSubClass(
-    code: str,
-    name: str,
-    cell_color: str,
-    row_number: int,
-    parent: ProjectClass,
-    for_coordinator_only: bool = False,
-    related_to: ProjectClass = None,
-) -> ProjectClass:
-    name = sanitizeString(data=name)
-    name = "{} {}".format(
-        # replace multiply spaces with one
-        re.sub("\s\s+", " ", code).strip() if code else "",
-        name,
-    ).strip()
-    return get_or_create_class_instance(
-        name=name,
-        cell_color=cell_color,
-        row_number=row_number,
-        for_coordinator_only=for_coordinator_only,
-        related_to=related_to,
-        parent=parent,
-    )
 
 
 def proceedWithDistrict(
