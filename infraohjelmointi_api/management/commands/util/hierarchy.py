@@ -351,7 +351,9 @@ def sanitizeString(data: str = None):
     if data != None and isinstance(data, str):
         data = (
             # remove first spaces between numbers and then remove all numbers from name
-            re.sub("^[\d.-]+\s*", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower()))
+            re.sub(
+                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower())
+            )
             .capitalize()
             .strip()
         )
