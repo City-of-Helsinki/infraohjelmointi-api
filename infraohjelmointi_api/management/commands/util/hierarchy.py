@@ -283,6 +283,15 @@ def buildHierarchies(
         # Handle other classification class #
         #####################################
         elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+            # special case where other classification maps to district
+            related_to_district = None
+            if pv_cell_color_hex in [DISTRICT_COLOR]:
+                related_to_district = proceedWithDistrict(
+                    name=pv_name,
+                    parent_class=pv_class_stack[-1],
+                    cell_color=str(DISTRICT_COLOR)[2:].upper(),
+                    row_number=pv_cell.row,
+                )
             end_index = getEndIndex(
                 color_list=cv_color_stack,
                 break_point=OTHER_CLASSIFICATION_COLOR,
@@ -303,6 +312,7 @@ def buildHierarchies(
                     for_coordinator_only=True,
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
+                    relatedPlanningDistrict=related_to_district,
                 )
             )
         elif DISTRICT_COLOR in cell_colors:
@@ -332,62 +342,6 @@ def buildHierarchies(
                     for_coordinator_only=True,
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
-                )
-            if cv_cell_color_hex in [
-                SUBCLASS_COLOR,
-                AGGREGATING_SUB_LEVEL,
-                OTHER_CLASSIFICATION_COLOR,
-                OTHER_CLASSIFICATION_SUBCLASS_COLOR,
-            ]:
-                if cv_cell_color_hex == SUBCLASS_COLOR:
-                    end_index = getEndIndex(
-                        color_list=cv_color_stack,
-                        break_point=SUBCLASS_COLOR,
-                        check_point=[CLASS_COLOR, CLASS_GROUP_COLOR],
-                    )
-
-                elif cv_cell_color_hex == AGGREGATING_SUB_LEVEL:
-                    end_index = getEndIndex(
-                        color_list=cv_color_stack,
-                        break_point=AGGREGATING_SUB_LEVEL,
-                        check_point=[
-                            SUBCLASS_COLOR,
-                        ],
-                    )
-
-                elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
-                    end_index = getEndIndex(
-                        color_list=cv_color_stack,
-                        break_point=OTHER_CLASSIFICATION_COLOR,
-                        check_point=[
-                            AGGREGATING_SUB_LEVEL,
-                            SUBCLASS_COLOR,
-                        ],
-                    )
-
-                else:  # cv_cell_color_hex == OTHER_CLASSIFICATION_SUBCLASS_COLOR:
-                    end_index = getEndIndex(
-                        color_list=cv_color_stack,
-                        break_point=OTHER_CLASSIFICATION_SUBCLASS_COLOR,
-                        check_point=[
-                            OTHER_CLASSIFICATION_COLOR,
-                        ],
-                    )
-
-                cv_color_stack = cv_color_stack[0:end_index]
-                cv_color_stack.append(cv_cell_color_hex)
-                cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
-                cv_class_stack.append(
-                    proceedWithClass(
-                        code=cv_code,
-                        name=cv_name,
-                        parent=cv_class_stack[-1],
-                        for_coordinator_only=True,
-                        related_to=None,
-                        cell_color=cv_cell_color,
-                        row_number=cv_cell.row,
-                        relatedPlanningDistrict=related_to_district,
-                    )
                 )
 
 
@@ -477,7 +431,12 @@ def proceedWithDistrict(
 ) -> ProjectLocation:
     district = name.split(" ")[0].strip()
     # exceptional case for Östersundom which can be Östersundomin
-    district = "Östersundom" if "östersundom" in district.lower() else district
+    if "östersundom" in name.lower():
+        district = "Östersundom"
+    elif "suurpiiri" in name.lower():
+        district = name.split(" ")[0].strip()
+    else:
+        district = sanitizeString(data=name.strip())
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             district,
