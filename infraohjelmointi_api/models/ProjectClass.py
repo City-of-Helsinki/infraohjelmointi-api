@@ -22,7 +22,7 @@ class ProjectClass(models.Model):
         blank=True,
         null=True,
     )
-    relatedPlanningDistrict = models.OneToOneField(
+    relatedLocation = models.OneToOneField(
         "ProjectLocation",
         on_delete=models.DO_NOTHING,
         related_name="relatedCoordinatorClass",

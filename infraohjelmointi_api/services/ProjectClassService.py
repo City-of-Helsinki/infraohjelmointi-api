@@ -17,7 +17,7 @@ class ProjectClassService:
             path=path,
             forCoordinatorOnly=forCoordinatorOnly,
             relatedTo=relatedTo,
-            relatedPlanningDistrict=relatedPlanningDistrict,
+            relatedLocation=relatedPlanningDistrict,
         )
 
     @staticmethod
