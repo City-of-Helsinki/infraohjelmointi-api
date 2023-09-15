@@ -333,6 +333,62 @@ def buildHierarchies(
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
                 )
+            if cv_cell_color_hex in [
+                SUBCLASS_COLOR,
+                AGGREGATING_SUB_LEVEL,
+                OTHER_CLASSIFICATION_COLOR,
+                OTHER_CLASSIFICATION_SUBCLASS_COLOR,
+            ]:
+                if cv_cell_color_hex == SUBCLASS_COLOR:
+                    end_index = getEndIndex(
+                        color_list=cv_color_stack,
+                        break_point=SUBCLASS_COLOR,
+                        check_point=[CLASS_COLOR, CLASS_GROUP_COLOR],
+                    )
+
+                elif cv_cell_color_hex == AGGREGATING_SUB_LEVEL:
+                    end_index = getEndIndex(
+                        color_list=cv_color_stack,
+                        break_point=AGGREGATING_SUB_LEVEL,
+                        check_point=[
+                            SUBCLASS_COLOR,
+                        ],
+                    )
+
+                elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+                    end_index = getEndIndex(
+                        color_list=cv_color_stack,
+                        break_point=OTHER_CLASSIFICATION_COLOR,
+                        check_point=[
+                            AGGREGATING_SUB_LEVEL,
+                            SUBCLASS_COLOR,
+                        ],
+                    )
+
+                else:  # cv_cell_color_hex == OTHER_CLASSIFICATION_SUBCLASS_COLOR:
+                    end_index = getEndIndex(
+                        color_list=cv_color_stack,
+                        break_point=OTHER_CLASSIFICATION_SUBCLASS_COLOR,
+                        check_point=[
+                            OTHER_CLASSIFICATION_COLOR,
+                        ],
+                    )
+
+                cv_color_stack = cv_color_stack[0:end_index]
+                cv_color_stack.append(cv_cell_color_hex)
+                cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
+                cv_class_stack.append(
+                    proceedWithClass(
+                        code=cv_code,
+                        name=cv_name,
+                        parent=cv_class_stack[-1],
+                        for_coordinator_only=True,
+                        related_to=None,
+                        cell_color=cv_cell_color,
+                        row_number=cv_cell.row,
+                        relatedPlanningDistrict=related_to_district,
+                    )
+                )
 
 
 def getEndIndex(color_list: list, break_point: hex, check_point: list):
@@ -370,6 +426,7 @@ def proceedWithClass(
     parent: ProjectClass = None,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
+    relatedPlanningDistrict: ProjectLocation = None,
 ) -> ProjectClass:
     name = sanitizeString(data=name)
 
@@ -406,6 +463,7 @@ def proceedWithClass(
         path=name if parent == None else "/".join([parent.path, name]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
+        relatedPlanningDistrict=relatedPlanningDistrict,
     )[0]
 
 
