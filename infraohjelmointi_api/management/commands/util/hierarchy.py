@@ -531,7 +531,7 @@ def buildHierarchiesAndProjects(
             .capitalize()
             .strip()
         )
-        if "-" in name:
+        if "-" in name and "liikunta" not in name:
             name = string.capwords(name, "-")
 
         name = "{} {}".format(
