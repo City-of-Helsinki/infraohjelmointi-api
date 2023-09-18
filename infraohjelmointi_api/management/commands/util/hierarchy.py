@@ -625,7 +625,7 @@ def buildHierarchiesAndProjects(
                 ProjectLocationService.get_or_create(
                     # keepe number in front of division
                     name="{} {}".format(
-                        re.sub("[^\d.-]+\s*$", "", str(cell.value).strip()).strip(),
+                        re.sub("[^\d.]+\s*$", "", str(cell.value).strip()).strip(),
                         name,
                     ),
                     parent=location_stack[-1],
