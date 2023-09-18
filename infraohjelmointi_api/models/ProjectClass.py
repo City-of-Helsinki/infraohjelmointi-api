@@ -25,7 +25,6 @@ class ProjectClass(models.Model):
     relatedLocation = models.OneToOneField(
         "ProjectLocation",
         on_delete=models.DO_NOTHING,
-        related_name="relatedCoordinatorClass",
         blank=True,
         null=True,
     )
