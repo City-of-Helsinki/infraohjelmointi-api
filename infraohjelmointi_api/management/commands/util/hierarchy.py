@@ -367,7 +367,7 @@ def sanitizeString(data: str = None):
             .capitalize()
             .strip()
         )
-        if "-" in data:
+        if "-" in data and "liikunta" not in data:
             data = string.capwords(data, "-")
 
     return data
@@ -485,7 +485,7 @@ def buildHierarchiesAndProjects(
         class_code = main_class.split(" ")[0]
         # capitalize the alpha part
         main_class = re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
-        if "-" in main_class:
+        if "-" in main_class and "liikunta" not in main_class:
             main_class = string.capwords(main_class, "-")
 
         main_class = "{} {}".format(class_code, main_class).strip()
