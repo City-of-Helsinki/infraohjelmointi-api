@@ -312,7 +312,7 @@ def buildHierarchies(
                     for_coordinator_only=True,
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
-                    relatedPlanningDistrict=related_to_district,
+                    relatedLocation=related_to_district,
                 )
             )
         elif DISTRICT_COLOR in cell_colors:
@@ -381,7 +381,7 @@ def proceedWithClass(
     parent: ProjectClass = None,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
-    relatedPlanningDistrict: ProjectLocation = None,
+    relatedLocation: ProjectLocation = None,
 ) -> ProjectClass:
     name = sanitizeString(data=name)
 
@@ -418,7 +418,7 @@ def proceedWithClass(
         path=name if parent == None else "/".join([parent.path, name]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
-        relatedPlanningDistrict=relatedPlanningDistrict,
+        relatedLocation=relatedLocation,
     )[0]
 
 
