@@ -367,7 +367,8 @@ def sanitizeString(data: str = None):
             .capitalize()
             .strip()
         )
-        data = string.capwords(data, "-")
+        if "-" in data:
+            data = string.capwords(data, "-")
 
     return data
 
@@ -480,12 +481,15 @@ def buildHierarchiesAndProjects(
     if main_class:
         # remove spaces between numbers
         main_class = re.sub("(?<=\d) (?=\d)", "", str(main_class).lower())
+
         class_code = main_class.split(" ")[0]
         # capitalize the alpha part
-        main_class = "{} {}".format(
-            class_code, re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
-        ).strip()
-        main_class = string.capwords(main_class, "-")
+        main_class = re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
+        if "-" in main_class:
+            main_class = string.capwords(main_class, "-")
+
+        main_class = "{} {}".format(class_code, main_class).strip()
+
         class_stack.append(
             ProjectClassService.get_or_create(
                 name=main_class,
@@ -527,7 +531,9 @@ def buildHierarchiesAndProjects(
             .capitalize()
             .strip()
         )
-        name = string.capwords(name, "-")
+        if "-" in name:
+            name = string.capwords(name, "-")
+
         name = "{} {}".format(
             class_code,
             name,
