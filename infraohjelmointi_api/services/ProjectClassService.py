@@ -9,7 +9,7 @@ class ProjectClassService:
         path: str,
         forCoordinatorOnly: bool = False,
         relatedTo: ProjectClass = None,
-        relatedPlanningDistrict: ProjectLocation = None,
+        relatedLocation: ProjectLocation = None,
     ) -> ProjectClass:
         return ProjectClass.objects.get_or_create(
             name=name,
@@ -17,7 +17,7 @@ class ProjectClassService:
             path=path,
             forCoordinatorOnly=forCoordinatorOnly,
             relatedTo=relatedTo,
-            relatedLocation=relatedPlanningDistrict,
+            relatedLocation=relatedLocation,
         )
 
     @staticmethod
