@@ -129,23 +129,22 @@ class ProjectViewSet(BaseViewSet):
             )
             financeInstances = []
             for field in finances.keys():
-                (
-                    financeInstance,
-                    created,
-                ) = ProjectFinancialService.get_or_create(
+                if hasattr(project, "lock"):
+                    raise ValidationError(
+                        detail={
+                            field: "The field {} cannot be modified when the project is locked".format(
+                                field
+                            )
+                        },
+                        code="project_locked",
+                    )
+                financeInstance = ProjectFinancial(
+                    project=project,
+                    value=finances[field],
                     year=fieldToYearMapping[field],
-                    project_id=project.id,
                     forFrameView=forcedToFrame,
                 )
-                ProjectFinancialSerializer(
-                    financeInstance,
-                    data={"value": finances[field]},
-                    partial=True,
-                    many=False,
-                    context={"finance_year": year},
-                ).is_valid(raise_exception=True)
 
-                financeInstance.value = finances[field]
                 financeInstances.append(financeInstance)
                 if (
                     forcedToFrame == False
