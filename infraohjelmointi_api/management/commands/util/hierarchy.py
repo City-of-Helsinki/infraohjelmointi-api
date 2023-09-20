@@ -283,6 +283,15 @@ def buildHierarchies(
         # Handle other classification class #
         #####################################
         elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+            # special case where other classification maps to district
+            related_to_district = None
+            if pv_cell_color_hex in [DISTRICT_COLOR]:
+                related_to_district = proceedWithDistrict(
+                    name=pv_name,
+                    parent_class=pv_class_stack[-1],
+                    cell_color=str(DISTRICT_COLOR)[2:].upper(),
+                    row_number=pv_cell.row,
+                )
             end_index = getEndIndex(
                 color_list=cv_color_stack,
                 break_point=OTHER_CLASSIFICATION_COLOR,
@@ -303,6 +312,7 @@ def buildHierarchies(
                     for_coordinator_only=True,
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
+                    relatedLocation=related_to_district,
                 )
             )
         elif DISTRICT_COLOR in cell_colors:
@@ -357,7 +367,8 @@ def sanitizeString(data: str = None):
             .capitalize()
             .strip()
         )
-        data = string.capwords(data, "-")
+        if "-" in data and "liikunta" not in data:
+            data = string.capwords(data, "-")
 
     return data
 
@@ -370,6 +381,7 @@ def proceedWithClass(
     parent: ProjectClass = None,
     for_coordinator_only: bool = False,
     related_to: ProjectClass = None,
+    relatedLocation: ProjectLocation = None,
 ) -> ProjectClass:
     name = sanitizeString(data=name)
 
@@ -406,6 +418,7 @@ def proceedWithClass(
         path=name if parent == None else "/".join([parent.path, name]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
+        relatedLocation=relatedLocation,
     )[0]
 
 
@@ -419,7 +432,12 @@ def proceedWithDistrict(
 ) -> ProjectLocation:
     district = name.split(" ")[0].strip()
     # exceptional case for Östersundom which can be Östersundomin
-    district = "Östersundom" if "östersundom" in district.lower() else district
+    if "östersundom" in name.lower():
+        district = "Östersundom"
+    elif "suurpiiri" in name.lower():
+        district = name.split(" ")[0].strip()
+    else:
+        district = sanitizeString(data=name.strip())
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             district,
@@ -463,12 +481,15 @@ def buildHierarchiesAndProjects(
     if main_class:
         # remove spaces between numbers
         main_class = re.sub("(?<=\d) (?=\d)", "", str(main_class).lower())
+
         class_code = main_class.split(" ")[0]
         # capitalize the alpha part
-        main_class = "{} {}".format(
-            class_code, re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
-        ).strip()
-        main_class = string.capwords(main_class, "-")
+        main_class = re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
+        if "-" in main_class and "liikunta" not in main_class:
+            main_class = string.capwords(main_class, "-")
+
+        main_class = "{} {}".format(class_code, main_class).strip()
+
         class_stack.append(
             ProjectClassService.get_or_create(
                 name=main_class,
@@ -510,7 +531,9 @@ def buildHierarchiesAndProjects(
             .capitalize()
             .strip()
         )
-        name = string.capwords(name, "-")
+        if "-" in name and "liikunta" not in name:
+            name = string.capwords(name, "-")
+
         name = "{} {}".format(
             class_code,
             name,
@@ -602,7 +625,7 @@ def buildHierarchiesAndProjects(
                 ProjectLocationService.get_or_create(
                     # keepe number in front of division
                     name="{} {}".format(
-                        re.sub("[^\d.-]+\s*$", "", str(cell.value).strip()).strip(),
+                        re.sub("[^\d.]+\s*$", "", str(cell.value).strip()).strip(),
                         name,
                     ),
                     parent=location_stack[-1],

@@ -1,4 +1,4 @@
-from ..models import ProjectClass
+from ..models import ProjectClass, ProjectLocation
 
 
 class ProjectClassService:
@@ -9,6 +9,7 @@ class ProjectClassService:
         path: str,
         forCoordinatorOnly: bool = False,
         relatedTo: ProjectClass = None,
+        relatedLocation: ProjectLocation = None,
     ) -> ProjectClass:
         return ProjectClass.objects.get_or_create(
             name=name,
@@ -16,6 +17,7 @@ class ProjectClassService:
             path=path,
             forCoordinatorOnly=forCoordinatorOnly,
             relatedTo=relatedTo,
+            relatedLocation=relatedLocation,
         )
 
     @staticmethod
