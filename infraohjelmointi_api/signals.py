@@ -106,14 +106,14 @@ def get_financial_sums(
             project=project
         )
 
-        # set cache for 2 hours
+        # set cache for 24 hours
         cache.set(
             "relationEffected",
             [
                 *projectRelations["coordination"].values(),
                 *projectRelations["planning"].values(),
             ],
-            60 * 60 * 2,
+            60 * 60 * 24,
         )
         logger.debug("Setting levels effected by ProjectFinancial change to cache")
         for viewType, instances in projectRelations.items():

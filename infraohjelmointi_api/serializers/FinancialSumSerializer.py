@@ -170,7 +170,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )
         ):
             # this instance needs new financial sums to be calculated
-
             relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
             summedFinances = relatedProjects.aggregate(
@@ -325,11 +324,12 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 ),
                 "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
             }
-
+            # caching calculations for 24 hours
+            # will get updated according to relations which change
             cache.set(
                 str(instance.id) + "/{}/{}".format(forcedToFrame, year),
                 summedFinances,
-                60 * 60 * 2,
+                60 * 60 * 24,
             )
             # delete this instance from relationEffected
             if relationEffectedCached != None and instance in relationEffectedCached:
