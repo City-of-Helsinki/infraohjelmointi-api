@@ -13,6 +13,7 @@ from .services import ClassFinancialService, ProjectService, LocationFinancialSe
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
+from django.core.cache import cache
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -96,12 +97,25 @@ def get_financial_sums(
         },
     }
     if _type == "ProjectFinancial":
+        # check which projcet relations get effected by this project,
+        # set those relations in cache
+
         project = instance.project
         forFrameView = instance.forFrameView
         projectRelations = ProjectService.get_project_class_location_group_relations(
             project=project
         )
 
+        # set cache for 2 hours
+        cache.set(
+            "relationEffected",
+            [
+                *projectRelations["coordination"].values(),
+                *projectRelations["planning"].values(),
+            ],
+            60 * 60 * 2,
+        )
+        logger.debug("Setting levels effected by ProjectFinancial change to cache")
         for viewType, instances in projectRelations.items():
             if viewType == "planning" and forFrameView == True:
                 continue
@@ -147,6 +161,17 @@ def get_financial_sums(
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
             instance=instance
         )
+
+        # set cache for 2 hours
+        cache.set(
+            "relationEffected",
+            [
+                *classRelations["coordination"].values(),
+                *classRelations["planning"].values(),
+            ],
+            60 * 60 * 2,
+        )
+        logger.debug("Setting levels effected by ClassFinancial change to cache")
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
                 if classInstance != None:
@@ -161,6 +186,16 @@ def get_financial_sums(
                 instance=instance
             )
         )
+
+        cache.set(
+            "relationEffected",
+            [
+                *locationFinancialRelations["coordination"].values(),
+                *locationFinancialRelations["planning"].values(),
+            ],
+            60 * 60 * 2,
+        )
+        logger.debug("Setting levels effected by LocationFinancial change to cache")
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
                 if instance != None:
