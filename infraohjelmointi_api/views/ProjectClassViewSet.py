@@ -56,6 +56,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             JSON
                 List of ProjectClass instances with financial sums for projects under each class
         """
+
         year = request.query_params.get("year", date.today().year)
         forcedToFrame = request.query_params.get("forcedToFrame", False)
         if forcedToFrame in ["False", "false"]:
@@ -79,6 +80,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                 "forcedToFrame": forcedToFrame,
             },
         )
+
         return Response(serializer.data)
 
     @action(
