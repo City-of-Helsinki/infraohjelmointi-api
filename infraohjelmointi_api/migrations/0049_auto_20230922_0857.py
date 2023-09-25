@@ -10,7 +10,7 @@ def set_existing_note_updatedBy_null(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("infraohjelmointi_api", "0047_alter_note_updatedby"),
+        ("infraohjelmointi_api", "0048_sapcost"),
     ]
 
     operations = [migrations.RunPython(set_existing_note_updatedBy_null)]
