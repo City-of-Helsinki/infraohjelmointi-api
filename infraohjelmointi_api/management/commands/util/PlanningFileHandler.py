@@ -162,10 +162,14 @@ class PlanningFileHandler(IExcelFileHandler):
                     )
                 break
 
-        project.sapProject = sapNumber
+        project.sapProject = (
+            str(sapNumber).strip()  # should start with number
+            if sapNumber != None and re.match("^\d+", str(sapNumber).strip())
+            else None
+        )
         project.sapNetwork = (
-            [sapNetwork]
-            if sapNetwork != None and not str(sapNetwork).strip() in ['"', "?"]
+            [str(sapNetwork).strip()]  # should start with number
+            if sapNetwork != None and re.match("^\d+", str(sapNetwork).strip())
             else None
         )
         project.hkrId = (

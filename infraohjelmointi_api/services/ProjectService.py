@@ -190,3 +190,15 @@ class ProjectService:
             lowestLevelCoordinationClass = lowestLevelCoordinationClass.parent
 
         return projectRelations
+
+    @staticmethod
+    def get_by_sap_id(sap_id: str) -> list[Project]:
+        return Project.objects.filter(sapProject=sap_id)
+
+    @staticmethod
+    def get_by_group_id(id: str) -> list[Project]:
+        return Project.objects.filter(projectGroup__id=id)
+
+    @staticmethod
+    def list_with_non_null_sap_id() -> list[Project]:
+        return Project.objects.filter(sapProject__isnull=False)
