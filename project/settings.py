@@ -26,10 +26,6 @@ ASGI_APPLICATION = "project.asgi.application"
 
 env = environ.Env(
     DEBUG=(bool, False),
-    DJANGO_SECRET_KEY=(
-        str,
-        "django-insecure-p&ef_@=(24(r_(+-+goh5ye22o+xfl_b6n2+g%kt%qu*-)!t(h",
-    ),
     ALLOWED_HOSTS=(list, ["*"]),
     DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
