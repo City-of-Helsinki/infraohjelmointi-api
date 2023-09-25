@@ -16,13 +16,7 @@ RUN TZ="Europe/Helsinki" apk add --update nano libffi-dev gcc \
     mkdir -p /srv/app/static && \
     DJANGO_SECRET_KEY="only-used-for-collectstatic" DATABASE_URL="sqlite:///" \
     python manage.py collectstatic --noinput && \
-    chmod +x /app/sync-from-sap.sh && \
-    chown nobody:nobody /usr/sbin/crond && \
-    setcap cap_setgid=ep /usr/sbin/crond && \
-    touch /var/log/cron.sap-sync.log && \
-    chown nobody:nobody /var/log/cron.sap-sync.log && \
-    touch /var/log/crond.log && \
-    chown nobody:nobody /var/log/crond.log
+    chmod +x /app/sync-from-sap.sh
 
 # Openshift starts the container process with group zero and random ID
 # we mimic that here with nobody and group zero
