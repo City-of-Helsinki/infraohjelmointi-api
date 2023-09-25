@@ -283,7 +283,5 @@ class BudgetFileHandler(IExcelFileHandler):
             NoteService.create(
                 content=notes,
                 project=project,
-                byPerson=PersonService.get_or_create_by_name(
-                    firstName="Excel", lastName="Integraatio"
-                )[0],
+                byPerson=None,
             )
