@@ -1,8 +1,9 @@
 from django.db import models
 from simple_history.models import HistoricalRecords
 from overrides import override
-
-from .Person import Person
+from django.db.models import UUIDField
+import uuid
+from .User import User
 
 import logging
 
@@ -11,7 +12,11 @@ class HistoricalModel(models.Model):
     class Meta:
         abstract = True
 
-    history = HistoricalRecords(inherit=True, user_model=Person)
+    history = HistoricalRecords(
+        inherit=True,
+        user_model=User,
+        history_user_id_field=UUIDField(default=uuid.uuid4, null=True),
+    )
 
     @override
     def save(self, *args, **kwargs):

@@ -21,6 +21,7 @@ from ..models import (
     ProjectGroup,
     ProjectLock,
     ProjectFinancial,
+    User,
 )
 from ..serializers import (
     ProjectGetSerializer,
@@ -143,6 +144,7 @@ class ProjectTestCase(TestCase):
     pwInstanceId_hkrId_2 = 1500
     pwInstanceId_hkrId_1_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
     pwInstanceId_hkrId_2_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{9d14d060-56c8-45c0-9323-303ab440e652}/"
+    notePerson_1_Id = uuid.UUID("22dc6826-e34c-4079-a748-9e8699f99a09")
 
     fixtures = []
     maxDiff = None
@@ -201,6 +203,9 @@ class ProjectTestCase(TestCase):
             email="random@random.com",
             title="Manager",
             phone="0414853275",
+        )
+        self.notePerson_1 = User.objects.create(
+            uuid=self.notePerson_1_Id, first_name="John", last_name="Doe"
         )
         self.person_2 = Person.objects.create(
             id=self.person_2_Id,
@@ -815,7 +820,7 @@ class ProjectTestCase(TestCase):
         Note.objects.create(
             id=self.noteId,
             content="Test note",
-            updatedBy=self.person_1,
+            updatedBy=self.notePerson_1,
             project=self.project,
         )
         response = self.client.get("/projects/{}/notes/".format(self.project_1_Id))

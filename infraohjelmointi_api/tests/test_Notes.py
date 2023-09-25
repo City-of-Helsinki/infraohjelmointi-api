@@ -1,6 +1,6 @@
 from django.test import TestCase
 import uuid
-from ..models import Person, Project, ProjectType
+from ..models import Person, Project, ProjectType, User
 from ..models import Note
 from ..serializers import NoteGetSerializer, NoteHistorySerializer
 from rest_framework.renderers import JSONRenderer
@@ -28,13 +28,8 @@ class NoteTestCase(TestCase):
             id=self.projectTypeId, value="projectComplex"
         )
 
-        self.person_1 = Person.objects.create(
-            id=self.person_1_Id,
-            firstName="John",
-            lastName="Doe",
-            email="random@random.com",
-            title="Manager",
-            phone="0414853275",
+        self.person_1 = User.objects.create(
+            uuid=self.person_1_Id, first_name="John", last_name="Doe"
         )
         self.project = Project.objects.create(
             id=self.projectId,

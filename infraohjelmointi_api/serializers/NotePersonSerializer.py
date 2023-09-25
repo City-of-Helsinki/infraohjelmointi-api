@@ -1,8 +1,8 @@
-from infraohjelmointi_api.models import Person
+from infraohjelmointi_api.models import User
 from rest_framework import serializers
 
 
 class NotePersonSerializer(serializers.ModelSerializer):
     class Meta:
-        fields = ("id", "firstName", "lastName")
-        model = Person
+        fields = ("uuid", "first_name", "last_name")
+        model = User
