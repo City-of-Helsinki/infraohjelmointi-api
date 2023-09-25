@@ -2,6 +2,8 @@
 
 set -e
 
+crond -c /app/crontabs -l 0 -L /var/log/crond.log
+
 if [[ "$WAIT_FOR_IT_ADDRESS" ]]; then
     ./wait-for-it.sh $WAIT_FOR_IT_ADDRESS --timeout=30
 fi

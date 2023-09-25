@@ -38,3 +38,4 @@ from .FinancialSumSerializer import FinancialSumSerializer
 from .ClassFinancialSerializer import ClassFinancialSerializer
 from .LocationFinancialSerializer import LocationFinancialSerializer
 from .WhoAmISerializer import WhoAmISerializer
+from .SapCostSerializer import SapCostSerializer

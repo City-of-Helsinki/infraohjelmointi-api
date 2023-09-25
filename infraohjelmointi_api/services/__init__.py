@@ -14,3 +14,5 @@ from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
 from .ClassFinancialService import ClassFinancialService
 from .LocationFinancialService import LocationFinancialService
+from .SapApiService import SapApiService
+from .SapCostService import SapCostService

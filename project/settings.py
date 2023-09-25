@@ -233,10 +233,10 @@ LOGGING = {
             "level": 1,
             "propagate": False,
         },
-        "helusers._oidc_auth_impl": {
-            "handlers": ["console"],
-            "level": 1,
-            "propagate": False,
-        },
+        # "helusers._oidc_auth_impl": {
+        #     "handlers": ["console"],
+        #     "level": 1,
+        #     "propagate": False,
+        # },
     },
 }
