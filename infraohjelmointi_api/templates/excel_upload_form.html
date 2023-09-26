@@ -1,0 +1,11 @@
+{% extends 'admin/base.html' %} 
+
+{% block content %}
+<div>
+  <h1>{{uploader_title}}</h1>
+  <form action="{{url}}" method="POST" enctype="multipart/form-data">
+    {{ form.as_p }} {% csrf_token %}
+    <button type="submit">Upload</button>
+  </form>
+</div>
+{% endblock %}
