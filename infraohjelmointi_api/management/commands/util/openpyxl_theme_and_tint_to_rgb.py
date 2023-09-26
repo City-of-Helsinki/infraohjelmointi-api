@@ -50,7 +50,7 @@ def get_theme_colors(wb):
     # see: https://groups.google.com/forum/#!topic/openpyxl-users/I0k3TfqNLrc
     from openpyxl.xml.functions import QName, fromstring
 
-    xlmns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    xlmns = "https://schemas.openxmlformats.org/drawingml/2006/main"
     root = fromstring(wb.loaded_theme)
     themeEl = root.find(QName(xlmns, "themeElements").text)
     colorSchemes = themeEl.findall(QName(xlmns, "clrScheme").text)

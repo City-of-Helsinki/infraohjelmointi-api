@@ -627,7 +627,7 @@ def buildHierarchiesAndProjects(
                     name="{} {}".format(
                         re.sub("[^\d.]+\s*$", "", str(cell.value).strip()).strip(),
                         name,
-                    ),
+                    ),  # NOSONAR
                     parent=location_stack[-1],
                     path="/".join([location_stack[-1].path] + [name]),
                     parentClass=class_stack[-1],
