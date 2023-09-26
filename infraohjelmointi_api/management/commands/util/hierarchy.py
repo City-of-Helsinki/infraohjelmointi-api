@@ -626,7 +626,7 @@ def buildHierarchiesAndProjects(
                     # keepe number in front of division
                     name="{} {}".format(
                         re.sub(
-                            "[^\d.]{0,100}\s*$", "", str(cell.value).strip()
+                            "[^\d\.]{1,100}\s*$", "", str(cell.value).strip()
                         ).strip(),
                         name,
                     ),
