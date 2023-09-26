@@ -18,13 +18,114 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import routers
-from infraohjelmointi_api import views
+from infraohjelmointi_api import views, admin_views
 
 router = routers.DefaultRouter()
-router.register(r'projects', views.ProjectViewSet)
-router.register(r'project-types', views.ProjectTypeViewSet)
+router.register(r"projects", views.ProjectViewSet, basename="projects")
+router.register(r"project-types", views.ProjectTypeViewSet, basename="projectTypes")
+router.register(r"projects-mock", views.MockProjectViewSet, basename="projectsMock")
+router.register(r"persons", views.PersonViewSet, basename="persons")
+router.register(r"project-sets", views.ProjectSetViewSet, basename="projectSets")
+router.register(r"project-areas", views.ProjectAreaViewSet, basename="personsAreas")
+router.register(r"budgets", views.BudgetItemViewSet, basename="budgetItems")
+router.register(r"tasks", views.TaskViewSet, basename="tasks")
+router.register(
+    r"project-priority", views.ProjectPriorityViewSet, basename="projectPriorities"
+)
+router.register(r"project-phases", views.ProjectPhaseViewSet, basename="projectPhases")
+router.register(r"task-status", views.TaskStatusViewSet, basename="taskStatuses")
+router.register(
+    r"construction-phase-details",
+    views.ConstructionPhaseDetailViewSet,
+    basename="constructionPhaseDetails",
+)
+router.register(
+    r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
+)
+router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")
+router.register(r"notes", views.NoteViewSet, basename="notes")
+router.register(
+    r"construction-phases",
+    views.ConstructionPhaseViewSet,
+    basename="constructionPhases",
+)
+router.register(
+    r"planning-phases",
+    views.PlanningPhaseViewSet,
+    basename="planningPhases",
+)
+
+router.register(
+    r"project-quality-levels",
+    views.ProjectQualityLevelViewSet,
+    basename="projectQualityLevels",
+)
+router.register(
+    r"project-classes",
+    views.ProjectClassViewSet,
+    basename="projectClasses",
+)
+router.register(
+    r"project-locations",
+    views.ProjectLocationViewSet,
+    basename="projectLocations",
+)
+
+router.register(
+    r"responsible-zones",
+    views.ProjectResponsibleZoneViewSet,
+    basename="responsibleZones",
+)
+
+router.register(
+    r"project-hashtags",
+    views.ProjectHashtagViewSet,
+    basename="projectHashTags",
+)
+router.register(
+    r"project-groups",
+    views.ProjectGroupViewSet,
+    basename="projectGroups",
+)
+router.register(
+    r"project-locks",
+    views.ProjectLockViewSet,
+    basename="projectLock",
+)
+router.register(
+    r"project-financials",
+    views.ProjectFinancialViewSet,
+    basename="projectFinancials",
+)
+router.register(
+    r"class-financials",
+    views.ClassFinancialViewSet,
+    basename="classFinancials",
+)
+
+router.register(
+    r"location-financials",
+    views.LocationFinancialViewSet,
+    basename="locationFinancials",
+)
+router.register(
+    r"who-am-i",
+    views.WhoAmIViewSet,
+    basename="whoAmI",
+)
+
+router.register(
+    r"sap-costs",
+    views.SapCostViewSet,
+    basename="sapCosts",
+)
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('admin/', admin.site.urls),
+    path("", include(router.urls)),
+    path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),
+    path("admin/budget-excel-uploader", admin_views.ExcelFormView.as_view()),
+    path("admin/class-location-excel-uploader", admin_views.ExcelFormView.as_view()),
+    path("admin/", admin.site.urls),
+    path("pysocial/", include("social_django.urls", namespace="social")),
+    path("helauth/", include("helusers.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
