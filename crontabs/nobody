@@ -1,5 +1,0 @@
-SHELL=/bin/sh
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# every night at 0 o'clock
-0 0 * * * /app/sync-from-sap.sh >> /var/log/cron.sap-sync.log 2>&1
