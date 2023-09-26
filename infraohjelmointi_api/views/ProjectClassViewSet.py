@@ -3,6 +3,7 @@ from .BaseClassLocationViewSet import BaseClassLocationViewSet
 from infraohjelmointi_api.serializers.ProjectClassSerializer import (
     ProjectClassSerializer,
 )
+from infraohjelmointi_api.models.ClassFinancial import ClassFinancial
 from infraohjelmointi_api.services import ProjectClassService, ClassFinancialService
 from overrides import override
 from rest_framework.response import Response
@@ -136,10 +137,19 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                     data={"message": "Invalid data format"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        # not using ClassFinancial Service here to manually be able to add finance_year to the instance which
+        # will be sent to post_save signal
+        try:
+            obj = ClassFinancial.objects.get(year=year, classRelation_id=class_id)
+            for key, value in patchData.items():
+                setattr(obj, key, value)
+            obj.finance_year = startYear
+            obj.save()
+        except ClassFinancial.DoesNotExist:
+            obj = ClassFinancial(**patchData, year=year, classRelation_id=class_id)
+            obj.finance_year = startYear
+            obj.save()
 
-        ClassFinancialService.update_or_create(
-            year=year, class_id=class_id, updatedData=patchData
-        )
         return Response(
             ProjectClassSerializer(
                 ProjectClassService.get_by_id(id=class_id),
