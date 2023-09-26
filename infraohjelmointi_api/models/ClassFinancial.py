@@ -26,7 +26,7 @@ class ClassFinancial(models.Model):
         related_name="finances",
     )
     frameBudget = models.PositiveIntegerField(blank=True, null=True, default=0)
-    budgetChange = models.PositiveIntegerField(blank=True, null=True, default=0)
+    budgetChange = models.IntegerField(blank=True, null=True, default=0)
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
