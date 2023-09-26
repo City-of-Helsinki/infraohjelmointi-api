@@ -68,6 +68,16 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
         if _type == "ProjectClass":
+            childLocationFrameSum = (
+                LocationFinancial.objects.filter(
+                    locationRelation__parentClass=OuterRef("id"), year=year
+                )
+                .select_related("locationRelation")
+                .values("locationRelation__parentClass")
+                .annotate(frameSum=Sum("frameBudget"))
+                .values("frameSum")
+            )
+
             # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
             childClassQueryResult = (
                 # First filter to get all children classes of the current class instance
@@ -82,7 +92,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     "parent__finances__frameBudget",
                     "parent__projectlocation__finances",
                 )
-                .prefetch_related("finances")
+                .prefetch_related("finances", "projectlocation")
                 # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
                 .values("parent")
                 .annotate(
@@ -97,7 +107,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         "parent__projectlocation__finances__frameBudget",
                         default=Value(0),
                         filter=Q(parent__projectlocation__finances__year=year),
-                    ),
+                    )
+                    + Subquery(childLocationFrameSum),
                     # Use subquery to get frameBudget for each levels parent for a given year
                     # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
                     parentFrameBudget=Coalesce(
@@ -157,15 +168,13 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = int(self.context.get("finance_year", date.today().year))
         forcedToFrame = self.context.get("forcedToFrame", False)
 
+        # Check if current instance has changed since the last time by searching for its id in the cache
         relationEffectedCached: list = cache.get("relationEffected", None)
         if (
-            relationEffectedCached != None
+            isinstance(relationEffectedCached, list)
             and (instance in relationEffectedCached)
             or (
-                relationEffectedCached == None
-                and cache.get(
-                    str(instance.id) + "/{}/{}".format(forcedToFrame, year), None
-                )
+                cache.get(str(instance.id) + "/{}/{}".format(forcedToFrame, year))
                 == None
             )
         ):
@@ -331,12 +340,18 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 summedFinances,
                 60 * 60 * 24,
             )
-            # delete this instance from relationEffected
-            if relationEffectedCached != None and instance in relationEffectedCached:
+
+            # delete this instance from relationEffected if it exists there since it has been updated now
+            if (
+                isinstance(relationEffectedCached, list)
+                and instance in relationEffectedCached
+            ):
                 relationEffectedCached.remove(instance)
             cache.set("relationEffected", relationEffectedCached)
 
         else:
+            # instance doesn't exist in changed relations cache
+            # get calculations from cache
             summedFinances = cache.get(
                 str(instance.id) + "/{}/{}".format(forcedToFrame, year)
             )
