@@ -68,16 +68,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
         if _type == "ProjectClass":
-            childLocationFrameSum = (
-                LocationFinancial.objects.filter(
-                    locationRelation__parentClass=OuterRef("id"), year=year
-                )
-                .select_related("locationRelation")
-                .values("locationRelation__parentClass")
-                .annotate(frameSum=Sum("frameBudget"))
-                .values("frameSum")
-            )
-
             # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
             childClassQueryResult = (
                 # First filter to get all children classes of the current class instance
@@ -107,8 +97,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         "parent__projectlocation__finances__frameBudget",
                         default=Value(0),
                         filter=Q(parent__projectlocation__finances__year=year),
-                    )
-                    + Subquery(childLocationFrameSum),
+                    ),
                     # Use subquery to get frameBudget for each levels parent for a given year
                     # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
                     parentFrameBudget=Coalesce(

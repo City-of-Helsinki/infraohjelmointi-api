@@ -166,11 +166,15 @@ class ProjectViewSet(BaseViewSet):
                 updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
                     project_financials=financeInstances
                 )[0]
+                # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
+                updatedFinanceInstance.finance_year = year
                 post_save.send(
                     ProjectFinancial, instance=updatedFinanceInstance, created=False
                 )
         # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
         project.forcedToFrame = forcedToFrame
+        # adding finance_year here so that on save the instance that gets to the post_save signal has this value
+        project.finance_year = year
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
