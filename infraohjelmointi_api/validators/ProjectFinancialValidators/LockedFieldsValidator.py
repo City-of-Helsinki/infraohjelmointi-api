@@ -28,7 +28,12 @@ class LockedFieldsValidator:
             for field in lockedFields:
                 if allFields.get(field, None) is not None:
                     raise ValidationError(
-                        "The field {} cannot be modified when the project is locked".format(
-                            yearToFieldMapping[projectFinancialInstance.year]
-                        )
+                        detail={
+                            yearToFieldMapping[
+                                projectFinancialInstance.year
+                            ]: "The field {} cannot be modified when the project is locked".format(
+                                yearToFieldMapping[projectFinancialInstance.year]
+                            )
+                        },
+                        code="project_locked",
                     )

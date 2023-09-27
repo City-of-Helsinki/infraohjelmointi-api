@@ -6,13 +6,14 @@ from infraohjelmointi_api.models import (
     LocationFinancial,
     ProjectLocation,
 )
-
-
+import pandas as pd
+from django.core.cache import cache
 from infraohjelmointi_api.services import (
     ProjectService,
     ClassFinancialService,
     LocationFinancialService,
 )
+from django.db.models import IntegerField
 from rest_framework import serializers
 from django.db.models import (
     Sum,
@@ -38,6 +39,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
         isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
         """
+
         for_coordinator = self.context.get("for_coordinator", False)
         _type = instance._meta.model.__name__
 
@@ -68,66 +70,102 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
         if _type == "ProjectClass":
-            # Django ORM query to iterate over all child classes and check at each level if child frame budget sums exceed parent frame budget
-            childClassQueryResult = (
-                # First filter to get all children classes of the current class instance
+            # get all childs with frameBudget for each level
+
+            childClasses = (
                 ProjectClass.objects.filter(
                     path__startswith=instance.path,
                     path__gt=instance.path,
                     forCoordinatorOnly=True,
                 )
-                .select_related(
-                    "parent__finances",
-                    "parent",
-                    "parent__finances__frameBudget",
-                    "parent__projectlocation__finances",
-                )
                 .prefetch_related("finances")
-                # Group all child classes by their parent classes, now we have all classes grouped by in their sub levels
-                .values("parent")
                 .annotate(
-                    # calculate frameBudget sums for each level for a given year
-                    childSum=Sum(
-                        "finances__frameBudget",
-                        default=Value(0),
-                        filter=Q(finances__year=year) & Q(parent=F("parent")),
-                    )
-                    # Add frameBudgets for locations under the level
-                    + Sum(
-                        "parent__projectlocation__finances__frameBudget",
-                        default=Value(0),
-                        filter=Q(parent__projectlocation__finances__year=year),
+                    frameBudget=Coalesce(
+                        Subquery(
+                            ClassFinancial.objects.filter(
+                                classRelation=OuterRef("id"), year=year
+                            ).values_list("frameBudget", flat=True)[:1],
+                            output_field=IntegerField(),
+                        ),
+                        Value(0),
                     ),
-                    # Use subquery to get frameBudget for each levels parent for a given year
-                    # Have to use a subquery intead of fetching frameBudget for parent directly as multiple joins mess up with the sums in the DB
+                    parentRelation=F("parent"),
                     parentFrameBudget=Coalesce(
                         Subquery(
                             ClassFinancial.objects.filter(
                                 classRelation=OuterRef("parent"), year=year
-                            ).values_list("frameBudget", flat=True)[:1]
+                            ).values_list("frameBudget", flat=True)[:1],
+                            output_field=IntegerField(),
                         ),
                         Value(0),
                     ),
-                    # Calculate if there frameBudgets for each level sums exceed their parents frameBudget
-                    isOverlap=Case(
-                        When(childSum__gt=F("parentFrameBudget"), then=Value(True)),
-                        default=Value(False),
-                        output_field=BooleanField(),
-                    ),
                 )
-                .aggregate(
-                    #  Sum all level frameBudgets to get the total frameBudget sums of all the levels under the current Class
-                    childSums=Sum("childSum", default=Value(0)),
-                    # mapping boolean for frameBudget overlap in each level to a number and count all of them
-                    subChildrenOverlapCount=Count(
-                        Case(
-                            When(isOverlap=True, then=Value(1)),
-                            default=Value(None),
-                            output_field=PositiveIntegerField(),
-                        )
-                    ),
-                )
+                .values("id", "parentRelation", "frameBudget", "parentFrameBudget")
             )
+            # get all locations with parentClass as childs and get frameBudgets
+            childLocations = (
+                ProjectLocation.objects.filter(
+                    parentClass__in=[
+                        *childClasses.values_list("id", flat=True),
+                        instance.id,
+                    ],
+                    forCoordinatorOnly=True,
+                )
+                .annotate(
+                    frameBudget=Coalesce(
+                        Subquery(
+                            LocationFinancial.objects.filter(
+                                locationRelation=OuterRef("id"), year=year
+                            ).values_list("frameBudget", flat=True)[:1],
+                            output_field=IntegerField(),
+                        ),
+                        Value(0),
+                    ),
+                    parentRelation=F("parentClass"),
+                    parentFrameBudget=Coalesce(
+                        Subquery(
+                            ClassFinancial.objects.filter(
+                                classRelation=OuterRef("parentClass"), year=year
+                            ).values_list("frameBudget", flat=True)[:1],
+                            output_field=IntegerField(),
+                        ),
+                        Value(0),
+                    ),
+                )
+                .values("id", "parentRelation", "frameBudget", "parentFrameBudget")
+            )
+            # Combine all child relations of the current instance into one single queryset
+            allChildRelations = childLocations.union(childClasses)
+            if allChildRelations.count() > 0:
+                dataFrame = pd.DataFrame.from_records(allChildRelations)
+
+                # Group by 'parentRelation' and calculate the sum of 'frameBudget' for each group
+                # This gives us frameBudget sums of each level under the current instance
+                grouped = (
+                    dataFrame.groupby("parentRelation")
+                    .agg({"parentFrameBudget": "first", "frameBudget": "sum"})
+                    .reset_index()
+                )
+                # Calculate for each level if child sums exceed frameBudget of that level
+                grouped["isOverlap"] = (
+                    grouped["frameBudget"] > grouped["parentFrameBudget"]
+                )
+
+                # Rename the 'frameBudget' column to 'frameBudgetSums'
+                grouped.rename(columns={"frameBudget": "frameBudgetSums"}, inplace=True)
+                # Total frameBudget sum of all levels under current instance
+                child_sums = grouped["frameBudgetSums"].sum()
+                # Check how many levels under current instance have frameBudget warnings
+                sub_children_overlap_count = grouped["isOverlap"].sum()
+
+                # Create a new DataFrame with the results
+                result_df = pd.DataFrame(
+                    {
+                        "childSums": [child_sums],
+                        "subChildrenOverlapCount": [sub_children_overlap_count],
+                    }
+                )
+                childClassQueryResult = result_df.to_dict(orient="records")[0]
 
         return {
             "frameBudget": financeInstance.frameBudget
@@ -147,6 +185,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             ),
         }
 
+    # try caching this whole result for a class
+    # can change based on frameview, and year
     def get_finance_sums(self, instance):
         """
         Calculates financial sums for 10 years given a group | location | class instance.
@@ -154,157 +194,194 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         forcedToFrame = self.context.get("forcedToFrame", False)
-        relatedProjects = self.get_related_projects(instance=instance, _type=_type)
-        summedFinances = relatedProjects.aggregate(
-            year0_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame) & Q(finances__year=year),
-            ),
-            year1_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 1),
-            ),
-            year2_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 2),
-            ),
-            year3_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 3),
-            ),
-            year4_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 4),
-            ),
-            year5_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 5),
-            ),
-            year6_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 6),
-            ),
-            year7_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 7),
-            ),
-            year8_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 8),
-            ),
-            year9_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 9),
-            ),
-            year10_plannedBudget=Sum(
-                "finances__value",
-                default=0,
-                filter=Q(finances__forFrameView=forcedToFrame)
-                & Q(finances__year=year + 10),
-            ),
-            budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
-        )
-        if _type == "ProjectGroup":
-            summedFinances["projectBudgets"] = relatedProjects.aggregate(
-                projectBudgets=Sum("costForecast", default=0)
-            )["projectBudgets"]
-        summedFinances["year"] = year
-        summedFinances["year0"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year,
-            ),
-            "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
-        }
-        summedFinances["year1"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 1,
-            ),
-            "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
-        }
-        summedFinances["year2"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 2,
-            ),
-            "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
-        }
-        summedFinances["year3"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 3,
-            ),
-            "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
-        }
-        summedFinances["year4"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 4,
-            ),
-            "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
-        }
-        summedFinances["year5"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 5,
-            ),
-            "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
-        }
-        summedFinances["year6"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 6,
-            ),
-            "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
-        }
-        summedFinances["year7"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 7,
-            ),
-            "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
-        }
-        summedFinances["year8"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 8,
-            ),
-            "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
-        }
-        summedFinances["year9"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 9,
-            ),
-            "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
-        }
-        summedFinances["year10"] = {
-            **self.get_frameBudget_and_budgetChange(
-                instance=instance,
-                year=year + 10,
-            ),
-            "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
-        }
+
+        # Check if current instance has changed since the last time by searching for its id in the cache
+        relationEffectedCached: list = cache.get("relationEffected", None)
+        if (
+            isinstance(relationEffectedCached, list)
+            and (instance in relationEffectedCached)
+            or (
+                cache.get(str(instance.id) + "/{}/{}".format(forcedToFrame, year))
+                == None
+            )
+        ):
+            # this instance needs new financial sums to be calculated
+            relatedProjects = self.get_related_projects(instance=instance, _type=_type)
+
+            summedFinances = relatedProjects.aggregate(
+                year0_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year),
+                ),
+                year1_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 1),
+                ),
+                year2_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 2),
+                ),
+                year3_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 3),
+                ),
+                year4_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 4),
+                ),
+                year5_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 5),
+                ),
+                year6_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 6),
+                ),
+                year7_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 7),
+                ),
+                year8_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 8),
+                ),
+                year9_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 9),
+                ),
+                year10_plannedBudget=Sum(
+                    "finances__value",
+                    default=0,
+                    filter=Q(finances__forFrameView=forcedToFrame)
+                    & Q(finances__year=year + 10),
+                ),
+                budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
+            )
+            if _type == "ProjectGroup":
+                summedFinances["projectBudgets"] = relatedProjects.aggregate(
+                    projectBudgets=Sum("costForecast", default=0)
+                )["projectBudgets"]
+
+            summedFinances["year"] = year
+            summedFinances["year0"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year,
+                ),
+                "plannedBudget": int(summedFinances.pop("year0_plannedBudget")),
+            }
+            summedFinances["year1"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 1,
+                ),
+                "plannedBudget": int(summedFinances.pop("year1_plannedBudget")),
+            }
+            summedFinances["year2"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 2,
+                ),
+                "plannedBudget": int(summedFinances.pop("year2_plannedBudget")),
+            }
+            summedFinances["year3"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 3,
+                ),
+                "plannedBudget": int(summedFinances.pop("year3_plannedBudget")),
+            }
+            summedFinances["year4"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 4,
+                ),
+                "plannedBudget": int(summedFinances.pop("year4_plannedBudget")),
+            }
+            summedFinances["year5"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 5,
+                ),
+                "plannedBudget": int(summedFinances.pop("year5_plannedBudget")),
+            }
+            summedFinances["year6"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 6,
+                ),
+                "plannedBudget": int(summedFinances.pop("year6_plannedBudget")),
+            }
+            summedFinances["year7"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 7,
+                ),
+                "plannedBudget": int(summedFinances.pop("year7_plannedBudget")),
+            }
+            summedFinances["year8"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 8,
+                ),
+                "plannedBudget": int(summedFinances.pop("year8_plannedBudget")),
+            }
+            summedFinances["year9"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 9,
+                ),
+                "plannedBudget": int(summedFinances.pop("year9_plannedBudget")),
+            }
+            summedFinances["year10"] = {
+                **self.get_frameBudget_and_budgetChange(
+                    instance=instance,
+                    year=year + 10,
+                ),
+                "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
+            }
+            # caching calculations for 24 hours
+            # will get updated according to relations which change
+            cache.set(
+                str(instance.id) + "/{}/{}".format(forcedToFrame, year),
+                summedFinances,
+                60 * 60 * 24,
+            )
+
+            # delete this instance from relationEffected if it exists there since it has been updated now
+            if (
+                isinstance(relationEffectedCached, list)
+                and instance in relationEffectedCached
+            ):
+                relationEffectedCached.remove(instance)
+            cache.set("relationEffected", relationEffectedCached)
+
+        else:
+            # instance doesn't exist in changed relations cache
+            # get calculations from cache
+            summedFinances = cache.get(
+                str(instance.id) + "/{}/{}".format(forcedToFrame, year)
+            )
 
         return summedFinances
 
