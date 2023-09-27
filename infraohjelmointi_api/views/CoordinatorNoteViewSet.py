@@ -1,3 +1,5 @@
+from django.shortcuts import get_object_or_404
+
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers.CoordinatorNoteSerializer import CoordinatorNoteSerializer
 from rest_framework.decorators import action
@@ -17,9 +19,9 @@ class CoordinatorNoteViewSet(BaseViewSet):
     @action(
         methods=["get"], 
         detail=False, 
-        url_path=r"(?P<projectId>[-\w]+)",
+        url_path=r"(?P<planningClassId>[-\w]+)",
     )
-    def get_coordinator_notes_by_project(self, request, projectId):
+    def get_coordinator_notes_by_project(self, request, planningClassId):
         """
         Custom action to get coordinator notes of a project
             URL Parameters
@@ -34,20 +36,22 @@ class CoordinatorNoteViewSet(BaseViewSet):
 
             Returns
             -------
-
-            JSON
-                List of coordinator notes of  a project
+            
+            List of coordinator notes of a project
         """
         try:
-            print(projectId)
-            queryFilter = {"projectId": projectId}
-            return Response(CoordinatorNoteSerializer(context={"planningClassId": queryFilter}).data)
+            serializer = CoordinatorNoteSerializer(
+                CoordinatorNoteService.list_all_notes(planningClassId),
+                many=True
+            )
+            return Response(serializer.data)
 
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+    
     @action(
         methods=["post"], 
         detail=False, 
