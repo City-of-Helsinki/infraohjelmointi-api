@@ -2455,7 +2455,7 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus0 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["budgetProposalCurrentYearPlus0"],
         )
 
         data = {"finances": {"budgetProposalCurrentYearPlus1": 200}}
@@ -2471,7 +2471,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus1 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["budgetProposalCurrentYearPlus1"],
         )
 
         data = {"finances": {"budgetProposalCurrentYearPlus2": 200}}
@@ -2487,7 +2487,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field budgetProposalCurrentYearPlus2 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["budgetProposalCurrentYearPlus2"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus3": 200}}
@@ -2503,7 +2503,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus3 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus3"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus4": 200}}
@@ -2519,7 +2519,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus4 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus4"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus5": 200}}
@@ -2535,7 +2535,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus5 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus5"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus6": 200}}
@@ -2551,7 +2551,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus6 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus6"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus7": 200}}
@@ -2567,7 +2567,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus7 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus7"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus8": 200}}
@@ -2583,7 +2583,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus8 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus8"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus9": 200}}
@@ -2599,7 +2599,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus9 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus9"],
         )
 
         data = {"finances": {"preliminaryCurrentYearPlus10": 200}}
@@ -2615,7 +2615,7 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             "The field preliminaryCurrentYearPlus10 cannot be modified when the project is locked",
-            response.json()["non_field_errors"][0],
+            response.json()["preliminaryCurrentYearPlus10"],
         )
 
     def test_locking_project_twice(self):

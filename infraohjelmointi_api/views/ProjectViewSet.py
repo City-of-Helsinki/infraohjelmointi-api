@@ -16,6 +16,7 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectClass,
     ProjectLocation,
+    ProjectFinancial,
 )
 from infraohjelmointi_api.services import (
     ProjectWiseService,
@@ -36,6 +37,7 @@ import uuid
 from rest_framework import status
 from itertools import chain
 from django.db.models import Count, Case, When, Q
+from django.db.models.signals import post_save
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -125,26 +127,54 @@ class ProjectViewSet(BaseViewSet):
                     start_year=year
                 )
             )
+            financeInstances = []
             for field in finances.keys():
-                (
-                    projectFinancialObject,
-                    created,
-                ) = ProjectFinancialService.get_or_create(
+                if hasattr(project, "lock"):
+                    raise ValidationError(
+                        detail={
+                            field: "The field {} cannot be modified when the project is locked".format(
+                                field
+                            )
+                        },
+                        code="project_locked",
+                    )
+                financeInstance = ProjectFinancial(
+                    project=project,
+                    value=finances[field],
                     year=fieldToYearMapping[field],
-                    project_id=project.id,
                     forFrameView=forcedToFrame,
                 )
-                financeSerializer = ProjectFinancialSerializer(
-                    projectFinancialObject,
-                    data={"value": finances[field]},
-                    partial=True,
-                    many=False,
-                    context={"finance_year": year},
+
+                financeInstances.append(financeInstance)
+                if (
+                    forcedToFrame == False
+                    and not ProjectFinancialService.instance_exists(
+                        project_id=project.id,
+                        year=fieldToYearMapping[field],
+                        forFrameView=True,
+                    )
+                ):
+                    frameViewFinanceObject = ProjectFinancial(
+                        project=project,
+                        year=fieldToYearMapping[field],
+                        value=finances[field],
+                        forFrameView=True,
+                    )
+                    financeInstances.append(frameViewFinanceObject)
+
+            if len(financeInstances) > 0:
+                updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
+                    project_financials=financeInstances
+                )[0]
+                # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
+                updatedFinanceInstance.finance_year = year
+                post_save.send(
+                    ProjectFinancial, instance=updatedFinanceInstance, created=False
                 )
-                financeSerializer.is_valid(raise_exception=True)
-                financeSerializer.save()
         # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
         project.forcedToFrame = forcedToFrame
+        # adding finance_year here so that on save the instance that gets to the post_save signal has this value
+        project.finance_year = year
         projectSerializer = self.get_serializer(
             project,
             data=request.data,
