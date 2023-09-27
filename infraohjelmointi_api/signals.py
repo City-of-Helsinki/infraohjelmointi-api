@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 from django.db.models.signals import post_save, m2m_changed
 from django.contrib.contenttypes.models import ContentType
@@ -13,6 +14,7 @@ from .services import ClassFinancialService, ProjectService, LocationFinancialSe
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
+from django.core.cache import cache
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -27,6 +29,7 @@ def on_transaction_commit(func):
 def get_financial_sums(
     _type: str,
     instance: ClassFinancial | ProjectFinancial | LocationFinancial,
+    finance_year: int,
 ):
     """
     Returns a dictionary of coordination and planning class instances with financial sum values.
@@ -36,6 +39,9 @@ def get_financial_sums(
         ----------
         instance : ClassFinancial | ProjectFinancial
             Updated Financial instance used to get related classes and calculate financial sums
+
+        finance_year : int
+            Start year for the 10 year financial sums
 
         Returns
         -------
@@ -96,12 +102,25 @@ def get_financial_sums(
         },
     }
     if _type == "ProjectFinancial":
+        # check which projcet relations get effected by this project,
+        # set those relations in cache
+
         project = instance.project
         forFrameView = instance.forFrameView
         projectRelations = ProjectService.get_project_class_location_group_relations(
             project=project
         )
 
+        # set cache for 24 hours
+        cache.set(
+            "relationEffected",
+            [
+                *projectRelations["coordination"].values(),
+                *projectRelations["planning"].values(),
+            ],
+            60 * 60 * 24,
+        )
+        logger.debug("Setting levels effected by ProjectFinancial change to cache")
         for viewType, instances in projectRelations.items():
             if viewType == "planning" and forFrameView == True:
                 continue
@@ -117,6 +136,7 @@ def get_financial_sums(
                             "for_coordinator": viewType == "coordination"
                             or forFrameView,
                             "forcedToFrame": forFrameView,
+                            "finance_year": finance_year,
                         },
                     ).data
 
@@ -129,6 +149,7 @@ def get_financial_sums(
                             "for_coordinator": viewType == "coordination"
                             or forFrameView,
                             "forcedToFrame": forFrameView,
+                            "finance_year": finance_year,
                         },
                     ).data
                 else:
@@ -140,6 +161,7 @@ def get_financial_sums(
                             "for_coordinator": viewType == "coordination"
                             or forFrameView,
                             "forcedToFrame": forFrameView,
+                            "finance_year": finance_year,
                         },
                     ).data
 
@@ -147,12 +169,26 @@ def get_financial_sums(
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
             instance=instance
         )
+
+        # set cache for 2 hours
+        cache.set(
+            "relationEffected",
+            [
+                *classRelations["coordination"].values(),
+                *classRelations["planning"].values(),
+            ],
+            60 * 60 * 2,
+        )
+        logger.debug("Setting levels effected by ClassFinancial change to cache")
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
                 if classInstance != None:
                     sums[viewType][classType] = ProjectClassSerializer(
                         classInstance,
-                        context={"for_coordinator": viewType == "coordination"},
+                        context={
+                            "for_coordinator": viewType == "coordination",
+                            "finance_year": finance_year,
+                        },
                     ).data
 
     if _type == "LocationFinancial":
@@ -161,18 +197,34 @@ def get_financial_sums(
                 instance=instance
             )
         )
+
+        cache.set(
+            "relationEffected",
+            [
+                *locationFinancialRelations["coordination"].values(),
+                *locationFinancialRelations["planning"].values(),
+            ],
+            60 * 60 * 2,
+        )
+        logger.debug("Setting levels effected by LocationFinancial change to cache")
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
                 if instance != None:
                     if instanceType in ["district"]:
                         sums[viewType][instanceType] = ProjectLocationSerializer(
                             instance,
-                            context={"for_coordinator": viewType == "coordination"},
+                            context={
+                                "for_coordinator": viewType == "coordination",
+                                "finance_year": finance_year,
+                            },
                         ).data
                     else:
                         sums[viewType][instanceType] = ProjectClassSerializer(
                             instance,
-                            context={"for_coordinator": viewType == "coordination"},
+                            context={
+                                "for_coordinator": viewType == "coordination",
+                                "finance_year": finance_year,
+                            },
                         ).data
 
     return sums
@@ -200,11 +252,11 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
     if created:
         logger.debug("Signal Triggered: {} Object was created".format(_type))
     logger.debug("Signal Triggered: {} Object was updated".format(_type))
-
+    year = getattr(instance, "finance_year", date.today().year)
     send_event(
         "finance",
         "finance-update",
-        get_financial_sums(instance=instance, _type=_type),
+        get_financial_sums(instance=instance, _type=_type, finance_year=year),
     )
 
 
@@ -219,6 +271,7 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         # This comes from partial_update action which is overriden in project view set
         # It gets added to the project instance before .save() is called
         forcedToFrame = getattr(instance, "forcedToFrame", False)
+        year = getattr(instance, "finance_year", date.today().year)
         send_event(
             "project",
             "project-update",
@@ -229,6 +282,7 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
                         "get_pw_link": True,
                         "forcedToFrame": forcedToFrame,
                         "for_coordinator": forcedToFrame == True,
+                        "finance_year": year,
                     },
                 ).data,
             },

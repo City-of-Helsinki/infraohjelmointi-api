@@ -6,6 +6,7 @@ from infraohjelmointi_api.services import (
     ProjectLocationService,
     LocationFinancialService,
 )
+from infraohjelmointi_api.models.LocationFinancial import LocationFinancial
 from overrides import override
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -131,10 +132,22 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
                     data={"message": "Invalid data format"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-        LocationFinancialService.update_or_create(
-            year=year, location_id=location_id, updatedData=patchData
-        )
+        # not using LocationFinancial Service here to manually be able to add finance_year to the instance which
+        # will be sent to post_save signal
+        try:
+            obj = LocationFinancial.objects.get(
+                year=year, locationRelation_id=location_id
+            )
+            for key, value in patchData.items():
+                setattr(obj, key, value)
+            obj.finance_year = startYear
+            obj.save()
+        except LocationFinancial.DoesNotExist:
+            obj = LocationFinancial(
+                **patchData, year=year, locationRelation_id=location_id
+            )
+            obj.finance_year = startYear
+            obj.save()
         return Response(
             ProjectLocationSerializer(
                 ProjectLocationService.get_by_id(id=location_id),
