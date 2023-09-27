@@ -1,11 +1,11 @@
-from django.shortcuts import get_object_or_404
-from infraohjelmointi_api.models import CoordinatorNote
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers.CoordinatorNoteSerializer import CoordinatorNoteSerializer
 from rest_framework.decorators import action
-import uuid
 from rest_framework.response import Response
 from rest_framework import status
+from infraohjelmointi_api.services.CoordinatorNoteService import (
+    CoordinatorNoteService,
+)
 
 class CoordinatorNoteViewSet(BaseViewSet):
     """
@@ -41,10 +41,34 @@ class CoordinatorNoteViewSet(BaseViewSet):
         try:
             print(projectId)
             queryFilter = {"projectId": projectId}
-          #  note_object = get_object_or_404(CoordinatorNote, **queryFilter)
             return Response(CoordinatorNoteSerializer(context={"planningClassId": queryFilter}).data)
 
         except ValueError:
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(
+        methods=["post"], 
+        detail=False, 
+        url_path=r"$",
+    )
+    def set_coordinator_note_by_project(self, request):
+        """
+        Custom action to add a coordinator note to a project
+            URL Parameters
+            ----------
+
+            request
+
+            Usage
+            ----------
+
+            coordinator-notes/<request>
+        """
+        try:
+           return CoordinatorNoteService.create(request)
+        except ValueError:
+            return Response(
+                data={"message": "Something went wrong"}, status=status.HTTP_400_BAD_REQUEST
             )
