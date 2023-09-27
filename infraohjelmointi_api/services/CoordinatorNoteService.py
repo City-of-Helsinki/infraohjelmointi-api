@@ -1,7 +1,5 @@
 from django.shortcuts import get_object_or_404
 from ..models import CoordinatorNote
-from ..models import Project
-from ..models import Person
 class CoordinatorNoteService:
 
     def create(self, request):
@@ -14,4 +12,12 @@ class CoordinatorNoteService:
             updatedByFirstName=request.get("updatedByFirstName"),
             updatedById=get_object_or_404(CoordinatorNote, pk=updatedById.id),
             updatedByLastName=request.get("updatedByLastName"),
+        )
+
+    def list_all_notes(classId) -> list[CoordinatorNote]:
+        """List all coordinator notes of a project"""
+        return (
+            CoordinatorNote.objects.all()
+            .filter(planningClassId=classId)
+            .order_by("createdDate")
         )
