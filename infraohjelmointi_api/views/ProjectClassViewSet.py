@@ -28,7 +28,12 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             .prefetch_related("coordinatorClass__finances")
         )
 
-    @action(methods=["get"], detail=False, url_path=r"coordinator")
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"coordinator",
+        name="get_coordinator_classes",
+    )
     def list_for_coordinator(self, request):
         """
         Overriden list action to get a list of coordinator ProjectClass
@@ -88,6 +93,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         methods=["patch"],
         detail=False,
         url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
+        name="patch_coordinator_class_finances",
     )
     def patch_coordinator_class_finances(self, request, class_id):
         """

@@ -5,11 +5,11 @@ from helusers.oidc import ApiTokenAuthentication
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-from ..permissions import IsSameUser
+from ..permissions import IsCoordinator
 
 
 class BaseViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated | (IsCoordinator)]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
 
     @override

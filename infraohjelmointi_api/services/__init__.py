@@ -16,3 +16,4 @@ from .ClassFinancialService import ClassFinancialService
 from .LocationFinancialService import LocationFinancialService
 from .SapApiService import SapApiService
 from .SapCostService import SapCostService
+from .ADGroupService import ADGroupService
