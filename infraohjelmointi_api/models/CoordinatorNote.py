@@ -5,7 +5,7 @@ class CoordinatorNote(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
     coordinatorNote = models.TextField(blank=True, null=False, default="")
-
+    year = models.CharField(max_length=4)
     planningClass = models.CharField(max_length=150)
     planningClassId = models.ForeignKey("ProjectClass", on_delete=models.DO_NOTHING)
 
@@ -14,5 +14,4 @@ class CoordinatorNote(models.Model):
     updatedByLastName = models.CharField(max_length=50)
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
-    updatedDate = models.DateTimeField(auto_now=True, blank=True)
     
