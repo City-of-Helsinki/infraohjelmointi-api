@@ -11,7 +11,7 @@ from infraohjelmointi_api.services.CoordinatorNoteService import (
 
 class CoordinatorNoteViewSet(BaseViewSet):
     """
-    API endpoint that allows coordinator notes to be viewed.
+    API endpoint that allows coordinator notes to be viewed and added.
     """
 
     serializer_class = CoordinatorNoteSerializer
@@ -41,8 +41,8 @@ class CoordinatorNoteViewSet(BaseViewSet):
         """
         try:
             serializer = CoordinatorNoteSerializer(
-                CoordinatorNoteService.list_all_notes(planningClassId),
-                many=True
+                CoordinatorNoteService.list_all_notes(),
+                many=True,
             )
             return Response(serializer.data)
 
