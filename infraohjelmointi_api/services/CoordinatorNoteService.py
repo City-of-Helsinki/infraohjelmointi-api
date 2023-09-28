@@ -14,10 +14,9 @@ class CoordinatorNoteService:
             updatedByLastName=request.get("updatedByLastName"),
         )
 
-    def list_all_notes(classId) -> list[CoordinatorNote]:
+    def list_all_notes() -> list[CoordinatorNote]:
         """List all coordinator notes of a project"""
         return (
             CoordinatorNote.objects.all()
-            .filter(planningClassId=classId)
             .order_by("createdDate")
         )
