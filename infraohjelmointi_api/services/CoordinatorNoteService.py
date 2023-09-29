@@ -13,7 +13,7 @@ class CoordinatorNoteService:
             updatedById=get_object_or_404(CoordinatorNote, pk=updatedById.id),
             updatedByLastName=request.get("updatedByLastName"),
         )
-
+    @staticmethod
     def list_all_notes() -> list[CoordinatorNote]:
         """List all coordinator notes of a project"""
         return (

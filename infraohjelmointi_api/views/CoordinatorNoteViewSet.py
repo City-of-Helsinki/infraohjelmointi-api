@@ -19,9 +19,9 @@ class CoordinatorNoteViewSet(BaseViewSet):
     @action(
         methods=["get"], 
         detail=False, 
-        url_path=r"(?P<planningClassId>[-\w]+)",
+        url_path=r"get-notes",
     )
-    def get_coordinator_notes_by_project(self, request, planningClassId):
+    def get_coordinator_notes_by_project(self, request):
         """
         Custom action to get coordinator notes of a project
             URL Parameters
