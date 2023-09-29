@@ -48,7 +48,7 @@ class CoordinatorNoteViewSet(BaseViewSet):
 
         except ValueError:
             return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+                data={"message": "Something went wrong"}, status=status.HTTP_400_BAD_REQUEST
             )
 
     
