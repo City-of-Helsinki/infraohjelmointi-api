@@ -67,6 +67,9 @@ def buildHierarchies(
     cv_color_stack: hex = []
 
     for row in rows[2:]:
+        if len(row) < 7:
+            continue
+
         # programmer view
         pv_cell = row[1]
         pv_code = str(row[0].value).strip() if row[0].value else None
