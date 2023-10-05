@@ -506,6 +506,10 @@ def buildHierarchiesAndProjects(
     type = "MAIN CLASS"
 
     for row in rows[2:]:
+        # If empty row, skip
+        if len(row) < 1:
+            continue
+
         cell = row[name_column_index]
         # read class/district name
         name = str(cell.value).strip()
