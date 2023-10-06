@@ -67,6 +67,9 @@ def buildHierarchies(
     cv_color_stack: hex = []
 
     for row in rows[2:]:
+        if len(row) < 7:
+            continue
+
         # programmer view
         pv_cell = row[1]
         pv_code = str(row[0].value).strip() if row[0].value else None
@@ -503,6 +506,10 @@ def buildHierarchiesAndProjects(
     type = "MAIN CLASS"
 
     for row in rows[2:]:
+        # If empty row, skip
+        if len(row) < 1:
+            continue
+
         cell = row[name_column_index]
         # read class/district name
         name = str(cell.value).strip()
