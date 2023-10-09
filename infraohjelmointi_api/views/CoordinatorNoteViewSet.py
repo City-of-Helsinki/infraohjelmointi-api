@@ -1,5 +1,3 @@
-from django.shortcuts import get_object_or_404
-
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers.CoordinatorNoteSerializer import CoordinatorNoteSerializer
 
