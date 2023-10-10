@@ -13,14 +13,13 @@ class CoordinatorNote(models.Model):
         django.core.validators.MaxValueValidator(3000),
     ])
     coordinatorClassName = models.CharField(max_length=150)
-    coordinatorClass = models.ForeignKey("ProjectClass", on_delete=models.DO_NOTHING)
+    coordinatorClass = models.ForeignKey("ProjectClass", on_delete=models.DO_NOTHING, null=True, blank=False)
 
-    updatedBy = models.ForeignKey("User", on_delete=models.DO_NOTHING, null=False, blank=False)
+    updatedBy = models.ForeignKey("User", on_delete=models.DO_NOTHING, null=True, blank=False)
     updatedByFirstName = models.CharField(max_length=50)
     updatedByLastName = models.CharField(max_length=50)
-
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
-    
+    updatedDate = models.DateTimeField(auto_now=True, blank=True)
     # Overriding clean() method to validate classRelation
     @override
     def clean(self):
