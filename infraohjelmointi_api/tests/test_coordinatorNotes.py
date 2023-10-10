@@ -98,16 +98,14 @@ class CoordinatorNoteTestCase(TestCase):
 
         response = self.client.post(
             "/coordinator-notes/",
-            data,
+            data.values(),
             content_type="application/json",
         )
-        print("data values: ", data)
-        print("post response: ", response, response.content)
-        self.assertEqual(response.status_code, 201, msg="Status code != 201 , Error: {}".format(response.json()),)
+        self.assertEqual(response.status_code, 201, msg="Status code != 201")
 
         res_data = response.json()
         new_createdId = res_data["id"]
-
+        
         del res_data["id"]
         del res_data["createdDate"]
         
