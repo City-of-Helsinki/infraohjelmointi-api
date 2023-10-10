@@ -22,4 +22,5 @@ class CoordinatorNoteSerializer(serializers.ModelSerializer):
             "updatedByFirstName",
             "updatedByLastName",
             "createdDate",
+            "updatedDate"
         )
