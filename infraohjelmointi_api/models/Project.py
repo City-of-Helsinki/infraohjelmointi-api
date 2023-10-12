@@ -96,7 +96,7 @@ class Project(models.Model):
         default=get_default_projectPhase,
     )
     favPersons = models.ManyToManyField(
-        Person, related_name="favourite", null=True, blank=True
+        Person, related_name="favourite", blank=True
     )
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.ForeignKey(
@@ -220,7 +220,7 @@ class Project(models.Model):
 
     delays = models.CharField(max_length=200, blank=True, null=True)
     hashTags = models.ManyToManyField(
-        ProjectHashTag, related_name="relatedProject", null=True, blank=True
+        ProjectHashTag, related_name="relatedProject", blank=True
     )
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)

@@ -32,8 +32,8 @@ class BudgetFileHandler(IExcelFileHandler):
         self.current_budget_year = datetime.date.today().year
 
     def proceed_with_file(self, excel_path):
-        logger.error(
-            "\n\nReading project data from budget file {}\n".format(excel_path)
+        logger.info(
+            "\nReading project data from budget file {}\n".format(excel_path)
         )
 
         wb = load_workbook(excel_path, data_only=True, read_only=True)
