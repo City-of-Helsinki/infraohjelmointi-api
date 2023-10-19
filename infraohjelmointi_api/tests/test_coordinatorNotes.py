@@ -47,12 +47,12 @@ class CoordinatorNoteTestCase(TestCase):
 
     def test_GET_all_coordinatorNotes(self):
         response = self.client.get("/coordinator-notes/")
-        noteCount = CoordinatorNote.objects.all().count()
+        notecount = CoordinatorNote.objects.all().count()
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
             len(response.json()),
-            noteCount,
-            msg="Number of retrieved Notes is != {}".format(noteCount),
+            notecount,
+            msg="Number of retrieved Notes is != {}".format(notecount),
         )
 
         CoordinatorNote.objects.create(
@@ -70,8 +70,8 @@ class CoordinatorNoteTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
             len(response.json()),
-            noteCount + 1,
-            msg="Number of retrieved Notes is != {}".format(noteCount),
+            notecount + 1,
+            msg="Number of retrieved Notes is != {}".format(notecount),
         )
 
         # serialize the model instances
