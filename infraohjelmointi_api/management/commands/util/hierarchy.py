@@ -23,8 +23,10 @@ AGGREGATING_SUB_LEVEL = hex(int("fff4faa4", 16))
 
 color_map = {
     "FFFF0000": "MAIN CLASS",
+    "FF66FF66": "CLASS GROUP",
     "FFFFC000": "CLASS",
     "FFFFFF00": "SUBCLASS",
+    "FFF4FAA4": "AGGREGATING SUB LEVEL",
     "FFC9C9C9": "DISTRICT",
     "FFA9D18E": "DIVISION",
     "FFF8CBAD": "GROUP",
@@ -153,7 +155,7 @@ def buildHierarchies(
                     end_index = 1
 
                 elif cv_cell_color_hex == CLASS_GROUP_COLOR:
-                    end_index = 2
+                    end_index = 1
 
                 elif cv_cell_color_hex == SUBCLASS_COLOR:
                     end_index = getEndIndex(
@@ -294,7 +296,18 @@ def buildHierarchies(
                     parent_class=pv_class_stack[-1],
                     cell_color=str(DISTRICT_COLOR)[2:].upper(),
                     row_number=pv_cell.row,
+                )   
+            elif pv_cell_color_hex in [OTHER_CLASSIFICATION_COLOR]:
+                pv_class = None
+                pv_class_stack = pv_class_stack[0:3]  # remove siblings
+                pv_class = proceedWithClass(
+                    code=None,
+                    name=pv_name,
+                    parent=pv_class_stack[-1],
+                    cell_color=pv_cell_color,
+                    row_number=pv_cell.row,
                 )
+                pv_class_stack.append(pv_class)
             end_index = getEndIndex(
                 color_list=cv_color_stack,
                 break_point=OTHER_CLASSIFICATION_COLOR,
@@ -303,6 +316,8 @@ def buildHierarchies(
                     SUBCLASS_COLOR,
                 ],
             )
+
+
 
             cv_color_stack = cv_color_stack[0:end_index]
             cv_color_stack.append(cv_cell_color_hex)
