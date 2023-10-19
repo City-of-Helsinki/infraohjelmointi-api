@@ -189,10 +189,13 @@ def buildHierarchies(
         ##############################
         # Handle sub class           #
         ##############################
-        elif SUBCLASS_COLOR in cell_colors:
+        elif SUBCLASS_COLOR in cell_colors or OTHER_CLASSIFICATION_COLOR in cell_colors:
             pv_class = None
-            if pv_cell_color_hex == SUBCLASS_COLOR:
-                pv_class_stack = pv_class_stack[0:2]  # remove siblings
+            if pv_cell_color_hex == SUBCLASS_COLOR or pv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+                if pv_cell_color_hex == SUBCLASS_COLOR:
+                    pv_class_stack = pv_class_stack[0:2]  # remove siblings
+                elif pv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+                    pv_class_stack = pv_class_stack[0:3]  # remove siblings
                 pv_class = proceedWithClass(
                     code=None,
                     name=pv_name,
@@ -200,6 +203,7 @@ def buildHierarchies(
                     cell_color=pv_cell_color,
                     row_number=pv_cell.row,
                 )
+                print(pv_class, pv_class.path, pv_class.relatedTo, pv_class.parent)
                 pv_class_stack.append(pv_class)
                 # if subslcass is also a district
                 if "suurpiiri" in pv_name.lower() or "östersundom" in pv_name.lower():
@@ -263,8 +267,7 @@ def buildHierarchies(
                 cv_color_stack = cv_color_stack[0:end_index]
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
-                cv_class_stack.append(
-                    proceedWithClass(
+                cv_class = proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         parent=cv_class_stack[-1],
@@ -273,6 +276,9 @@ def buildHierarchies(
                         cell_color=cv_cell_color,
                         row_number=cv_cell.row,
                     )
+                print(cv_class.path, cv_class.relatedTo, cv_class.parent)
+                cv_class_stack.append(
+                    cv_class
                 )
 
             elif cv_cell_color_hex in [DISTRICT_COLOR]:
@@ -287,7 +293,7 @@ def buildHierarchies(
         #####################################
         # Handle other classification class #
         #####################################
-        elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+        elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR and pv_cell_color_hex == DISTRICT_COLOR:
             # special case where other classification maps to district
             related_to_district = None
             if pv_cell_color_hex in [DISTRICT_COLOR]:
@@ -296,10 +302,11 @@ def buildHierarchies(
                     parent_class=pv_class_stack[-1],
                     cell_color=str(DISTRICT_COLOR)[2:].upper(),
                     row_number=pv_cell.row,
-                )   
+                )
+
             elif pv_cell_color_hex in [OTHER_CLASSIFICATION_COLOR]:
                 pv_class = None
-                pv_class_stack = pv_class_stack[0:3]  # remove siblings
+                #pv_class_stack = pv_class_stack[0:5]  # remove siblings
                 pv_class = proceedWithClass(
                     code=None,
                     name=pv_name,
