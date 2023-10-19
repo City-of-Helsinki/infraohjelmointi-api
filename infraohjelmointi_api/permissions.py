@@ -1,14 +1,18 @@
+import logging
 from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectClass import ProjectClass
 from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from rest_framework import permissions
 from infraohjelmointi_api.services.ADGroupService import ADGroupService
 
+logger = logging.getLogger("infraohjelmointi_api")
+
 GET = "GET"
 POST = "POST"
 PATCH = "PATCH"
 DELETE = "DELETE"
 PUT = "PUT"
+#OPTIONS = "OPTIONS"
 SAFE_METHODS = [GET, POST, PATCH, DELETE, PUT]
 DJANGO_BASE_READ_ONLY_ACTIONS = ["list", "retrieve"]
 DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
@@ -121,7 +125,14 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 # THESE CLASSES CAN BE ADDED TO BaseViewSet.py To APPLY THE REQUIRED PERMISSIONS AND ROLES
 # WORK STILL NEEDED
 
+#        "sg_kymp_sso_io_koordinaattorit": "86b826df-589c-40f9-898f-1584e80b5482",
+#        "sg_kymp_sso_io_ohjelmoijat": "da48bfe9-6a99-481f-a252-077d31473c4c",
+#        "sg_kymp_sso_io_projektialueiden_ohjelmoijat": "4d229780-b511-4652-b32b-362ad88a7b55",
+#        "sg_kymp_sso_io_projektipaallikot": "31f86f09-b674-4c1d-81db-6d5fe2e587f9",
+#        "sl_dyn_kymp_sso_io_katselijat": "7e39a13e-bd48-43ab-bd23-738e73b5137a",
+#        "sg_kymp_sso_io_admin": "sg_kymp_sso_io_admin",
 
+# katselijat
 class IsViewer(permissions.BasePermission):
     def user_in_viewer_group(self, request):
         if "sl_dyn_kymp_sso_io_katselijat" in request.user.ad_groups.all().values_list(
@@ -154,7 +165,7 @@ class IsViewer(permissions.BasePermission):
         # Viewer cannot edit anything or get an object instance
         return False
 
-
+# koordinaattorit
 class IsCoordinator(permissions.BasePermission):
     def user_in_coordinator_group(self, request):
         if "sg_kymp_sso_io_koordinaattorit" in request.user.ad_groups.all().values_list(
@@ -187,6 +198,14 @@ class IsCoordinator(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        logger.error("???")
+        logging.ERROR("?????")
+        logging.ERROR(obj._meta.model.__name__)
+
+        _type = obj._meta.model.__name__
+        # Coordinators can not ??
+        # if view.action in DJANGO_BASE_UPDATE_ONLY_ACTIONS: #and _type == "ProjectGroup":
+          #  return False
         # Coordinators can edit and perform all operations so return true for all model instance actions
         return True
 
@@ -219,10 +238,17 @@ class BaseProgrammerPlanner(permissions.BasePermission):
         ):
             return True
 
-        return False
+        return False 
 
-
+# Ohjelmoijat 
 class IsProgrammer(BaseProgrammerPlanner):
+    #logger.error("???")
+    def user_in_viewer_group(self, request):
+        if "sg_dyn_kymp_sso_io_ohjelmoijat" in request.user.ad_groups.all().values_list(
+            "name", flat=True
+        ):
+            return True
+        
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
         # Programmer cannot update/create a group
@@ -231,13 +257,13 @@ class IsProgrammer(BaseProgrammerPlanner):
         # Programmers can edit and perform all other operations so return true for all other model instance actions
         return True
 
-
+# 
 class IsPlanner(BaseProgrammerPlanner):
     def has_object_permission(self, request, view, obj):
         # Planners can edit and perform all operations so return true for all model instance actions
         return True
 
-
+# projektipaallikot
 class IsProjectManager(permissions.BasePermission):
     def user_in_project_manager_group(self, request):
         if (
@@ -394,7 +420,7 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
         ):
             return True
 
-
+# projektialueiden_ohjelmoijat
 class IsProgrammerOfProjectAreas(BaseProjectAreaPermissions):
     def has_permission(self, request, view):
         if (
