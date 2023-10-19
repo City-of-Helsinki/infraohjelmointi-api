@@ -10,19 +10,20 @@ from ..permissions import *
 
 class BaseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    # permissions can uncommented to test
-    # permission_classes = [
-    #     IsAuthenticated
-    #     & (
-    #         IsCoordinator
-    #         | IsPlanner
-    #         | IsProgrammer
-    #         | IsPlannerOfProjectAreas
-    #         | IsProgrammerOfProjectAreas
-    #         | IsProjectManager
-    #         | IsViewer
-    #     )
-    # ]
+     #permissions can uncommented to test
+    permission_classes = [
+         IsAuthenticated
+         & (
+             IsCoordinator
+             #or IsPlanner
+             or IsProgrammer
+             #or IsPlannerOfProjectAreas
+             or IsProgrammerOfProjectAreas
+             or IsProjectManager
+             or IsViewer
+             #or isAdmin
+         )
+     ]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
 
     @override
