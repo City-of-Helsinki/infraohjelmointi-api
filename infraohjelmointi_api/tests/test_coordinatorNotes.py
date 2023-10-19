@@ -1,3 +1,4 @@
+import uuid
 from django.test import TestCase
 
 from ..models import CoordinatorNote, User
@@ -14,16 +15,17 @@ from unittest.mock import patch
 class CoordinatorNoteTestCase(TestCase):
     coordinatorClass = "d94e8f20-3597-4430-8d29-7725ec26600f"
     coordinatorClassName = "801 Esirakentaminen (kiinteä omaisuus)"
-    coordinatorClassId = "d94e8f20-3597-4430-8d29-7725ec26600f"
     coordinatorNote = "This is a test note!"
-    createdDate = "2023-10-10T07:27:55.636353+03:00"
-    updatedByFirstName = "Jane"
+    updatedBy = "2"
+    updatedByFirstName = "John"
     updatedByLastName = "Doe"
-    updatedDate = "2023-10-10T07:27:55.636361+03:00"
     year = 2023
+    createdDate = "2023-10-10T07:27:55.636353+03:00"
+    updatedDate = "2023-10-10T07:27:55.636361+03:00"
+
+    user_id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
     test_id1 = "395941a7-c0ff-4bff-a65e-18634a0d16b8"
     test_id2 = "0277866c-cd15-4984-a25d-686d3c6d2131"
-    user_id = "2c6dece3-cf93-45ba-867d-8f1dd14923fc"
 
     @classmethod
     @override
@@ -42,20 +44,6 @@ class CoordinatorNoteTestCase(TestCase):
             updatedByLastName = self.updatedByLastName,
             year = self.year
         )
-    """
-    def test_note_is_created(self):
-        self.assertTrue(
-            CoordinatorNote.objects.filter(id=self.test_id1).exists(),
-            msg="Object does not exist in DB",
-        )
-        coordinatorNote = CoordinatorNote.objects.get(id=self.test_id1)
-        print("note!: ", coordinatorNote)
-        print("self note!: ", self.coordinatorNote)
-        self.assertIsInstance(
-            coordinatorNote, CoordinatorNote, msg="Object retrieved from DB != typeof coordinatorNote Model"
-        )
-        self.assertEqual(coordinatorNote, self.coordinatorNote, msg="Object from DB != created Object")
-    """
 
     def test_GET_all_coordinatorNotes(self):
         response = self.client.get("/coordinator-notes/")
@@ -66,6 +54,7 @@ class CoordinatorNoteTestCase(TestCase):
             noteCount,
             msg="Number of retrieved Notes is != {}".format(noteCount),
         )
+
         CoordinatorNote.objects.create(
             coordinatorClassName = self.coordinatorClassName,
             coordinatorNote = self.coordinatorNote,
@@ -98,25 +87,27 @@ class CoordinatorNoteTestCase(TestCase):
     """
     def test_POST_coordinatorNote(self):
         data = {
-            "coordinatorClass": self.coordinatorClass,
-            "coordinatorClassName": self.coordinatorClassName,
-            "coordinatorNote": self.coordinatorNote,
-            "updatedBy": self.user,
-            "updatedByFirstName": self.updatedByFirstName,
-            "updatedByLastName": self.updatedByLastName,
-            "year": self.year
+            "coordinatorClass": "d94e8f20-3597-4430-8d29-7725ec26600f",
+            "coordinatorClassName": "801 Esirakentaminen (kiinteä omaisuus)",
+            "coordinatorNote": "This is a test note!",
+            "updatedBy": self.user_id,
+            "updatedByFirstName": "John",
+            "updatedByLastName": "Doe",
+            "year": 2023,
         }
 
         response = self.client.post(
             "/coordinator-notes/",
-            data.values(),
+            data,
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201, msg="Status code != 201")
+        print("data values: ", data)
+        print("post response: ", response, response.content)
+        self.assertEqual(response.status_code, 201, msg="Status code != 201 , Error: {}".format(response.json()),)
 
         res_data = response.json()
         new_createdId = res_data["id"]
-        
+
         del res_data["id"]
         del res_data["createdDate"]
         

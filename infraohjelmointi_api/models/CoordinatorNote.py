@@ -6,7 +6,7 @@ from overrides import override
 
 class CoordinatorNote(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     coordinatorNote = models.TextField(blank=True, null=False, default="")
     year = models.PositiveIntegerField(validators=[
         django.core.validators.MinValueValidator(1900),
