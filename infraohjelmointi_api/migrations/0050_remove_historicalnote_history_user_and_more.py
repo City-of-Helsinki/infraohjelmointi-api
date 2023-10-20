@@ -7,7 +7,6 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("infraohjelmointi_api", "0049_auto_20230922_0857"),
     ]
@@ -26,23 +25,23 @@ class Migration(migrations.Migration):
             model_name="historicalnote",
             name="updatedBy",
             field=models.ForeignKey(
-                blank=True, 
-                db_constraint=False, 
-                null=True, 
-                on_delete=django.db.models.deletion.DO_NOTHING, 
-                related_name="+", 
-                to=settings.AUTH_USER_MODEL, 
-                to_field="uuid"
+                blank=True,
+                db_constraint=False,
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                related_name="+",
+                to=settings.AUTH_USER_MODEL,
+                to_field="uuid",
             ),
         ),
         migrations.AlterField(
             model_name="note",
             name="updatedBy",
             field=models.ForeignKey(
-                null=True, 
-                on_delete=django.db.models.deletion.DO_NOTHING, 
-                to=settings.AUTH_USER_MODEL, 
-                to_field="uuid"
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                to=settings.AUTH_USER_MODEL,
+                to_field="uuid",
             ),
         ),
     ]
