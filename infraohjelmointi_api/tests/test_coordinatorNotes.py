@@ -1,7 +1,12 @@
 import uuid
 from django.test import TestCase
 
-from ..models import CoordinatorNote, User
+from ..models import (
+    CoordinatorNote,
+    ProjectClass,
+    User,
+)
+
 from ..serializers import CoordinatorNoteSerializer
 from rest_framework.renderers import JSONRenderer
 from overrides import override
@@ -9,14 +14,11 @@ from overrides import override
 from infraohjelmointi_api.views import BaseViewSet
 from unittest.mock import patch
 
-
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
 class CoordinatorNoteTestCase(TestCase):
-    coordinatorClass = "d94e8f20-3597-4430-8d29-7725ec26600f"
-    coordinatorClassName = "801 Esirakentaminen (kiinteä omaisuus)"
+    coordinatorClassName = "Test Master Class"
     coordinatorNote = "This is a test note!"
-    updatedBy = "2"
     updatedByFirstName = "John"
     updatedByLastName = "Doe"
     year = 2023
@@ -24,8 +26,9 @@ class CoordinatorNoteTestCase(TestCase):
     updatedDate = "2023-10-10T07:27:55.636361+03:00"
 
     user_id = uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc")
-    test_id1 = "395941a7-c0ff-4bff-a65e-18634a0d16b8"
-    test_id2 = "0277866c-cd15-4984-a25d-686d3c6d2131"
+    projectClass_Id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c253")
+    note_id1 = "395941a7-c0ff-4bff-a65e-18634a0d16b8"
+    note_id2 = "0277866c-cd15-4984-a25d-686d3c6d2131"
 
     @classmethod
     @override
@@ -34,15 +37,23 @@ class CoordinatorNoteTestCase(TestCase):
             uuid=self.user_id, first_name="John", last_name="Doe"
         )
 
-        self.coordinatorNote = CoordinatorNote.objects.create(
+        self.projectClass = ProjectClass.objects.create(
+            id = self.projectClass_Id,
+            name = self.coordinatorClassName,
+            parent = None,
+            path = self.coordinatorClassName,
+        )
+
+        CoordinatorNote.objects.create(
+            id = self.note_id1,
             coordinatorClassName = self.coordinatorClassName,
+            coordinatorClass = self.projectClass,
             coordinatorNote = self.coordinatorNote,
+            year = self.year,
             createdDate = self.createdDate,
-            id = self.test_id1,
             updatedBy = self.user,
             updatedByFirstName = self.updatedByFirstName,
             updatedByLastName = self.updatedByLastName,
-            year = self.year
         )
 
     def test_GET_all_coordinatorNotes(self):
@@ -57,9 +68,10 @@ class CoordinatorNoteTestCase(TestCase):
 
         CoordinatorNote.objects.create(
             coordinatorClassName = self.coordinatorClassName,
+            coordinatorClass = self.projectClass,
             coordinatorNote = self.coordinatorNote,
             createdDate = self.createdDate,
-            id = self.test_id2,
+            id = self.note_id2,
             updatedBy = self.user,
             updatedByFirstName = self.updatedByFirstName,
             updatedByLastName = self.updatedByLastName,
@@ -84,13 +96,13 @@ class CoordinatorNoteTestCase(TestCase):
         self.assertEqual(
             response.content, result_expected, msg="Data returned != data in DB"
         )
-    """
+
     def test_POST_coordinatorNote(self):
         data = {
-            "coordinatorClass": "d94e8f20-3597-4430-8d29-7725ec26600f",
-            "coordinatorClassName": "801 Esirakentaminen (kiinteä omaisuus)",
+            "coordinatorClass": self.projectClass_Id.__str__(),
+            "coordinatorClassName": "Test Master Class",
             "coordinatorNote": "This is a test note!",
-            "updatedBy": self.user_id,
+            "updatedBy": self.user_id.__str__(),
             "updatedByFirstName": "John",
             "updatedByLastName": "Doe",
             "year": 2023,
@@ -101,8 +113,7 @@ class CoordinatorNoteTestCase(TestCase):
             data,
             content_type="application/json",
         )
-        print("data values: ", data)
-        print("post response: ", response, response.content)
+
         self.assertEqual(response.status_code, 201, msg="Status code != 201 , Error: {}".format(response.json()),)
 
         res_data = response.json()
@@ -116,4 +127,4 @@ class CoordinatorNoteTestCase(TestCase):
             True,
             msg="Note created using POST request does not exist in DB",
         )
-    """
+   

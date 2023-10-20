@@ -15,7 +15,7 @@ class CoordinatorNote(models.Model):
     coordinatorClassName = models.CharField(max_length=150)
     coordinatorClass = models.ForeignKey("ProjectClass", on_delete=models.DO_NOTHING, null=True, blank=False)
 
-    updatedBy = models.ForeignKey("User", on_delete=models.DO_NOTHING, null=True, blank=False)
+    updatedBy = models.ForeignKey("User", on_delete=models.DO_NOTHING, null=True, blank=False, to_field="uuid")
     updatedByFirstName = models.CharField(max_length=50)
     updatedByLastName = models.CharField(max_length=50)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
