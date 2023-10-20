@@ -30,6 +30,8 @@ class CoordinatorNoteTestCase(TestCase):
     note_id1 = "395941a7-c0ff-4bff-a65e-18634a0d16b8"
     note_id2 = "0277866c-cd15-4984-a25d-686d3c6d2131"
 
+    endpoint = "/coordinator-notes/"
+
     @classmethod
     @override
     def setUpTestData(self):
@@ -57,7 +59,7 @@ class CoordinatorNoteTestCase(TestCase):
         )
 
     def test_GET_all_coordinatorNotes(self):
-        response = self.client.get("/coordinator-notes/")
+        response = self.client.get(self.endpoint)
         notecount = CoordinatorNote.objects.all().count()
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
@@ -78,7 +80,7 @@ class CoordinatorNoteTestCase(TestCase):
             updatedDate = self.updatedDate,
             year = self.year
         )
-        response = self.client.get("/coordinator-notes/")
+        response = self.client.get(self.endpoint)
         self.assertEqual(response.status_code, 200, msg="Status code != 200")
         self.assertEqual(
             len(response.json()),
@@ -109,7 +111,7 @@ class CoordinatorNoteTestCase(TestCase):
         }
 
         response = self.client.post(
-            "/coordinator-notes/",
+            self.endpoint,
             data,
             content_type="application/json",
         )
@@ -117,13 +119,13 @@ class CoordinatorNoteTestCase(TestCase):
         self.assertEqual(response.status_code, 201, msg="Status code != 201 , Error: {}".format(response.json()),)
 
         res_data = response.json()
-        new_createdId = res_data["id"]
+        new_createdid = res_data["id"]
 
         del res_data["id"]
         del res_data["createdDate"]
         
         self.assertEqual(
-            CoordinatorNote.objects.filter(id=new_createdId).exists(),
+            CoordinatorNote.objects.filter(id=new_createdid).exists(),
             True,
             msg="Note created using POST request does not exist in DB",
         )

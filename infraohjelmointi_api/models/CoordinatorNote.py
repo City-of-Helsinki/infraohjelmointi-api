@@ -20,10 +20,4 @@ class CoordinatorNote(models.Model):
     updatedByLastName = models.CharField(max_length=50)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
-    # Overriding clean() method to validate classRelation
-    @override
-    def clean(self):
-        if self.coordinatorClass.forCoordinatorOnly != True:
-            raise ValidationError(
-                {"classRelation": "classRelation can only point to a coordinator class"}
-            )
+
