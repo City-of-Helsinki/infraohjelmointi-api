@@ -25,6 +25,7 @@ color_map = {
     "FFFF0000": "MAIN CLASS",
     "FFFFC000": "CLASS",
     "FFFFFF00": "SUBCLASS",
+    "FFF4FAA4": "AGGREGATING SUB LEVEL",
     "FFC9C9C9": "DISTRICT",
     "FFA9D18E": "DIVISION",
     "FFF8CBAD": "GROUP",
@@ -32,7 +33,6 @@ color_map = {
     "FF66FF66": "CLASS GROUP",
     "FFE6B9B8": "OTHER CLASSIFICATION",
     "FFF2DCDB": "OTHER CLASSIFICATION SUBCLASS",
-    "FFF4FAA4": "AGGREGATING SUB LEVEL",
 }
 
 
@@ -153,7 +153,7 @@ def buildHierarchies(
                     end_index = 1
 
                 elif cv_cell_color_hex == CLASS_GROUP_COLOR:
-                    end_index = 2
+                    end_index = 1
 
                 elif cv_cell_color_hex == SUBCLASS_COLOR:
                     end_index = getEndIndex(
@@ -187,10 +187,13 @@ def buildHierarchies(
         ##############################
         # Handle sub class           #
         ##############################
-        elif SUBCLASS_COLOR in cell_colors:
+        elif SUBCLASS_COLOR in cell_colors or OTHER_CLASSIFICATION_COLOR in cell_colors:
             pv_class = None
-            if pv_cell_color_hex == SUBCLASS_COLOR:
-                pv_class_stack = pv_class_stack[0:2]  # remove siblings
+            if pv_cell_color_hex == SUBCLASS_COLOR or pv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+                if pv_cell_color_hex == SUBCLASS_COLOR:
+                    pv_class_stack = pv_class_stack[0:2]  # remove siblings
+                elif pv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
+                    pv_class_stack = pv_class_stack[0:3]  # remove siblings
                 pv_class = proceedWithClass(
                     code=None,
                     name=pv_name,
@@ -261,8 +264,7 @@ def buildHierarchies(
                 cv_color_stack = cv_color_stack[0:end_index]
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
-                cv_class_stack.append(
-                    proceedWithClass(
+                cv_class = proceedWithClass(
                         code=cv_code,
                         name=cv_name,
                         parent=cv_class_stack[-1],
@@ -271,6 +273,8 @@ def buildHierarchies(
                         cell_color=cv_cell_color,
                         row_number=cv_cell.row,
                     )
+                cv_class_stack.append(
+                    cv_class
                 )
 
             elif cv_cell_color_hex in [DISTRICT_COLOR]:
@@ -282,42 +286,7 @@ def buildHierarchies(
                     cell_color=cv_cell_color,
                     row_number=cv_cell.row,
                 )
-        #####################################
-        # Handle other classification class #
-        #####################################
-        elif cv_cell_color_hex == OTHER_CLASSIFICATION_COLOR:
-            # special case where other classification maps to district
-            related_to_district = None
-            if pv_cell_color_hex in [DISTRICT_COLOR]:
-                related_to_district = proceedWithDistrict(
-                    name=pv_name,
-                    parent_class=pv_class_stack[-1],
-                    cell_color=str(DISTRICT_COLOR)[2:].upper(),
-                    row_number=pv_cell.row,
-                )
-            end_index = getEndIndex(
-                color_list=cv_color_stack,
-                break_point=OTHER_CLASSIFICATION_COLOR,
-                check_point=[
-                    AGGREGATING_SUB_LEVEL,
-                    SUBCLASS_COLOR,
-                ],
-            )
-
-            cv_color_stack = cv_color_stack[0:end_index]
-            cv_color_stack.append(cv_cell_color_hex)
-            cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
-            cv_class_stack.append(
-                proceedWithClass(
-                    code=cv_code,
-                    name=cv_name,
-                    parent=cv_class_stack[-1],
-                    for_coordinator_only=True,
-                    cell_color=cv_cell_color,
-                    row_number=cv_cell.row,
-                    relatedLocation=related_to_district,
-                )
-            )
+        
         elif DISTRICT_COLOR in cell_colors:
             if pv_cell_color_hex in [DISTRICT_COLOR]:
                 related_to_district = proceedWithDistrict(
