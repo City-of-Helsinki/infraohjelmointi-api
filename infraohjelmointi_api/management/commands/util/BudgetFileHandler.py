@@ -148,6 +148,7 @@ class BudgetFileHandler(IExcelFileHandler):
         preliminaryCurrentYearPlus9 = row[28].value
 
         budget_list = [
+            0,
             budgetProposalCurrentYearPlus0 or 0,
             budgetProposalCurrentYearPlus1 or 0,
             budgetProposalCurrentYearPlus2 or 0,
@@ -163,7 +164,13 @@ class BudgetFileHandler(IExcelFileHandler):
         budget_sum = sum(budget_list)
 
         notes = str(row[29].value).strip()
-        pwNumber = str(row[30].value).strip().lower()
+
+        # some rows might not have pw number
+        # with this we skip the index out of range -error
+        
+        pwNumber = None
+        if not len(row) < 31:
+            pwNumber = str(row[30].value).strip().lower()
 
         try:
             project = ProjectService.get(
