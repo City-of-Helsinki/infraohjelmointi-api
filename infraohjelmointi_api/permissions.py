@@ -132,7 +132,27 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 #        "sl_dyn_kymp_sso_io_katselijat": "7e39a13e-bd48-43ab-bd23-738e73b5137a",
 #        "sg_kymp_sso_io_admin": "sg_kymp_sso_io_admin",
 
-# katselijat
+
+#  testiluokka
+# omista neljästä ryhmästä muut paitsi koordinaattorit toimii. katselijat ja admin pitää vielä testata
+class isTestUser(permissions.BasePermission):
+    def user_in_test_group(self, request):
+        if "sg_kymp_sso_io_projektipaallikot" in request.user.ad_groups.all().values_list(
+            "name", flat=True
+        ):
+            return True
+        
+    def has_permission(self, request, view):
+        if (
+            request.user.is_authenticated
+            and self.user_in_test_group(request=request)
+        ):
+            logger.critical("testitesti")
+            return True
+
+        return False
+
+
 class IsViewer(permissions.BasePermission):
     def user_in_viewer_group(self, request):
         if "sl_dyn_kymp_sso_io_katselijat" in request.user.ad_groups.all().values_list(
@@ -165,7 +185,6 @@ class IsViewer(permissions.BasePermission):
         # Viewer cannot edit anything or get an object instance
         return False
 
-# koordinaattorit
 class IsCoordinator(permissions.BasePermission):
     def user_in_coordinator_group(self, request):
         if "sg_kymp_sso_io_koordinaattorit" in request.user.ad_groups.all().values_list(
@@ -240,7 +259,7 @@ class BaseProgrammerPlanner(permissions.BasePermission):
 
         return False 
 
-# Ohjelmoijat 
+
 class IsProgrammer(BaseProgrammerPlanner):
     #logger.error("???")
     def user_in_viewer_group(self, request):
@@ -263,7 +282,7 @@ class IsPlanner(BaseProgrammerPlanner):
         # Planners can edit and perform all operations so return true for all model instance actions
         return True
 
-# projektipaallikot
+
 class IsProjectManager(permissions.BasePermission):
     def user_in_project_manager_group(self, request):
         if (
@@ -420,7 +439,7 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
         ):
             return True
 
-# projektialueiden_ohjelmoijat
+
 class IsProgrammerOfProjectAreas(BaseProjectAreaPermissions):
     def has_permission(self, request, view):
         if (
