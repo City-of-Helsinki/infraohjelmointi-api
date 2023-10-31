@@ -5,7 +5,7 @@ WORKDIR /app
 ENV STATIC_ROOT /srv/app/static
 COPY . .
 
-RUN TZ="Europe/Helsinki" apk add --update nano libffi-dev gcc \
+RUN TZ="Europe/Helsinki" apk add --update nano libffi-dev gcc busybox-extras \
     musl-dev python3-dev python3  py3-pip py3-pandas uwsgi \
     postgresql-client netcat-openbsd gettext libpq-dev unzip \
     bash grep busybox-suid dcron libcap && \
