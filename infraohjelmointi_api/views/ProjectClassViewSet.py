@@ -142,6 +142,11 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         try:
             obj = ClassFinancial.objects.get(year=year, classRelation_id=class_id)
             for key, value in patchData.items():
+                if value == None:
+                    return Response(
+                        data={"message": "Invalid value"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 setattr(obj, key, value)
             obj.finance_year = startYear
             obj.save()
