@@ -1,4 +1,9 @@
 static-files
+
+# Ignore Excel import files. Do not upload new excel files
+*.xlsx
+*.zip
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,django,macos,vscode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,macos,vscode
 
