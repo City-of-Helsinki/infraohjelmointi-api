@@ -179,10 +179,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "isFrameBudgetOverlap": False
             if _type == "ProjectLocation"
             else childClassQueryResult["subChildrenOverlapCount"] > 0
-            or (
-                financeInstance != None
-                and (childClassQueryResult["childSums"] > financeInstance.frameBudget)
-            ),
+            ,
         }
 
     # try caching this whole result for a class
