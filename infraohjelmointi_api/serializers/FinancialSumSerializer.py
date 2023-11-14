@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from infraohjelmointi_api.models import (
     Project,
     ClassFinancial,
@@ -29,6 +30,8 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -179,10 +182,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "isFrameBudgetOverlap": False
             if _type == "ProjectLocation"
             else childClassQueryResult["subChildrenOverlapCount"] > 0
-            or (
-                financeInstance != None
-                and (childClassQueryResult["childSums"] > financeInstance.frameBudget)
-            ),
+            ,
         }
 
     # try caching this whole result for a class
