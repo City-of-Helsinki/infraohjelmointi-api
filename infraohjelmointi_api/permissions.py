@@ -61,7 +61,7 @@ PROJECT_LOCATION_ALL_ACTIONS = [
 ]
 
 #### Project Notes custom actions ####
-PROJECT_NOTE_COORDINATOR_GET_ACTIONS = []
+PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user"]
 PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user"]
 PROJECT_NOTE_ALL_GET_ACTIONS = [
     *PROJECT_NOTE_PLANNING_GET_ACTIONS,
@@ -319,7 +319,6 @@ class IsProjectManager(permissions.BasePermission):
                         "entityName", # * Hankekokonaisuuden nimi Ei (No) #entityName
                         "sapProject", # * Projektinumero Ei (No) # sapProject
                         "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
-                        #"phase", # * Hankkeen vaihe # phase # * Kyllä rajoitetusti: ei voi muuttaa taaksepäin vaihetta
                         "programmed", # * Ohjelmoitu Ei (No) # programmed
                         "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
                         "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
@@ -361,7 +360,7 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
         else:
             return False
 
-        return projectClass.path.startswith("8 08")
+        return projectClass.path.startswith("808")
 
     def group_belongs_to_808_main_class(self, obj: ProjectGroup, request):
         groupClassRelation = request.data.get("classRelation", None)
@@ -375,7 +374,7 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
         else:
             return False
 
-        return groupClassRelation.path.startswith("8 08")
+        return groupClassRelation.path.startswith("808")
 
     def patch_data_in_forbidden_non_808_main_class_project_fields(self, request):
         """
@@ -389,40 +388,36 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
                 if item
                 in [
                     "finances",
-                    "hkrId",
-                    "type",
-                    "name",
-                    "masterPlanAreaNumber",
-                    "trafficPlanNumber",
-                    "bridgeNumber",
-                    "sapProject",
-                    "sapNetwork",
-                    "programmed",
-                    "planningStartYear",
-                    "constructionEndYear",
-                    "category",
-                    "effectHousing",
-                    "riskAssessment",
-                    "projectClass",
-                    "budget",
-                    "projectCostForecast",
-                    "planningCostForecast",
-                    "constructionCostForecast",
+                    "name", #* Kohde/hanke Ei (No) # name
+                    "hkrId", # * PW hanketunnus Ei (No) # hkrId
+                    "type", # * Hanketyyppi Ei (No) # type
+                    "entityName", # * Hankekokonaisuuden nimi Ei (No) #entityName
+                    "sapProject", # * Projektinumero Ei (No) # sapProject
+                    "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
+                    "programmed", # * Ohjelmoitu Ei (No) # programmed
+                    "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
+                    "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
+                    "category", # * Kategoria Ei (No) # category
+                    "effectHousing", # * Vaikutus asuntotuotantoon Ei (No) # effectHousing
+                    "riskAssessment", # * Riskiarvio Ei (No) # riskAssessment
+                    "projectClass", # luokka: value can be masterClass/class/subClass
                     "costForecast",
-                    "personPlanning",
-                    "personProgramming",
-                    "personConstruction",
-                    "projectLocation",
+                    "realizedCost", # * Toteumatiedot Ei (No) # realizedCost
+                    "comittedCost", # * Sidotut Ei (No) # comittedCost
+                    "spentCost", # * Käytetty Ei (No) # spentCost
+                    "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
+                    "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
+                    "personPlanning", # * Vastuuhenkilö Ei (No) # personPlanning
+                    "personConstruction", # * Rakennuttamisen vastuuhenkilö Ei (No) # personConstruction
+                    "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
+                    "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
+                    "projectLocation", # value can be district/division/subDivision
+
+                    # preliminaryBudgetDivision is not yet implemented in UI
+                    #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No) # preliminaryBudgetDivision # ei löydy project.py
                 ]
             ]
         )
-
-    def user_in_area_programmer_planner_group(self, request):
-        if (
-            "sg_kymp_sso_io_projektialueiden_ohjelmoijat"
-            in request.user.ad_groups.all().values_list("name", flat=True)
-        ):
-            return True
 
 
 # class IsProgrammerOfProjectAreas(BaseProjectAreaPermissions):
@@ -473,11 +468,65 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
 #         return False
 
 
-class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
+#class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
+    # def has_permission(self, request, view):
+    #     if (
+    #         request.user.is_authenticated
+    #         and self.user_in_area_programmer_planner_group(request=request)
+    #         and request.method in SAFE_METHODS
+    #         and view.action
+    #         in [
+    #             *DJANGO_BASE_READ_ONLY_ACTIONS,
+    #             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+    #             *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+    #             *PROJECT_CLASS_ALL_GET_ACTIONS,
+    #             *PROJECT_LOCATION_ALL_GET_ACTIONS,
+    #             *PROJECT_GROUP_ALL_ACTIONS,
+    #             *PROJECT_NOTE_ALL_ACTIONS,
+    #             *PROJECT_ALL_ACTIONS,
+    #             *PROJECT_FINANCES_ALL_GET_ACTIONS,
+    #             *SAP_COST_ALL_GET_ACTIONS,
+    #         ]
+    #     ):
+    #         return True
+
+    #     return False
+
+    # def has_object_permission(self, request, view, obj):
+    #     _type = obj._meta.model.__name__
+    #     if view.action in DJANGO_BASE_UPDATE_ONLY_ACTIONS and _type in [
+    #         "Project",
+    #         "ProjectGroup",
+    #         "Note",
+    #     ]:
+    #         if _type == "Project":
+    #             if not self.project_belongs_to_808_main_class(
+    #                 obj, request
+    #             ) and self.patch_data_in_forbidden_non_808_main_class_project_fields(
+    #                 request
+    #             ):
+    #                 return False
+
+    #         if _type == "ProjectGroup":
+    #             if not self.group_belongs_to_808_main_class(obj, request):
+    #                 return False
+
+    #         return True
+    #     return False
+    
+ 
+class isTestUser(BaseProjectAreaPermissions):
+    def user_in_project_test_group(self, request):
+        if (
+            "sg_kymp_sso_io_projektialueiden_ohjelmoijat"
+            in request.user.ad_groups.all().values_list("name", flat=True)
+        ):
+            return True
+
     def has_permission(self, request, view):
         if (
             request.user.is_authenticated
-            and self.user_in_area_programmer_planner_group(request=request)
+            and self.user_in_project_test_group(request=request)
             and request.method in SAFE_METHODS
             and view.action
             in [
@@ -499,107 +548,28 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
 
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
-        if view.action in DJANGO_BASE_UPDATE_ONLY_ACTIONS and _type in [
-            "Project",
-            "ProjectGroup",
-            "Note",
-        ]:
+        if view.action in [
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *DJANGO_BASE_DELETE_ONLY_ACTIONS,
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+        ] and _type in ["Project",  "ProjectGroup", "Note"]:
+            # logger.info("infoinfoinfo")
+            # logger.info(_type)
+            # logger.info(request.action)
+            # if _type == "Note" and view.action == "destroy":
+            #     return False
+        
             if _type == "Project":
-                if not self.project_belongs_to_808_main_class(
+                if self.project_belongs_to_808_main_class(
                     obj, request
-                ) and self.patch_data_in_forbidden_non_808_main_class_project_fields(
-                    request
+                    ):
+                    return True
+                
+                elif self.patch_data_in_forbidden_non_808_main_class_project_fields(
+                        request
                 ):
                     return False
 
-            if _type == "ProjectGroup":
-                if not self.group_belongs_to_808_main_class(obj, request):
-                    return False
-
-            return True
-        return False
-    
- 
-class isTestUser(permissions.BasePermission):
-    def user_in_project_test_group(self, request):
-        if (
-            "sg_kymp_sso_io_projektipaallikot"
-            in request.user.ad_groups.all().values_list("name", flat=True)
-        ):
             return True
 
-    def has_permission(self, request, view):
-        # has edit permissions for projects only
-        # and read permissions
-        if (
-            request.user.is_authenticated
-            and self.user_in_project_test_group(request=request)
-            and request.method in [GET, PATCH]
-            and view.action
-            in [
-                *DJANGO_BASE_READ_ONLY_ACTIONS,
-                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                *PROJECT_ALL_ACTIONS,
-                *PROJECT_CLASS_ALL_GET_ACTIONS,
-                *PROJECT_LOCATION_ALL_GET_ACTIONS,
-                *PROJECT_FINANCES_ALL_GET_ACTIONS,
-                *PROJECT_GROUP_ALL_GET_ACTIONS,
-                *PROJECT_NOTE_ALL_GET_ACTIONS,
-                *SAP_COST_ALL_GET_ACTIONS,
-            ]
-        ):
-            return True
-
-        return False
-
-    def has_object_permission(self, request, view, obj):
-        # has edit permissions for projects only
-        # and only specific project fields
-
-        _type = obj._meta.model.__name__
-        if view.action in [*DJANGO_BASE_UPDATE_ONLY_ACTIONS, *DJANGO_BASE_READ_ONLY_ACTIONS] and _type in [
-            "Project",
-            "Note",
-        ]:
-            if any(
-                [
-                    item
-                    for item in request.data.keys()
-                    if item
-                    in [
-                        "finances",
-                        "name", #* Kohde/hanke Ei (No) # name
-                        "hkrId", # * PW hanketunnus Ei (No) # hkrId
-                        "type", # * Hanketyyppi Ei (No) # type
-                        "entityName", # * Hankekokonaisuuden nimi Ei (No) #entityName
-                        "sapProject", # * Projektinumero Ei (No) # sapProject
-                        "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
-                        #"phase", # * Hankkeen vaihe # phase # * Kyllä rajoitetusti: ei voi muuttaa taaksepäin vaihetta
-                        "programmed", # * Ohjelmoitu Ei (No) # programmed
-                        "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
-                        "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
-                        "category", # * Kategoria Ei (No) # category
-                        "effectHousing", # * Vaikutus asuntotuotantoon Ei (No) # effectHousing
-                        "riskAssessment", # * Riskiarvio Ei (No) # riskAssessment
-                        "projectClass", # luokka: value can be masterClass/class/subClass
-                        "costForecast",
-                        "realizedCost", # * Toteumatiedot Ei (No) # realizedCost
-                        "comittedCost", # * Sidotut Ei (No) # comittedCost
-                        "spentCost", # * Käytetty Ei (No) # spentCost
-                        "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
-                        "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
-                        "personPlanning", # * Vastuuhenkilö Ei (No) # personPlanning
-                        "personConstruction", # * Rakennuttamisen vastuuhenkilö Ei (No) # personConstruction
-                        "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
-                        "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
-                        "projectLocation", # value can be district/division/subDivision
-
-                        # preliminaryBudgetDivision is not yet implemented in UI
-                        #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No) # preliminaryBudgetDivision # ei löydy project.py
-                ]
-            ]):
-                return False
-            return True
-
-        return False
-
+        return True
