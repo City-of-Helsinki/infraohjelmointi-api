@@ -15,10 +15,10 @@ class BaseViewSet(viewsets.ModelViewSet):
      #    IsAuthenticated
      #    & (
      #        IsCoordinator
-             #or IsPlanner
-      #       or IsProgrammer
-             #or IsPlannerOfProjectAreas
-       #      or IsProgrammerOfProjectAreas
+      #       or IsPlanner
+              #or IsProgrammer
+      #       or IsPlannerOfProjectAreas
+              #or IsProgrammerOfProjectAreas
         #     or IsProjectManager
          #    or IsViewer
              #or isAdmin
