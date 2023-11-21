@@ -39,6 +39,8 @@ from itertools import chain
 from django.db.models import Count, Case, When, Q
 from django.db.models.signals import post_save
 
+import logging
+logger = logging.getLogger("infraohjelmointi_api")
 
 class ProjectFilter(django_filters.FilterSet):
     hashtag = django_filters.ModelMultipleChoiceFilter(
@@ -112,6 +114,19 @@ class ProjectViewSet(BaseViewSet):
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
+
+        logger.info(project.projectClass.name)
+        projectClassName = project.projectClass.name 
+
+        #logger.info(request.data["classOptions"])
+
+        if "suurpiiri" in projectClassName.lower() or "östersundom" in projectClassName.name.lower():
+            
+            subClasses = request.data["classOptions"]["subClasses"]
+
+            result = next((item for item in subClasses if "suurpiiri" in item["label"].lower()), None)
+            logger.info(result)
+
         year = (
             finances.pop("year", date.today().year)
             if finances is not None
@@ -121,6 +136,7 @@ class ProjectViewSet(BaseViewSet):
             finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
+        logger.info(finances)
         if finances is not None:
             fieldToYearMapping = (
                 ProjectFinancialService.get_financial_field_to_year_mapping(
@@ -182,7 +198,15 @@ class ProjectViewSet(BaseViewSet):
             partial=True,
             context={"finance_year": year, "forcedToFrame": forcedToFrame},
         )
-        projectSerializer.is_valid(raise_exception=True)
+
+        logger.info(project)
+        try:
+            projectSerializer.is_valid(raise_exception=True)
+        except Exception as e:
+            logger.error(e)
+
+
+        logger.info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         updated_project = projectSerializer.save()
         self.projectWiseService.sync_project_to_pw(
             data=request.data, project=updated_project

@@ -206,7 +206,7 @@ def buildHierarchies(
                 if "suurpiiri" in pv_name.lower() or "östersundom" in pv_name.lower():
                     related_to_district = proceedWithDistrict(
                         name=pv_name,
-                        parent_class=pv_class_stack[-1],
+                        parent_class=pv_class_stack[-2],
                         cell_color=str(DISTRICT_COLOR)[2:].upper(),
                         row_number=pv_cell.row,
                     )
