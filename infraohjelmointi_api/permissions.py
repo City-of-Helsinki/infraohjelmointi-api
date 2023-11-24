@@ -61,8 +61,8 @@ PROJECT_LOCATION_ALL_ACTIONS = [
 ]
 
 #### Project Notes custom actions ####
-PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user"]
-PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user"]
+PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
+PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
 PROJECT_NOTE_ALL_GET_ACTIONS = [
     *PROJECT_NOTE_PLANNING_GET_ACTIONS,
     *PROJECT_NOTE_COORDINATOR_GET_ACTIONS,
@@ -88,7 +88,7 @@ PROJECT_PLANNING_GET_ACTIONS = [
     "get_projects_by_financial_year",
     "get_project_by_financial_year",
     "get_search_results",
-    "get_project_notes",
+    
 ]
 PROJECT_ALL_GET_ACTIONS = [
     *PROJECT_COORDINATOR_GET_ACTIONS,
@@ -146,7 +146,6 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_LOCATION_PLANNING_GET_ACTIONS,
                 *PROJECT_FINANCES_PLANNING_GET_ACTIONS,
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
-                *PROJECT_NOTE_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
             ]
         ):
@@ -188,10 +187,6 @@ class IsCoordinator(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        _type = obj._meta.model.__name__ 
-        # Coordinators can not 
-        if view.action in [*DJANGO_BASE_DELETE_ONLY_ACTIONS,*DJANGO_BASE_CREATE_ONLY_ACTIONS] and _type != "Project":
-            return False
         # Coordinators can edit and perform all operations so return true for all model instance actions
         return True
 
@@ -225,13 +220,8 @@ class IsPlanner(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        _type = obj._meta.model.__name__ 
-        # Planners can not 
-        if view.action in [*DJANGO_BASE_DELETE_ONLY_ACTIONS,*DJANGO_BASE_CREATE_ONLY_ACTIONS] and _type != "Project":
-            return False
         # Planners can edit and perform all operations so return true for all model instance actions
         return True
-
 
 class IsProjectManager(permissions.BasePermission):
     def user_in_project_manager_group(self, request):
@@ -247,18 +237,19 @@ class IsProjectManager(permissions.BasePermission):
         if (
             request.user.is_authenticated
             and self.user_in_project_manager_group(request=request)
-            and request.method in [GET, PATCH]
+            and request.method in SAFE_METHODS
             and view.action
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *DJANGO_BASE_DELETE_ONLY_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
                 *PROJECT_CLASS_ALL_GET_ACTIONS,
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *PROJECT_GROUP_ALL_GET_ACTIONS,
-                *PROJECT_NOTE_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
+                *PROJECT_NOTE_ALL_ACTIONS,
             ]
         ):
             return True
@@ -266,13 +257,12 @@ class IsProjectManager(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        # has edit permissions for projects only
+        # has edit permissions for projects nad notes only
         # and only specific project fields
-
         _type = obj._meta.model.__name__
+
         if view.action in [*DJANGO_BASE_UPDATE_ONLY_ACTIONS, *DJANGO_BASE_READ_ONLY_ACTIONS] and _type in [
             "Project",
-            "Note",
         ]:
             if any(
                 [
@@ -311,9 +301,10 @@ class IsProjectManager(permissions.BasePermission):
                 ]
             ]):
                 return False
+            
             return True
 
-        return False
+        return True
     
 class BaseProjectAreaPermissions(permissions.BasePermission):
     def project_belongs_to_808_main_class(self, obj: Project, request):
@@ -362,13 +353,14 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
                 *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *DJANGO_BASE_DELETE_ONLY_ACTIONS,
                 *PROJECT_CLASS_ALL_GET_ACTIONS,
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_GROUP_ALL_ACTIONS,
-                *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
+                *PROJECT_NOTE_ALL_ACTIONS
             ]
         ):
             return True
@@ -377,22 +369,19 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
 
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
+
         if view.action in [
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *DJANGO_BASE_DELETE_ONLY_ACTIONS,
+            *DJANGO_BASE_CREATE_ONLY_ACTIONS,
             *DJANGO_BASE_READ_ONLY_ACTIONS,
-        ] and _type in ["Project",  "ProjectGroup", "Note"]:
-
-            # if _type == "Note" and view.action == "destroy":
-            #     return False
-        
+            *PROJECT_NOTE_ALL_ACTIONS
+        ] and _type in ["Project", "ProjectGroup", "Note"]:
+            
             if _type == "Project":
                 if self.project_belongs_to_808_main_class(
                     obj, request
                     ):
-                    return True
-                
-                if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS]:
                     return True
         
             if _type == "ProjectGroup":
@@ -400,6 +389,9 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                     obj, request
                 ):
                     return True
+            
+            if _type == "Note":
+                return True
         
         return False
 
@@ -414,7 +406,7 @@ class IsAdmin(permissions.BasePermission):
         if (
             request.user.is_authenticated
             and self.user_in_test_group(request=request)
-            and request.method == GET
+            and request.method in SAFE_METHODS
             and view.action
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
@@ -435,5 +427,6 @@ class IsAdmin(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        _type = obj._meta.model.__name__ 
         return True
 
