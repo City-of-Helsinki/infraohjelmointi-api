@@ -34,7 +34,6 @@ class WhoAmISerializer(serializers.ModelSerializer):
     def get_ad_groups(self, current_user):
         groups = []
         for group in current_user.ad_groups.all():
-            #if group.name in ADGroupService().get_group_to_uuid_dict():
             if group.name in self.group_to_uuid_mapping:
                 groups.append(
                     {
