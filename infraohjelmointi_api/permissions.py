@@ -1,11 +1,7 @@
-import logging
 from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectClass import ProjectClass
 from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from rest_framework import permissions
-from infraohjelmointi_api.services.ADGroupService import ADGroupService
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 GET = "GET"
 POST = "POST"

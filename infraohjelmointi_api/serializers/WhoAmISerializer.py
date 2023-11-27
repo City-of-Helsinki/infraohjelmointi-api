@@ -1,6 +1,5 @@
 from infraohjelmointi_api.models import User
 from rest_framework import serializers
-from infraohjelmointi_api.services.ADGroupService import ADGroupService
 
 
 class WhoAmISerializer(serializers.ModelSerializer):
