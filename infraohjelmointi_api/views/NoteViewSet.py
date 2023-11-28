@@ -29,7 +29,7 @@ class NoteViewSet(BaseViewSet):
             return NoteCreateSerializer
         return NoteUpdateSerializer
 
-    @action(methods=["get"], detail=True, url_path=r"history")
+    @action(methods=["get"], detail=True, url_path=r"history", name="get_note_history")
     def history(self, request, pk):
         """
         Custom action to get edit history of a note
@@ -72,7 +72,12 @@ class NoteViewSet(BaseViewSet):
         note.save()
         return Response({"id": data})
 
-    @action(methods=["get"], detail=True, url_path=r"history/(?P<userId>[-\w]+)")
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"history/(?P<userId>[-\w]+)",
+        name="get_note_history_by_user",
+    )
     def history_user(self, request, pk, userId):
         """
         Custom action to get edit history of a note edited by a specific user

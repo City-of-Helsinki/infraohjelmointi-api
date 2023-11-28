@@ -27,7 +27,12 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
         """Default is programmer view"""
         return ProjectLocationService.list_all()
 
-    @action(methods=["get"], detail=False, url_path=r"coordinator")
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"coordinator",
+        name="get_coordinator_locations",
+    )
     def list_for_coordinator(self, request):
         """
         Overriden list action to get a list of coordinator ProjectLocations
@@ -83,6 +88,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
         methods=["patch"],
         detail=False,
         url_path=r"coordinator/(?P<location_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
+        name="patch_coordinator_location_finances",
     )
     def patch_coordinator_location_finances(self, request, location_id):
         """

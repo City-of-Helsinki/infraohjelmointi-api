@@ -25,6 +25,7 @@ class SapCostViewSet(BaseViewSet):
         methods=["get"],
         detail=False,
         url_path=r"(?P<year>[0-9]{4})",
+        name="get_sap_costs_by_year",
     )
     def get_sap_cost_by_year(self, request, year):
         """
