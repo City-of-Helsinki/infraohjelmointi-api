@@ -59,6 +59,7 @@ class ProjectGroupViewSet(BaseViewSet):
         methods=["get"],
         detail=False,
         url_path=r"coordinator",
+        name="get_groups_for_coordinator",
     )
     def get_groups_for_coordinator(self, request):
         """

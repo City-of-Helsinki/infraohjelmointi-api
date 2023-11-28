@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 class WhoAmISerializer(serializers.ModelSerializer):
     ad_groups = serializers.SerializerMethodField()
+
     group_to_uuid_mapping = {
         "sg_kymp_sso_io_koordinaattorit": "86b826df-589c-40f9-898f-1584e80b5482",
         "sg_kymp_sso_io_ohjelmoijat": "da48bfe9-6a99-481f-a252-077d31473c4c",
