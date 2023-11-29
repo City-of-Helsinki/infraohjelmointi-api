@@ -174,7 +174,7 @@ class ProjectTestCase(TestCase):
             id=self.projectDivision_1_Id, name="Test district"
         )
         self.projectCategory = ProjectCategory.objects.create(
-            id=self.projectCategory_1_Id, value="K5"
+            id=self.projectCategory_1_Id, value="K5.1"
         )
         self.projectMasterClass = ProjectClass.objects.create(
             id=self.projectMasterClass_1_Id,
@@ -1094,7 +1094,7 @@ class ProjectTestCase(TestCase):
         )
 
         category_1 = ProjectCategory.objects.create(
-            id=self.projectCategory_2_Id, value="K5"
+            id=self.projectCategory_2_Id, value="K5.1"
         )
         category_2 = ProjectCategory.objects.create(
             id=self.projectCategory_3_Id, value="K1"
