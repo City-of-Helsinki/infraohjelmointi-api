@@ -13,6 +13,7 @@ class ProjectCategoryViewSet(BaseViewSet):
 
     serializer_class = ProjectCategorySerializer
 
+    # Categories will be cached for the frontend (24h)
     @method_decorator(cache_page(60 * 60 * 24))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
