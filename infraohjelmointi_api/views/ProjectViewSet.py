@@ -236,6 +236,7 @@ class ProjectViewSet(BaseViewSet):
         methods=["get"],
         detail=False,
         url_path=r"(?P<year>[0-9]{4})",
+        name="get_projects_by_financial_year",
     )
     def get_projects_by_financial_year(self, request, year):
         """
@@ -275,7 +276,12 @@ class ProjectViewSet(BaseViewSet):
         }
         return Response(response)
 
-    @action(methods=["get"], detail=True, url_path=r"financials/(?P<year>[0-9]{4})")
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"financials/(?P<year>[0-9]{4})",
+        name="get_project_by_financial_year",
+    )
     def get_project_with_specific_financial_year(self, request, pk, year):
         """
         Custom action to get a project with financials starting from the year provided
@@ -314,6 +320,7 @@ class ProjectViewSet(BaseViewSet):
         methods=["get"],
         detail=False,
         url_path=r"search-results",
+        name="get_search_results",
     )
     def get_search_results(self, request):
         """
@@ -659,6 +666,7 @@ class ProjectViewSet(BaseViewSet):
         detail=False,
         url_path=r"coordinator",
         serializer_class=ProjectGetSerializer,
+        name="get_coordinator_projects",
     )
     def get_projects_for_coordinator(self, request):
         """
@@ -898,7 +906,7 @@ class ProjectViewSet(BaseViewSet):
         except Exception as e:
             raise e
 
-    @action(methods=["get"], detail=True, url_path=r"notes")
+    @action(methods=["get"], detail=True, url_path=r"notes", name="get_project_notes")
     def get_project_notes(self, request, pk):
         """
         Custom action to get notes related to a project
@@ -937,6 +945,7 @@ class ProjectViewSet(BaseViewSet):
         detail=False,
         url_path=r"bulk-update",
         serializer_class=ProjectCreateSerializer,
+        name="patch_bulk_projects",
     )
     def patch_bulk_projects(self, request):
         """
