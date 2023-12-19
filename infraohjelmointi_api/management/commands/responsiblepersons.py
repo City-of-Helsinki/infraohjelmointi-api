@@ -41,7 +41,7 @@ class Command(BaseCommand):
                 )
             )
             return
-        
+
         if not os.path.isfile(options["file"]):
             self.stdout.write(
                 self.style.ERROR(
@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 )
             )
             return
-        
+
         try:
             self.populateDBWithExcel(excelPath=options["file"])
             self.stdout.write(
@@ -63,27 +63,26 @@ class Command(BaseCommand):
 
     def populateDBWithExcel(self, excelPath):
         """
-        Add every person from the excel file. 
+        Add every person from the excel file.
         [firstName | lastName]
         """
         wb = load_workbook(excelPath, data_only=True, read_only=True)
         rows = list(wb.worksheets[0].rows)
-        
+
         for row in rows:
             if len(row) < 2:
                 continue
 
-            firstName = str(row[0].value).strip()
-            lastName = str(row[1].value).strip()
+            firstname = str(row[0].value).strip()
+            lastname = str(row[1].value).strip()
 
             person, _ = PersonService.get_or_create_by_name(
-                    firstName=firstName, lastName=lastName
+                    firstName=firstname, lastName=lastname
                 )
-        
+
             if person:
                 logger.info(
                     "\nPerson added: {} {} ({})\n".format(
-                        person.firstName, person.lastName, person.id
+                        person.firstname, person.lastname, person.id
                     )
-                )       
-        
+                )
