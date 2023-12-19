@@ -12,7 +12,7 @@ class Note(HistoricalModel):
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
     project = models.ForeignKey(
-        "Project", on_delete=models.DO_NOTHING, null=False, blank=False
+        "Project", on_delete=models.CASCADE, null=False, blank=False
     )
 
     deleted = models.BooleanField(null=False, default=False)
