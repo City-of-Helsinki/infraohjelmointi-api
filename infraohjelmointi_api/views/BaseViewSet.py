@@ -14,11 +14,11 @@ class BaseViewSet(viewsets.ModelViewSet):
         IsAuthenticated
         & (
             IsCoordinator
-            or IsPlanner
-            or IsPlannerOfProjectAreas
-            or IsProjectManager
-            or IsViewer
-            or IsAdmin
+            | IsPlanner
+            | IsPlannerOfProjectAreas
+            | IsProjectManager
+            | IsViewer
+            | IsAdmin
         )
     ]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
