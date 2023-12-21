@@ -83,6 +83,6 @@ class Command(BaseCommand):
             if person:
                 logger.info(
                     "\nPerson added: {} {} ({})\n".format(
-                        person.firstname, person.lastname, person.id
+                        person.firstName, person.lastName, person.id
                     )
                 )
