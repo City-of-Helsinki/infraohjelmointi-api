@@ -1,5 +1,6 @@
 from .ProjectService import ProjectService
 from .ProjectClassService import ProjectClassService
+from .ProjectDistrictService import ProjectDistrictService
 from .ProjectLocationService import ProjectLocationService
 from .ProjectGroupService import ProjectGroupService
 from .PersonService import PersonService
