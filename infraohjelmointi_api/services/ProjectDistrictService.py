@@ -19,19 +19,19 @@ class ProjectDistrictService:
     @staticmethod
     def list_all() -> list[ProjectDistrict]:
         return ProjectDistrict.objects.all()
-    
+
     @staticmethod
     def get_by_path(path: str) -> ProjectDistrict:
         """Gets project's district, subdistrict or sub-subdistrict"""
         try:
             return ProjectDistrict.objects.get(path=path)
-        except:
+        except (Exception):
             return None
-        
+
     @staticmethod
     def get_by_parent(parent: ProjectDistrict):
         """Gets project's districts, subdistricts and subsubdistricts by parent"""
         try:
             return ProjectDistrict.objects.get(parent=parent)
-        except:
+        except (Exception):
             return None

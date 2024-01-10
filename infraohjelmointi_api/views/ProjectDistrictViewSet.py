@@ -1,8 +1,6 @@
 from infraohjelmointi_api.serializers.ProjectDistrictSerializer import ProjectDistrictSerializer
 from .BaseViewSet import BaseViewSet
 
-from rest_framework.decorators import action
-
 
 class ProjectDistrictViewSet(BaseViewSet):
     """
@@ -10,5 +8,3 @@ class ProjectDistrictViewSet(BaseViewSet):
     """
 
     serializer_class = ProjectDistrictSerializer
-
-       

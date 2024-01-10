@@ -1,7 +1,7 @@
 from infraohjelmointi_api.services import ProjectDistrictService
 
 
-def addLocations(rows):
+def add_locations(rows):
     for row in rows[1:]:
         district = row[1].value
         division = row[2].value
@@ -22,23 +22,23 @@ def addLocations(rows):
 
         district = ProjectDistrictService.get_or_create(
             name=district,
-            parent=None, 
+            parent=None,
             path=district,
             level="district",
             )[0]
         print(district.name)
         if subClassParentPath:
             division = ProjectDistrictService.get_or_create(
-                name=division, 
-                parent=district, 
+                name=division,
+                parent=district,
                 path=subClassParentPath,
                 level="division",
                 )[0]
             print(division.name)
             if subSubClassParentPath:
                 subsubDistrict = ProjectDistrictService.get_or_create(
-                    name=subDivision, 
-                    parent=division, 
+                    name=subDivision,
+                    parent=division,
                     path=path,
                     level="subDivision",
                     )[0]

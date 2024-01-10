@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 import os
 import traceback
 from openpyxl import load_workbook
-from .util.locationFileHandler import addLocations
+from .util.locationFileHandler import add_locations
 
 
 class Command(BaseCommand):
@@ -34,7 +34,7 @@ class Command(BaseCommand):
                 )
             )
             return
-        
+
         try:
             self.populateDBWithLocations(excelPath=options["file"])
         except Exception as e:
@@ -53,4 +53,4 @@ class Command(BaseCommand):
             )
         )
         wb = load_workbook(excelPath, data_only=True, read_only=True)
-        addLocations(list(wb.worksheets[0].rows))
+        add_locations(list(wb.worksheets[0].rows))
