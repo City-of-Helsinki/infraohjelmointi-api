@@ -288,6 +288,7 @@ def buildHierarchies(
                 )
         
         elif DISTRICT_COLOR in cell_colors:
+            related_to_district = None
             if pv_cell_color_hex in [DISTRICT_COLOR]:
                 related_to_district = proceedWithDistrict(
                     name=pv_name,
@@ -308,7 +309,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
                 proceedWithDistrict(
-                    name=pv_name,
+                    name=cv_name,
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
                     for_coordinator_only=True,

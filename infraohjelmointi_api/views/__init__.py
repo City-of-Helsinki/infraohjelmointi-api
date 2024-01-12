@@ -29,3 +29,4 @@ from .LocationFinancialViewSet import *
 from .BaseClassLocationViewSet import *
 from .WhoAmIViewSet import *
 from .SapCostViewSet import *
+from .ProjectDistrictViewSet import *
