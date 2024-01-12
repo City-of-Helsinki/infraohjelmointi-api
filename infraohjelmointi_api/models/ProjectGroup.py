@@ -2,11 +2,15 @@ import uuid
 from django.db import models
 from .ProjectLocation import ProjectLocation
 from .ProjectClass import ProjectClass
+from .ProjectDistrict import ProjectDistrict
 
 
 class ProjectGroup(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, blank=False, null=False)
+    location = models.ForeignKey(
+        ProjectDistrict, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     locationRelation = models.ForeignKey(
         ProjectLocation, on_delete=models.DO_NOTHING, null=True, blank=True
     )
@@ -21,6 +25,7 @@ class ProjectGroup(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "name",
+                    "location",
                     "locationRelation",
                     "classRelation",
                 ],
