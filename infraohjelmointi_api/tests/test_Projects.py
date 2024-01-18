@@ -2735,47 +2735,47 @@ class ProjectTestCase(TestCase):
     def test_class_location_validation(self):
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_4_Id,
-            name="Eteläinen",
+            name="Eteläinen suurpiiri",
             parent=None,
-            path="Eteläinen",
+            path="Eteläinen suurpiiri",
         )
         district_2 = ProjectLocation.objects.create(
             id=self.projectDistrict_5_Id,
-            name="Läntinen",
+            name="Läntinen suurpiiri",
             parent=None,
-            path="Läntinen",
+            path="Läntinen suurpiiri",
         )
         district_3 = ProjectLocation.objects.create(
             id=self.projectDistrict_6_Id,
-            name="Keskinen",
+            name="Keskinen suurpiiri",
             parent=None,
-            path="Keskinen",
+            path="Keskinen suurpiiri",
         )
         district_4 = ProjectLocation.objects.create(
             id=self.projectDistrict_7_Id,
-            name="Östersundom",
+            name="Östersundomin suurpiiri",
             parent=None,
-            path="Östersundom",
+            path="Östersundomin suurpiiri",
         )
         district_1.childLocation.create(
             id=self.projectDivision_3_Id,
             name="Munkkiniemi",
-            path="Eteläinen/Munkkiniemi",
+            path="Eteläinen suurpiiri/Munkkiniemi",
         )
         district_2.childLocation.create(
             id=self.projectDivision_4_Id,
             name="Munkkiniemi",
-            path="Läntinen/Munkkiniemi",
+            path="Läntinen suurpiiri/Munkkiniemi",
         )
         district_3.childLocation.create(
             id=self.projectDivision_5_Id,
             name="Munkkiniemi",
-            path="Keskinen/Munkkiniemi",
+            path="Keskinen suurpiiri/Munkkiniemi",
         )
         district_4.childLocation.create(
             id=self.projectDivision_6_Id,
             name="ostersundomTest",
-            path="Östersundom/ostersundomTest",
+            path="Östersundomin suurpiiri/ostersundomTest",
         )
 
         masterClass_1 = ProjectClass.objects.create(
@@ -2817,9 +2817,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_3_Id.__str__(),
         }
 
-        # Creating project with Class "Eteläinen suurpiiri" and location path "Eteläinen/Munkkiniemi"
+        # Creating project with Class "Eteläinen suurpiiri" and location path "Eteläinen suurpiiri/Munkkiniemi"
         # Current class is "Läntinen suurpiiri"
-        # Current location path is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen suurpiiri/Munkkiniemi"
         response = self.client.post(
             "/projects/",
             data,
@@ -2837,9 +2837,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_4_Id.__str__(),
         }
 
-        # Patching project with location path "Läntinen/Munkkiniemi"
+        # Patching project with location path "Läntinen suurpiiri/Munkkiniemi"
         # Current class is "Eteläinen suurpiiri"
-        # Current location path is "Läntinen/Munkkiniemi"
+        # Current location path is "Läntinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2853,9 +2853,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_4_Id.__str__(),
         }
 
-        # Patching project with location path "Läntinen/Munkkiniemi" and class "Läntinen suurpiiri"
+        # Patching project with location path "Läntinen suurpiiri/Munkkiniemi" and class "Läntinen suurpiiri"
         # Current class is "Läntinen suurpiiri"
-        # Current location path is "Läntinen/Munkkiniemi"
+        # Current location path is "Läntinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2869,9 +2869,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_6_Id.__str__(),
         }
 
-        # Patching project with location path "Östersundom/ostersundomTest" and class "Östersundomin suurpiiri"
+        # Patching project with location path "Östersundomin suurpiiri/ostersundomTest" and class "Östersundomin suurpiiri"
         # Current class is "Östersundomin suurpiiri"
-        # Current location path is "Östersundom/ostersundomTest"
+        # Current location path is "Östersundomin suurpiiri/ostersundomTest"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2884,9 +2884,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_3_Id.__str__(),
         }
 
-        # Patching project with location path "Eteläinen/Munkkiniemi"
+        # Patching project with location path "Eteläinen suurpiiri/Munkkiniemi"
         # Current class is "Östersundomin suurpiiri"
-        # Current location path is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2901,7 +2901,7 @@ class ProjectTestCase(TestCase):
 
         # Patching project with class "Siltojen peruskorjaus ja uusiminen"
         # Current class is "Siltojen peruskorjaus ja uusiminen"
-        # Current location path is "Eteläinen/Munkkiniemi"
+        # Current location path is "Eteläinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2914,9 +2914,9 @@ class ProjectTestCase(TestCase):
             "projectLocation": self.projectDivision_5_Id.__str__(),
         }
 
-        # Patching project with location path "Keskinen/Munkkiniemi"
+        # Patching project with location path "Keskinen suurpiiri/Munkkiniemi"
         # Current class is "Siltojen peruskorjaus ja uusiminen"
-        # Current location path is "Keskinen/Munkkiniemi"
+        # Current location path is "Keskinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
@@ -2931,7 +2931,7 @@ class ProjectTestCase(TestCase):
 
         # Patching project with class "Läntinen suurpiiri"
         # Current class is "Läntinen suurpiiri"
-        # Current location path is "Keskinen/Munkkiniemi"
+        # Current location path is "Keskinen suurpiiri/Munkkiniemi"
         response = self.client.patch(
             "/projects/{}/".format(newProjectId),
             data,
