@@ -2733,29 +2733,34 @@ class ProjectTestCase(TestCase):
         )
 
     def test_class_location_validation(self):
+        ETELAINEN_SUURPIIRI = "Eteläinen suurpiiri"
+        LANTINEN_SUURPIIRI = "Läntinen suurpiiri"
+        KESKINEN_SUURPIIRI = "Keskinen suurpiiri"
+        OSTERSUNDOMIN_SUURPIIRI = "Östersundomin suurpiiri"
+
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_4_Id,
-            name="Eteläinen suurpiiri",
+            name=ETELAINEN_SUURPIIRI,
             parent=None,
-            path="Eteläinen suurpiiri",
+            path=ETELAINEN_SUURPIIRI,
         )
         district_2 = ProjectLocation.objects.create(
             id=self.projectDistrict_5_Id,
-            name="Läntinen suurpiiri",
+            name=LANTINEN_SUURPIIRI,
             parent=None,
-            path="Läntinen suurpiiri",
+            path=LANTINEN_SUURPIIRI,
         )
         district_3 = ProjectLocation.objects.create(
             id=self.projectDistrict_6_Id,
-            name="Keskinen suurpiiri",
+            name=KESKINEN_SUURPIIRI,
             parent=None,
-            path="Keskinen suurpiiri",
+            path=KESKINEN_SUURPIIRI,
         )
         district_4 = ProjectLocation.objects.create(
             id=self.projectDistrict_7_Id,
-            name="Östersundomin suurpiiri",
+            name=OSTERSUNDOMIN_SUURPIIRI,
             parent=None,
-            path="Östersundomin suurpiiri",
+            path=OSTERSUNDOMIN_SUURPIIRI,
         )
         district_1.childLocation.create(
             id=self.projectDivision_3_Id,
@@ -2790,17 +2795,17 @@ class ProjectTestCase(TestCase):
             path="803 Kadut, liikenneväylät/Uudisrakentaminen",
         )
         _class.childClass.create(
-            name="Läntinen suurpiiri",
+            name=LANTINEN_SUURPIIRI,
             id=self.projectSubClass_3_Id,
             path="803 Kadut, liikenneväylät/Uudisrakentaminen/Läntinen suurpiiri",
         )
         _class.childClass.create(
-            name="Eteläinen suurpiiri",
+            name=ETELAINEN_SUURPIIRI,
             id=self.projectSubClass_4_Id,
             path="803 Kadut, liikenneväylät/Uudisrakentaminen/Eteläinen suurpiiri",
         )
         _class.childClass.create(
-            name="Östersundomin suurpiiri",
+            name=OSTERSUNDOMIN_SUURPIIRI,
             id=self.projectSubClass_5_Id,
             path="803 Kadut, liikenneväylät/Uudisrakentaminen/Östersundomin suurpiiri",
         )
