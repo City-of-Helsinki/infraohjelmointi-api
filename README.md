@@ -119,11 +119,23 @@ Import Budget (TAE) project data:
 
 Import Planning (TS) and Budget (TAE) files in bulk together:
 
-```bash
+  ```bash
   $ ./import-excels.sh -d path/to/directory/containing/all/Excels
   ```
 
+### Other Optional File Imports
 
+Import project location options:
+
+  ```bash
+  $ python manage.py locationimporter --file path/to/locationData.xlsx
+  ```
+
+Import new person information into responsible persons list:
+
+  ```bash
+  $ python manage.py responsiblepersons --file path/to/responsiblePersons.xlsx
+  ```
 
 
 
