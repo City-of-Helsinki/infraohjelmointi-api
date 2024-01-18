@@ -160,3 +160,4 @@ Import new person information into responsible persons list:
   ```bash
   $ python manage.py responsiblepersons --file path/to/responsiblePersons.xlsx
   ```
+  
