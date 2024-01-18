@@ -405,9 +405,9 @@ def proceedWithDistrict(
 ) -> ProjectLocation:
     district = name.split(" ")[0].strip()
     # exceptional case for Östersundom which can be Östersundomin
-    #if "östersundom" in name.lower():
-    #    district = "Östersundom"
-    if "suurpiiri" in name.lower():
+    if name.lower() == "östersundom":
+        district = "Östersundomin suurpiiri"
+    elif "suurpiiri" in name.lower():
         district = name.strip()
     else:
         district = sanitizeString(data=name.strip())
@@ -562,10 +562,10 @@ def buildHierarchiesAndProjects(
             if "suurpiiri" in name.lower():
                 location_stack.clear()  # remove all
                 district = name.strip()
-                # exceptional case for Östersundom which can be Östersundomin
-                #district = (
-                #    "Östersundom" if "östersundom" in district.lower() else district
-                #)
+                # exceptional case for Östersundom which can be Östersundomin suurpiiri
+                district = (
+                    "Östersundomin suurpiiri" if district.lower() == "östersundom" else district
+                )
                 location_stack.append(
                     ProjectLocationService.get_or_create(
                         name=district,
@@ -582,7 +582,7 @@ def buildHierarchiesAndProjects(
             district = name
 
             # exceptional case for Östersundom which can be Östersundomin
-            district = "Östersundom" if "östersundom" in district.lower() else district
+            district = "Östersundomin suurpiiri" if district.lower() == "östersundom" else district
             location_stack.append(
                 ProjectLocationService.get_or_create(
                     name=district,
