@@ -13,10 +13,10 @@ def add_locations(rows):
         subClassParentPath = None
         subSubClassParentPath = None
         if district != division:
-            path += " / " + division
+            path += "/" + division
             subClassParentPath = path
             if division != subDivision:
-                path += " / " + subDivision
+                path += "/" + subDivision
                 subSubClassParentPath = path
 
 
@@ -27,7 +27,7 @@ def add_locations(rows):
             level="district",
             )[0]
         print(district.name)
-        if subClassParentPath:
+        if subClassParentPath is not None:
             division = ProjectDistrictService.get_or_create(
                 name=division,
                 parent=district,
@@ -35,7 +35,7 @@ def add_locations(rows):
                 level="division",
                 )[0]
             print(division.name)
-            if subSubClassParentPath:
+            if subSubClassParentPath is not None:
                 subsubDistrict = ProjectDistrictService.get_or_create(
                     name=subDivision,
                     parent=division,
