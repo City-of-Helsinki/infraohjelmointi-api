@@ -40,8 +40,6 @@ from itertools import chain
 from django.db.models import Count, Case, When, Q
 from django.db.models.signals import post_save
 
-logger = logging.getLogger("infraohjelmointi_api")
-
 
 class ProjectFilter(django_filters.FilterSet):
     hashtag = django_filters.ModelMultipleChoiceFilter(
@@ -233,7 +231,6 @@ class ProjectViewSet(BaseViewSet):
         serializer = self.get_serializer(
             instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
         )
-        logger.info(serializer)
         return Response(serializer.data)
 
     @action(
