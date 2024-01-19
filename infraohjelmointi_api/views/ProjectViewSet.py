@@ -1,5 +1,4 @@
 from datetime import date
-import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
