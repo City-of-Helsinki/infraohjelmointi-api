@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -38,6 +39,8 @@ from rest_framework import status
 from itertools import chain
 from django.db.models import Count, Case, When, Q
 from django.db.models.signals import post_save
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -230,6 +233,7 @@ class ProjectViewSet(BaseViewSet):
         serializer = self.get_serializer(
             instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
         )
+        logger.info(serializer)
         return Response(serializer.data)
 
     @action(

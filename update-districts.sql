@@ -9,8 +9,7 @@ UPDATE infraohjelmointi_api_project
 SET "projectDistrict_id" = infraohjelmointi_api_projectdistrict.id
 FROM infraohjelmointi_api_projectdistrict, infraohjelmointi_api_projectlocation
 WHERE infraohjelmointi_api_project."projectLocation_id" = infraohjelmointi_api_projectlocation.id
-AND infraohjelmointi_api_projectlocation.path = infraohjelmointi_api_projectdistrict.path
-AND infraohjelmointi_api_project."projectLocation_id" IS NOT NULL;
+AND infraohjelmointi_api_projectlocation.path = infraohjelmointi_api_projectdistrict.path;
 
 
 --ryhmien suurpiirit projectgroup
@@ -23,6 +22,5 @@ AND infraohjelmointi_api_project."projectLocation_id" IS NOT NULL;
 UPDATE infraohjelmointi_api_projectgroup
 SET "location_id" = infraohjelmointi_api_projectdistrict.id
 FROM infraohjelmointi_api_projectdistrict, infraohjelmointi_api_projectlocation
-WHERE infraohjelmointi_api_project."projectLocation_id" = infraohjelmointi_api_projectlocation.id
-AND infraohjelmointi_api_projectlocation.path = infraohjelmointi_api_projectdistrict.path
-AND infraohjelmointi_api_projectgroup."locationRelation_id" IS NOT NULL;
+WHERE infraohjelmointi_api_projectgroup."locationRelation_id" = infraohjelmointi_api_projectlocation.id
+AND infraohjelmointi_api_projectlocation.path = infraohjelmointi_api_projectdistrict.path;
