@@ -2765,22 +2765,22 @@ class ProjectTestCase(TestCase):
         district_1.childLocation.create(
             id=self.projectDivision_3_Id,
             name="Munkkiniemi",
-            path="Eteläinen suurpiiri/Munkkiniemi",
+            path=f"{ETELAINEN_SUURPIIRI}/Munkkiniemi",
         )
         district_2.childLocation.create(
             id=self.projectDivision_4_Id,
             name="Munkkiniemi",
-            path="Läntinen suurpiiri/Munkkiniemi",
+            path=f"{LANTINEN_SUURPIIRI}/Munkkiniemi",
         )
         district_3.childLocation.create(
             id=self.projectDivision_5_Id,
             name="Munkkiniemi",
-            path="Keskinen suurpiiri/Munkkiniemi",
+            path=f"{KESKINEN_SUURPIIRI}/Munkkiniemi",
         )
         district_4.childLocation.create(
             id=self.projectDivision_6_Id,
             name="ostersundomTest",
-            path="Östersundomin suurpiiri/ostersundomTest",
+            path=f"{OSTERSUNDOMIN_SUURPIIRI}/ostersundomTest",
         )
 
         masterClass_1 = ProjectClass.objects.create(
@@ -2797,17 +2797,17 @@ class ProjectTestCase(TestCase):
         _class.childClass.create(
             name=LANTINEN_SUURPIIRI,
             id=self.projectSubClass_3_Id,
-            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Läntinen suurpiiri",
+            path=f"803 Kadut, liikenneväylät/Uudisrakentaminen/{LANTINEN_SUURPIIRI}",
         )
         _class.childClass.create(
             name=ETELAINEN_SUURPIIRI,
             id=self.projectSubClass_4_Id,
-            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Eteläinen suurpiiri",
+            path=f"803 Kadut, liikenneväylät/Uudisrakentaminen/{ETELAINEN_SUURPIIRI}",
         )
         _class.childClass.create(
             name=OSTERSUNDOMIN_SUURPIIRI,
             id=self.projectSubClass_5_Id,
-            path="803 Kadut, liikenneväylät/Uudisrakentaminen/Östersundomin suurpiiri",
+            path=f"803 Kadut, liikenneväylät/Uudisrakentaminen/{OSTERSUNDOMIN_SUURPIIRI}",
         )
         _class.childClass.create(
             name="Siltojen peruskorjaus ja uusiminen",
