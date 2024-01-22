@@ -16,6 +16,7 @@ from .ProjectQualityLevel import ProjectQualityLevel
 from .ConstructionPhase import ConstructionPhase
 from .PlanningPhase import PlanningPhase
 from .ProjectClass import ProjectClass
+from .ProjectDistrict import ProjectDistrict
 from .ProjectLocation import ProjectLocation
 from .ResponsibleZone import ResponsibleZone
 from .ProjectHashTag import ProjectHashTag

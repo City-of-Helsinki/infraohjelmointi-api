@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as lazy
 
 from .ProjectLocation import ProjectLocation
+from .ProjectDistrict import ProjectDistrict
 from .ProjectSet import ProjectSet
 from .ProjectArea import ProjectArea
 from .BudgetItem import BudgetItem
@@ -45,6 +46,9 @@ class Project(models.Model):
     )
     projectLocation = models.ForeignKey(
         ProjectLocation, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    projectDistrict = models.ForeignKey(
+        ProjectDistrict, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     projectGroup = models.ForeignKey(
         ProjectGroup, on_delete=models.SET_NULL, null=True, blank=True
