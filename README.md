@@ -147,6 +147,13 @@ Fix known issues from database:
   infraohjelmointi_api_db=# \i fix-database.sql
   ```
 
+Update projects' missing `projectDistrict_id` data with `infraohjelmointi_api_projectdistrict.id`.
+
+  ```bash
+  $ psql $DATABASE_URL
+  infraohjelmointi_api_db=# \i update-districts.sql
+  ```
+
 ### Other Optional File Imports
 
 Import project location options:
