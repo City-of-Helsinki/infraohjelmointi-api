@@ -35,9 +35,6 @@ color_map = {
     "FFF2DCDB": "OTHER CLASSIFICATION SUBCLASS",
 }
 
-SUURPIIRI = "suurpiiri"
-OSTERSUNDOM = "östersundom"
-OSTERSUNDOMIN_SUURPIIRI = "Östersundomin suurpiiri"
 
 def getColor(wb, color_object) -> str:
     try:
@@ -206,7 +203,7 @@ def buildHierarchies(
                 )
                 pv_class_stack.append(pv_class)
                 # if subslcass is also a district
-                if SUURPIIRI in pv_name.lower() or OSTERSUNDOM in pv_name.lower():
+                if "suurpiiri" in pv_name.lower() or "östersundom" in pv_name.lower():
                     related_to_district = proceedWithDistrict(
                         name=pv_name,
                         parent_class=pv_class_stack[-1],
@@ -408,10 +405,10 @@ def proceedWithDistrict(
 ) -> ProjectLocation:
     district = name.split(" ")[0].strip()
     # exceptional case for Östersundom which can be Östersundomin
-    if name.lower() == OSTERSUNDOM:
-        district = OSTERSUNDOMIN_SUURPIIRI
-    elif SUURPIIRI in name.lower():
-        district = name.strip()
+    if "östersundom" in name.lower():
+        district = "Östersundom"
+    elif "suurpiiri" in name.lower():
+        district = name.split(" ")[0].strip()
     else:
         district = sanitizeString(data=name.strip())
     print_with_bg_color(
@@ -562,12 +559,12 @@ def buildHierarchiesAndProjects(
             )
 
             # if subslcass is also a district
-            if SUURPIIRI in name.lower():
+            if "suurpiiri" in name.lower():
                 location_stack.clear()  # remove all
-                district = name.strip()
-                # exceptional case for Östersundom which can be Östersundomin suurpiiri
+                district = name.split(" ")[0].strip()
+                # exceptional case for Östersundom which can be Östersundomin
                 district = (
-                    OSTERSUNDOMIN_SUURPIIRI if district.lower() == OSTERSUNDOM else district
+                    "Östersundom" if "östersundom" in district.lower() else district
                 )
                 location_stack.append(
                     ProjectLocationService.get_or_create(
@@ -582,10 +579,12 @@ def buildHierarchiesAndProjects(
             location_stack.clear()  # remove all
             type = "DISTRICT"
             indention = 3
-            district = name
+            district = (
+                name.split(" ")[0].strip() if "suurpiiri" in name.lower() else name
+            )
 
             # exceptional case for Östersundom which can be Östersundomin
-            district = OSTERSUNDOMIN_SUURPIIRI if district.lower() == OSTERSUNDOM else district
+            district = "Östersundom" if "östersundom" in district.lower() else district
             location_stack.append(
                 ProjectLocationService.get_or_create(
                     name=district,
@@ -710,7 +709,7 @@ def buildHierarchiesAndProjects(
             cell_color,
         )
 
-        if type == "SUB CLASS" and SUURPIIRI in name:
+        if type == "SUB CLASS" and "suurpiiri" in name:
             print_with_bg_color(
                 "{}'{}' will be used as '{}' ({}) too at line {}. Its class path is '{}', and location path is '{}'.".format(
                     " " * indention,
