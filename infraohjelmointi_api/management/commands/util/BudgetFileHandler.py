@@ -290,4 +290,4 @@ class BudgetFileHandler(IExcelFileHandler):
                 content=notes,
                 project=project,
                 byPerson=None,
-            )#
+            )
