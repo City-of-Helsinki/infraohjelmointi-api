@@ -148,7 +148,6 @@ class BudgetFileHandler(IExcelFileHandler):
         preliminaryCurrentYearPlus9 = row[28].value
 
         budget_list = [
-            0,
             budgetProposalCurrentYearPlus0 or 0,
             budgetProposalCurrentYearPlus1 or 0,
             budgetProposalCurrentYearPlus2 or 0,
