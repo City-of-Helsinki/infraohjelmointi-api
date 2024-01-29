@@ -192,7 +192,7 @@ class ProjectWiseDataMapper:
         result = {}
         for field in data.keys():
             if not field in to_pw_map:
-                """ raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported") """
+                logger.debug(f"Field '{field}' not supported")
                 continue
             value = data[field]
             mapped_field = to_pw_map[field]
