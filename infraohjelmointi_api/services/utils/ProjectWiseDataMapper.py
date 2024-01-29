@@ -1,3 +1,4 @@
+from infraohjelmointi_api.services import ProjectDistrictService
 from ...models import Project
 from ..ProjectAreaService import ProjectAreaService
 from ..ProjectPhaseService import ProjectPhaseService
@@ -101,7 +102,7 @@ to_pw_map = {
         "field": "PROJECT_Rakentamisvaiheen_tarkenne",
         "type": "listvalue",
     },
-    "projectLocation": {
+    "projectDistrict": {
         "type": "enum",
         "values": [
             "PROJECT_Suurpiirin_nimi",
@@ -191,7 +192,8 @@ class ProjectWiseDataMapper:
         result = {}
         for field in data.keys():
             if not field in to_pw_map:
-                raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
+                """ raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported") """
+                continue
             value = data[field]
             mapped_field = to_pw_map[field]
             mapped_field_type = type(mapped_field).__name__
@@ -262,9 +264,9 @@ class ProjectWiseDataMapper:
                         result[mapped_field["values"][1]] = classes[1]
                     if len(classes) > 2:
                         result[mapped_field["values"][2]] = classes[2]
-                elif field == "projectLocation":
+                elif field == "projectDistrict":
                     locations = (
-                        ProjectLocationService.get_by_id(value).path.split("/")
+                        ProjectDistrictService.get_by_id(value).path.split("/")
                         if not value is None
                         else ["", "", ""]
                     )
