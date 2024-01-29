@@ -119,34 +119,35 @@ class ProjectWiseService:
                 data=data, project=project
             )
 
-            pw_instance_id = self.get_project_from_pw(project.hkrId)[
-                "relationshipInstances"
-            ][0]["relatedInstance"]["instanceId"]
+            if pw_project_data:
+                pw_instance_id = self.get_project_from_pw(project.hkrId)[
+                    "relationshipInstances"
+                ][0]["relatedInstance"]["instanceId"]
 
-            (
-                schema_name,
-                class_name,
-                *others,
-            ) = self.pw_api_project_update_endpoint.split("/")
+                (
+                    schema_name,
+                    class_name,
+                    *others,
+                ) = self.pw_api_project_update_endpoint.split("/")
 
-            pw_update_data = {
-                "instance": {
-                    "schemaName": schema_name,
-                    "className": class_name,
-                    "instanceId": pw_instance_id,
-                    "changeState": "modified",
-                    "properties": pw_project_data,
+                pw_update_data = {
+                    "instance": {
+                        "schemaName": schema_name,
+                        "className": class_name,
+                        "instanceId": pw_instance_id,
+                        "changeState": "modified",
+                        "properties": pw_project_data,
+                    }
                 }
-            }
 
-            api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
+                api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
 
-            logger.debug(f"PW update endpoint {api_url}")
-            logger.debug(f"Update request data: {pw_update_data}")
+                logger.debug(f"PW update endpoint {api_url}")
+                logger.debug(f"Update request data: {pw_update_data}")
 
-            response = self.session.post(url=api_url, json=pw_update_data)
-            logger.debug("PW responded to Update request")
-            logger.debug(response.json())
+                response = self.session.post(url=api_url, json=pw_update_data)
+                logger.debug("PW responded to Update request")
+                logger.debug(response.json())
         except (
             ProjectWiseDataFieldNotFound,
             PWProjectResponseError,
