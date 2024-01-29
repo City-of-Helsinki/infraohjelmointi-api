@@ -5,7 +5,7 @@ Backend repository for infraohjelmointi API service in City of Helsinki.
 Instructions in this README.md assume that you know  what __docker__ and __docker-compose__ are, and you already have both installed locally. Also you understand what __docker-compose up -d__ means.
 This helps to keep the README.md concise.
 
-## Setting up local development environment with Docker
+## Setting Up Local Development Environment With Docker
 
 In order to create placeholder for your own environment variables file, make a local `.env.template` copy:
 
@@ -25,7 +25,20 @@ Then you can run docker image with:
 
 - Done!
 
-## Managing project packages
+### What Next?
+
+This list is a 'TL;DR'. Steps are described more detailed on this README file.
+
+- [Excel Files](#excel-files)
+  - Import Location/Class hierarchy structure
+  - Import Planning (TS) and Budget (TAE) files in bulk together
+- [Fix known issues from database](#fix-database-issues)
+
+- [Optional imports](#other-optional-file-imports)
+  - Import project location options
+  - Import new person information into responsible persons list
+
+## Managing Project Packages
 
 - We use `pip` to manage python packages we need
 - After adding a new package to requirements.txt file, compile it and re-build the Docker image so that the container would have access to the new package
@@ -34,7 +47,7 @@ Then you can run docker image with:
   docker-compose up --build
   ```
 
-## Running tests
+## Running Tests
 
 Tests are written for django management commands and the endpoints. They can be found in the following location:
 
@@ -52,7 +65,7 @@ An optional verbosity parameter can be added to get a more descriptive view of t
   $ python manage.py test -v 1/2/3
   ```
 
-## How to: production release
+## How To: Production Release
 
 1. Create a release PR from develop to main
 2. Wait for the PR pipeline to run and check that all checks pass
@@ -119,11 +132,39 @@ Import Budget (TAE) project data:
 
 Import Planning (TS) and Budget (TAE) files in bulk together:
 
-```bash
+  ```bash
   $ ./import-excels.sh -d path/to/directory/containing/all/Excels
   ```
 
+# Fix Database Issues
 
+Imported files might included typos or incorrectly written information.
 
+Fix known issues from database:
 
+  ```bash
+  $ psql $DATABASE_URL
+  infraohjelmointi_api_db=# \i fix-database.sql
+  ```
 
+Update projects' missing `projectDistrict_id` data with `infraohjelmointi_api_projectdistrict.id`.
+
+  ```bash
+  $ psql $DATABASE_URL
+  infraohjelmointi_api_db=# \i update-districts.sql
+  ```
+
+### Other Optional File Imports
+
+Import project location options:
+
+  ```bash
+  $ python manage.py locationimporter --file path/to/locationData.xlsx
+  ```
+
+Import new person information into responsible persons list:
+
+  ```bash
+  $ python manage.py responsiblepersons --file path/to/responsiblePersons.xlsx
+  ```
+  
