@@ -35,11 +35,11 @@ class ProjectDistrictService:
             return ProjectDistrict.objects.get(parent=parent)
         except (Exception):
             return None
-        
+
     @staticmethod
     def get_by_id(id: ProjectDistrict):
         """Gets project's district by its id"""
         try:
             return ProjectDistrict.objects.get(id=id)
-        except (Exception):
+        except ():
             return None
