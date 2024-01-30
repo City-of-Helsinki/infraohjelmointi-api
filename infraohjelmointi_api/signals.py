@@ -3,7 +3,7 @@ import logging
 from django.db.models.signals import post_save, m2m_changed
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial
+from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, MaintenanceMode
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -288,3 +288,10 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
             },
         )
         logger.debug("Signal Triggered: Project was updated")
+
+
+@receiver(post_save, sender=MaintenanceMode)
+def get_notified_maintenance_mode(created, instance, **kwargs):
+    if not created:
+        send_event('maintenance_mode', 'update', {'value': instance.value})
+        logger.debug("Signal triggered: Maintenance mode was updated")
