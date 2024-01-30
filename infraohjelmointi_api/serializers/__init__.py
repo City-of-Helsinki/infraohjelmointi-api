@@ -40,3 +40,4 @@ from .ClassFinancialSerializer import ClassFinancialSerializer
 from .LocationFinancialSerializer import LocationFinancialSerializer
 from .WhoAmISerializer import WhoAmISerializer
 from .SapCostSerializer import SapCostSerializer
+from .MaintenanceModeSerializer import MaintenanceModeSerializer
