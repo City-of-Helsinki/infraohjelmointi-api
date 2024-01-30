@@ -357,13 +357,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 ),
                 "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
             }
-            # caching calculations for 24 hours
-            # will get updated according to relations which change
-            cache.set(
-                str(instance.id) + "/{}/{}".format(forcedToFrame, year),
-                summedFinances,
-                60 * 60 * 24,
-            )
 
             # delete this instance from relationEffected if it exists there since it has been updated now
             if (
