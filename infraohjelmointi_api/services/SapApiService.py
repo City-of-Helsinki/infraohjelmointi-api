@@ -188,7 +188,7 @@ class SapApiService:
         """Helper method fo store SAP cost values into DB"""
 
         # store SAP costs for each project and calculate the total costs for project group
-        project_group_id = group_id if group_id is not "nogroup" else None
+        project_group_id = group_id if group_id != "nogroup" else None
         project_group_costs = {"costs": 0, "commitments": 0}
         costs_by_projects = len(costs_by_sap_id.keys()) > 1
         for sap_id in costs_by_sap_id:
