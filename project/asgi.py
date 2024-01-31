@@ -16,7 +16,7 @@ urlRouter = URLRouter(
             AuthMiddlewareStack(
                 URLRouter([path("", consumers.CostomEventConsumer.as_asgi())])
             ),
-            {"channels": ["finance", "project"]},
+            {"channels": ["finance", "project", "maintenance"]},
         ),
         re_path(r"", get_asgi_application()),
     ]
