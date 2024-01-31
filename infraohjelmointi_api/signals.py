@@ -259,6 +259,17 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
         get_financial_sums(instance=instance, _type=_type, finance_year=year),
     )
 
+@receiver(post_save, sender=MaintenanceMode)
+def get_notified_maintenance_mode(created, instance, **kwargs):
+    if not created:
+        send_event(
+            "maintenance",
+            "maintenance-update",
+            {
+                'value': "False"
+            }
+        )
+        logger.debug("Signal triggered: Maintenance mode was updated")
 
 @receiver(post_save, sender=Project)
 # Using this decorator below to make sure the function is only fired when the transaction has commited.
@@ -289,9 +300,3 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         )
         logger.debug("Signal Triggered: Project was updated")
 
-
-@receiver(post_save, sender=MaintenanceMode)
-def get_notified_maintenance_mode(created, instance, **kwargs):
-    if not created:
-        send_event('maintenance_mode', 'update', {'value': instance.value})
-        logger.debug("Signal triggered: Maintenance mode was updated")
