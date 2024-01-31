@@ -26,11 +26,11 @@ class ProjectClassValidator(BaseValidator):
         if projectClass is None:
             return
 
-        projectLocation = allFields.get("projectLocation", None)
+        projectLocation = allFields.get("projectDistrict", None)
         if (
             projectLocation is None
             and project is not None
-            and "projectLocation" not in allFields
+            and "projectDistrict" not in allFields
         ):
             projectLocation = project.projectLocation
 
