@@ -100,20 +100,13 @@ class ProjectFinancialService:
         }
 
     @staticmethod
-    def get_financial_field_to_year_mapping(start_year: int):
-        return {
-            "budgetProposalCurrentYearPlus0": start_year,
-            "budgetProposalCurrentYearPlus1": start_year + 1,
-            "budgetProposalCurrentYearPlus2": start_year + 2,
-            "preliminaryCurrentYearPlus3": start_year + 3,
-            "preliminaryCurrentYearPlus4": start_year + 4,
-            "preliminaryCurrentYearPlus5": start_year + 5,
-            "preliminaryCurrentYearPlus6": start_year + 6,
-            "preliminaryCurrentYearPlus7": start_year + 7,
-            "preliminaryCurrentYearPlus8": start_year + 8,
-            "preliminaryCurrentYearPlus9": start_year + 9,
-            "preliminaryCurrentYearPlus10": start_year + 10,
-        }
+    def convert_financial_field_to_year(field_name: str, start_year: int):
+        number = None
+        if field_name.startswith("budgetProposalCurrentYearPlus"):
+            number = int(field_name.replace("budgetProposalCurrentYearPlus", ""))
+        elif field_name.startswith("preliminaryCurrentYearPlus"):
+            number = int(field_name.replace("preliminaryCurrentYearPlus", ""))
+        return start_year + number
 
     @staticmethod
     def instance_exists(project_id: str, year: int, forFrameView: bool = False) -> bool:
