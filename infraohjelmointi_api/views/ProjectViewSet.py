@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -31,13 +32,15 @@ from overrides import override
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException, ParseError, ValidationError
+from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
 from django.db.models import Count, Case, When, Q
 from django.db.models.signals import post_save
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -122,11 +125,6 @@ class ProjectViewSet(BaseViewSet):
         )
 
         if finances is not None:
-            fieldToYearMapping = (
-                ProjectFinancialService.get_financial_field_to_year_mapping(
-                    start_year=year
-                )
-            )
             financeInstances = []
             for field in finances.keys():
                 if hasattr(project, "lock"):
@@ -138,10 +136,17 @@ class ProjectViewSet(BaseViewSet):
                         },
                         code="project_locked",
                     )
+                if not finances[field]:
+                    logger.info("No budget set for key: {}", field)
+                    continue
+
+                logger.info(finances[field])
+
+                financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
                 financeInstance = ProjectFinancial(
                     project=project,
                     value=finances[field],
-                    year=fieldToYearMapping[field],
+                    year=financeYear,
                     forFrameView=forcedToFrame,
                 )
 
@@ -150,13 +155,13 @@ class ProjectViewSet(BaseViewSet):
                     forcedToFrame == False
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
-                        year=fieldToYearMapping[field],
+                        year=financeYear,
                         forFrameView=True,
                     )
                 ):
                     frameViewFinanceObject = ProjectFinancial(
                         project=project,
-                        year=fieldToYearMapping[field],
+                        year=financeYear,
                         value=finances[field],
                         forFrameView=True,
                     )
@@ -989,20 +994,16 @@ class ProjectViewSet(BaseViewSet):
 
                         if year is None:
                             year = date.today().year
-                        fieldToYearMapping = (
-                            ProjectFinancialService.get_financial_field_to_year_mapping(
-                                start_year=year
-                            )
-                        )
                         for field in finances.keys():
                             # skip the year field in finances
                             if field == "year":
                                 continue
+                            financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
                             (
                                 projectFinancialObject,
                                 created,
                             ) = ProjectFinancialService.get_or_create(
-                                year=fieldToYearMapping[field],
+                                year=financeYear,
                                 project_id=Project(id=financeData["project"]).id,
                                 forFrameView=forcedToFrame,
                             )
