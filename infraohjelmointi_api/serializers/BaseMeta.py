@@ -1,2 +1,3 @@
 class BaseMeta:
-    exclude = ["createdDate", "updatedDate"]
+    #exclude = ["createdDate", "updatedDate"]
+    exclude = ["createdDate"]
