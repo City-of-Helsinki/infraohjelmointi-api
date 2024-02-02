@@ -140,8 +140,6 @@ class ProjectViewSet(BaseViewSet):
                     logger.info("No budget set for key: {}", field)
                     continue
 
-                logger.info(finances[field])
-
                 financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
                 financeInstance = ProjectFinancial(
                     project=project,

@@ -98,7 +98,7 @@ class ProjectFinancialService:
             start_year + 9: "preliminaryCurrentYearPlus9",
             start_year + 10: "preliminaryCurrentYearPlus10",
         }
-    
+
     @staticmethod
     def convert_financial_field_to_year(field_name: str, start_year: int):
         number = None
