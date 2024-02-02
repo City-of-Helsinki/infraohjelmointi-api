@@ -120,15 +120,15 @@ class ProjectViewSet(BaseViewSet):
             if finances is not None
             else date.today().year
         )
-        forcedToFrame = (
+        forced_to_frame = (
             finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
         if finances is not None:
-            financeInstances = self.get_finance_instances(finances, project, forcedToFrame, year)
-            if len(financeInstances) > 0:
+            finance_instances = self.get_finance_instances(finances, project, forced_to_frame, year)
+            if len(finance_instances) > 0:
                 updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
-                    project_financials=financeInstances
+                    project_financials=finance_instances
                 )[0]
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updatedFinanceInstance.finance_year = year
@@ -136,7 +136,7 @@ class ProjectViewSet(BaseViewSet):
                     ProjectFinancial, instance=updatedFinanceInstance, created=False
                 )
         # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
-        project.forcedToFrame = forcedToFrame
+        project.forcedToFrame = forced_to_frame
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
         projectSerializer = self.get_serializer(
@@ -144,7 +144,7 @@ class ProjectViewSet(BaseViewSet):
             data=request.data,
             many=False,
             partial=True,
-            context={"finance_year": year, "forcedToFrame": forcedToFrame},
+            context={"finance_year": year, "forcedToFrame": forced_to_frame},
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
@@ -154,7 +154,7 @@ class ProjectViewSet(BaseViewSet):
         return Response(projectSerializer.data)
     
     def get_finance_instances(self, finances, project, forcedToFrame, year):
-        financeInstances = []
+        finance_instances = []
         for field in finances.keys():
                 if hasattr(project, "lock"):
                     raise ValidationError(
@@ -169,31 +169,31 @@ class ProjectViewSet(BaseViewSet):
                     logger.info("No budget set for key: {}".format(field))
                     continue
 
-                financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
-                financeInstance = ProjectFinancial(
+                finance_year = ProjectFinancialService.convert_financial_field_to_year(field, year)
+                finance_instance = ProjectFinancial(
                     project=project,
                     value=finances[field],
-                    year=financeYear,
+                    year=finance_year,
                     forFrameView=forcedToFrame,
                 )
 
-                financeInstances.append(financeInstance)
+                finance_instances.append(finance_instance)
                 if (
                     forcedToFrame == False
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
-                        year=financeYear,
+                        year=finance_year,
                         forFrameView=True,
                     )
                 ):
                     frameViewFinanceObject = ProjectFinancial(
                         project=project,
-                        year=financeYear,
+                        year=finance_year,
                         value=finances[field],
                         forFrameView=True,
                     )
-                    financeInstances.append(frameViewFinanceObject)
-        return financeInstances
+                    finance_instances.append(frameViewFinanceObject)
+        return finance_instances
 
     @override
     def retrieve(self, request, *args, **kwargs):
