@@ -189,10 +189,6 @@ class ProjectViewSet(BaseViewSet):
         self.projectWiseService.sync_project_to_pw(
             data=request.data, project=updated_project
         )
-        logger.info("testitestitesti")
-        #logger.info(projectSerializer.data)
-        #logger.info(projectSerializer.data)
-
         return Response(projectSerializer.data)
 
     @override
