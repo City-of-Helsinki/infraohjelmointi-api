@@ -152,8 +152,8 @@ class ProjectViewSet(BaseViewSet):
             data=request.data, project=updated_project
         )
         return Response(projectSerializer.data)
-    
-    def get_finance_instances(self, finances, project, forcedToFrame, year):
+
+    def get_finance_instances(self, finances, project, forced_to_frame, year):
         finance_instances = []
         for field in finances.keys():
                 if hasattr(project, "lock"):
@@ -174,12 +174,12 @@ class ProjectViewSet(BaseViewSet):
                     project=project,
                     value=finances[field],
                     year=finance_year,
-                    forFrameView=forcedToFrame,
+                    forFrameView=forced_to_frame,
                 )
 
                 finance_instances.append(finance_instance)
                 if (
-                    forcedToFrame == False
+                    forced_to_frame == False
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
                         year=finance_year,
