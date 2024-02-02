@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -31,13 +32,15 @@ from overrides import override
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException, ParseError, ValidationError
+from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
 from django.db.models import Count, Case, When, Q
 from django.db.models.signals import post_save
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -117,18 +120,42 @@ class ProjectViewSet(BaseViewSet):
             if finances is not None
             else date.today().year
         )
-        forcedToFrame = (
+        forced_to_frame = (
             finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
         if finances is not None:
-            fieldToYearMapping = (
-                ProjectFinancialService.get_financial_field_to_year_mapping(
-                    start_year=year
+            finance_instances = self.get_finance_instances(finances, project, forced_to_frame, year)
+            if len(finance_instances) > 0:
+                updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
+                    project_financials=finance_instances
+                )[0]
+                # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
+                updatedFinanceInstance.finance_year = year
+                post_save.send(
+                    ProjectFinancial, instance=updatedFinanceInstance, created=False
                 )
-            )
-            financeInstances = []
-            for field in finances.keys():
+        # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
+        project.forcedToFrame = forced_to_frame
+        # adding finance_year here so that on save the instance that gets to the post_save signal has this value
+        project.finance_year = year
+        projectSerializer = self.get_serializer(
+            project,
+            data=request.data,
+            many=False,
+            partial=True,
+            context={"finance_year": year, "forcedToFrame": forced_to_frame},
+        )
+        projectSerializer.is_valid(raise_exception=True)
+        updated_project = projectSerializer.save()
+        self.projectWiseService.sync_project_to_pw(
+            data=request.data, project=updated_project
+        )
+        return Response(projectSerializer.data)
+
+    def get_finance_instances(self, finances, project, forced_to_frame, year):
+        finance_instances = []
+        for field in finances.keys():
                 if hasattr(project, "lock"):
                     raise ValidationError(
                         detail={
@@ -138,56 +165,35 @@ class ProjectViewSet(BaseViewSet):
                         },
                         code="project_locked",
                     )
-                financeInstance = ProjectFinancial(
+                if not finances[field]:
+                    logger.info("No budget set for key: {}".format(field))
+                    continue
+
+                finance_year = ProjectFinancialService.convert_financial_field_to_year(field, year)
+                finance_instance = ProjectFinancial(
                     project=project,
                     value=finances[field],
-                    year=fieldToYearMapping[field],
-                    forFrameView=forcedToFrame,
+                    year=finance_year,
+                    forFrameView=forced_to_frame,
                 )
 
-                financeInstances.append(financeInstance)
+                finance_instances.append(finance_instance)
                 if (
-                    forcedToFrame == False
+                    forced_to_frame == False
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
-                        year=fieldToYearMapping[field],
+                        year=finance_year,
                         forFrameView=True,
                     )
                 ):
                     frameViewFinanceObject = ProjectFinancial(
                         project=project,
-                        year=fieldToYearMapping[field],
+                        year=finance_year,
                         value=finances[field],
                         forFrameView=True,
                     )
-                    financeInstances.append(frameViewFinanceObject)
-
-            if len(financeInstances) > 0:
-                updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
-                    project_financials=financeInstances
-                )[0]
-                # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
-                updatedFinanceInstance.finance_year = year
-                post_save.send(
-                    ProjectFinancial, instance=updatedFinanceInstance, created=False
-                )
-        # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
-        project.forcedToFrame = forcedToFrame
-        # adding finance_year here so that on save the instance that gets to the post_save signal has this value
-        project.finance_year = year
-        projectSerializer = self.get_serializer(
-            project,
-            data=request.data,
-            many=False,
-            partial=True,
-            context={"finance_year": year, "forcedToFrame": forcedToFrame},
-        )
-        projectSerializer.is_valid(raise_exception=True)
-        updated_project = projectSerializer.save()
-        self.projectWiseService.sync_project_to_pw(
-            data=request.data, project=updated_project
-        )
-        return Response(projectSerializer.data)
+                    finance_instances.append(frameViewFinanceObject)
+        return finance_instances
 
     @override
     def retrieve(self, request, *args, **kwargs):
@@ -989,20 +995,16 @@ class ProjectViewSet(BaseViewSet):
 
                         if year is None:
                             year = date.today().year
-                        fieldToYearMapping = (
-                            ProjectFinancialService.get_financial_field_to_year_mapping(
-                                start_year=year
-                            )
-                        )
                         for field in finances.keys():
                             # skip the year field in finances
                             if field == "year":
                                 continue
+                            finance_year = ProjectFinancialService.convert_financial_field_to_year(field, year)
                             (
                                 projectFinancialObject,
                                 created,
                             ) = ProjectFinancialService.get_or_create(
-                                year=fieldToYearMapping[field],
+                                year=finance_year,
                                 project_id=Project(id=financeData["project"]).id,
                                 forFrameView=forcedToFrame,
                             )
