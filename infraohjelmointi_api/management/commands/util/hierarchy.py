@@ -409,8 +409,9 @@ def proceedWithDistrict(
     district = name.split(" ")[0].strip()
     path = district
     # exceptional case for Östersundom which can be Östersundomin
-    if name.lower() == OSTERSUNDOM:
+    if district.lower() in [OSTERSUNDOM, "östersundomin"]:
         district = OSTERSUNDOMIN_SUURPIIRI
+        path = OSTERSUNDOM.capitalize()
     elif SUURPIIRI in name.lower():
         district = name.strip()
     else:
