@@ -137,7 +137,7 @@ class ProjectViewSet(BaseViewSet):
                         code="project_locked",
                     )
                 if not finances[field]:
-                    logger.info("No budget set for key: {}", field)
+                    logger.info("No budget set for key: {}".format(field))
                     continue
 
                 financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
