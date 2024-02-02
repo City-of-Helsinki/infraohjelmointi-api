@@ -999,12 +999,12 @@ class ProjectViewSet(BaseViewSet):
                             # skip the year field in finances
                             if field == "year":
                                 continue
-                            financeYear = ProjectFinancialService.convert_financial_field_to_year(field, year)
+                            finance_year = ProjectFinancialService.convert_financial_field_to_year(field, year)
                             (
                                 projectFinancialObject,
                                 created,
                             ) = ProjectFinancialService.get_or_create(
-                                year=financeYear,
+                                year=finance_year,
                                 project_id=Project(id=financeData["project"]).id,
                                 forFrameView=forcedToFrame,
                             )
