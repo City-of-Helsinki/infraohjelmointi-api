@@ -89,7 +89,6 @@ Import only Budget project data (files with "TAE"):
   ```
 </details>
 
-<br>
 
 ### Import project location options
 
@@ -149,8 +148,6 @@ An optional verbosity parameter can be added to get a more descriptive view of t
   $ python manage.py test -v 1/2/3
   ```
 
-<br>
-
 ## External data sources
 
 Infra tool project data and financial data can be imported from external sources.
@@ -174,11 +171,9 @@ The CRON job is added on both prod and dev environments.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#SAP-integraatio).
 
-<br>
-
 ### ProjectWise
 
-Sync all project data in the DB with ProjectWise. 
+Sync all project data in the DB with ProjectWise:
 
   ```bash
   $ python manage.py projectimporter --sync-projects-with-pw
@@ -191,6 +186,8 @@ Sync project by PW id in the DB with ProjectWise
   ```
 
 Projects are also synced to PW service when a PATCH request is made to the projecs endpoint.
+
+Scripts were used when dev and prod environments were setup for the first time.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
 
