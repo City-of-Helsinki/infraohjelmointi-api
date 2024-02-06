@@ -72,6 +72,10 @@ Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
   $ python manage.py hierarchies --file path/to/hierarchy.xlsx
   ```
 
+_In some contexts, hierarchy is known as "luokkajako"._
+
+<br>
+
 Import only Planning project data (files with "TS"):
 
   ```bash
@@ -153,6 +157,8 @@ An optional verbosity parameter can be added to get a more descriptive view of t
 4. Trigger build-infraohjelmointi-api-stageprod
 5. Approve pipeline run in azure. Deploy pipelines are triggered by the build pipeline but prod deploy needs to be approved separately (=2 approvals in total). To approve, open the pipeline run you want to approve (from menu, select pipelines, then select the correct pipeline and then select the run you need to approve) and there should be a button to approve it (pipeline run is paused until you approve).
 
+<br>
+
 ## External data sources
 
 Infra tool project data and financial data can be imported from external sources.
@@ -166,15 +172,21 @@ Populate DB with SAP costs and commitments using management command:
   ```bash
   $ python manage.py sapsynchronizer
   ```
-All projects in DB will also be synced with SAP to update SAP costs and commitments at midnight through the script:
+All projects in DB will also be synced with SAP to update SAP costs and commitments at midnight through the CRON job and script:
 
   ```bash
   $ ./sync-from-sap.sh
   ```
 
+The CRON job is added on both prod and dev environments.
+
+More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#SAP-integraatio).
+
+<br>
+
 ### ProjectWise
 
-Sync all project data in the DB with ProjectWise
+Sync all project data in the DB with ProjectWise. 
 
   ```bash
   $ python manage.py projectimporter --sync-projects-with-pw
@@ -187,3 +199,9 @@ Sync project by PW id in the DB with ProjectWise
   ```
 
 Projects are also synced to PW service when a PATCH request is made to the projecs endpoint.
+
+More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
+
+## Technical documentation
+
+Technical documentation can be found from [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/7895089196/Tekninen+dokumentaatio).
