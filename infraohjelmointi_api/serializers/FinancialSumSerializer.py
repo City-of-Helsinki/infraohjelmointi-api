@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from infraohjelmointi_api.models import (
     Project,
     ClassFinancial,
@@ -29,6 +30,8 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -201,6 +204,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 cache.get(str(instance.id) + "/{}/{}".format(forcedToFrame, year))
                 == None
             )
+            or (_type == "ProjectGroup")
         ):
             # this instance needs new financial sums to be calculated
             relatedProjects = self.get_related_projects(instance=instance, _type=_type)
@@ -357,6 +361,13 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 ),
                 "plannedBudget": int(summedFinances.pop("year10_plannedBudget")),
             }
+
+            if _type != "ProjectGroup":
+                cache.set(
+                    str(instance.id) + "/{}/{}".format(forcedToFrame, year),
+                    summedFinances,
+                    60 * 60 * 24,
+                )
 
             # delete this instance from relationEffected if it exists there since it has been updated now
             if (
