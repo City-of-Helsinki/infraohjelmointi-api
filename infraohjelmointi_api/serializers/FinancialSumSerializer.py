@@ -1,5 +1,4 @@
 from datetime import date
-import logging
 from infraohjelmointi_api.models import (
     Project,
     ClassFinancial,
@@ -30,8 +29,6 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
