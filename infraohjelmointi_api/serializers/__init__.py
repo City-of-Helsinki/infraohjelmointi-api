@@ -8,6 +8,7 @@ from .NoteGetSerializer import NoteGetSerializer
 from .NoteHistorySerializer import NoteHistorySerializer
 from .NotePersonSerializer import NotePersonSerializer
 from .NoteUpdateSerializer import NoteUpdateSerializer
+from .CoordinatorNoteSerializer import CoordinatorNoteSerializer
 from .PersonSerializer import PersonSerializer
 from .PlanningPhaseSerializer import PlanningPhaseSerializer
 from .ProjectAreaSerializer import ProjectAreaSerializer
