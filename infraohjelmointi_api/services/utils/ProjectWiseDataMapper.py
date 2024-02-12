@@ -276,20 +276,20 @@ class ProjectWiseDataMapper:
                     if len(locations) > 2:
                         result[mapped_field["values"][2]] = locations[2]
                 elif field == "personPlanning":
-                    planningPersonModel = PersonService.get_by_id(value)
+                    planningPersonModel = PersonService.get_by_id(value) if value else None
                     logger.debug("planningPerson", planningPersonModel)
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}".format(
                         planningPersonModel.lastName, planningPersonModel.firstName
-                    )
+                    ) if planningPersonModel else ""
                     # title
-                    result[mapped_field["values"][1]] = planningPersonModel.title
+                    result[mapped_field["values"][1]] = planningPersonModel.title if planningPersonModel else ""
                     # phone
-                    result[mapped_field["values"][2]] = planningPersonModel.phone
+                    result[mapped_field["values"][2]] = planningPersonModel.phone if planningPersonModel else ""
                     # email
-                    result[mapped_field["values"][3]] = planningPersonModel.email
+                    result[mapped_field["values"][3]] = planningPersonModel.email if planningPersonModel else ""
                 elif field == "personConstruction":
-                    constructionPersonModel = PersonService.get_by_id(value)
+                    constructionPersonModel = PersonService.get_by_id(value) if value else None
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}, {}, {}, {}".format(
                         constructionPersonModel.lastName,
@@ -297,7 +297,7 @@ class ProjectWiseDataMapper:
                         constructionPersonModel.title,
                         constructionPersonModel.phone,
                         constructionPersonModel.email,
-                    )
+                    ) if constructionPersonModel else ""
 
             # Date field handling
             elif mapped_field["type"] == "date":

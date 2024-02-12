@@ -45,6 +45,7 @@ router.register(
 )
 router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")
 router.register(r"notes", views.NoteViewSet, basename="notes")
+router.register(r"coordinator-notes", views.CoordinatorNoteViewSet, basename="coordinatorNotes")
 router.register(
     r"construction-phases",
     views.ConstructionPhaseViewSet,

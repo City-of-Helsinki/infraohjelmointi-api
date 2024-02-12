@@ -1,8 +1,11 @@
 static-files
 
 # Ignore Excel import files. Do not upload new excel files
-*.xlsx*
+*.xlsx
 *.zip
+
+# Ignore Zone Identifier files
+*:Zone.Identifier
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,django,macos,vscode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,macos,vscode
