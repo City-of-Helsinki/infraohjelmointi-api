@@ -5,7 +5,7 @@ Backend repository for infraohjelmointi API service in City of Helsinki.
 Instructions in this README.md assume that you know  what __docker__ and __docker-compose__ are, and you already have both installed locally. Also you understand what __docker-compose up -d__ means.
 This helps to keep the README.md concise.
 
-## Setting Up Local Development Environment With Docker
+## Setting up local development environment with Docker
 
 In order to create placeholder for your own environment variables file, make a local `.env.template` copy:
 
@@ -13,7 +13,7 @@ In order to create placeholder for your own environment variables file, make a l
 $ cp .env.template .env
 ```
 
-Then you can run docker image with:
+Then you can run docker image as detached mode with:
 
   ```bash
   docker-compose up -d
@@ -25,20 +25,103 @@ Then you can run docker image with:
 
 - Done!
 
-### What Next?
+## What next?
 
-This list is a 'TL;DR'. Steps are described more detailed on this README file.
+This list is a 'TL;DR'. Steps are described more detailed on this README file under [Populate database](#populate-database).
 
-- [Excel Files](#excel-files)
+- [Hierarchy and project data](#hierarchy-and-project-data)
   - Import Location/Class hierarchy structure
   - Import Planning (TS) and Budget (TAE) files in bulk together
-- [Fix known issues from database](#fix-database-issues)
+- [Populate database](#populate-database)
+  - [Import project location options](#import-project-location-options)
+  - [Update missing projectDistrict data](#update-missing-projectdistrict-data)
 
-- [Optional imports](#other-optional-file-imports)
-  - Import project location options
-  - Import new person information into responsible persons list
+## Populate database
 
-## Managing Project Packages
+### Hierarchy and project data
+
+Project data and finances can be imported using excel files into the infra tool.
+
+When importing, you need to run scripts in the container:
+  ```bash
+  $ docker exec -it infraohjelmointi-api sh
+  ```
+
+Importing Location/Class hierarchy structure and Planning (TS) and Budget (TAE) files:
+
+- Location/Class hierarchy structure
+  ```bash
+  $ ./import-excels.sh -c path/to/hierarchy.xlsx
+  ```
+
+- Planning and Budget files (e.g. in `Excels` folder):
+  ```bash
+  $ ./import-excels.sh -d path/to/Excels/
+  ```
+
+<br>
+
+*Other available file import scripts:*
+<details>
+<summary>Click to open</summary>
+<br>
+
+Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
+
+  ```bash
+  $ python manage.py hierarchies --file path/to/hierarchy.xlsx
+  ```
+
+_In some contexts, hierarchy is known as "luokkajako"._
+
+<br>
+
+Import only Planning project data (files with "TS"):
+
+  ```bash
+  $ python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
+  ```
+
+Import only Budget project data (files with "TAE"):
+
+  ```bash
+  $ python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
+  ```
+</details>
+
+
+### Import project location options
+
+Import project location options:
+
+  ```bash
+  $ python manage.py locationimporter --file path/to/locationdata.xlsx
+  ```
+
+### Update missing projectDistrict data
+
+Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`.
+
+  ```bash
+  $ psql $DATABASE_URL
+  infraohjelmointi_api_db=# \i update-districts.sql
+  ```
+
+## Other optional file imports
+
+### Import new persons
+
+Import new person information into responsible persons list. The list can be found from project form:
+
+  ```bash
+  $ python manage.py responsiblepersons --file path/to/filename.xlsx
+  ```
+  
+
+---
+
+
+## Managing project packages
 
 - We use `pip` to manage python packages we need
 - After adding a new package to requirements.txt file, compile it and re-build the Docker image so that the container would have access to the new package
@@ -47,7 +130,7 @@ This list is a 'TL;DR'. Steps are described more detailed on this README file.
   docker-compose up --build
   ```
 
-## Running Tests
+## Running tests
 
 Tests are written for django management commands and the endpoints. They can be found in the following location:
 
@@ -65,15 +148,7 @@ An optional verbosity parameter can be added to get a more descriptive view of t
   $ python manage.py test -v 1/2/3
   ```
 
-## How To: Production Release
-
-1. Create a release PR from develop to main
-2. Wait for the PR pipeline to run and check that all checks pass
-3. Merge the PR
-4. Trigger build-infraohjelmointi-api-stageprod
-5. Approve pipeline run in azure. Deploy pipelines are triggered by the build pipeline but prod deploy needs to be approved separately (=2 approvals in total). To approve, open the pipeline run you want to approve (from menu, select pipelines, then select the correct pipeline and then select the run you need to approve) and there should be a button to approve it (pipeline run is paused until you approve).
-
-## External Data Sources
+## External data sources
 
 Infra tool project data and financial data can be imported from external sources.
 
@@ -86,15 +161,19 @@ Populate DB with SAP costs and commitments using management command:
   ```bash
   $ python manage.py sapsynchronizer
   ```
-All projects in DB will also be synced with SAP to update SAP costs and commitments at midnight through the script:
+All projects in DB will also be synced with SAP to update SAP costs and commitments at midnight through the CRON job and script:
 
   ```bash
   $ ./sync-from-sap.sh
   ```
 
+The CRON job is added on both prod and dev environments.
+
+More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#SAP-integraatio).
+
 ### ProjectWise
 
-Sync all project data in the DB with ProjectWise
+Sync all project data in the DB with ProjectWise:
 
   ```bash
   $ python manage.py projectimporter --sync-projects-with-pw
@@ -108,63 +187,10 @@ Sync project by PW id in the DB with ProjectWise
 
 Projects are also synced to PW service when a PATCH request is made to the projecs endpoint.
 
-### Excel Files
+Scripts were used when dev and prod environments were setup for the first time.
 
-Project data and finances can be imported using excel files into the infra tool.
+More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
 
-Import Location/Class hierarchy structure:
+## Technical documentation
 
-  ```bash
-  $ python manage.py hierarchies --file path/to/hierarchy.xlsx
-  ```
-
-Import Planning (TS) project data:
-
-  ```bash
-  $ python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
-  ```
-
-Import Budget (TAE) project data:
-
-  ```bash
-  $ python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
-  ```
-
-Import Planning (TS) and Budget (TAE) files in bulk together:
-
-  ```bash
-  $ ./import-excels.sh -d path/to/directory/containing/all/Excels
-  ```
-
-# Fix Database Issues
-
-Imported files might included typos or incorrectly written information.
-
-Fix known issues from database:
-
-  ```bash
-  $ psql $DATABASE_URL
-  infraohjelmointi_api_db=# \i fix-database.sql
-  ```
-
-Update projects' missing `projectDistrict_id` data with `infraohjelmointi_api_projectdistrict.id`.
-
-  ```bash
-  $ psql $DATABASE_URL
-  infraohjelmointi_api_db=# \i update-districts.sql
-  ```
-
-### Other Optional File Imports
-
-Import project location options:
-
-  ```bash
-  $ python manage.py locationimporter --file path/to/locationData.xlsx
-  ```
-
-Import new person information into responsible persons list:
-
-  ```bash
-  $ python manage.py responsiblepersons --file path/to/responsiblePersons.xlsx
-  ```
-  
+Technical documentation can be found from [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/7895089196/Tekninen+dokumentaatio).

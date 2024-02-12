@@ -27,3 +27,4 @@ from .ClassFinancial import ClassFinancial
 from .LocationFinancial import LocationFinancial
 from .User import User
 from .SapCost import SapCost
+from .CoordinatorNote import CoordinatorNote
