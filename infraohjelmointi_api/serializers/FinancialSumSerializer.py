@@ -363,7 +363,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                 cache.set(
                     str(instance.id) + "/{}/{}".format(forcedToFrame, year),
                     summedFinances,
-                    60 * 60 * 24,
+                    60 * 60 * 2,
                 )
 
             # delete this instance from relationEffected if it exists there since it has been updated now
