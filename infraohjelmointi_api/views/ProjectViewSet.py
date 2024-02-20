@@ -165,7 +165,7 @@ class ProjectViewSet(BaseViewSet):
                         },
                         code="project_locked",
                     )
-                if not finances[field]:
+                if finances[field] == None:
                     logger.info("No budget set for key: {}".format(field))
                     continue
 

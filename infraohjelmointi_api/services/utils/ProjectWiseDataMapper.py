@@ -277,7 +277,6 @@ class ProjectWiseDataMapper:
                         result[mapped_field["values"][2]] = locations[2]
                 elif field == "personPlanning":
                     planningPersonModel = PersonService.get_by_id(value) if value else None
-                    logger.debug("planningPerson", planningPersonModel)
                     # fullname
                     result[mapped_field["values"][0]] = "{} {}".format(
                         planningPersonModel.lastName, planningPersonModel.firstName
