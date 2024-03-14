@@ -18,5 +18,5 @@ fi
 if [[ "$DEV_SERVER" = "True" ]]; then
     python /app/manage.py runserver 0.0.0.0:8000
 else
-    daphne -b 0.0.0.0 -p 8000 project.asgi:application -t 60
+    daphne -b 0.0.0.0 -p 8000 project.asgi:application
 fi
