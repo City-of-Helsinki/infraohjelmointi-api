@@ -208,6 +208,7 @@ def buildHierarchies(
                 # if subslcass is also a district
                 if SUURPIIRI in pv_name.lower() or OSTERSUNDOM in pv_name.lower():
                     related_to_district = proceedWithDistrict(
+                        code=None,
                         name=pv_name,
                         parent_class=pv_class_stack[-1],
                         cell_color=str(DISTRICT_COLOR)[2:].upper(),
@@ -282,6 +283,7 @@ def buildHierarchies(
 
             elif cv_cell_color_hex in [DISTRICT_COLOR]:
                 proceedWithDistrict(
+                    code=cv_code,
                     name=pv_name,
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
@@ -294,6 +296,7 @@ def buildHierarchies(
             related_to_district = None
             if pv_cell_color_hex in [DISTRICT_COLOR]:
                 related_to_district = proceedWithDistrict(
+                    code=None,
                     name=pv_name,
                     parent_class=pv_class_stack[-1],
                     cell_color=str(DISTRICT_COLOR)[2:].upper(),
@@ -312,6 +315,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
                 proceedWithDistrict(
+                    code=cv_code,
                     name=cv_name,
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
@@ -361,6 +365,9 @@ def proceedWithClass(
 ) -> ProjectClass:
     name = sanitizeString(data=name)
 
+    # We store raw name for the case if OTHER_CLASSIFICATION uses code in the name
+    raw_name = name
+
     if parent == None:
         # Main Classes need different formatting
         name = "{} {}".format(
@@ -376,13 +383,18 @@ def proceedWithClass(
             name,
         ).strip()
 
+    path = name
+    if cell_color == "FFE6B9B8":
+        # Don't add code (A, B, C, ...) for OTHER_CLASSIFICATION_COLOR's path
+        path = raw_name
+
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             name,
             color_map[cell_color],
             cell_color,
             row_number,
-            name if parent == None else "/".join([parent.path, name]),
+            path if parent == None else "/".join([parent.path, path]),
             related_to.id if related_to else None,
             for_coordinator_only,
         ),
@@ -391,7 +403,7 @@ def proceedWithClass(
     return ProjectClassService.get_or_create(
         name=name,
         parent=parent,
-        path=name if parent == None else "/".join([parent.path, name]),
+        path=path if parent == None else "/".join([parent.path, path]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
         relatedLocation=relatedLocation,
@@ -399,6 +411,7 @@ def proceedWithClass(
 
 
 def proceedWithDistrict(
+    code: str,
     name: str,
     parent_class: ProjectClass,
     cell_color: str,
@@ -416,13 +429,20 @@ def proceedWithDistrict(
         district = name.strip()
     else:
         district = sanitizeString(data=name.strip())
+
+    if code:
+        district = "{} {}".format(
+            code,
+            name,
+        ).strip()
+
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             district,
             color_map[cell_color],
             cell_color,
             row_number,
-            district,
+            path,
             related_to.id if related_to else None,
             for_coordinator_only,
         ),
