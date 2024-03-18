@@ -730,6 +730,12 @@ class ProjectViewSet(BaseViewSet):
                 .select_related(
                     "projectClass",
                     "projectLocation",
+                    "lock",
+                    "phase",
+                    "category",
+                    "personPlanning",
+                    "personProgramming",
+                    "personConstruction",
                     "projectClass__coordinatorClass",
                     "projectLocation__coordinatorLocation",
                     "projectClass__parent__coordinatorClass",
