@@ -17,7 +17,6 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         If no year is passed to the serializer using either the project id or finance_year as key
         the current year is used as the default.
         """
-        forcedToFrame = self.context.get("forcedToFrame", False)
         year = self.context.get(
             str(project.id), self.context.get("finance_year", date.today().year)
         )
