@@ -1,5 +1,4 @@
 from datetime import date
-import logging
 from os import path
 from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import (
@@ -8,10 +7,6 @@ from infraohjelmointi_api.serializers import (
     PersonSerializer,
     ProjectLockSerializer,
 )
-from infraohjelmointi_api.serializers.ProjectClassSerializer import (
-    ProjectClassSerializer,
-)
-from infraohjelmointi_api.services import ProjectFinancialService
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
     PWProjectResponseError,
@@ -51,15 +46,12 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
 from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
-from django.db.models import Sum
 from rest_framework import serializers
 import environ
 from overrides import override
 
 env = environ.Env()
 env.escape_proxy = True
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 if path.exists(".env"):
     env.read_env(".env")

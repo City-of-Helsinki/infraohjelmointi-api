@@ -37,7 +37,7 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, Prefetch, Sum, Subquery, OuterRef
+from django.db.models import Count, Case, When, Q, Prefetch
 from django.db.models.signals import post_save
 
 logger = logging.getLogger("infraohjelmointi_api")
