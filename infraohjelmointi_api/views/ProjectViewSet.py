@@ -37,7 +37,7 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q
+from django.db.models import Count, Case, When, Q, Prefetch, Sum, Subquery, OuterRef
 from django.db.models.signals import post_save
 
 logger = logging.getLogger("infraohjelmointi_api")
@@ -722,6 +722,7 @@ class ProjectViewSet(BaseViewSet):
         Provided url query params filter out the queryset before returning it.
         """
         qs = None
+        year = int(self.request.query_params.get("year", date.today().year))
         if for_coordinator == True:
             # add select_related to the queryset to get in the same db query projectClass and projectLocation
             qs = (
@@ -742,12 +743,49 @@ class ProjectViewSet(BaseViewSet):
                     "projectLocation__parent__coordinatorLocation",
                     "projectLocation__parent__parent__coordinatorLocation",
                 )
+                .prefetch_related(
+                    "favPersons",
+                    "hashTags",
+                    Prefetch(
+                        "finances",
+                        queryset=ProjectFinancial.objects.filter(
+                            year__in=range(year, year + 11),
+                            forFrameView=True
+                        ),
+                        to_attr="finances_filtered"
+                    ),
+                )
                 .filter(
                     Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
                 )
             )
         else:
-            qs = super().get_queryset()
+            qs = (
+                super()
+                .get_queryset()
+                .select_related(
+                    "projectClass",
+                    "projectLocation",
+                    "lock",
+                    "phase",
+                    "category",
+                    "personPlanning",
+                    "personProgramming",
+                    "personConstruction",
+                )
+                .prefetch_related(
+                    "favPersons",
+                    "hashTags",
+                    Prefetch(
+                        "finances",
+                        queryset=ProjectFinancial.objects.filter(
+                            year__in=range(year, year + 11),
+                            forFrameView=True
+                        ),
+                        to_attr="finances_filtered"
+                    )
+                )
+            )
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
