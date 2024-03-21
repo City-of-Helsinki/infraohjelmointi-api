@@ -7,6 +7,10 @@ from infraohjelmointi_api.serializers import (
     PersonSerializer,
     ProjectLockSerializer,
 )
+from infraohjelmointi_api.serializers.ProjectClassSerializer import (
+    ProjectClassSerializer,
+)
+from infraohjelmointi_api.services import ProjectFinancialService
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
     PWProjectResponseError,
@@ -46,6 +50,7 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
 from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
+from django.db.models import Sum
 from rest_framework import serializers
 import environ
 from overrides import override
@@ -97,17 +102,14 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         model = Project
 
     def get_spent_budget(self, project: Project):
-        # this data should come from SAP, but since we don't have the connection yet
-        # we'll just return zero for now
-        """ year = self.context.get("finance_year", date.today().year)
+        year = self.context.get("finance_year", date.today().year)
         if year is None:
             year = date.today().year
         spentBudget = ProjectFinancialService.find_by_project_id_and_max_year(
             project_id=project.id, max_year=year
         ).aggregate(spent_budget=Sum("value", default=0))["spent_budget"]
 
-        return int(spentBudget) """
-        return 0
+        return int(spentBudget)
 
     def get_pw_folder_link(self, project: Project):
         if not self.context.get("get_pw_link", False) or project.hkrId is None:
