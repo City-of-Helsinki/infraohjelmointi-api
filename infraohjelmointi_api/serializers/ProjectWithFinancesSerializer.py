@@ -7,7 +7,6 @@ from infraohjelmointi_api.serializers.ProjectFinancialSerializer import (
 from infraohjelmointi_api.services import ProjectFinancialService
 from rest_framework import serializers
 
-
 class ProjectWithFinancesSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField()
 
@@ -29,14 +28,11 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
                 start_year=year
             )
         )
-        if hasattr(project, 'finances_filtered'):
-            queryset = project.finances_filtered
-        else:
-            queryset = ProjectFinancialService.find_by_project_id_and_year_range(
-                project_id=project.id,
-                year_range=range(year, year + 11),
-                forFrameView=forcedToFrame,
-            )
+        queryset = ProjectFinancialService.find_by_project_id_and_year_range(
+            project_id=project.id,
+            year_range=range(year, year + 11),
+            forFrameView=forcedToFrame,
+        )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {
             "year": year,
