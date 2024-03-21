@@ -20,6 +20,7 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         year = self.context.get(
             str(project.id), self.context.get("finance_year", date.today().year)
         )
+        forcedToFrame = self.context.get("forcedToFrame", False)
         if year is None:
             year = date.today().year
         year = int(year)
@@ -28,7 +29,14 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
                 start_year=year
             )
         )
-        queryset = project.finances_filtered
+        if hasattr(project, 'finances_filtered'):
+            queryset = project.finances_filtered
+        else:
+            queryset = ProjectFinancialService.find_by_project_id_and_year_range(
+                project_id=project.id,
+                year_range=range(year, year + 11),
+                forFrameView=forcedToFrame,
+            )
         allFinances = ProjectFinancialSerializer(queryset, many=True).data
         serializedFinances = {
             "year": year,
