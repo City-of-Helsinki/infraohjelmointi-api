@@ -122,6 +122,12 @@ router.register(
     basename="sapCosts",
 )
 
+router.register(
+    r"api",
+    views.ApiViewSet,
+    basename="api",
+)
+
 urlpatterns = [
     path("", include(router.urls)),
     path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),
