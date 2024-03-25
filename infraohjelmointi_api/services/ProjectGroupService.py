@@ -13,3 +13,7 @@ class ProjectGroupService:
             locationRelation=locationRelation,
             classRelation=classRelation,
         )
+
+    @staticmethod
+    def get_all_groups() -> list[ProjectGroup]:
+        return ProjectGroup.objects.all()

@@ -33,6 +33,10 @@ class ProjectService:
             projectGroup=projectGroup,
             description=description,
         )
+    
+    @staticmethod
+    def get_all_projects() -> list[Project]:
+        return Project.objects.all()
 
     @staticmethod
     def list_with_non_null_hkr_id() -> list[Project]:
