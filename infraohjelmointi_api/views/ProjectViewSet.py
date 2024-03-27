@@ -90,8 +90,11 @@ class ProjectViewSet(BaseViewSet):
         """
         Overriding destroy action to get the deleted project id as a response
         """
+        body = json.loads(request.body)
         project = self.get_object()
         project_id = project.id
+        user_id = body.get("user")
+
         project.delete()
         return Response({"id": project_id})
 
@@ -113,6 +116,8 @@ class ProjectViewSet(BaseViewSet):
                 Patched Project Instance
         """
         # finances data appear with field names, convert to year to update
+        user_id = request.data['user']
+        project_id = request.data['projectId']
         finances = request.data.pop("finances", None)
         project = self.get_object()
         year = (

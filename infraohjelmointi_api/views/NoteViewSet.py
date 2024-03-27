@@ -1,3 +1,4 @@
+import json
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers import (
     NoteGetSerializer,
@@ -66,6 +67,9 @@ class NoteViewSet(BaseViewSet):
         """
         Overriding destroy action to soft delete note on DELETE request
         """
+        body = json.loads(request.body)
+        updatedBy = body.get("updatedBy")
+        project = body.get("project")
         note = self.get_object()
         data = note.id
         note.deleted = True
