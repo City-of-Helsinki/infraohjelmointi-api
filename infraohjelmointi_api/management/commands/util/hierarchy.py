@@ -208,6 +208,7 @@ def buildHierarchies(
                 # if subslcass is also a district
                 if SUURPIIRI in pv_name.lower() or OSTERSUNDOM in pv_name.lower():
                     related_to_district = proceedWithDistrict(
+                        code=None,
                         name=pv_name,
                         parent_class=pv_class_stack[-1],
                         cell_color=str(DISTRICT_COLOR)[2:].upper(),
@@ -282,6 +283,7 @@ def buildHierarchies(
 
             elif cv_cell_color_hex in [DISTRICT_COLOR]:
                 proceedWithDistrict(
+                    code=cv_code,
                     name=pv_name,
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
@@ -294,6 +296,7 @@ def buildHierarchies(
             related_to_district = None
             if pv_cell_color_hex in [DISTRICT_COLOR]:
                 related_to_district = proceedWithDistrict(
+                    code=None,
                     name=pv_name,
                     parent_class=pv_class_stack[-1],
                     cell_color=str(DISTRICT_COLOR)[2:].upper(),
@@ -312,6 +315,7 @@ def buildHierarchies(
                 cv_color_stack.append(cv_cell_color_hex)
                 cv_class_stack = cv_class_stack[0:end_index]  # remove siblings
                 proceedWithDistrict(
+                    code=cv_code,
                     name=cv_name,
                     parent_class=cv_class_stack[-1],
                     related_to=related_to_district,
@@ -338,9 +342,8 @@ def sanitizeString(data: str = None):
         data = (
             # remove first spaces between numbers and then remove all numbers from name
             re.sub(
-                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower())
+                "^[\d.-]+\s\d{1,2}", "", re.sub("(?<=\d) (?=\d)", "", str(data))
             )
-            .capitalize()
             .strip()
         )
         if "-" in data and "liikunta" not in data:
@@ -350,7 +353,7 @@ def sanitizeString(data: str = None):
 
 
 def proceedWithClass(
-    code: str,
+    code: str | None,
     name: str,
     cell_color: str,
     row_number: int,
@@ -361,12 +364,13 @@ def proceedWithClass(
 ) -> ProjectClass:
     name = sanitizeString(data=name)
 
+    # We store raw name for the case if OTHER_CLASSIFICATION uses code in the name
+    raw_name = name
+
     if parent == None:
         # Main Classes need different formatting
         name = "{} {}".format(
-            re.sub(
-                "(?<=\d) (?=\d)", "", str(code).lower()
-            ),  # remove spaces between numbers
+            str(code).lower(),
             name,
         ).strip()
     else:
@@ -376,13 +380,18 @@ def proceedWithClass(
             name,
         ).strip()
 
+    path = name
+    if cell_color == "FFE6B9B8":
+        # Don't add code (A, B, C, ...) for OTHER_CLASSIFICATION_COLOR's path
+        path = raw_name
+
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             name,
             color_map[cell_color],
             cell_color,
             row_number,
-            name if parent == None else "/".join([parent.path, name]),
+            path if parent == None else "/".join([parent.path, path]),
             related_to.id if related_to else None,
             for_coordinator_only,
         ),
@@ -391,7 +400,7 @@ def proceedWithClass(
     return ProjectClassService.get_or_create(
         name=name,
         parent=parent,
-        path=name if parent == None else "/".join([parent.path, name]),
+        path=path if parent == None else "/".join([parent.path, path]),
         forCoordinatorOnly=for_coordinator_only,
         relatedTo=related_to,
         relatedLocation=relatedLocation,
@@ -399,6 +408,7 @@ def proceedWithClass(
 
 
 def proceedWithDistrict(
+    code: str,
     name: str,
     parent_class: ProjectClass,
     cell_color: str,
@@ -416,13 +426,20 @@ def proceedWithDistrict(
         district = name.strip()
     else:
         district = sanitizeString(data=name.strip())
+
+    if code:
+        district = "{} {}".format(
+            code,
+            name,
+        ).strip()
+
     print_with_bg_color(
         "'{}' is a {} ({}) at line {}. Its class path is '{}'. It is related to '{}' and is for coordinator '{}'".format(
             district,
             color_map[cell_color],
             cell_color,
             row_number,
-            district,
+            path,
             related_to.id if related_to else None,
             for_coordinator_only,
         ),
@@ -458,9 +475,12 @@ def buildHierarchiesAndProjects(
     # if main class give
     if main_class:
         # remove spaces between numbers
-        main_class = re.sub("(?<=\d) (?=\d)", "", str(main_class).lower())
+        main_class = str(main_class).lower()
+        main_class_array = main_class.split(" ")[0,1]
 
-        class_code = main_class.split(" ")[0]
+        # code structure is "8 01" including space
+        class_code = "{} {}".format(main_class_array[0], main_class_array[1]).strip()
+
         # capitalize the alpha part
         main_class = re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
         if "-" in main_class and "liikunta" not in main_class:
@@ -494,12 +514,10 @@ def buildHierarchiesAndProjects(
         cell_color = getColor(wb, cell.fill.start_color)
         cell_color_hex = hex(int(cell_color, 16))
 
+        class_code_array = str(row[name_column_index - 1 if name_column_index > 0 else 0].value).split(" ")[0:2]
+
         class_code = (
-            re.sub(
-                "(?<=\d) (?=\d)",
-                "",
-                row[name_column_index - 1 if name_column_index > 0 else 0].value,
-            ).split(" ")[0]
+            "{} {}".format(class_code_array[0], class_code_array[1])
             if cell_color_hex == MAIN_CLASS_COLOR
             else str(row[name_column_index - 1].value).strip()
             if for_coordinator_only and row[name_column_index - 1].value
