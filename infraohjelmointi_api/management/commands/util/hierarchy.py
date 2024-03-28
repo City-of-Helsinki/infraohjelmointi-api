@@ -342,7 +342,7 @@ def sanitizeString(data: str = None):
         data = (
             # remove first spaces between numbers and then remove all numbers from name
             re.sub(
-                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data))
+                "^[\d.-]+\s\d{1,2}", "", re.sub("(?<=\d) (?=\d)", "", str(data))
             )
             .strip()
         )
@@ -353,7 +353,7 @@ def sanitizeString(data: str = None):
 
 
 def proceedWithClass(
-    code: str,
+    code: str | None,
     name: str,
     cell_color: str,
     row_number: int,
