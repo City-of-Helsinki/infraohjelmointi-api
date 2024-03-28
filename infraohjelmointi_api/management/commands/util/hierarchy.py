@@ -342,9 +342,8 @@ def sanitizeString(data: str = None):
         data = (
             # remove first spaces between numbers and then remove all numbers from name
             re.sub(
-                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data).lower())
+                "^[\d.-]+\s[0,100]", "", re.sub("(?<=\d) (?=\d)", "", str(data))
             )
-            .capitalize()
             .strip()
         )
         if "-" in data and "liikunta" not in data:
@@ -371,9 +370,7 @@ def proceedWithClass(
     if parent == None:
         # Main Classes need different formatting
         name = "{} {}".format(
-            re.sub(
-                "(?<=\d) (?=\d)", "", str(code).lower()
-            ),  # remove spaces between numbers
+            str(code).lower(),
             name,
         ).strip()
     else:
@@ -478,9 +475,12 @@ def buildHierarchiesAndProjects(
     # if main class give
     if main_class:
         # remove spaces between numbers
-        main_class = re.sub("(?<=\d) (?=\d)", "", str(main_class).lower())
+        main_class = str(main_class).lower()
+        main_class_array = main_class.split(" ")[0,1]
 
-        class_code = main_class.split(" ")[0]
+        # code structure is "8 01" including space
+        class_code = "{} {}".format(main_class_array[0], main_class_array[1]).strip()
+
         # capitalize the alpha part
         main_class = re.sub("^[\d.-]+\s*", "", main_class).strip().capitalize()
         if "-" in main_class and "liikunta" not in main_class:
@@ -514,12 +514,10 @@ def buildHierarchiesAndProjects(
         cell_color = getColor(wb, cell.fill.start_color)
         cell_color_hex = hex(int(cell_color, 16))
 
+        class_code_array = str(row[name_column_index - 1 if name_column_index > 0 else 0].value).split(" ")[0:2]
+
         class_code = (
-            re.sub(
-                "(?<=\d) (?=\d)",
-                "",
-                row[name_column_index - 1 if name_column_index > 0 else 0].value,
-            ).split(" ")[0]
+            "{} {}".format(class_code_array[0], class_code_array[1])
             if cell_color_hex == MAIN_CLASS_COLOR
             else str(row[name_column_index - 1].value).strip()
             if for_coordinator_only and row[name_column_index - 1].value
