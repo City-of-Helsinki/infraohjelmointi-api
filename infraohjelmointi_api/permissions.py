@@ -312,10 +312,8 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
 
         if projectClass == None and obj.projectClass != None:
             projectClass = obj.projectClass
-        else:
-            return False
 
-        return projectClass.path.startswith("808")
+        return projectClass.path.startswith("8 08")
 
     def group_belongs_to_808_main_class(self, obj: ProjectGroup, request):
         groupClassRelation = request.data.get("classRelation", None)
@@ -326,10 +324,8 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
 
         if groupClassRelation == None and obj.classRelation != None:
             groupClassRelation = obj.classRelation
-        else:
-            return False
 
-        return groupClassRelation.path.startswith("808")
+        return groupClassRelation.path.startswith("8 08")
 
 class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
     def user_in_project_area_planner_group(self, request):
