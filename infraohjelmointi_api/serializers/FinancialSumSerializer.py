@@ -1,5 +1,3 @@
-from itertools import chain
-import logging
 from datetime import date
 from infraohjelmointi_api.models import (
     Project,
@@ -17,8 +15,6 @@ from infraohjelmointi_api.services import (
 from django.db.models import IntegerField
 from rest_framework import serializers
 from django.db.models import (
-    When,
-    Case,
     IntegerField,
     Sum,
     F,
@@ -29,7 +25,6 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 
-logger = logging.getLogger("infraohjelmointi_api")
 
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
