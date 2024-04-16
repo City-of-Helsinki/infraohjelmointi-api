@@ -1,3 +1,4 @@
+from itertools import chain
 import logging
 from datetime import date
 from infraohjelmointi_api.models import (
@@ -16,6 +17,9 @@ from infraohjelmointi_api.services import (
 from django.db.models import IntegerField
 from rest_framework import serializers
 from django.db.models import (
+    When,
+    Case,
+    IntegerField,
     Sum,
     F,
     Value,
@@ -65,7 +69,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
-        if _type == "ProjectClass":
+        if _type == "ProjectClass" and financeInstance:
             # get all childs with frameBudget for each level
 
             childClasses = (
@@ -260,6 +264,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             ),
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
+
         if _type == "ProjectGroup":
             summedFinances["projectBudgets"] = relatedProjects.aggregate(
                 projectBudgets=Sum("costForecast", default=0)
