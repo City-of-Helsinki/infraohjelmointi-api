@@ -13,16 +13,28 @@ import logging
 
 logger = logging.getLogger("infraohjelmointi_api")
 
+from drf_yasg.utils import swagger_auto_schema
+
 class ApiViewSet(BaseViewSet):
     """
     API endpoint that allows API connections
     """
+
+    http_method_names = ['get'] 
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     serializer_class = ProjectGetSerializer
 
+
+    @swagger_auto_schema(
+            operation_description = """
+            `GET /api/projects/`
+            
+            Get all projects.
+            """,
+            )
     @method_decorator(cache_page(60 * 60 * 6))
     @action(
         methods=["get"],
@@ -43,6 +55,14 @@ class ApiViewSet(BaseViewSet):
 
         return Response(projectsSerialized)
     
+
+    @swagger_auto_schema(
+            operation_description = """
+            `GET /api/groups/`
+            
+            Get all project groups.
+            """,
+            )
     @action(
         methods=["get"],
         detail=False,
@@ -56,6 +76,14 @@ class ApiViewSet(BaseViewSet):
 
         return Response(serialized)
     
+
+    @swagger_auto_schema(
+            operation_description = """
+            `GET /api/classes/`
+            
+            Get all hierarchy classes. Includes both Coordinator and Programmer classes.
+            """,
+            )
     @action(
         methods=["get"],
         detail=False,
@@ -69,6 +97,14 @@ class ApiViewSet(BaseViewSet):
 
         return Response(serialized)
     
+
+    @swagger_auto_schema(
+            operation_description = """
+            `GET /api/locations/`
+            
+            Get all project locations.
+            """,
+            )
     @action(
         methods=["get"],
         detail=False,
