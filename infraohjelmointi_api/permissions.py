@@ -17,14 +17,6 @@ DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
 DJANGO_BASE_CREATE_ONLY_ACTIONS = ["create"]
 DJANGO_BASE_DELETE_ONLY_ACTIONS = ["destroy"]
 
-#### API ####
-API_GET_ACTIONS = [
-    "get_api_all_projects",
-    "get_api_all_groups",
-    "get_api_all_classes",
-    "get_api_all_locations",
-]
-
 #### Project Class Custom Actions ####
 PROJECT_CLASS_COORDINATOR_GET_ACTIONS = ["get_coordinator_classes"]
 PROJECT_CLASS_PLANNING_GET_ACTIONS = []
@@ -151,7 +143,6 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_FINANCES_PLANNING_GET_ACTIONS,
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
-                *API_GET_ACTIONS,
             ]
         ):
             return True
@@ -434,4 +425,3 @@ class IsAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__ 
         return True
-
