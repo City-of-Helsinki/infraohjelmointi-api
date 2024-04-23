@@ -3,8 +3,18 @@ from datetime import datetime
 from .BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
-from infraohjelmointi_api.services import ProjectClassService, ProjectGroupService, ProjectLocationService, ProjectService
+from infraohjelmointi_api.serializers import (
+    ProjectClassSerializer,
+    ProjectGetSerializer,
+    ProjectGroupSerializer,
+    ProjectLocationSerializer
+)
+from infraohjelmointi_api.services import (
+    ProjectClassService,
+    ProjectGroupService,
+    ProjectLocationService,
+    ProjectService
+)
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
@@ -20,7 +30,7 @@ class ApiViewSet(BaseViewSet):
     API endpoint that allows API connections
     """
 
-    http_method_names = ['get'] 
+    http_method_names = ['get']
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -31,7 +41,7 @@ class ApiViewSet(BaseViewSet):
     @swagger_auto_schema(
             operation_description = """
             `GET /api/projects/`
-            
+
             Get all projects.
             """,
             )
@@ -54,12 +64,12 @@ class ApiViewSet(BaseViewSet):
         logger.debug("### Request took " + str(time_diff))
 
         return Response(projectsSerialized)
-    
+
 
     @swagger_auto_schema(
             operation_description = """
             `GET /api/groups/`
-            
+
             Get all project groups.
             """,
             )
@@ -75,12 +85,12 @@ class ApiViewSet(BaseViewSet):
         serialized = ProjectGroupSerializer(groups, many=True).data
 
         return Response(serialized)
-    
+
 
     @swagger_auto_schema(
             operation_description = """
             `GET /api/classes/`
-            
+
             Get all hierarchy classes. Includes both Coordinator and Programmer classes.
             """,
             )
@@ -96,12 +106,12 @@ class ApiViewSet(BaseViewSet):
         serialized = ProjectClassSerializer(classes, many=True).data
 
         return Response(serialized)
-    
+
 
     @swagger_auto_schema(
             operation_description = """
             `GET /api/locations/`
-            
+
             Get all project locations.
             """,
             )

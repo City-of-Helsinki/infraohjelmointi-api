@@ -33,7 +33,7 @@ class ProjectService:
             projectGroup=projectGroup,
             description=description,
         )
-    
+
     @staticmethod
     def get_all_projects() -> list[Project]:
         return Project.objects.all()

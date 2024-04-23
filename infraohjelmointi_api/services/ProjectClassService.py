@@ -37,7 +37,7 @@ class ProjectClassService:
             .filter(forCoordinatorOnly=True)
             .order_by("createdDate")
         )
-    
+
     @staticmethod
     def list_all_classes() -> list[ProjectClass]:
         """List all both coordinator and programmer view classes"""
