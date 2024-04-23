@@ -206,6 +206,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "helusers.oidc.ApiTokenAuthentication",
         'rest_framework.authentication.SessionAuthentication',
+        'project.customtokenauth.CustomTokenAuth',
     ],
 }
 
