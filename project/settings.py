@@ -260,9 +260,5 @@ SWAGGER_SETTINGS = {
         }
     },
     'SUPPORTED_SUBMIT_METHODS': ['get'],
-}
-
-REDOC_SETTINGS = {
-    "HIDE_HOSTNAME": True,
-    "EXPAND_RESPONSES": "",
+    'USE_SESSION_AUTH': False,
 }

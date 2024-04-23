@@ -1,10 +1,10 @@
 from datetime import datetime
+
 from .BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
-from infraohjelmointi_api.services import PersonService, ProjectClassService, ProjectGroupService, ProjectLocationService, ProjectService
-from infraohjelmointi_api.serializers.PersonSerializer import PersonSerializer
+from infraohjelmointi_api.services import ProjectClassService, ProjectGroupService, ProjectLocationService, ProjectService
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
