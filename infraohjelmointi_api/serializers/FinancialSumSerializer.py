@@ -8,7 +8,6 @@ from infraohjelmointi_api.models import (
     LocationFinancial,
     ProjectLocation,
 )
-import pandas as pd
 from infraohjelmointi_api.services import (
     ProjectService,
     ClassFinancialService,
@@ -66,7 +65,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     location_id=instance.id, year=year
                 )
 
-        isFrameBudgetOverlap = False
+        is_frame_budget_overlap = False
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
         if _type == "ProjectClass":
             # get all childs with frameBudget for each level
@@ -144,7 +143,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
                 for budgets in grouped.values():
                     if budgets['frameBudget'] > budgets['parentFrameBudget']:
-                        isFrameBudgetOverlap = True
+                        is_frame_budget_overlap = True
                         break
                         
 
@@ -157,12 +156,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             else 0,
             "isFrameBudgetOverlap": False
             if _type == "ProjectLocation"
-            else isFrameBudgetOverlap
+            else is_frame_budget_overlap
             ,
         }
 
-    # try caching this whole result for a class
-    # can change based on frameview, and year
     def get_finance_sums(self, instance):
         """
         Calculates financial sums for 10 years given a group | location | class instance.
@@ -171,7 +168,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = int(self.context.get("finance_year", date.today().year))
         forcedToFrame = self.context.get("forcedToFrame", False)
 
-        # this instance needs new financial sums to be calculated
         relatedProjects = self.get_related_projects(instance=instance, _type=_type)
 
         summedFinances = relatedProjects.aggregate(

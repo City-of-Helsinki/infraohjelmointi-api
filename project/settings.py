@@ -153,8 +153,6 @@ OIDC_API_TOKEN_AUTH = {
     "AUDIENCE": env("HELSINKI_TUNNISTUS_AUDIENCE"),
 }
 
-from helusers.defaults import SOCIAL_AUTH_PIPELINE
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -235,15 +233,4 @@ LOGGING = {
         #     "propagate": False,
         # },
     },
-}
-
-
-# Caching framework defaults
-
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
-        "OPTIONS": {"MAX_ENTRIES": 6000},
-    }
 }
