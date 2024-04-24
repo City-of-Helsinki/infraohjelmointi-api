@@ -1,3 +1,5 @@
+from collections import defaultdict
+import logging
 from datetime import date
 from infraohjelmointi_api.models import (
     Project,
@@ -24,6 +26,8 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -62,9 +66,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     location_id=instance.id, year=year
                 )
 
-        childClassQueryResult = {"subChildrenOverlapCount": 0, "childSums": 0}
+        isFrameBudgetOverlap = False
         # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
-        if _type == "ProjectClass" and financeInstance:
+        if _type == "ProjectClass":
             # get all childs with frameBudget for each level
 
             childClasses = (
@@ -131,36 +135,18 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )
             # Combine all child relations of the current instance into one single queryset
             allChildRelations = childLocations.union(childClasses)
-            if allChildRelations.count() > 0:
-                dataFrame = pd.DataFrame.from_records(allChildRelations)
+            if allChildRelations.exists():
+                grouped = defaultdict(lambda: {'parentFrameBudget': 0, 'frameBudget': 0})
 
-                # Group by 'parentRelation' and calculate the sum of 'frameBudget' for each group
-                # This gives us frameBudget sums of each level under the current instance
-                grouped = (
-                    dataFrame.groupby("parentRelation")
-                    .agg({"parentFrameBudget": "first", "frameBudget": "sum"})
-                    .reset_index()
-                )
-                # Calculate for each level if child sums exceed frameBudget of that level
-                grouped["isOverlap"] = (
-                    grouped["frameBudget"] > grouped["parentFrameBudget"]
-                )
+                for relation in allChildRelations:
+                    grouped[relation['parentRelation']]['parentFrameBudget'] = relation['parentFrameBudget']
+                    grouped[relation['parentRelation']]['frameBudget'] += relation['frameBudget']
 
-                # Rename the 'frameBudget' column to 'frameBudgetSums'
-                grouped.rename(columns={"frameBudget": "frameBudgetSums"}, inplace=True)
-                # Total frameBudget sum of all levels under current instance
-                child_sums = grouped["frameBudgetSums"].sum()
-                # Check how many levels under current instance have frameBudget warnings
-                sub_children_overlap_count = grouped["isOverlap"].sum()
-
-                # Create a new DataFrame with the results
-                result_df = pd.DataFrame(
-                    {
-                        "childSums": [child_sums],
-                        "subChildrenOverlapCount": [sub_children_overlap_count],
-                    }
-                )
-                childClassQueryResult = result_df.to_dict(orient="records")[0]
+                for budgets in grouped.values():
+                    if budgets['frameBudget'] > budgets['parentFrameBudget']:
+                        isFrameBudgetOverlap = True
+                        break
+                        
 
         return {
             "frameBudget": financeInstance.frameBudget
@@ -169,11 +155,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "budgetChange": financeInstance.budgetChange
             if financeInstance != None
             else 0,
-            # check if overlapCount > 0, means there is some level under this class which has frameBudget exceeding its parent
-            # or the frameBudget sums for all child levels exceeds the frameBudget of this level
             "isFrameBudgetOverlap": False
             if _type == "ProjectLocation"
-            else childClassQueryResult["subChildrenOverlapCount"] > 0
+            else isFrameBudgetOverlap
             ,
         }
 
