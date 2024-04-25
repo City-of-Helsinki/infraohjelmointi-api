@@ -1,5 +1,4 @@
 from collections import defaultdict
-import logging
 from datetime import date
 from infraohjelmointi_api.models import (
     Project,
@@ -25,8 +24,6 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -135,14 +132,11 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             # Combine all child relations of the current instance into one single queryset
             allChildRelations = childLocations.union(childClasses)
             if allChildRelations.exists():
-                grouped = defaultdict(lambda: {'parentFrameBudget': 0, 'frameBudget': 0})
+                grouped = defaultdict(lambda: {'frameBudget': 0})
 
                 for relation in allChildRelations:
-                    grouped[relation['parentRelation']]['parentFrameBudget'] = relation['parentFrameBudget']
                     grouped[relation['parentRelation']]['frameBudget'] += relation['frameBudget']
-
-                for budgets in grouped.values():
-                    if budgets['frameBudget'] > budgets['parentFrameBudget']:
+                    if grouped[relation['parentRelation']]['frameBudget'] > relation['parentFrameBudget']:
                         is_frame_budget_overlap = True
                         break
                         
