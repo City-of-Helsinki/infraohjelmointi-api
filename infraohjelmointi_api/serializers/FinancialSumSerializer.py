@@ -139,7 +139,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     if grouped[relation['parentRelation']]['frameBudget'] > relation['parentFrameBudget']:
                         is_frame_budget_overlap = True
                         break
-                        
 
         return {
             "frameBudget": financeInstance.frameBudget
