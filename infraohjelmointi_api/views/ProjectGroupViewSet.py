@@ -40,7 +40,11 @@ class ProjectGroupViewSet(BaseViewSet):
                 List of ProjectGroup instances with financial sums for projects under each group
         """
         year = request.query_params.get("year", date.today().year)
-        qs = self.get_queryset()
+        qs = self.get_queryset().select_related(
+            "classRelation",
+            "locationRelation",
+            "location",
+        )
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
 
         return Response(serializer.data)
@@ -88,6 +92,7 @@ class ProjectGroupViewSet(BaseViewSet):
         qs = self.get_queryset().select_related(
             "classRelation",
             "locationRelation",
+            "location",
             "classRelation__coordinatorClass",
             "locationRelation__coordinatorLocation",
             "classRelation__parent__coordinatorClass",
