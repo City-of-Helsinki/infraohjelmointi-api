@@ -153,6 +153,8 @@ OIDC_API_TOKEN_AUTH = {
     "AUDIENCE": env("HELSINKI_TUNNISTUS_AUDIENCE"),
 }
 
+from helusers.defaults import SOCIAL_AUTH_PIPELINE
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
