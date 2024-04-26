@@ -1,8 +1,11 @@
-from datetime import datetime
-
 from .BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -15,19 +18,12 @@ from infraohjelmointi_api.services import (
     ProjectLocationService,
     ProjectService
 )
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-import logging
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 from drf_yasg.utils import swagger_auto_schema
 
 class ApiViewSet(BaseViewSet):
     """
-    API endpoint that allows API connections
+    API root. This endpoint is disabled.
     """
 
     http_method_names = ['get']
@@ -54,16 +50,10 @@ class ApiViewSet(BaseViewSet):
         name="get_api_all_projects",
     )
     def get_api_all_projects(self, request):
-        start = datetime.now()
         projects = ProjectService.get_all_projects()
-        projectsSerialized = ProjectGetSerializer(projects, many=True).data
+        projects_serialized = ProjectGetSerializer(projects, many=True).data
 
-        end = datetime.now()
-        time_diff = end - start
-
-        logger.debug("### Request took " + str(time_diff))
-
-        return Response(projectsSerialized)
+        return Response(projects_serialized)
 
 
     @swagger_auto_schema(
@@ -127,3 +117,10 @@ class ApiViewSet(BaseViewSet):
         serialized = ProjectLocationSerializer(locations, many=True).data
 
         return Response(serialized)
+
+
+    def get_queryset(self):
+        """
+        Override the default queryset to disable the base /api/ endpoint.
+        """
+        raise NotFound("This endpoint is disabled.")
