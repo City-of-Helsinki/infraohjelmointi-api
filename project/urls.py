@@ -24,8 +24,10 @@ from infraohjelmointi_api import views, admin_views
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 
+from .urls_api import api_router
+apirouter = api_router()
+
 router = routers.DefaultRouter()
-apirouter = routers.DefaultRouter()
 router.register(r"projects", views.ProjectViewSet, basename="projects")
 router.register(r"project-types", views.ProjectTypeViewSet, basename="projectTypes")
 router.register(r"projects-mock", views.MockProjectViewSet, basename="projectsMock")
@@ -125,12 +127,6 @@ router.register(
     r"sap-costs",
     views.SapCostViewSet,
     basename="sapCosts",
-)
-
-apirouter.register(
-    r"api",
-    views.ApiViewSet,
-    basename="api",
 )
 
 schema_view = get_schema_view(

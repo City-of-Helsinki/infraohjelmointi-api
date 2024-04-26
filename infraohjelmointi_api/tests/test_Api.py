@@ -60,8 +60,10 @@ class ApiTestCase(TestCase):
         response_groups = self.client.get("/api/groups/")
         response_classes = self.client.get("/api/classes/")
         response_locations = self.client.get("/api/locations/")
+        response_project = self.client.get("/api/project/5d82c31b-4dee-4e48-be7c-b417e6c5bb92/")
 
         self.assertEqual(response_projects.status_code, 200, msg="Projects status code != 200")
         self.assertEqual(response_groups.status_code, 200, msg="Groups status code != 200")
         self.assertEqual(response_classes.status_code, 200, msg="Classes status code != 200")
         self.assertEqual(response_locations.status_code, 200, msg="Locations status code != 200")
+        self.assertEqual(response_project.status_code, 200, msg="Project status code != 200")
