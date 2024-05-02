@@ -5,15 +5,27 @@ router = routers.DefaultRouter()
 
 def api_router():
     router.register(
-        r"api/projects",
-        views.ApiProjectsViewSet,
-        basename="apiProject"
+        r"api/classes",
+        views.ApiClassesViewSet,
+        basename="apiClasses"
     )
 
     router.register(
-        r"api",
-        views.ApiViewSet,
-        basename="api",
+        r"api/groups",
+        views.ApiGroupsViewSet,
+        basename="apiGroups"
+    )
+
+    router.register(
+        r"api/locations",
+        views.ApiLocationsViewSet,
+        basename="apiLocations"
+    )
+
+    router.register(
+        r"api/projects",
+        views.ApiProjectsViewSet,
+        basename="apiProject"
     )
 
     return router
