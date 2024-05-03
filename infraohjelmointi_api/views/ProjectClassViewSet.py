@@ -77,8 +77,12 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             )
         serializer = ProjectClassSerializer(
             ProjectClassService.list_all_for_coordinator()
-            .prefetch_related("coordinatorClass__finances")
-            .select_related("coordinatorClass"),
+            .select_related(
+                "parent",
+                "relatedTo",
+                "relatedLocation",
+                "coordinatorClass"
+            ),
             many=True,
             context={
                 "finance_year": year,
