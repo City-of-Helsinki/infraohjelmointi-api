@@ -253,7 +253,7 @@ class IsProjectManager(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        # has edit permissions for projects nad notes only
+        # has edit permissions for projects and notes only
         # and only specific project fields
         _type = obj._meta.model.__name__
 
@@ -274,7 +274,6 @@ class IsProjectManager(permissions.BasePermission):
                         "sapProject", # * Projektinumero Ei (No) # sapProject
                         "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
                         "programmed", # * Ohjelmoitu Ei (No) # programmed
-                        "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
                         "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
                         "category", # * Kategoria Ei (No) # category
                         "effectHousing", # * Vaikutus asuntotuotantoon Ei (No) # effectHousing
@@ -286,12 +285,9 @@ class IsProjectManager(permissions.BasePermission):
                         "spentCost", # * Käytetty Ei (No) # spentCost
                         "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
                         "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
-                        "personPlanning", # * Vastuuhenkilö Ei (No) # personPlanning
-                        "personConstruction", # * Rakennuttamisen vastuuhenkilö Ei (No) # personConstruction
                         "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
                         "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
                         "projectLocation", # value can be district/division/subDivision
-
                         # preliminaryBudgetDivision is not yet implemented in UI
                         #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No) # preliminaryBudgetDivision # ei löydy project.py
                 ]
