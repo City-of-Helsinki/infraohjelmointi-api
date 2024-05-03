@@ -7,7 +7,6 @@ from infraohjelmointi_api.serializers.ProjectFinancialSerializer import (
 from infraohjelmointi_api.services import ProjectFinancialService
 from rest_framework import serializers
 
-
 class ProjectWithFinancesSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField()
 
@@ -17,10 +16,10 @@ class ProjectWithFinancesSerializer(serializers.ModelSerializer):
         If no year is passed to the serializer using either the project id or finance_year as key
         the current year is used as the default.
         """
-        forcedToFrame = self.context.get("forcedToFrame", False)
         year = self.context.get(
             str(project.id), self.context.get("finance_year", date.today().year)
         )
+        forcedToFrame = self.context.get("forcedToFrame", False)
         if year is None:
             year = date.today().year
         year = int(year)
