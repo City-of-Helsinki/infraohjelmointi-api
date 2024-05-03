@@ -23,53 +23,53 @@ class ApiTestCase(TestCase):
 
     @classmethod
     @override
-    def setUpTestData(self):
-        self.user = User.objects.create(
+    def setUpTestData(cls):
+        cls.user = User.objects.create(
             username="AppName"
         )
-        self.token = Token.objects.create(user=self.user)
+        cls.token = Token.objects.create(user=cls.user)
 
-        self.projectMasterClass = ProjectClass.objects.create(
-            id=self.masterClassId,
+        cls.projectMasterClass = ProjectClass.objects.create(
+            id=cls.masterClassId,
             name="Test Master Class",
             path="Test Master Class",
         )
-        self.projectClass = self.projectMasterClass.childClass.create(
+        cls.projectClass = cls.projectMasterClass.childClass.create(
             name="Test Class",
-            id=self.classId,
+            id=cls.classId,
             path="Test Class",
         )
-        self.district = ProjectLocation.objects.create(
-            id=self.districtId,
+        cls.district = ProjectLocation.objects.create(
+            id=cls.districtId,
             name="Test district",
             parent=None,
             path="Test district",
         )
 
-        self.projectLocation = self.district.childLocation.create(
-            id=self.divisionId,
+        cls.projectLocation = cls.district.childLocation.create(
+            id=cls.divisionId,
             name="Test division",
         )
 
-        self.projectGroup = ProjectGroup.objects.create(
-            id=self.projectGroupId,
+        cls.projectGroup = ProjectGroup.objects.create(
+            id=cls.projectGroupId,
             name="Test Group",
-            locationRelation=self.projectLocation,
-            classRelation=self.projectClass,
+            locationRelation=cls.projectLocation,
+            classRelation=cls.projectClass,
         )
 
-        self.project = Project.objects.create(
-            id=self.projectId,
+        cls.project = Project.objects.create(
+            id=cls.projectId,
             name="Test project 1",
             description="description of the test project",
-            projectClass=self.projectClass,
-            projectLocation=self.projectLocation,
+            projectClass=cls.projectClass,
+            projectLocation=cls.projectLocation,
         )
 
         # Create financial data for the project
         year = int(datetime.date.today().year)
         for x in range(11):
-            ProjectFinancial.objects.create(project=self.project, year=str(year + x), value=str(x * 10))
+            ProjectFinancial.objects.create(project=cls.project, year=str(year + x), value=str(x * 10))
 
 
     def test_api_incorrect_token(self):
