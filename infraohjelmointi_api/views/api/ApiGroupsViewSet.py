@@ -41,7 +41,7 @@ class ApiGroupsViewSet(BaseViewSet):
             obj = queryset.get(pk=pk)
             serializer = self.get_serializer(obj)
             return Response(serializer.data)
-        except:
+        except (Exception):
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
