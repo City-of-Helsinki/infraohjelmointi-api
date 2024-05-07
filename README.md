@@ -5,6 +5,20 @@ Backend repository for infraohjelmointi API service in City of Helsinki.
 Instructions in this README.md assume that you know  what __docker__ and __docker-compose__ are, and you already have both installed locally. Also you understand what __docker-compose up -d__ means.
 This helps to keep the README.md concise.
 
+### Ways of working
+##### Commits
+
+To make our commits more informative those should be written in a format of Conventional Commits i.e. a suitable prefix should be added in the beginning
+of every commit e.g. **feat:** built a notification or **refactor**:... etc. The Conventional Commits could be properly configured to the project in the future.
+
+##### Hotfixes
+
+Hotfixes should be done by creating a hotfix branch out of main and then merge that to main and develop to avoid doing any rebases.
+
+##### Merges
+
+The common way of merging branches is using normal merges i.e. not using squash merging unless there is a situation when squashing should be done.
+
 ## Setting up local development environment with Docker
 
 In order to create placeholder for your own environment variables file, make a local `.env.template` copy:
