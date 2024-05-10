@@ -3,13 +3,16 @@ from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from infraohjelmointi_api.models import Project, ProjectClass
+from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import ProjectGetSerializer
 import uuid
 from rest_framework import status
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+
+import logging
+logger = logging.getLogger("infraohjelmointi_api")
 
 class_parameter = openapi.Parameter(
     'class',
@@ -50,7 +53,7 @@ class ApiProjectsViewSet(BaseViewSet):
             obj = queryset.get(pk=pk)
             serializer = self.get_serializer(obj)
             return Response(serializer.data)
-        except (Exception):
+        except Exception:
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
