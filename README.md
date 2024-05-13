@@ -205,6 +205,23 @@ Scripts were used when dev and prod environments were setup for the first time.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
 
+## Production release
+
+1. Create a release PR from develop to main
+2. Wait for the PR pipeline to run and check that all checks pass
+3. Merge the PR
+4. Trigger build-infraohjelmointi-api-stageprod
+5. Approve pipeline run in [Azure DevOps](https://dev.azure.com/City-of-Helsinki/infraohjelmointi/_build/). Deploy pipelines are triggered by the build pipeline but prod deploy needs to be approved separately (=2 approvals in total). To approve:
+    1. Open the pipeline run you want to approve (from left menu, select Pipelines)
+    2. Select the correct pipeline
+    3. Select the run you need to approve
+    4. Wait and click a button to approve it (pipeline run is paused until you approve).
+
+<hr>
+
+- Steps on Confluence with pictures: [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Tuotantoonvienti)
+- Link to Azure DevOps services: [Azure DevOps](https://dev.azure.com/City-of-Helsinki/infraohjelmointi/_build/)
+
 ## Technical documentation
 
 Technical documentation can be found from [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/7895089196/Tekninen+dokumentaatio).
