@@ -24,7 +24,7 @@ The common way of merging branches is using normal merges i.e. not using squash 
 In order to create placeholder for your own environment variables file, make a local `.env.template` copy:
 
 ```bash
-$ cp .env.template .env
+cp .env.template .env
 ```
 
 Then you can run docker image as detached mode with:
@@ -58,19 +58,19 @@ Project data and finances can be imported using excel files into the infra tool.
 
 When importing, you need to run scripts in the container:
   ```bash
-  $ docker exec -it infraohjelmointi-api sh
+  docker exec -it infraohjelmointi-api sh
   ```
 
 Importing Location/Class hierarchy structure and Planning (TS) and Budget (TAE) files:
 
 - Location/Class hierarchy structure
   ```bash
-  $ ./import-excels.sh -c path/to/hierarchy.xlsx
+  ./import-excels.sh -c path/to/hierarchy.xlsx
   ```
 
 - Planning and Budget files (e.g. in `Excels` folder):
   ```bash
-  $ ./import-excels.sh -d path/to/Excels/
+  ./import-excels.sh -d path/to/Excels/
   ```
 
 <br>
@@ -83,7 +83,7 @@ Importing Location/Class hierarchy structure and Planning (TS) and Budget (TAE) 
 Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
 
   ```bash
-  $ python manage.py hierarchies --file path/to/hierarchy.xlsx
+  python manage.py hierarchies --file path/to/hierarchy.xlsx
   ```
 
 _In some contexts, hierarchy is known as "luokkajako"._
@@ -93,13 +93,13 @@ _In some contexts, hierarchy is known as "luokkajako"._
 Import only Planning project data (files with "TS"):
 
   ```bash
-  $ python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
+  python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
   ```
 
 Import only Budget project data (files with "TAE"):
 
   ```bash
-  $ python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
+  python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
   ```
 </details>
 
@@ -109,7 +109,7 @@ Import only Budget project data (files with "TAE"):
 Import project location options:
 
   ```bash
-  $ python manage.py locationimporter --file path/to/locationdata.xlsx
+  python manage.py locationimporter --file path/to/locationdata.xlsx
   ```
 
 ### Update missing projectDistrict data
@@ -117,7 +117,7 @@ Import project location options:
 Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`.
 
   ```bash
-  $ psql $DATABASE_URL
+  psql $DATABASE_URL
   infraohjelmointi_api_db=# \i update-districts.sql
   ```
 
@@ -128,7 +128,7 @@ Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_p
 Import new person information into responsible persons list. The list can be found from project form:
 
   ```bash
-  $ python manage.py responsiblepersons --file path/to/filename.xlsx
+  python manage.py responsiblepersons --file path/to/filename.xlsx
   ```
   
 
@@ -154,12 +154,12 @@ Tests are written for django management commands and the endpoints. They can be 
 Run the tests
 
   ```bash
-  $ python manage.py test
+  python manage.py test
   ```
 An optional verbosity parameter can be added to get a more descriptive view of the tests
 
   ```bash
-  $ python manage.py test -v 1/2/3
+  python manage.py test -v 1/2/3
   ```
 
 ## External data sources
@@ -173,12 +173,12 @@ To synchronize project data with SAP in local environment, VPN service provided 
 Populate DB with SAP costs and commitments using management command:
 
   ```bash
-  $ python manage.py sapsynchronizer
+  python manage.py sapsynchronizer
   ```
 All projects in DB will also be synced with SAP to update SAP costs and commitments at midnight through the CRON job and script:
 
   ```bash
-  $ ./sync-from-sap.sh
+  ./sync-from-sap.sh
   ```
 
 The CRON job is added on both prod and dev environments.
@@ -190,13 +190,13 @@ More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/
 Sync all project data in the DB with ProjectWise:
 
   ```bash
-  $ python manage.py projectimporter --sync-projects-with-pw
+  python manage.py projectimporter --sync-projects-with-pw
   ```
 
 Sync project by PW id in the DB with ProjectWise
 
   ```bash
-  $ python manage.py projectimporter --sync-project-from-pw pw_id
+  python manage.py projectimporter --sync-project-from-pw pw_id
   ```
 
 Projects are also synced to PW service when a PATCH request is made to the projecs endpoint.
