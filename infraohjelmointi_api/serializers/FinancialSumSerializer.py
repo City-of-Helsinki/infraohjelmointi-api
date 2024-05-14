@@ -1,4 +1,3 @@
-import logging
 from collections import defaultdict
 from datetime import date
 from infraohjelmointi_api.models import (
@@ -25,8 +24,6 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Coalesce
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -236,10 +233,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
 
-        if instance.name == "Malmi":
-            logger.info("projektit")
-            logger.info(relatedProjects)
-
         if _type == "ProjectGroup":
             summedFinances["projectBudgets"] = relatedProjects.aggregate(
                 projectBudgets=Sum("costForecast", default=0)
@@ -380,9 +373,9 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     .filter(
                         (
                             Q(projectClass__name__icontains="suurpiiri")
-                            & (Q(projectClass=instance) 
-                            | Q(projectClass__parent=instance) 
-                            | Q(projectClass__parent__parent=instance))
+                            & Q(
+                                projectClass__parent__coordinatorClass__path__startswith=instance.path
+                            )
                         )
                         | Q(
                             projectClass__coordinatorClass__path__startswith=instance.path
