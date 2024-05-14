@@ -389,8 +389,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
                     .filter(
-                        Q(projectClass=instance) 
-                        | Q(projectClass__parent=instance) 
+                        Q(projectClass=instance)
+                        | Q(projectClass__parent=instance)
                         | Q(projectClass__parent__parent=instance),
                         programmed=True,
                     )
