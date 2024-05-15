@@ -381,7 +381,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                             projectClass__coordinatorClass__path__startswith=instance.path
                         ),
                         programmed=True,
-                        phase__value="programming"
                     )
                 )
             else:
