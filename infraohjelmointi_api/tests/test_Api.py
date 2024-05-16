@@ -3,13 +3,12 @@ from unittest.mock import patch
 import uuid
 from django.test import TestCase
 from django.urls import reverse
-from infraohjelmointi_api.views.api.ApiClassesViewSet import ApiClassesViewSet
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from infraohjelmointi_api.models import Project, ProjectClass, ProjectFinancial, ProjectGroup, ProjectLocation, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
-from infraohjelmointi_api.views import BaseViewSet
+from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
 from project.customtokenauth import CustomTokenAuth
 from rest_framework.permissions import IsAuthenticated
 
@@ -152,6 +151,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(viewset.serializer_class, ProjectClassSerializer)
         self.assertEqual(ApiClassesViewSet.http_method_names, ['get'])
         self.assertIn(IsAuthenticated, ApiClassesViewSet.permission_classes)
+
+    def test_class_not_found_returns_404(self):
+        viewset = ApiClassesViewSet()
+        response = viewset.retrieve('faulty request')
+        self.assertEqual(response.status_code, 404)
 
 
     def test_api_GET_locations(self):
