@@ -166,6 +166,14 @@ class ApiTestCase(TestCase):
         location_data = ProjectLocationSerializer(ProjectLocation.objects.get(id=self.division_id)).data
         self.assertEqual(response_location.json()["id"], location_data["id"])
 
+    def test_retrieve_location_not_found(self):
+        self = setup_client(self)
+        # Test to ensure that a 404 is returned if the class does not exist
+        non_existent_uuid = uuid.uuid4()
+        url = reverse('apiLocations-detail', kwargs={'pk': non_existent_uuid})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
 
     def test_api_GET_incorrect_uuid(self):
         # Test endpoints returns 404 if object with request ID not found
