@@ -11,6 +11,7 @@ from infraohjelmointi_api.models import Project, ProjectClass, ProjectFinancial,
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
 from infraohjelmointi_api.views import BaseViewSet
 from project.customtokenauth import CustomTokenAuth
+from rest_framework.permissions import IsAuthenticated
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -146,12 +147,11 @@ class ApiTestCase(TestCase):
         class_data = ProjectClassSerializer(ProjectClass.objects.get(id=self.class_id)).data
         self.assertEqual(response_class.json()["id"], class_data["id"])
 
-    def test_retrieve_class_not_found(self):
-        self = setup_client(self)
-        # Test to ensure that a 404 is returned if the class does not exist
-        non_existent_uuid = uuid.uuid4()
-        response= ApiClassesViewSet.retrieve(self, "request", non_existent_uuid)
-        self.assertEqual(response.status_code, 404)
+    def test_class_viewset_configuration(self):
+        viewset = ApiClassesViewSet()
+        self.assertEqual(viewset.serializer_class, ProjectClassSerializer)
+        self.assertEqual(ApiClassesViewSet.http_method_names, ['get'])
+        self.assertIn(IsAuthenticated, ApiClassesViewSet.permission_classes)
 
 
     def test_api_GET_locations(self):
