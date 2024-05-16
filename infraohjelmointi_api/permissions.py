@@ -291,8 +291,6 @@ class IsProjectManager(permissions.BasePermission):
                         "spentCost", # * Käytetty Ei (No) # spentCost
                         "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
                         "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
-                        "personPlanning", # * Vastuuhenkilö Ei (No) # personPlanning
-                        "personConstruction", # * Rakennuttamisen vastuuhenkilö Ei (No) # personConstruction
                         "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
                         "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
                         "projectLocation", # value can be district/division/subDivision
@@ -302,11 +300,9 @@ class IsProjectManager(permissions.BasePermission):
                 ]
             ]):
                 return False
-            
+
             if _type == "Note":
                 return True
-            
-            return True
 
         return True
     
