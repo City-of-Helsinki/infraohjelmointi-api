@@ -3,6 +3,7 @@ from unittest.mock import patch
 import uuid
 from django.test import TestCase
 from django.urls import reverse
+from infraohjelmointi_api.views.api.ApiClassesViewSet import ApiClassesViewSet
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -149,8 +150,7 @@ class ApiTestCase(TestCase):
         self = setup_client(self)
         # Test to ensure that a 404 is returned if the class does not exist
         non_existent_uuid = uuid.uuid4()
-        url = reverse('apiClasses-detail', kwargs={'pk': non_existent_uuid})
-        response = self.client.get(url)
+        response= ApiClassesViewSet.retrieve(self, "request", non_existent_uuid)
         self.assertEqual(response.status_code, 404)
 
 
