@@ -262,8 +262,6 @@ class IsProjectManager(permissions.BasePermission):
         if view.action in [
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *DJANGO_BASE_READ_ONLY_ACTIONS,
-            *DJANGO_BASE_DELETE_ONLY_ACTIONS,
-            *DJANGO_BASE_CREATE_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS] and _type in [
             "Project", "Note"
         ]:
