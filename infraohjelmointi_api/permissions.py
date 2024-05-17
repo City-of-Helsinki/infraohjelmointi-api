@@ -421,4 +421,3 @@ class IsAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__ 
         return True
-

@@ -30,7 +30,7 @@ cp .env.template .env
 Then you can run docker image as detached mode with:
 
   ```bash
-  docker-compose up -d
+  docker-compose up
   ```
 
 - Access development server on [localhost:8000](http://localhost:8000)
@@ -134,6 +134,21 @@ Import new person information into responsible persons list. The list can be fou
 
 ---
 
+## Add or delete API token
+
+Add new API token:
+
+  ```bash
+  python manage.py generatetoken --name AppNameToken
+  ```
+
+This creates a new User which name is `--name` value.
+
+Delete API token:
+
+  ```bash
+  python manage.py generatetoken --name ExistingAPITokenName --deletetoken
+  ```
 
 ## Managing project packages
 

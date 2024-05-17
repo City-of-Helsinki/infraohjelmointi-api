@@ -66,12 +66,14 @@ INSTALLED_APPS = [
     "overrides",
     "corsheaders",
     "rest_framework",
+    "rest_framework.authtoken",
     "django_filters",
     "drf_standardized_errors",
     "channels",
     "django_eventstream",
     "social_django",
     "infraohjelmointi_api",
+    'drf_yasg',
 ]
 
 # Application definition
@@ -201,7 +203,11 @@ STATIC_ROOT = env("STATIC_ROOT")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("helusers.oidc.ApiTokenAuthentication",),
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "helusers.oidc.ApiTokenAuthentication",
+        'rest_framework.authentication.SessionAuthentication',
+        'project.customtokenauth.CustomTokenAuth',
+    ],
 }
 
 DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": False}
@@ -229,10 +235,30 @@ LOGGING = {
             "level": 1,
             "propagate": False,
         },
-        # "helusers._oidc_auth_impl": {
-        #     "handlers": ["console"],
-        #     "level": 1,
-        #     "propagate": False,
-        # },
     },
+}
+
+
+# Caching framework defaults
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
+        "OPTIONS": {"MAX_ENTRIES": 6000},
+    }
+}
+
+
+# Swagger settings
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+        }
+    },
+    'SUPPORTED_SUBMIT_METHODS': ['get'],
+    'USE_SESSION_AUTH': False,
 }

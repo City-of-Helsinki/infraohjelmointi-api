@@ -18,7 +18,14 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import routers
+from rest_framework import permissions
 from infraohjelmointi_api import views, admin_views
+
+from drf_yasg import openapi
+from drf_yasg.views import get_schema_view
+
+from .urls_api import api_router
+apirouter = api_router()
 
 router = routers.DefaultRouter()
 router.register(r"projects", views.ProjectViewSet, basename="projects")
@@ -122,12 +129,25 @@ router.register(
     basename="sapCosts",
 )
 
+schema_view = get_schema_view(
+    openapi.Info(
+        title="Infraohjelmointi API",
+        description="API documentation for Infrahankkeiden ohjelmointi",
+        default_version="v1"
+    ),
+    public=True,
+    permission_classes=(permissions.AllowAny,),
+    patterns=[path("", include((apirouter.urls, "api")))],
+)
+
 urlpatterns = [
     path("", include(router.urls)),
+    path("", include(apirouter.urls)),
     path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/budget-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/class-location-excel-uploader", admin_views.ExcelFormView.as_view()),
     path("admin/", admin.site.urls),
     path("pysocial/", include("social_django.urls", namespace="social")),
     path("helauth/", include("helusers.urls")),
+    path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
