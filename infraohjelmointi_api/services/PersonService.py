@@ -29,3 +29,7 @@ class PersonService:
         id: str,
     ) -> Person:
         return Person.objects.get(id=id)
+
+    @staticmethod
+    def get_all_persons() -> list[Person]:
+        return Person.objects.all()

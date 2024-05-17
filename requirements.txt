@@ -21,3 +21,4 @@ django-eventstream                            # For server sent events
 daphne                                      # application server
 django-helusers                               # Tunnistamo user inegration
 social-auth-app-django
+drf-yasg                                    # API Swagger documentation
