@@ -1123,7 +1123,7 @@ class BalkSumTestCase(TestCase):
             ),
             data={
                 "finances": {
-                    "year": 2023,
+                    "year": date.today().year,
                     "year0": {"frameBudget": 1000, "budgetChange": 50},
                 }
             },
@@ -1230,7 +1230,7 @@ class BalkSumTestCase(TestCase):
             ),
             data={
                 "finances": {
-                    "year": 2023,
+                    "year": date.today().year,
                     "year0": {"frameBudget": 1000, "budgetChange": 50},
                 }
             },
