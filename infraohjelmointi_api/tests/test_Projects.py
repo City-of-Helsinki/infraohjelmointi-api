@@ -1,5 +1,10 @@
 from django.test import TestCase
+from datetime import (date, datetime)
+from overrides import override
+from rest_framework.renderers import JSONRenderer
+from unittest.mock import patch
 import uuid
+
 from ..models import (
     Project,
     ProjectArea,
@@ -28,12 +33,8 @@ from ..serializers import (
     ProjectNoteGetSerializer,
     ProjectCreateSerializer,
 )
-from datetime import date
 
-from rest_framework.renderers import JSONRenderer
-from overrides import override
 from infraohjelmointi_api.views import BaseViewSet
-from unittest.mock import patch
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -148,6 +149,8 @@ class ProjectTestCase(TestCase):
 
     fixtures = []
     maxDiff = None
+
+    todayDate = date.today()
 
     @classmethod
     @override
@@ -3257,9 +3260,17 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
 
+        # Phase value can't be `warrantyPeriod` if current date is earlier than `estConstructionEnd`
         self.assertEqual(
+            response.json()["phase"]["value"],
+            "warrantyPeriod",
+            msg="Phase value != `warrantyPeriod`"
+        )
+
+        self.assertLess(
+            datetime.strptime(response.json()["estConstructionEnd"], "%d.%m.%Y").date(),
+            self.todayDate,
             "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-            response.json()["phase"][0],
         )
 
         data = {
@@ -3774,7 +3785,7 @@ class ProjectTestCase(TestCase):
         new_createdId = response.json()["id"]
         patchData = {
             "finances": {
-                "year": 2023,
+                "year": self.todayDate.year,
                 "budgetProposalCurrentYearPlus0": "0.00",
                 "budgetProposalCurrentYearPlus1": "200.00",
                 "budgetProposalCurrentYearPlus2": "0.00",
