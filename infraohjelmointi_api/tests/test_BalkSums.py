@@ -1,6 +1,5 @@
 from datetime import date
 from django.test import TestCase
-from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.models import (
     Project,
     ProjectClass,

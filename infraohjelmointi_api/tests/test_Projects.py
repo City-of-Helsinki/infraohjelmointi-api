@@ -24,7 +24,6 @@ from ..models import (
     ProjectLocation,
     ProjectHashTag,
     ProjectGroup,
-    ProjectLock,
     ProjectFinancial,
     User,
 )
