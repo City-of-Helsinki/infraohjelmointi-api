@@ -2886,7 +2886,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format("Östersundomin suurpiiri cannot have the location Munkkiniemi under it"),
+        )
 
         data = {
             "projectLocation": self.projectDivision_3_Id.__str__(),
@@ -3282,10 +3286,13 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
+        # Projects value programmed is `false` and phase `Warrantyperiod`
+        # If programmed value is false, phase must be set to `proposal` or `design`
         self.assertEqual(
             response.status_code,
-            200,
-            msg="Status code != 200 , Error: {}".format(response.json()),
+            400,
+            msg="Status code != 400 , Error: {}".format("phase must be set to `proposal` or `design` if programmed is `False`"),
         )
 
         data = {"programmed": False}
