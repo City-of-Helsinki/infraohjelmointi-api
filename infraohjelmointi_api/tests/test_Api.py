@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 from infraohjelmointi_api.models import Project, ProjectClass, ProjectFinancial, ProjectGroup, ProjectLocation, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
 from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
-from project.extensions import CustomTokenAuth
+from project.extensions.CustomTokenAuth import CustomTokenAuth
 from rest_framework.permissions import IsAuthenticated
 
 
