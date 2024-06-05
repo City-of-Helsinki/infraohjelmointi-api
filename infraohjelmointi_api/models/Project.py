@@ -230,8 +230,9 @@ class Project(models.Model):
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
     def projectReadiness(self) -> int:
-        # some calculation based on cost and stuff
-        # returns percentage of readiness random.randint(0, 100)
+        # TODO: implement the calculation logic after we get SAP connection
+        # Should be money spent (from SAP) divided by project budget
+        # returns 95% now cause we don't have the SAP connection yet
         return 95
 
     def _strip_whitespaces(self, inputString: str) -> str:
