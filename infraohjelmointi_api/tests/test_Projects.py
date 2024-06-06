@@ -1,5 +1,10 @@
 from django.test import TestCase
+from datetime import (date, datetime)
+from overrides import override
+from rest_framework.renderers import JSONRenderer
+from unittest.mock import patch
 import uuid
+
 from ..models import (
     Project,
     ProjectArea,
@@ -19,7 +24,6 @@ from ..models import (
     ProjectLocation,
     ProjectHashTag,
     ProjectGroup,
-    ProjectLock,
     ProjectFinancial,
     User,
 )
@@ -28,12 +32,8 @@ from ..serializers import (
     ProjectNoteGetSerializer,
     ProjectCreateSerializer,
 )
-from datetime import date
 
-from rest_framework.renderers import JSONRenderer
-from overrides import override
 from infraohjelmointi_api.views import BaseViewSet
-from unittest.mock import patch
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -148,6 +148,8 @@ class ProjectTestCase(TestCase):
 
     fixtures = []
     maxDiff = None
+
+    todayDate = date.today()
 
     @classmethod
     @override
@@ -2851,7 +2853,7 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400, msg=response.json())
+        self.assertEqual(response.status_code, 200, msg=response.json())
 
         data = {
             "projectClass": self.projectSubClass_3_Id.__str__(),
@@ -2883,7 +2885,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertEqual(
+            response.status_code,
+            400,
+            msg="Status code != 400 , Error: {}".format("Östersundomin suurpiiri cannot have the location Munkkiniemi under it"),
+        )
 
         data = {
             "projectLocation": self.projectDivision_3_Id.__str__(),
@@ -2898,7 +2904,7 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400, msg=response.json())
+        self.assertEqual(response.status_code, 200, msg=response.json())
 
         data = {
             "projectClass": self.projectSubClass_6_Id.__str__(),
@@ -3253,13 +3259,21 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             response.status_code,
-            400,
-            msg="Status code != 400 , Error: {}".format(response.json()),
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
+        # Phase value can't be `warrantyPeriod` if current date is earlier than `estConstructionEnd`
         self.assertEqual(
+            response.json()["phase"]["value"],
+            "warrantyPeriod",
+            msg="Phase value != `warrantyPeriod`"
+        )
+
+        self.assertLess(
+            datetime.strptime(response.json()["estConstructionEnd"], "%d.%m.%Y").date(),
+            self.todayDate,
             "phase cannot be `warrantyPeriod` if current date is earlier than estConstructionEnd",
-            response.json()["phase"][0],
         )
 
         data = {
@@ -3271,10 +3285,13 @@ class ProjectTestCase(TestCase):
             data,
             content_type="application/json",
         )
+
+        # Projects value programmed is `false` and phase `Warrantyperiod`
+        # If programmed value is false, phase must be set to `proposal` or `design`
         self.assertEqual(
             response.status_code,
-            200,
-            msg="Status code != 200 , Error: {}".format(response.json()),
+            400,
+            msg="Status code != 400 , Error: {}".format("phase must be set to `proposal` or `design` if programmed is `False`"),
         )
 
         data = {"programmed": False}
@@ -3774,7 +3791,7 @@ class ProjectTestCase(TestCase):
         new_createdId = response.json()["id"]
         patchData = {
             "finances": {
-                "year": 2023,
+                "year": self.todayDate.year,
                 "budgetProposalCurrentYearPlus0": "0.00",
                 "budgetProposalCurrentYearPlus1": "200.00",
                 "budgetProposalCurrentYearPlus2": "0.00",
