@@ -11,6 +11,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
         "sg_kymp_sso_io_projektialueiden_ohjelmoijat": "4d229780-b511-4652-b32b-362ad88a7b55",
         "sg_kymp_sso_io_projektipaallikot": "31f86f09-b674-4c1d-81db-6d5fe2e587f9",
         "sl_dyn_kymp_sso_io_katselijat": "7e39a13e-bd48-43ab-bd23-738e73b5137a",
+        "sg_kymp_sso_io_katselijat_muut": "61336d5e-4b74-400f-a1d6-c9f96d3f1d4d",
         "sg_kymp_sso_io_admin": "sg_kymp_sso_io_admin",
     }
 

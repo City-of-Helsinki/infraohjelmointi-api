@@ -35,6 +35,10 @@ class ProjectService:
         )
 
     @staticmethod
+    def get_all_projects() -> list[Project]:
+        return Project.objects.all()
+
+    @staticmethod
     def list_with_non_null_hkr_id() -> list[Project]:
         return Project.objects.filter(hkrId__isnull=False)
 

@@ -111,3 +111,11 @@ class ProjectLocationService:
             return "subDivision"
 
         return None
+
+    @staticmethod
+    def list_all_locations() -> list[ProjectLocation]:
+        """List all project locations"""
+        return (
+            ProjectLocation.objects.all()
+            .order_by("createdDate")
+        )
