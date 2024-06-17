@@ -39,6 +39,13 @@ class ProjectClassService:
         )
 
     @staticmethod
+    def list_all_classes() -> list[ProjectClass]:
+        """List all both coordinator and programmer view classes"""
+        return (
+            ProjectClass.objects.all().order_by("createdDate")
+        )
+
+    @staticmethod
     def get_by_id(id: str) -> ProjectClass:
         """Get project class by id"""
         return ProjectClass.objects.get(id=id)

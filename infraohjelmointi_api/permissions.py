@@ -59,11 +59,12 @@ PROJECT_LOCATION_ALL_ACTIONS = [
 #### Project Notes custom actions ####
 PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
 PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
+PROJECT_NOTE_BASIC_ACTIONS = ["create"]
 PROJECT_NOTE_ALL_GET_ACTIONS = [
     *PROJECT_NOTE_PLANNING_GET_ACTIONS,
     *PROJECT_NOTE_COORDINATOR_GET_ACTIONS,
 ]
-PROJECT_NOTE_ALL_ACTIONS = [*PROJECT_NOTE_ALL_GET_ACTIONS]
+PROJECT_NOTE_ALL_ACTIONS = [*PROJECT_NOTE_ALL_GET_ACTIONS, *PROJECT_NOTE_BASIC_ACTIONS,]
 
 #### PROJECT Finances custom actions ####
 PROJECT_FINANCES_PLANNING_GET_ACTIONS = ["get_project_finances_by_year"]
@@ -84,7 +85,6 @@ PROJECT_PLANNING_GET_ACTIONS = [
     "get_projects_by_financial_year",
     "get_project_by_financial_year",
     "get_search_results",
-    
 ]
 PROJECT_ALL_GET_ACTIONS = [
     *PROJECT_COORDINATOR_GET_ACTIONS,
@@ -101,7 +101,7 @@ PROJECT_ALL_PATCH_ACTIONS = [
 PROJECT_ALL_ACTIONS = [*PROJECT_ALL_GET_ACTIONS, *PROJECT_ALL_PATCH_ACTIONS]
 
 #### SAP COST CUSTOM ACTIONS ####
-SAP_COST_PLANNING_GET_ACTIONS = ["get_sap_cost_by_year"] 
+SAP_COST_PLANNING_GET_ACTIONS = ["get_sap_cost_by_year"]
 SAP_COST_COORDINATOR_GET_ACTIONS = []
 SAP_COST_ALL_GET_ACTIONS = [
     *SAP_COST_PLANNING_GET_ACTIONS,
@@ -125,6 +125,8 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 class IsViewer(permissions.BasePermission):
     def user_in_viewer_group(self, request):
         if "sl_dyn_kymp_sso_io_katselijat" in request.user.ad_groups.all().values_list(
+            "name", flat=True
+        ) or "sg_kymp_sso_io_katselijat_muut" in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
@@ -159,7 +161,7 @@ class IsCoordinator(permissions.BasePermission):
             "name", flat=True
         ):
             return True
-        
+
     def has_permission(self, request, view):
         if (
             request.user.is_authenticated
@@ -192,7 +194,7 @@ class IsPlanner(permissions.BasePermission):
             "name", flat=True
         ):
             return True
-        
+
     def has_permission(self, request, view):
         if (
             request.user.is_authenticated
@@ -228,7 +230,7 @@ class IsProjectManager(permissions.BasePermission):
             return True
 
     def has_permission(self, request, view):
-        # has edit permissions for projects only
+        # has edit permissions for projects and notes
         # and read permissions
         if (
             request.user.is_authenticated
@@ -257,10 +259,13 @@ class IsProjectManager(permissions.BasePermission):
         # and only specific project fields
         _type = obj._meta.model.__name__
 
-        if view.action in [*DJANGO_BASE_UPDATE_ONLY_ACTIONS, *DJANGO_BASE_READ_ONLY_ACTIONS] and _type in [
-            "Project",
+        if view.action in [
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *PROJECT_NOTE_ALL_ACTIONS] and _type in [
+            "Project", "Note"
         ]:
-            if any(
+            if _type == "Project" and any(
                 [
                     item
                     for item in request.data.keys()
@@ -286,22 +291,22 @@ class IsProjectManager(permissions.BasePermission):
                         "spentCost", # * Käytetty Ei (No) # spentCost
                         "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
                         "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
-                        "personPlanning", # * Vastuuhenkilö Ei (No) # personPlanning
-                        "personConstruction", # * Rakennuttamisen vastuuhenkilö Ei (No) # personConstruction
                         "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
                         "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
                         "projectLocation", # value can be district/division/subDivision
 
                         # preliminaryBudgetDivision is not yet implemented in UI
-                        #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No) # preliminaryBudgetDivision # ei löydy project.py
+                        #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No)
+                        # preliminaryBudgetDivision # ei löydy project.py
                 ]
             ]):
                 return False
-            
-            return True
+
+            if _type == "Note":
+                return True
 
         return True
-    
+
 class BaseProjectAreaPermissions(permissions.BasePermission):
     def project_belongs_to_808_main_class(self, obj: Project, request):
         projectClass = request.data.get("projectClass", None)
@@ -369,22 +374,16 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
             *DJANGO_BASE_READ_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS
         ] and _type in ["Project", "ProjectGroup", "Note"]:
-            
-            if _type == "Project":
-                if self.project_belongs_to_808_main_class(
-                    obj, request
-                    ):
-                    return True
-        
-            if _type == "ProjectGroup":
-                if self.group_belongs_to_808_main_class(
-                    obj, request
-                ):
-                    return True
-            
+
+            if (
+                (_type == "Project" and self.project_belongs_to_808_main_class(obj, request))
+                or (_type == "ProjectGroup" and self.group_belongs_to_808_main_class(obj, request))
+            ):
+                return True
+
             if _type == "Note":
                 return True
-        
+
         return False
 
 class IsAdmin(permissions.BasePermission):
@@ -419,6 +418,5 @@ class IsAdmin(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        _type = obj._meta.model.__name__ 
+        _type = obj._meta.model.__name__
         return True
-
