@@ -116,9 +116,11 @@ class ProjectViewSet(BaseViewSet):
                 Patched Project Instance
         """
         # finances data appear with field names, convert to year to update
-        user_id = request.data['user']
-        project_id = request.data['projectId']
-        finances = request.data.pop("finances", None)
+
+        # requestData should contain both the data to be saved and data to be logged
+        requestData = request.data['requestData']
+        logger.info("request data: {}".format(requestData))
+        finances = requestData.pop("finances", None)
         project = self.get_object()
         year = (
             finances.pop("year", date.today().year)
@@ -146,7 +148,7 @@ class ProjectViewSet(BaseViewSet):
         project.finance_year = year
         projectSerializer = self.get_serializer(
             project,
-            data=request.data,
+            data=requestData,
             many=False,
             partial=True,
             context={"finance_year": year, "forcedToFrame": forced_to_frame},
@@ -154,7 +156,7 @@ class ProjectViewSet(BaseViewSet):
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
         self.projectWiseService.sync_project_to_pw(
-            data=request.data, project=updated_project
+            data=requestData, project=updated_project
         )
         return Response(projectSerializer.data)
 
