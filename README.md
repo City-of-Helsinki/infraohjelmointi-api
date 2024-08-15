@@ -73,36 +73,6 @@ Importing Location/Class hierarchy structure and Planning (TS) and Budget (TAE) 
   ./import-excels.sh -d path/to/Excels/
   ```
 
-<br>
-
-*Other available file import scripts:*
-<details>
-<summary>Click to open</summary>
-<br>
-
-Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
-
-  ```bash
-  python manage.py hierarchies --file path/to/hierarchy.xlsx
-  ```
-
-_In some contexts, hierarchy is known as "luokkajako"._
-
-<br>
-
-Import only Planning project data (files with "TS"):
-
-  ```bash
-  python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
-  ```
-
-Import only Budget project data (files with "TAE"):
-
-  ```bash
-  python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
-  ```
-</details>
-
 
 ### Import project location options
 
@@ -118,7 +88,7 @@ Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_p
 
   ```bash
   psql $DATABASE_URL
-  infraohjelmointi_api_db=# \i update-districts.sql
+  \i update-districts.sql
   ```
 
 ## Other optional file imports
@@ -219,6 +189,34 @@ Projects are also synced to PW service when a PATCH request is made to the proje
 Scripts were used when dev and prod environments were setup for the first time.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
+
+## Other optional import scripts
+
+While populating the database the script file `import-excels.sh` was used to create the hierarchy (`/import-excels.sh -c path/to/hierarchy.xlsx`) and importing all Excels (`./import-excels.sh -d path/to/Excels/`).
+
+Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
+
+  ```bash
+  python manage.py hierarchies --file path/to/hierarchy.xlsx
+  ```
+
+_In some contexts, hierarchy is known as "luokkajako"._
+
+<br>
+
+Import only Planning project data (files with "TS"):
+
+  ```bash
+  python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
+  ```
+
+Import only Budget project data (files with "TAE"):
+
+  ```bash
+  python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
+  ```
+
+_`./import-excels.sh -d path/to/Excels` includes both of TS and TAE import commands._
 
 ## Production release
 
