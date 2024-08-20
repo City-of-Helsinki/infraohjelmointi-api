@@ -150,16 +150,26 @@ class SapApiService:
         else:
             json_response["costs"] = response.json()["d"]["results"]
 
+        # Fetch projects by SAP ID and get earliest planning start year
+        projects = ProjectService.get_by_sap_id(id)
+
+        sap_start_year = budat_start.year - 1
+
+        for project in projects:
+            if project.planningStartYear < sap_start_year:
+                sap_start_year = project.planningStartYear
+
         start_time = time.perf_counter()
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
             posid=id,
-            budat_start=budat_start.replace(year=budat_start.year - 5).strftime(
+            budat_start=budat_start.replace(year=sap_start_year).strftime(
                 "%Y-%m-%dT%H:%M:%S"
             ),
             budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
         )
 
-        logger.debug("Requesting API {} for commitments".format(api_url))
+        logger.debug("Requesting API {} for commitments from {} to {}".format(api_url, sap_start_year, budat_end.year))
+
         response = self.session.get(api_url)
         response_time = time.perf_counter() - start_time
 
