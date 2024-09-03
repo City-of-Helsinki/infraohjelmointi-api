@@ -85,7 +85,7 @@ class Command(BaseCommand):
             and not options["sync_project_from_pw"]
             and not options["import_from_budget"]
             and not options["import_from_plan"]
-            and not options["import-responsible-persons-from-pw"]
+            and not options["import_responsible_persons_from_pw"]
         ):
             self.stdout.write(
                 self.style.ERROR(
@@ -124,7 +124,7 @@ class Command(BaseCommand):
                 handler=PlanningFileHandler(),
             )
 
-        if options["import-responsible-persons-from-pw"] == True:
+        if options["import_responsible_persons_from_pw"] == True:
             ProjectWiseService().sync_responsible_perons_from_pw()
 
     @transaction.atomic

@@ -114,9 +114,6 @@ class ProjectWiseService:
         """Method to import responsible perosns from PW"""
 
         logger.debug("Importing resposible persons from PW")
-        project_properties = pw_project["relationshipInstances"][0]["relatedInstance"][
-            "properties"
-        ]
         projects=ProjectService.list_with_non_null_hkr_id()
         for project in projects:
             logger.debug(f"Fetching project '{project.id}' with PW Id '{project.hkrId}' from PW")
@@ -124,6 +121,9 @@ class ProjectWiseService:
                 return
             try:
                 pw_project = self.get_project_from_pw(project.hkrId)
+                project_properties = pw_project["relationshipInstances"][0]["relatedInstance"][
+                    "properties"
+                ]
                 if pw_project.personPlanning:
                     planning_person_data = "{}, {}, {}, {}".format(
                         project_properties["PROJECT_Vastuuhenkil"],
