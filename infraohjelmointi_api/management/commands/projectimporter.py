@@ -15,6 +15,7 @@ class Command(BaseCommand):
         + " --import-from-plan /path/to/plan.xsls"
         + " --sync-projects-with-pw"
         + " --sync-project-with-pw pwid"
+        + " --import-responsible-persons-from-pw"
     )
 
     def add_arguments(self, parser):
@@ -68,12 +69,23 @@ class Command(BaseCommand):
             default="",
         )
 
+        parser.add_argument(
+            "--import-responsible-persons-from-pw",
+            action="store_true",
+            help=(
+                "Imports all responsible persons from projects with PW ids to the DB"
+                + "Usage: --import-responsible-persons-from-pw"
+            ),
+            default="",
+        )
+
     def handle(self, *args, **options):
         if (
             not options["sync_projects_from_pw"]
             and not options["sync_project_from_pw"]
             and not options["import_from_budget"]
             and not options["import_from_plan"]
+            and not options["import-responsible-persons-from-pw"]
         ):
             self.stdout.write(
                 self.style.ERROR(
@@ -83,6 +95,7 @@ class Command(BaseCommand):
                     + " --import-from-plan /path/to/plan.xsls\n"
                     + " [--sync-projects-from-pw]\n"
                     + " [--sync-project-from-pw pwid]\n"
+                    + " [--import-responsible-persons-from-pw]\n"
                 )
             )
             return
@@ -110,6 +123,9 @@ class Command(BaseCommand):
                 options=options,
                 handler=PlanningFileHandler(),
             )
+
+        if options["import-responsible-persons-from-pw"] == True:
+            ProjectWiseService().sync_responsible_perons_from_pw()
 
     @transaction.atomic
     def proceedWithFileArgument(

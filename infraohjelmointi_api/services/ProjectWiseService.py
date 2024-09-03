@@ -110,6 +110,41 @@ class ProjectWiseService:
                 )
             )
 
+    def sync_responsible_perons_from_pw(self) -> None:
+        """Method to import responsible perosns from PW"""
+
+        logger.debug("Importing resposible persons from PW")
+        project_properties = pw_project["relationshipInstances"][0]["relatedInstance"][
+            "properties"
+        ]
+        projects=ProjectService.list_with_non_null_hkr_id()
+        for project in projects:
+            logger.debug(f"Fetching project '{project.id}' with PW Id '{project.hkrId}' from PW")
+            if not project.hkrId:
+                return
+            try:
+                pw_project = self.get_project_from_pw(project.hkrId)
+                if pw_project.personPlanning:
+                    planning_person_data = "{}, {}, {}, {}".format(
+                        project_properties["PROJECT_Vastuuhenkil"],
+                        project_properties["PROJECT_Vastuuhenkiln_titteli"],
+                        project_properties["PROJECT_Vastuuhenkiln_puhelinnumero"],
+                        project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
+                    )
+                    planning_person = self.__get_project_person(
+                        person_data=planning_person_data
+                    )
+                    if planning_person:
+                        logger.info(f"Imported person {planning_person_data}")
+            except (PWProjectNotFoundError, PWProjectResponseError) as e:
+                logger.error(e)
+            except Exception as e:
+                logger.error(
+                    "Error occurred while fetching project '{}' with PW id '{}'. \nError: {}".format(
+                        project.id, project.hkrId, e
+                    )
+                )
+
     def sync_project_to_pw(self, data: dict, project: Project) -> None:
         """Method to synchronise given product field value to PW"""
         if project.hkrId is None or str(project.hkrId).strip() == "":
