@@ -153,15 +153,16 @@ class SapApiService:
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
 
-        if not all(project.planningStartYear for project in projects):
-            logger.debug(f"No planning start year set for project ID {id}. Skipping SAP data fetch.")
-            return {"error": "No planning start year set"}
-
         sap_start_year = budat_start.year - 1
 
         for project in projects:
-            if project.planningStartYear < sap_start_year:
-                sap_start_year = project.planningStartYear
+            if not project.planningStartYear:
+                logger.debug(f"No planning start year set for project ID {project.id}. Skipping SAP data fetch.")
+            elif project.planningStartYear > budat_start.year:
+                logger.debug(f"Planning start year is set in the future for project ID {project.id}. Skipping SAP data fetch.")
+            else:
+                if project.planningStartYear and project.planningStartYear < sap_start_year:
+                    sap_start_year = project.planningStartYear
 
         start_time = time.perf_counter()
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
