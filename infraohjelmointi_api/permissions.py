@@ -152,7 +152,12 @@ class IsViewer(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        # Viewer cannot edit anything or get an object instance
+        # Viewer can only access project object, to be able to see the project card
+        _type = obj._meta.model.__name__
+
+        if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
+            return True
+        
         return False
 
 class IsCoordinator(permissions.BasePermission):
