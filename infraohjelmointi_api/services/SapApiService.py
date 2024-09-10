@@ -153,45 +153,48 @@ class SapApiService:
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
 
-        sap_start_year = budat_start.year - 1
+        sap_start_year = None
 
         for project in projects:
             if not project.planningStartYear:
-                logger.debug(f"No planning start year set for project ID {project.id}. Skipping SAP data fetch.")
+                logger.debug(f"No planning start year set for project ID {project.id}.")
             elif project.planningStartYear > budat_start.year:
-                logger.debug(f"Planning start year is set in the future for project ID {project.id}. Skipping SAP data fetch.")
+                logger.debug(f"Planning start year is set in the future for project ID {project.id}.")
+            elif (sap_start_year and sap_start_year > project.planningStartYear) or not sap_start_year:
+                sap_start_year = project.planningStartYear
+
+        if sap_start_year:
+            start_time = time.perf_counter()
+            api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
+                posid=id,
+                budat_start=budat_start.replace(year=sap_start_year).strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                ),
+                budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
+            )
+            logger.debug("Requesting API {} for commitments from {} to {}".format(api_url, sap_start_year, budat_end.year))
+
+            response = self.session.get(api_url)
+            response_time = time.perf_counter() - start_time
+
+            logger.debug(f"SAP responded in {response_time}s")
+
+            # Check if SAP responded with error
+            if response.status_code != 200:
+                logger.error(
+                    f"SAP responded for commitments with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
+                )
             else:
-                if project.planningStartYear and project.planningStartYear < sap_start_year:
-                    sap_start_year = project.planningStartYear
+                json_response["commitments"] = response.json()["d"]["results"]
 
-        start_time = time.perf_counter()
-        api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
-            posid=id,
-            budat_start=budat_start.replace(year=sap_start_year).strftime(
-                "%Y-%m-%dT%H:%M:%S"
-            ),
-            budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
-        )
-
-        logger.debug("Requesting API {} for commitments from {} to {}".format(api_url, sap_start_year, budat_end.year))
-
-        response = self.session.get(api_url)
-        response_time = time.perf_counter() - start_time
-
-        logger.debug(f"SAP responded in {response_time}s")
-
-        # Check if SAP responded with error
-        if response.status_code != 200:
-            logger.error(
-                f"SAP responded for commitments with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
+            return self.__group_costs_and_commitments(
+                sap_costs_and_commitments=json_response,
+                sap_id=id,
             )
         else:
-            json_response["commitments"] = response.json()["d"]["results"]
-
-        return self.__group_costs_and_commitments(
-            sap_costs_and_commitments=json_response,
-            sap_id=id,
-        )
+            logger.debug(f"No planning start year set or planning start year in the future for project(s) with SAP id {id}.
+                         Skipping SAP data fetch for id {id}")
+            return {}
 
     def __store_sap_costs(
         self,
