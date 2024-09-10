@@ -192,8 +192,9 @@ class SapApiService:
                 sap_id=id,
             )
         else:
-            logger.debug(f"No planning start year set or planning start year in the future for project(s) with SAP id {id}.
-                         Skipping SAP data fetch for id {id}")
+            logger.debug(
+                f"No planning start year set or planning start year in the future for project(s) with SAP id {id}. Skipping SAP data fetch for id {id}"
+            )
             return {}
 
     def __store_sap_costs(
