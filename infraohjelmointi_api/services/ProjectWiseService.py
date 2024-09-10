@@ -110,7 +110,7 @@ class ProjectWiseService:
                 )
             )
 
-    def sync_responsible_perons_from_pw(self) -> None:
+    def sync_responsible_persons_from_pw(self) -> None:
         """Method to import responsible perosns from PW"""
 
         logger.debug("Importing resposible persons from PW")
@@ -124,14 +124,14 @@ class ProjectWiseService:
                 project_properties = pw_project["relationshipInstances"][0]["relatedInstance"][
                     "properties"
                 ]
-                if pw_project.personPlanning:
+                if pw_project['personPlanning']:
                     planning_person_data = "{}, {}, {}, {}".format(
                         project_properties["PROJECT_Vastuuhenkil"],
                         project_properties["PROJECT_Vastuuhenkiln_titteli"],
                         project_properties["PROJECT_Vastuuhenkiln_puhelinnumero"],
                         project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
                     )
-                    planning_person = self.__get_project_person(
+                    planning_person = self.get_project_person(
                         person_data=planning_person_data
                     )
                     if planning_person:
@@ -421,7 +421,7 @@ class ProjectWiseService:
                 project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
             )
 
-            planning_person = self.__get_project_person(
+            planning_person = self.get_project_person(
                 person_data=planning_person_data
             )
             if planning_person:
@@ -434,7 +434,7 @@ class ProjectWiseService:
                 project.personPlanning = planning_person
 
         if project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"]:
-            construction_person = self.__get_project_person(
+            construction_person = self.get_project_person(
                 person_data=project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"]
             )
 
@@ -458,7 +458,7 @@ class ProjectWiseService:
 
         project.save()
 
-    def __get_project_person(self, person_data: str) -> Person:
+    def get_project_person(self, person_data: str) -> Person:
         """Helper method to load person from DB with PW data"""
 
         person_data = person_data.strip().replace(", ", ",")
