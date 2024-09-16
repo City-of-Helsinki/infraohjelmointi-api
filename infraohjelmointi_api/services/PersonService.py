@@ -25,6 +25,14 @@ class PersonService:
         return Person.objects.get_or_create(firstName=firstName, lastName=lastName)
 
     @staticmethod
+    def get_or_create_by_name_and_email(
+        firstName: str,
+        lastName: str,
+        email: str,
+    ) -> Person:
+        return Person.objects.get_or_create(firstName=firstName, lastName=lastName, email=email)
+
+    @staticmethod
     def get_by_id(
         id: str,
     ) -> Person:
