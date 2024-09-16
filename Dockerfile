@@ -16,9 +16,8 @@ RUN TZ="Europe/Helsinki" \
     rm -rf /var/cache/yum && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /srv/app/static && \
-    chmod +x /app/sync-from-sap.sh
-
-RUN python manage.py collectstatic --noinput && \
+    chmod +x /app/sync-from-sap.sh && \
+    python manage.py collectstatic --noinput && \
     chown -R nobody:nobody /srv/app/static
 
 USER nobody:0
