@@ -18,7 +18,7 @@ RUN TZ="Europe/Helsinki" \
     mkdir -p /srv/app/static && \
     chmod +x /app/sync-from-sap.sh
 
-ENV DJANGO_SECRET_KEY="only-used-for-collectstatic" DATABASE_URL="sqlite:///"
+ENV DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 
 RUN python manage.py collectstatic --noinput && \
     chown -R nobody:nobody /srv/app/static
