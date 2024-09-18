@@ -64,6 +64,8 @@ class ApiProjectsViewSet(BaseViewSet):
         queryset = self.queryset
         if project_class_id is not None:
             queryset = queryset.filter(projectClass__id=uuid.UUID(project_class_id))
+        else:
+            queryset = Project.objects.all()
         self.queryset = queryset
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(serializer.data)
