@@ -3,7 +3,7 @@ FROM registry.access.redhat.com/ubi9/python-311:latest
 WORKDIR /app
 
 ENV STATIC_ROOT /srv/app/static
-ENV URL https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+ENV URL https://download.postgresql.org/pub/repos/yum/keys/RPM-GPG-KEY-PGDG-AARCH64-RHEL8
 
 COPY . .
 
