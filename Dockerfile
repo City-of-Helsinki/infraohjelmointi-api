@@ -9,7 +9,20 @@ USER root
 
 RUN TZ="Europe/Helsinki" && \
     yum -y update && \
-    yum install -y nano libffi-devel gcc python3 python3-devel python3-pip postgresql postgresql-devel libpq-devel unzip bash grep cronie libcap && \
+    yum install -y nano \
+    libffi-devel \
+    gcc \
+    python3 \
+    python3-devel \
+    python3-pip \
+    postgresql \
+    postgresql-devel \
+    libpq-devel \
+    unzip \
+    bash \
+    grep \
+    cronie \
+    libcap && \
     # Install pip packages (pandas and uwsgi) instead of using yum
     pip install pandas uwsgi && \
     # Ensure pip and python are accessible globally
