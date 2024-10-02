@@ -40,7 +40,6 @@ env = environ.Env(
     HELSINKI_TUNNISTUS_AUDIENCE=(str, "infraohjelmointi-api-dev"),
     HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED=(bool, False),
     SOCIAL_AUTH_TUNNISTAMO_SCOPE=(str, "ad_group"),
-    TWISTED_MAX_LINE_LENGTH=(int, 32768),
 )
 
 if path.exists(".env"):
@@ -263,20 +262,3 @@ SWAGGER_SETTINGS = {
     'SUPPORTED_SUBMIT_METHODS': ['get'],
     'USE_SESSION_AUTH': False,
 }
-
-TWISTED_MAX_LINE_LENGTH = env("TWISTED_MAX_LINE_LENGTH")
-
-def overwrite_twisted_max_line_length(max_line_length):
-    """
-    Twisted has a default max line length of 16384.
-    The following is used to override the default length which is necessary
-    for long headers - in the case of helsinki-tunnistus the Authentication
-    header can be rather long if the user has many AD groups.
-    """
-    from twisted.protocols.basic import LineReceiver
-    from twisted.web.http import HTTPChannel
-
-    LineReceiver.MAX_LENGTH = max_line_length
-    HTTPChannel.totalHeadersSize = max_line_length
-
-overwrite_twisted_max_line_length(TWISTED_MAX_LINE_LENGTH)
