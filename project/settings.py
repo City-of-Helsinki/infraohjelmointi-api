@@ -207,7 +207,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "helusers.oidc.ApiTokenAuthentication",
         'rest_framework.authentication.SessionAuthentication',
-        'project.customtokenauth.CustomTokenAuth',
+        'project.extensions.CustomTokenAuth.CustomTokenAuth',
     ],
 }
 
@@ -220,7 +220,7 @@ LOGGING = {
         "console": {
             "format": "%(asctime)s %(levelname)s %(pathname)s:%(lineno)d %(message)s",
             "datefmt": "[%d/%b/%Y %H:%M:%S]",
-            "()": "project.customlogging.ColoredFormatter",
+            "()": "project.extensions.ColoredFormatter.ColoredFormatter",
         },
     },
     "handlers": {
