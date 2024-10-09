@@ -21,16 +21,50 @@ class PersonService:
     def get_or_create_by_name(
         firstName: str,
         lastName: str,
+        email: str = None,
     ) -> Person:
-        return Person.objects.get_or_create(firstName=firstName, lastName=lastName)
+        if email == None:
+            return Person.objects.get_or_create(firstName=firstName, lastName=lastName)
+        else:
+            return Person.objects.get_or_create(firstName=firstName, lastName=lastName, email=email)
 
     @staticmethod
-    def get_or_create_by_name_and_email(
+    def get_by_email(
+        email: str
+    ) -> Person:
+        try:
+            return Person.objects.get(email=email)
+        except Person.DoesNotExist:
+            return None
+
+    @staticmethod
+    def get_by_name(
+        firstName: str,
+        lastName: str
+    ) -> Person:
+        try:
+            return Person.objects.get(firstName=firstName, lastName=lastName)
+        except Person.MultipleObjectsReturned:
+            return list(Person.objects.filter(firstName=firstName, lastName=lastName))
+        except Person.DoesNotExist:
+            return None
+
+    @staticmethod
+    def create_by_name(
         firstName: str,
         lastName: str,
-        email: str,
+        email: str
     ) -> Person:
-        return Person.objects.get_or_create(firstName=firstName, lastName=lastName, email=email)
+        return Person.objects.create(firstName=firstName, lastName=lastName, email=email)
+
+    @staticmethod
+    def get_by_email(
+        email: str
+    ) -> Person:
+        try:
+            return Person.objects.get(email=email)
+        except Person.DoesNotExist:
+            return None
 
     @staticmethod
     def get_by_id(
