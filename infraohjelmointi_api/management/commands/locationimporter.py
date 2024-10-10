@@ -3,6 +3,9 @@ from django.core.management.base import BaseCommand
 import os
 import traceback
 from openpyxl import load_workbook
+
+from infraohjelmointi_api.models import ProjectDistrict
+from infraohjelmointi_api.services import ProjectDistrictService
 from .util.locationFileHandler import add_locations
 
 
@@ -17,9 +20,13 @@ class Command(BaseCommand):
             ),
             default="",
         )
+        parser.add_argument(
+            "--eri-kaupunginosia",
+            action="store_true",
+        )
 
     def handle(self, *args, **options):
-        if not options["file"]:
+        if not options["file"] and not options["eri_kaupunginosia"]:
             self.stdout.write(
                 self.style.ERROR(
                     "No arguments given. "
@@ -27,6 +34,10 @@ class Command(BaseCommand):
                 )
             )
             return
+        if options["eri_kaupunginosia"] is True:
+            self.add_eri_kaupunginosia_location_option()
+            return
+        
         if not os.path.isfile(options["file"]):
             self.stdout.write(
                 self.style.ERROR(
@@ -54,3 +65,16 @@ class Command(BaseCommand):
         )
         wb = load_workbook(excelPath, data_only=True, read_only=True)
         add_locations(list(wb.worksheets[0].rows))
+
+    def add_eri_kaupunginosia_location_option(self):
+        districts = ProjectDistrict.objects.filter(level='district')
+        for district in districts:
+            division = ProjectDistrictService.get_or_create(
+                name='Eri kaupunginosia',
+                parent=district,
+                path=district.name + '/Eri kaupunginosia',
+                level="division",
+                )[0]
+            self.stdout.write(
+                self.style.NOTICE(division.name + " division was added under " + district.name + " district")
+            )
