@@ -110,6 +110,41 @@ class ProjectWiseService:
                 )
             )
 
+    def sync_responsible_persons_from_pw(self) -> None:
+        """Method to import responsible perosns from PW"""
+
+        logger.debug("Importing resposible persons from PW")
+        projects=ProjectService.list_with_non_null_hkr_id()
+        for project in projects:
+            logger.debug(f"Fetching project '{project.id}' with PW Id '{project.hkrId}' from PW")
+            if not project.hkrId:
+                return
+            try:
+                pw_project = self.get_project_from_pw(project.hkrId)
+                project_properties = pw_project["relationshipInstances"][0]["relatedInstance"][
+                    "properties"
+                ]
+                if pw_project['personPlanning']:
+                    planning_person_data = "{}, {}, {}, {}".format(
+                        project_properties["PROJECT_Vastuuhenkil"],
+                        project_properties["PROJECT_Vastuuhenkiln_titteli"],
+                        project_properties["PROJECT_Vastuuhenkiln_puhelinnumero"],
+                        project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
+                    )
+                    planning_person = self.get_project_person(
+                        person_data=planning_person_data
+                    )
+                    if planning_person:
+                        logger.info(f"Imported person {planning_person_data}")
+            except (PWProjectNotFoundError, PWProjectResponseError) as e:
+                logger.error(e)
+            except Exception as e:
+                logger.error(
+                    "Error occurred while fetching project '{}' with PW id '{}'. \nError: {}".format(
+                        project.id, project.hkrId, e
+                    )
+                )
+
     def sync_project_to_pw(self, data: dict, project: Project) -> None:
         """Method to synchronise given product field value to PW"""
         if project.hkrId is None or str(project.hkrId).strip() == "":
@@ -386,7 +421,7 @@ class ProjectWiseService:
                 project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
             )
 
-            planning_person = self.__get_project_person(
+            planning_person = self.get_project_person(
                 person_data=planning_person_data
             )
             if planning_person:
@@ -399,7 +434,7 @@ class ProjectWiseService:
                 project.personPlanning = planning_person
 
         if project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"]:
-            construction_person = self.__get_project_person(
+            construction_person = self.get_project_person(
                 person_data=project_properties["PROJECT_Vastuuhenkil_rakennuttaminen"]
             )
 
@@ -423,7 +458,7 @@ class ProjectWiseService:
 
         project.save()
 
-    def __get_project_person(self, person_data: str) -> Person:
+    def get_project_person(self, person_data: str) -> Person:
         """Helper method to load person from DB with PW data"""
 
         person_data = person_data.strip().replace(", ", ",")
