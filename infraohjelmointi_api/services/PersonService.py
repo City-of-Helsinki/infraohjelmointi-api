@@ -77,4 +77,4 @@ class PersonService:
 
     @staticmethod
     def get_all_persons() -> list[Person]:
-        return Person.objects.all()
+        return list(Person.objects.all())
