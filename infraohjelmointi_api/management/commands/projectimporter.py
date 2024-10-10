@@ -125,7 +125,7 @@ class Command(BaseCommand):
             )
 
         if options["import_responsible_persons_from_pw"] == True:
-            ProjectWiseService().sync_responsible_perons_from_pw()
+            ProjectWiseService().sync_responsible_persons_from_pw()
 
     @transaction.atomic
     def proceedWithFileArgument(
