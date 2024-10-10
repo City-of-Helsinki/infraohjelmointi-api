@@ -70,7 +70,10 @@ class PersonService:
     def get_by_id(
         id: str,
     ) -> Person:
-        return Person.objects.get(id=id)
+        try:
+            return Person.objects.get(id=id)
+        except Person.DoesNotExist:
+            return None
 
     @staticmethod
     def get_all_persons() -> list[Person]:
