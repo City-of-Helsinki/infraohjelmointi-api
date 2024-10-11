@@ -58,15 +58,6 @@ class PersonService:
         return Person.objects.create(firstName=firstName, lastName=lastName, email=email)
 
     @staticmethod
-    def get_by_email(
-        email: str
-    ) -> Person:
-        try:
-            return Person.objects.get(email=email)
-        except Person.DoesNotExist:
-            return None
-
-    @staticmethod
     def get_by_id(
         id: str,
     ) -> Person:
