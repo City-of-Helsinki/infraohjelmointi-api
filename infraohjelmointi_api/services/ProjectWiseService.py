@@ -127,8 +127,8 @@ class ProjectWiseService:
                 if pw_project['personPlanning']:
                     planning_person_data = "{}, {}, {}, {}".format(
                         project_properties["PROJECT_Vastuuhenkil"],
-                        project_properties["PROJECT_Vastuuhenkiln_titteli"],
-                        project_properties["PROJECT_Vastuuhenkiln_puhelinnumero"],
+                        "",
+                        "",
                         project_properties["PROJECT_Vastuuhenkiln_shkpostiosoite"],
                     )
                     planning_person = self.get_project_person(
