@@ -520,6 +520,8 @@ class ProjectViewSet(BaseViewSet):
             groups = ProjectGroup.objects.filter(
                 id__in=queryset.values_list("projectGroup", flat=True).distinct()
             ).select_related("classRelation")
+            logger.info("ryhmät")
+            logger.info(groups)
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
