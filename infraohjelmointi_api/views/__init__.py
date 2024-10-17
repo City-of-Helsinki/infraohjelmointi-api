@@ -35,3 +35,4 @@ from .api.ApiClassesViewSet import *
 from .api.ApiGroupsViewSet import *
 from .api.ApiLocationsViewSet import *
 from .api.ApiProjectsViewSet import *
+from .AppStateValueViewSet import *

@@ -129,6 +129,12 @@ router.register(
     basename="sapCosts",
 )
 
+router.register(
+    r"app-state-value",
+    views.AppStateValueViewSet,
+    basename="appStateValue",
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
