@@ -24,9 +24,13 @@ class Command(BaseCommand):
             "--eri-kaupunginosia",
             action="store_true",
         )
+        parser.add_argument(
+            "--eri-suurpiirejä",
+            action="store_true",
+        )
 
     def handle(self, *args, **options):
-        if not options["file"] and not options["eri_kaupunginosia"]:
+        if not options["file"] and not options["eri_kaupunginosia"] and not options["eri_suurpiirejä"]:
             self.stdout.write(
                 self.style.ERROR(
                     "No arguments given. "
@@ -36,6 +40,10 @@ class Command(BaseCommand):
             return
         if options["eri_kaupunginosia"] is True:
             self.add_eri_kaupunginosia_location_option()
+            return
+        
+        if options["eri_suurpiirejä"] is True:
+            self.add_eri_suurpiirejä_location_option()
             return
         
         if not os.path.isfile(options["file"]):
@@ -78,3 +86,14 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.NOTICE(division.name + " division was added under " + district.name + " district")
             )
+
+    def add_eri_suurpiirejä_location_option(self):
+        division = ProjectDistrictService.get_or_create(
+            name='Eri suurpiirejä',
+            path='Eri suurpiirejä',
+            parent=None,
+            level="district",
+            )[0]
+        self.stdout.write(
+            self.style.NOTICE(division.name + " district was added")
+        )
