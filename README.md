@@ -153,18 +153,16 @@ The codebase should always have a test coverage % higher than 65%. It is usualy 
 the % locally, a report can be created with pytest-cov.
 
 1. If not installed inside the container, you need to install pytest-django and pytest-cov
-  ```bash
+    ```bash
     pip install pytest-django
-    ```
-  ```bash
     pip install pytest-cov
     ```
 
 2. Run
-  ```bash
-      pytest --cov=infraohjelmointi_api/
-      ```
-  to get the test coverage report from the whole project. You can also specify folders or files by changing the value given to --cov=
+    ```bash
+    pytest --cov=infraohjelmointi_api/
+    ```
+    to get the test coverage report from the whole project. You can also specify folders or files by changing the value given to `--cov=`
 
 ## External data sources
 
