@@ -34,7 +34,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         
         # Create new person by lastname
         person, created = PersonService.get_or_create_by_last_name(lastName=lastname)
-        self.assertTrue(created, "Created should be False when creating a new person by lastname")
+        self.assertTrue(created, "Created should be True when creating a new person by lastname")
         self.assertEqual(person.lastName, lastname, "The last name of the person should match the query")
 
         # Get existing person by lastname
@@ -47,13 +47,13 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         
         # Create new person by firstname
         person, created = PersonService.get_or_create_by_first_name(firstName=firstname)
-        self.assertTrue(created, "Created should be False when creating a new person by firstname")
+        self.assertTrue(created, "Created should be True when creating a new person by firstname")
         self.assertEqual(person.firstName, firstname, "The first name of the person should match the query")
 
         # Get existing person by firstname
         person, created = PersonService.get_or_create_by_first_name(firstName=self.firstname)
         self.assertFalse(created, "Created should be False when retrieving an existing person by firstname")
-        self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+        self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
 
     def test_get_or_create_by_name(self):
         firstname1 = "Matt"
@@ -62,23 +62,23 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         lastname2 = "Vainamoinen"
         email = "matt.kalevala@example.com"
 
-        # Create new person without email
+        # Create new person without email. Creating a new person without email is allowed.
         person, created = PersonService.get_or_create_by_name(firstName=firstname1, lastName=lastname1)
-        self.assertTrue(created, "Created should be False when creating a new person by first and lastname")
+        self.assertTrue(created, "Created should be True when creating a new person by first and lastname")
         self.assertEqual(person.firstName, firstname1, "The first name of the person should match the query")
-        self.assertEqual(person.lastName, lastname1, "The first name of the person should match the query")
+        self.assertEqual(person.lastName, lastname1, "The last name of the person should match the query")
 
         # Create new person including email
         person, created = PersonService.get_or_create_by_name(firstName=firstname2, lastName=lastname2, email=email)
-        self.assertTrue(created, "Created should be False when creating a new person by first, lastname, and email")
+        self.assertTrue(created, "Created should be True when creating a new person by first, lastname, and email")
         self.assertEqual(person.firstName, firstname2, "The first name of the person should match the query")
-        self.assertEqual(person.lastName, lastname2, "The first name of the person should match the query")
+        self.assertEqual(person.lastName, lastname2, "The last name of the person should match the query")
         self.assertEqual(person.email, email, "The email of the person should match the query")
 
         # Get existing person by name and email
         person, created = PersonService.get_or_create_by_name(firstName=self.firstname, lastName=self.lastname, email=self.email)
         self.assertFalse(created, "Created should be False when retrieving an existing person by firstname")
-        self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+        self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
         self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
         self.assertEqual(person.email, self.email, "The email of the person should match the query")
 
@@ -96,7 +96,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
     def test_get_by_name(self):
         # Get person
         person = PersonService.get_by_name(firstName=self.firstname, lastName=self.lastname)
-        self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+        self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
         self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
 
         # Create duplicate Person with the same name
@@ -106,7 +106,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         self.assertEqual(len(persons), 2, "Returned persons list length should be 2")
 
         for person in persons:
-            self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+            self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
             self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
 
         # Person does not exists
@@ -126,7 +126,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
 
         # self.assertFalse(created, "Created should be False when creating a new person by first, lastname, and email")
         self.assertEqual(person.firstName, firstname, "The first name of the person should match the query")
-        self.assertEqual(person.lastName, lastname, "The first name of the person should match the query")
+        self.assertEqual(person.lastName, lastname, "The last name of the person should match the query")
         self.assertEqual(person.email, email, "The email of the person should match the query")
 
     def test_get_by_email(self):
@@ -134,7 +134,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         
         # Get person by email
         person = PersonService.get_by_email(email=self.email)
-        self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+        self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
         self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
         self.assertEqual(person.email, self.email, "The email of the person should match the query")
 
@@ -148,7 +148,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         # Get person by UUID
         person = PersonService.get_by_id(id=self._id)
         self.assertEqual(person.id, self._uuid, "The UUID of the person should match the query")
-        self.assertEqual(person.firstName, self.firstname, "The last name of the person should match the query")
+        self.assertEqual(person.firstName, self.firstname, "The first name of the person should match the query")
         self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
         self.assertEqual(person.email, self.email, "The email of the person should match the query")
 
@@ -164,5 +164,5 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         # Total count of person is four
         persons = PersonService.get_all_persons()
         self.assertEqual(isinstance(persons, list), True, "Returned data should be a list of multiple Persons")
-        self.assertEqual(len(persons), 4, "Returned list of multiple Person should be exactly 10")
+        self.assertEqual(len(persons), 4, "Returned list of multiple Person should be exactly 4")
 
