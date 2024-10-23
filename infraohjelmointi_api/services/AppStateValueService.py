@@ -1,4 +1,4 @@
-from ..models import AppStateValueModel
+from ..models import AppStateValue
 
 
 class AppStateValueService:
@@ -6,5 +6,5 @@ class AppStateValueService:
     def get_or_create(
         name: str,
         value: bool
-    ) -> AppStateValueModel:
-        return AppStateValueModel.objects.get_or_create(name=name, value=value)
+    ) -> AppStateValue:
+        return AppStateValue.objects.get_or_create(name=name, value=value)
