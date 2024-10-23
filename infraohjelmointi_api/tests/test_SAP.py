@@ -6,7 +6,7 @@ from infraohjelmointi_api.services.SapApiService import SapApiService
 
 class TestSAPService(unittest.TestCase):
     def setUp(self):
-        self.sap_service = SapApiService()  # Instantiate your SAPService class
+        self.sap_service = SapApiService()
         self.sap_service.sap_api_url = "http://fake-sap-api-url.com"
         self.sap_service.sap_api_costs_endpoint = "$/costs?id='{posid}'&start={budat_start}&end={budat_end}"
         self.sap_service.sap_api_commitments_endpoint = "$/costs?id='{posid}'&start={budat_start}&end={budat_end}"
