@@ -119,36 +119,6 @@ class SapApiService:
         """Method to fetch costs and commitments from SAP with given SAP project id"""
         logger.debug("in get_project_costs_and_commitments_from_sap")
         start_time = time.perf_counter()
-        api_url = f"{self.sap_api_url}{self.sap_api_costs_endpoint}".format(
-            posid=id,
-            budat_start=budat_start.strftime("%Y-%m-%dT%H:%M:%S"),
-            budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
-        )
-
-        logger.debug("Requesting API {} for costs".format(api_url))
-        response = self.session.get(api_url)
-        response_time = time.perf_counter() - start_time
-
-        logger.debug(f"SAP responded in {response_time}s")
-        # costs and commitments are zeros by default defaults
-        json_response = {
-            "costs": [
-                {"Posid": f"{id}.01", "Wkgbtr": Decimal(0.000)},
-                {"Posid": f"{id}.02", "Wkgbtr": Decimal(0.000)},
-            ],
-            "commitments": [
-                {"Posid": f"{id}.01", "Wkgbtr": Decimal(0.000)},
-                {"Posid": f"{id}.02", "Wkgbtr": Decimal(0.000)},
-            ],
-        }
-        print(response.content)
-        # Check if SAP responded with error
-        if response.status_code != 200:
-            logger.error(
-                f"SAP responded for costs with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
-            )
-        else:
-            json_response["costs"] = response.json()["d"]["results"]
 
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
@@ -164,6 +134,40 @@ class SapApiService:
                 sap_start_year = project.planningStartYear
 
         if sap_start_year:
+            api_url = f"{self.sap_api_url}{self.sap_api_costs_endpoint}".format(
+                posid=id,
+                budat_start=budat_start.replace(year=sap_start_year).strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                ),
+                budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
+            )
+
+            logger.debug("Requesting API {} for costs".format(api_url))
+            response = self.session.get(api_url)
+            response_time = time.perf_counter() - start_time
+
+            logger.debug(f"SAP responded in {response_time}s")
+            # costs and commitments are zeros by default defaults
+            json_response = {
+                "costs": [
+                    {"Posid": f"{id}.01", "Wkgbtr": Decimal(0.000)},
+                    {"Posid": f"{id}.02", "Wkgbtr": Decimal(0.000)},
+                ],
+                "commitments": [
+                    {"Posid": f"{id}.01", "Wkgbtr": Decimal(0.000)},
+                    {"Posid": f"{id}.02", "Wkgbtr": Decimal(0.000)},
+                ],
+            }
+
+            # Check if SAP responded with error
+            if response.status_code != 200:
+                logger.error(
+                    f"SAP responded for costs with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
+                )
+            else:
+                json_response["costs"] = response.json()["d"]["results"]
+
+
             start_time = time.perf_counter()
             api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
                 posid=id,
