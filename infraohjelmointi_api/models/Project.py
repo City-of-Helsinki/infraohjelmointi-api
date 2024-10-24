@@ -181,8 +181,8 @@ class Project(models.Model):
     unitCost = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
-    costForecast = models.DecimalField(
-        max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
+    costForecast = models.PositiveIntegerField(
+        default=0, blank=True, null=True
     )
     neighborhood = models.CharField(max_length=200, blank=True, null=True)
     comittedCost = models.DecimalField(
