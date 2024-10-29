@@ -1,25 +1,42 @@
-FROM alpine:3.18
+FROM registry.access.redhat.com/ubi9/python-311:1-77.1726664316
 
 WORKDIR /app
 
 ENV STATIC_ROOT /srv/app/static
 COPY . .
 
-RUN TZ="Europe/Helsinki" apk add --update nano libffi-dev gcc \
-    musl-dev python3-dev python3  py3-pip py3-pandas uwsgi \
-    postgresql-client netcat-openbsd gettext libpq-dev unzip \
-    bash grep busybox-suid dcron libcap && \
+USER root
+
+RUN TZ="Europe/Helsinki" && \
+    yum -y update && \
+    yum install -y nano \
+    libffi-devel \
+    gcc \
+    python3 \
+    python3-devel \
+    python3-pip \
+    postgresql \
+    postgresql-devel \
+    libpq-devel \
+    unzip \
+    bash \
+    grep \
+    cronie \
+    libcap && \
+    # Install pip packages (pandas and uwsgi) instead of using yum
+    pip install pandas uwsgi && \
+    # Ensure pip and python are accessible globally
     ln -s /usr/bin/pip3 /usr/local/bin/pip && \
     ln -s /usr/bin/python3 /usr/local/bin/python && \
-    # install python project modules
+    # Install Python project dependencies
     pip install --no-cache-dir -r requirements.txt && \
+    # Collect static files using Django settings
     mkdir -p /srv/app/static && \
     DJANGO_SECRET_KEY="only-used-for-collectstatic" DATABASE_URL="sqlite:///" \
     python manage.py collectstatic --noinput && \
     chmod +x /app/sync-from-sap.sh
 
-# Openshift starts the container process with group zero and random ID
-# we mimic that here with nobody and group zero
+# Set user to nobody and group 0, to match OpenShift's UID/GID setup
 USER nobody:0
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

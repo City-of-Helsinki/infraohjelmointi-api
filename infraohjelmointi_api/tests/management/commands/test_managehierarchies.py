@@ -7,12 +7,10 @@ import environ
 import uuid
 from overrides import override
 from os import path
-import pandas as pd
-import numpy as np
 
-from ....models import Project, ProjectClass, ProjectLocation
-from ....services.ProjectWiseService import PWProjectResponseError
-from ....services import ProjectLocationService
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectLocation
+from infraohjelmointi_api.services.ProjectWiseService import PWProjectResponseError
+from infraohjelmointi_api.services import ProjectLocationService
 
 
 if path.exists(".env"):
