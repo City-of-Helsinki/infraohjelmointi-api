@@ -43,4 +43,4 @@ class SyncResponsiblePersonsFromPWTestCase(TestCase):
         mock_get_project_from_pw.assert_called_with(12345)
 
         # Assert that __get_project_person was called with the correct data
-        mock_get_project_person.assert_called_with(person_data="John Doe, , , john.doe@example.com")
+        mock_get_project_person.assert_called_with(person_data="John Doe, Project Manager, 1234567890, john.doe@example.com")
