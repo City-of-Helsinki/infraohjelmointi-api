@@ -403,7 +403,7 @@ class IsAdmin(permissions.BasePermission):
             request.user.is_authenticated
             and self.user_in_test_group(request=request)
             and request.method in SAFE_METHODS
-            and view.action
+            and (view.action
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
@@ -416,12 +416,16 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_ALL_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
-            ]
+            ])
+            or request.user.is_authenticated
         ):
+            print("PERMISSION")
+            print("Action", request.method, view.action)
             return True
-
+        print("Action", request.method, view.action)
         return False
 
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
+        print("OBJECT PERMISSION")
         return True
