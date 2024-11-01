@@ -11,7 +11,7 @@ logger = logging.getLogger("infraohjelmointi_api")
 class Command(BaseCommand):
     help = (
         "Populates the DB with person information. "
-        + "\nOne person per a line, first name, second name and email in different cells: "
+        + "\nOne person per a line, first name, last name and email in different cells: "
         + "\n[firstName | lastName | email]"
         + "\nUsage: python manage.py addusers --file <path/to/excel.xlsx>"
     )
