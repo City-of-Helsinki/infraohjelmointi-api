@@ -2,7 +2,6 @@ from datetime import date
 import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
-from infraohjelmointi_api.models.AppStateValueModel import AppStateValue
 from infraohjelmointi_api.serializers import (
     AppStateValueSerializer,
     ProjectHashtagSerializer,
@@ -570,8 +569,6 @@ class ProjectViewSet(BaseViewSet):
             groups = ProjectGroup.objects.filter(
                 id__in=queryset.values_list("projectGroup", flat=True).distinct()
             ).select_related("classRelation")
-            logger.info("ryhmät")
-            logger.info(groups)
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
