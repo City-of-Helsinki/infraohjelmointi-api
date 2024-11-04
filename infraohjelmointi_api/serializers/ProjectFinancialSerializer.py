@@ -30,12 +30,12 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
             if not ProjectFinancialService.instance_exists(
                 project_id=validated_data.get("project").id,
                 year=validated_data.get("year"),
-                forFrameView=True,
+                for_frame_view=True,
             ):
                 ProjectFinancialService.create(
                     project_id=validated_data.get("project").id,
                     year=validated_data.get("year"),
-                    forFrameView=True,
+                    for_frame_view=True,
                     value=validated_data.get("value", 0),
                 )
 
@@ -52,12 +52,12 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
             if not ProjectFinancialService.instance_exists(
                 project_id=instance.project.id,
                 year=instance.year,
-                forFrameView=True,
+                for_frame_view=True,
             ):
                 ProjectFinancialService.create(
                     project_id=instance.project.id,
                     year=instance.year,
-                    forFrameView=True,
+                    for_frame_view=True,
                     value=validated_data.get("value", 0),
                 )
         return super(ProjectFinancialSerializer, self).update(instance, validated_data)

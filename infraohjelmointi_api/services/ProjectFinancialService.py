@@ -4,32 +4,32 @@ from ..models import ProjectFinancial
 class ProjectFinancialService:
     @staticmethod
     def get_or_create(
-        year: str, project_id: str, forFrameView: bool = False
+        year: str, project_id: str, for_frame_view: bool = False
     ) -> ProjectFinancial:
         return ProjectFinancial.objects.get_or_create(
-            year=year, project_id=project_id, forFrameView=forFrameView
+            year=year, project_id=project_id, forFrameView=for_frame_view
         )
 
     @staticmethod
     def create(
-        year: str, project_id: str, forFrameView: bool = False, value: int = 0
+        year: str, project_id: str, for_frame_view: bool = False, value: int = 0
     ) -> ProjectFinancial:
         return ProjectFinancial.objects.create(
-            year=year, project_id=project_id, forFrameView=forFrameView, value=value
+            year=year, project_id=project_id, forFrameView=for_frame_view, value=value
         )
 
     @staticmethod
     def update_or_create(
         year: str,
         project_id: str,
-        updatedData: dict,
-        forFrameView: bool = False,
+        updated_data: dict,
+        for_gframe_view: bool = False,
     ) -> ProjectFinancial:
         return ProjectFinancial.objects.update_or_create(
             year=year,
             project_id=project_id,
-            forFrameView=forFrameView,
-            defaults=updatedData,
+            forFrameView=for_gframe_view,
+            defaults=updated_data,
         )
 
     @staticmethod
@@ -45,42 +45,42 @@ class ProjectFinancialService:
 
     @staticmethod
     def find_by_project_id_and_max_year(
-        project_id: str, max_year: int, forFrameView: bool = False
+        project_id: str, max_year: int, for_frame_view: bool = False
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            project=project_id, year__lt=max_year, forFrameView=forFrameView
+            project=project_id, year__lt=max_year, forFrameView=for_frame_view
         )
 
     @staticmethod
     def find_by_project_id_and_year_range(
-        project_id: str, year_range: range, forFrameView: bool = False
+        project_id: str, year_range: range, for_frame_view: bool = False
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            project=project_id, year__in=year_range, forFrameView=forFrameView
+            project=project_id, year__in=year_range, forFrameView=for_frame_view
         )
 
     @staticmethod
     def find_by_min_value_and_year_range(
-        min_value: int, year_range: range, forFrameView: bool = False
+        min_value: int, year_range: range, for_frame_view: bool = False
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            value__gt=min_value, year__in=year_range, forFrameView=forFrameView
+            value__gt=min_value, year__in=year_range, forFrameView=for_frame_view
         )
 
     @staticmethod
     def find_by_min_value_and_min_year(
-        min_value: int, min_year: int, forFrameView: bool = False
+        min_value: int, min_year: int, for_frame_view: bool = False
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            value__gt=min_value, year__gte=min_year, forFrameView=forFrameView
+            value__gt=min_value, year__gte=min_year, forFrameView=for_frame_view
         )
 
     @staticmethod
     def find_by_min_value_and_max_year(
-        min_value: int, max_year: int, forFrameView: bool = False
+        min_value: int, max_year: int, for_frame_view: bool = False
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            value__gt=min_value, year__lte=max_year, forFrameView=forFrameView
+            value__gt=min_value, year__lte=max_year, forFrameView=for_frame_view
         )
 
     @staticmethod
@@ -109,8 +109,16 @@ class ProjectFinancialService:
         return start_year + number
 
     @staticmethod
-    def instance_exists(project_id: str, year: int, forFrameView: bool = False) -> bool:
+    def instance_exists(project_id: str, year: int, for_frame_view: bool = False) -> bool:
         """Check if instance exists in DB"""
         return ProjectFinancial.objects.filter(
-            project_id=project_id, year=year, forFrameView=forFrameView
+            project_id=project_id, year=year, forFrameView=for_frame_view
         ).exists()
+    
+    @staticmethod
+    def get_by_project_id_and_forced_to_frame_value(
+        project_id: str, forced_to_frame: bool
+    ) -> list[ProjectFinancial]:
+        return ProjectFinancial.objects.filter(
+            project_id=project_id, forced_to_frame=forced_to_frame
+        )

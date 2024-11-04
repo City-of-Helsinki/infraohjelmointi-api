@@ -419,13 +419,9 @@ class IsAdmin(permissions.BasePermission):
             ])
             or request.user.is_authenticated
         ):
-            print("PERMISSION")
-            print("Action", request.method, view.action)
             return True
-        print("Action", request.method, view.action)
         return False
 
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
-        print("OBJECT PERMISSION")
         return True
