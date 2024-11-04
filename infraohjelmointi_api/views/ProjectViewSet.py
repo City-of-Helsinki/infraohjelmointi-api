@@ -2,7 +2,9 @@ from datetime import date
 import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
+from infraohjelmointi_api.models.AppStateValueModel import AppStateValue
 from infraohjelmointi_api.serializers import (
+    AppStateValueSerializer,
     ProjectHashtagSerializer,
     ProjectPhaseSerializer,
     ProjectGetSerializer,
@@ -15,6 +17,7 @@ from infraohjelmointi_api.serializers import (
 )
 from infraohjelmointi_api.models import (
     ClassFinancial,
+    LocationFinancial,
     Project,
     ProjectGroup,
     ProjectClass,
@@ -22,6 +25,7 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
 )
 from infraohjelmointi_api.services import (
+    AppStateValueService,
     ProjectWiseService,
     ProjectFinancialService,
     ProjectClassService,
@@ -1024,9 +1028,49 @@ class ProjectViewSet(BaseViewSet):
             for start in range(0, total, batch_size):
                 end = min(start + batch_size, total)
                 yield queryset[start:end]
+        
+        bulk_size = 100
 
-        BATCH_SIZE = 100
+        new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
 
+        # Bulk create new ProjectFinancial entries
+        ProjectFinancial.objects.bulk_create(new_project_finances, bulk_size)
+
+        # Bulk update existing ProjectFinancial entries
+        if update_project_finances:
+            for batch in batch_process(update_project_finances, bulk_size):
+                ProjectFinancial.objects.bulk_update(batch, ['value'])
+
+        new_class_finances, update_class_finances = self.update_forced_to_frame_classes()
+
+        # Bulk create new ClassFinancial entries
+        ClassFinancial.objects.bulk_create(new_class_finances, bulk_size)
+
+        # Bulk update existing ClassFinancial entries
+        if update_class_finances:
+            for batch in batch_process(update_class_finances, bulk_size):
+                ClassFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
+
+        new_location_finances, update_location_finances = self.update_forced_to_frame_locations()
+
+        # Bulk create new LocationFinancial entries
+        LocationFinancial.objects.bulk_create(new_location_finances, bulk_size)
+
+        # Bulk update existing LocationFinancial entries
+        if update_location_finances:
+            for batch in batch_process(update_location_finances, bulk_size):
+                LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
+
+        forced_to_frame_data_updated, created = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
+
+        forced_to_frame_data_updated_serializer = AppStateValueSerializer(forced_to_frame_data_updated)
+
+        return Response(
+            data=forced_to_frame_data_updated_serializer.data,
+            status=200
+        )
+    
+    def update_forced_to_frame_projects(self):
         # updating the forced to frame schedule
         Project.objects.all().update(
             frameEstPlanningStart=F('estPlanningStart'),
@@ -1062,23 +1106,71 @@ class ProjectViewSet(BaseViewSet):
                     forFrameView=True
                 )
                 new_finances.append(new_finance)
-
-        # Bulk create new ProjectFinancial entries
-        ProjectFinancial.objects.bulk_create(new_finances)
-
-        # Bulk update existing ProjectFinancial entries
-        if update_finances:
-            for batch in batch_process(update_finances, BATCH_SIZE):
-                ProjectFinancial.objects.bulk_update(batch, ['value'])
-
+        return new_finances, update_finances
+    
+    def update_forced_to_frame_classes(self):
         # updating forced to frame finance data for classes
-        planning_view_finances = ClassFinancial.objects.filter(forFrameView=False, )
+        coordination_view_finances = ClassFinancial.objects.filter(forFrameView=False)
         existing_frame_view_map = defaultdict(dict)
         frame_view_finances = ClassFinancial.objects.filter(forFrameView=True)
 
-        return Response(
-            status=200
-        )
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.classRelation_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in coordination_view_finances:
+            key = (finance.classRelation_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.frameBudget = finance.frameBudget
+                frame_view_finance.budgetChange = finance.budgetChange
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = ClassFinancial(
+                    classRelation_id=finance.classRelation_id,
+                    year=finance.year,
+                    frameBudget=finance.frameBudget,
+                    budgetChange=finance.budgetChange,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+        return new_finances, update_finances
+    
+    def update_forced_to_frame_locations(self):
+        # updating forced to frame finance data for classes
+        coordination_view_finances = LocationFinancial.objects.filter(forFrameView=False)
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = LocationFinancial.objects.filter(forFrameView=True)
+
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.locationRelation_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in coordination_view_finances:
+            key = (finance.locationRelation_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.frameBudget = finance.frameBudget
+                frame_view_finance.budgetChange = finance.budgetChange
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = LocationFinancial(
+                    locationRelation_id=finance.locationRelation_id,
+                    year=finance.year,
+                    frameBudget=finance.frameBudget,
+                    budgetChange=finance.budgetChange,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+        return new_finances, update_finances
         
 
     @transaction.atomic
