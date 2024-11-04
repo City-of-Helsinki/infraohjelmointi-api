@@ -9,10 +9,12 @@ from infraohjelmointi_api.serializers import (
     ProjectCreateSerializer,
     ProjectFinancialSerializer,
     ProjectGroupSerializer,
+    ProjectWithFinancesSerializer,
     SearchResultSerializer,
     ProjectNoteGetSerializer,
 )
 from infraohjelmointi_api.models import (
+    ClassFinancial,
     Project,
     ProjectGroup,
     ProjectClass,
@@ -37,8 +39,9 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, Prefetch
+from django.db.models import Count, Case, When, Q, Prefetch, F
 from django.db.models.signals import post_save
+from collections import defaultdict
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -183,7 +186,7 @@ class ProjectViewSet(BaseViewSet):
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
                         year=finance_year,
-                        forFrameView=True,
+                        for_frame_view=True,
                     )
                 ):
                     frameViewFinanceObject = ProjectFinancial(
@@ -990,6 +993,93 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+        
+    @transaction.atomic
+    @action(
+        methods=["patch"],
+        detail=False,
+        url_path=r"bulk-update/forced-to-frame",
+        serializer_class=ProjectWithFinancesSerializer,
+        name="patch_bulk_forced_to_frame",
+    )
+    def patch_bulk_forced_to_frame_projects(self, request):
+        """
+        Custom action to get allow bulk forced to frame project updates in one PATCH request
+
+            Usage
+            ----------
+
+            projects/bulk-update/forced-to-frame
+            Request body format: [{id: project_id, data: {} }, ..]
+
+            Returns
+            -------
+
+            JSON
+                List of updated Project instances
+        """
+
+        def batch_process(queryset, batch_size):
+            total = len(queryset)
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                yield queryset[start:end]
+
+        BATCH_SIZE = 100
+
+        # updating the forced to frame schedule
+        Project.objects.all().update(
+            frameEstPlanningStart=F('estPlanningStart'),
+            frameEstPlanningEnd=F('estPlanningEnd'),
+            frameEstConstructionStart=F('estConstructionStart'),
+            frameEstConstructionEnd=F('estConstructionEnd')
+        )
+
+        #updating the forced to frame finance data for projects
+        planning_view_finances = ProjectFinancial.objects.filter(forFrameView=False)
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = ProjectFinancial.objects.filter(forFrameView=True)
+
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.project_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in planning_view_finances:
+            key = (finance.project_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.value = finance.value
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = ProjectFinancial(
+                    project_id=finance.project_id,
+                    year=finance.year,
+                    value=finance.value,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+
+        # Bulk create new ProjectFinancial entries
+        ProjectFinancial.objects.bulk_create(new_finances)
+
+        # Bulk update existing ProjectFinancial entries
+        if update_finances:
+            for batch in batch_process(update_finances, BATCH_SIZE):
+                ProjectFinancial.objects.bulk_update(batch, ['value'])
+
+        # updating forced to frame finance data for classes
+        planning_view_finances = ClassFinancial.objects.filter(forFrameView=False, )
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = ClassFinancial.objects.filter(forFrameView=True)
+
+        return Response(
+            status=200
+        )
+        
 
     @transaction.atomic
     @action(
