@@ -94,6 +94,9 @@ PROJECT_COORDINATOR_PATCH_ACTIONS = []
 PROJECT_PLANNING_PATCH_ACTIONS = [
     "patch_bulk_projects",
 ]
+PROJECT_FORCED_TO_FRAME_PATCH = [
+    "patch_bulk_forced_to_frame",
+]
 PROJECT_ALL_PATCH_ACTIONS = [
     *PROJECT_COORDINATOR_PATCH_ACTIONS,
     *PROJECT_PLANNING_PATCH_ACTIONS,
@@ -403,7 +406,7 @@ class IsAdmin(permissions.BasePermission):
             request.user.is_authenticated
             and self.user_in_test_group(request=request)
             and request.method in SAFE_METHODS
-            and (view.action
+            and view.action
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
@@ -416,8 +419,8 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_ALL_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
-            ])
-            or request.user.is_authenticated
+                *PROJECT_FORCED_TO_FRAME_PATCH,
+            ]
         ):
             return True
         return False

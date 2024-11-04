@@ -1049,7 +1049,7 @@ class ProjectViewSet(BaseViewSet):
         serializer_class=ProjectWithFinancesSerializer,
         name="patch_bulk_forced_to_frame",
     )
-    def patch_bulk_forced_to_frame_projects(self, request):
+    def patch_bulk_forced_to_frame(self, request):
         """
         Custom action to get allow bulk forced to frame project updates in one PATCH request
 
