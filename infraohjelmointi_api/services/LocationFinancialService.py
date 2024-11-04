@@ -5,22 +5,22 @@ from ..models import LocationFinancial, ProjectLocation
 
 class LocationFinancialService:
     @staticmethod
-    def get_or_create(year: str, location_id: str) -> LocationFinancial:
+    def get_or_create(year: str, location_id: str, for_frame_view: bool) -> LocationFinancial:
         return LocationFinancial.objects.get_or_create(
-            year=year, locationRelation_id=location_id
+            year=year, locationRelation_id=location_id, forFrameView=for_frame_view
         )
 
     @staticmethod
     def update_or_create(
-        year: str, location_id: str, updatedData: dict
+        year: str, location_id: str, updatedData: dict, for_frame_view: bool
     ) -> LocationFinancial:
         return LocationFinancial.objects.update_or_create(
-            year=year, locationRelation_id=location_id, defaults=updatedData
+            year=year, locationRelation_id=location_id, forFrameView=for_frame_view, defaults=updatedData
         )
 
     @staticmethod
-    def get(location_id: str, year: str) -> LocationFinancial:
-        return LocationFinancial.objects.get(locationRelation_id=location_id, year=year)
+    def get(location_id: str, year: str, for_frame_view: bool) -> LocationFinancial:
+        return LocationFinancial.objects.get(locationRelation_id=location_id, year=year, forFrameView=for_frame_view)
 
     @staticmethod
     def get_request_field_to_year_mapping(start_year: int):
