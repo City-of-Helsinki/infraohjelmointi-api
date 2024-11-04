@@ -10,9 +10,9 @@ class ClassFinancialService:
         )
 
     @staticmethod
-    def update_or_create(year: str, class_id: str, updatedData: dict) -> ClassFinancial:
+    def update_or_create(year: str, class_id: str, for_frame_view: bool, updatedData: dict) -> ClassFinancial:
         return ClassFinancial.objects.update_or_create(
-            year=year, classRelation_id=class_id, defaults=updatedData
+            year=year, classRelation_id=class_id, forFrameView=for_frame_view, defaults=updatedData
         )
 
     @staticmethod
