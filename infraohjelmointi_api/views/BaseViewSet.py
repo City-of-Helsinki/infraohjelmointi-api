@@ -12,7 +12,14 @@ class BaseViewSet(viewsets.ModelViewSet):
     #permissions can uncommented to test
     permission_classes = [
         IsAuthenticated
-        & IsAdmin
+        & (
+            IsCoordinator
+            | IsPlanner
+            | IsPlannerOfProjectAreas
+            | IsProjectManager
+            | IsViewer
+            | IsAdmin
+        )
     ]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
 
