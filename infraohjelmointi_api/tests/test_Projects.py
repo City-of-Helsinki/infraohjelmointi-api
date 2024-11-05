@@ -1,5 +1,6 @@
 from django.test import TestCase
 from datetime import (date, datetime)
+from infraohjelmointi_api.services import AppStateValueService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
@@ -711,10 +712,15 @@ class ProjectTestCase(TestCase):
         )
 
     def test_PATCH_project(self):
+        AppStateValueService.update_or_create(name="forcedToFrameStatus", value=True)
         data = {
             "name": "Test Project 1 patched",
             "favPersons": [self.person_1.id.__str__(), self.person_3.id.__str__()],
             "phase": self.projectPhase_1_Id,
+            "estPlanningStart": "21.11.2022",
+            "estPlanningEnd": "29.11.2022",
+            "estConstructionStart": "21.11.2022",
+            "estConstructionEnd": "29.11.2022",
         }
         response = self.client.patch(
             "/projects/{}/".format(self.project_1_Id),
@@ -732,6 +738,10 @@ class ProjectTestCase(TestCase):
             data["favPersons"],
             msg="Data: favPersons sent through PATCH != Data: favPersons in the DB",
         )
+        self.assertEqual(response.json()["frameEstPlanningStart"], data["estPlanningStart"])
+        self.assertEqual(response.json()["frameEstPlanningEnd"], data["estPlanningEnd"])
+        self.assertEqual(response.json()["frameEstConstructionStart"], data["estConstructionStart"])
+        self.assertEqual(response.json()["frameEstConstructionEnd"], data["estConstructionEnd"])
 
     def test_DELETE_project(self):
         response = self.client.delete("/projects/{}/".format(self.project_1_Id))
