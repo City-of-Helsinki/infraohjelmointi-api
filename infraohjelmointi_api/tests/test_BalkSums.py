@@ -9,6 +9,7 @@ from infraohjelmointi_api.models import (
 )
 
 import uuid
+from infraohjelmointi_api.models.AppStateValueModel import AppStateValue
 from overrides import override
 
 from infraohjelmointi_api.views import BaseViewSet
@@ -636,7 +637,13 @@ class BalkSumTestCase(TestCase):
             frameBudget=100, budgetChange=100, year=year
         )
         coordinatorMasterClass_1.finances.create(
+            frameBudget=100, budgetChange=100, year=year, forFrameView=True
+        )
+        coordinatorMasterClass_1.finances.create(
             frameBudget=50, budgetChange=50, year=year + 1
+        )
+        coordinatorMasterClass_1.finances.create(
+            frameBudget=50, budgetChange=50, year=year + 1, forFrameView=True
         )
 
         coordinatorClass_1 = coordinatorMasterClass_1.childClass.create(
@@ -647,6 +654,7 @@ class BalkSumTestCase(TestCase):
             relatedTo=_class,
         )
         coordinatorClass_1.finances.create(frameBudget=2000, budgetChange=50, year=year)
+        coordinatorClass_1.finances.create(frameBudget=2000, budgetChange=50, year=year, forFrameView=True)
         coordinatorSubClass_1 = coordinatorClass_1.childClass.create(
             id=self.projectCoordinatorSubClass_1_Id,
             name="Coordinator Sub class 1",
@@ -664,6 +672,10 @@ class BalkSumTestCase(TestCase):
 
         coordinatorSubClass_1.finances.create(
             frameBudget=0, budgetChange=50, year=year + 5
+        )
+
+        coordinatorSubClass_1.finances.create(
+            frameBudget=0, budgetChange=50, year=year + 5, forFrameView=True
         )
 
         projectCoordinationDistrict_1 = ProjectLocation.objects.create(
@@ -778,7 +790,8 @@ class BalkSumTestCase(TestCase):
                 "finances": {
                     "year": date.today().year,
                     "year0": {"frameBudget": 1000, "budgetChange": 50},
-                }
+                },
+                "forcedToFrame": False
             },
             content_type="application/json",
         )
@@ -838,7 +851,8 @@ class BalkSumTestCase(TestCase):
                 "finances": {
                     "year": date.today().year,
                     "year0": {"frameBudget": 1000, "budgetChange": 50},
-                }
+                },
+                "forcedToFrame": False
             },
             content_type="application/json",
         )

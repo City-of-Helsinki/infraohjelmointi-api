@@ -1274,7 +1274,7 @@ class ProjectViewSet(BaseViewSet):
                             ) = ProjectFinancialService.get_or_create(
                                 year=finance_year,
                                 project_id=Project(id=financeData["project"]).id,
-                                forFrameView=forcedToFrame,
+                                for_frame_view=forcedToFrame,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,
