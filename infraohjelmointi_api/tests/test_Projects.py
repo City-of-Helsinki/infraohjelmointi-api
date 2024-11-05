@@ -4,6 +4,8 @@ from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
 import uuid
+from django.urls import reverse
+from rest_framework import status
 
 from ..models import (
     Project,
@@ -563,6 +565,13 @@ class ProjectTestCase(TestCase):
             set(project["finances"]["year"] for project in response.json()["results"]),
             msg="Project Data in response must have the financial data from year 2025",
         )
+    
+    def test_get_projects_list(self):
+        # Test retrieving a list of projects
+        url = reverse('projects-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 4)
 
     def test_GET_one_project(self):
         response = self.client.get(
