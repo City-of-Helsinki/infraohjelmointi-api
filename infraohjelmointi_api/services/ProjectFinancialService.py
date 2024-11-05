@@ -120,5 +120,5 @@ class ProjectFinancialService:
         project_id: str, forced_to_frame: bool
     ) -> list[ProjectFinancial]:
         return ProjectFinancial.objects.filter(
-            project_id=project_id, forced_to_frame=forced_to_frame
+            project_id=project_id, forFrameView=forced_to_frame
         )

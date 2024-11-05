@@ -1,6 +1,6 @@
 from django.test import TestCase
 from datetime import (date, datetime)
-from infraohjelmointi_api.services import AppStateValueService
+from infraohjelmointi_api.services import AppStateValueService, ProjectFinancialService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
@@ -841,6 +841,13 @@ class ProjectTestCase(TestCase):
             response.json()[1]["finances"]["budgetProposalCurrentYearPlus0"],
             "2.00",
         )
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
 
     def test_notes_project(self):
         Note.objects.create(
