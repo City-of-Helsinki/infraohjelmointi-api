@@ -26,6 +26,7 @@ admin.site.register(models.ProjectQualityLevel)
 admin.site.register(models.ProjectClass)
 admin.site.register(models.ProjectRisk)
 admin.site.register(models.ProjectLocation)
+admin.site.register(models.AppStateValue)
 
 
 # Register your models here.

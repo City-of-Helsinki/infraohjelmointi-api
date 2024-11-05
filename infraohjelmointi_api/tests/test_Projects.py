@@ -1,9 +1,12 @@
 from django.test import TestCase
 from datetime import (date, datetime)
+from infraohjelmointi_api.services import AppStateValueService, ProjectFinancialService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
 import uuid
+from django.urls import reverse
+from rest_framework import status
 
 from ..models import (
     Project,
@@ -563,6 +566,13 @@ class ProjectTestCase(TestCase):
             set(project["finances"]["year"] for project in response.json()["results"]),
             msg="Project Data in response must have the financial data from year 2025",
         )
+    
+    def test_get_projects_list(self):
+        # Test retrieving a list of projects
+        url = reverse('projects-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 4)
 
     def test_GET_one_project(self):
         response = self.client.get(
@@ -702,10 +712,19 @@ class ProjectTestCase(TestCase):
         )
 
     def test_PATCH_project(self):
+        AppStateValueService.update_or_create(name="forcedToFrameStatus", value=True)
         data = {
             "name": "Test Project 1 patched",
             "favPersons": [self.person_1.id.__str__(), self.person_3.id.__str__()],
             "phase": self.projectPhase_1_Id,
+            "estPlanningStart": "21.11.2022",
+            "estPlanningEnd": "29.11.2022",
+            "estConstructionStart": "21.11.2022",
+            "estConstructionEnd": "29.11.2022",
+            "finances": {
+                "year": 2024,
+                "budgetProposalCurrentYearPlus1": 600
+            }
         }
         response = self.client.patch(
             "/projects/{}/".format(self.project_1_Id),
@@ -723,6 +742,11 @@ class ProjectTestCase(TestCase):
             data["favPersons"],
             msg="Data: favPersons sent through PATCH != Data: favPersons in the DB",
         )
+        self.assertEqual(response.json()["frameEstPlanningStart"], data["estPlanningStart"])
+        self.assertEqual(response.json()["frameEstPlanningEnd"], data["estPlanningEnd"])
+        self.assertEqual(response.json()["frameEstConstructionStart"], data["estConstructionStart"])
+        self.assertEqual(response.json()["frameEstConstructionEnd"], data["estConstructionEnd"])
+        self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus1"], "600.00")
 
     def test_DELETE_project(self):
         response = self.client.delete("/projects/{}/".format(self.project_1_Id))
@@ -817,6 +841,13 @@ class ProjectTestCase(TestCase):
             response.json()[1]["finances"]["budgetProposalCurrentYearPlus0"],
             "2.00",
         )
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
 
     def test_notes_project(self):
         Note.objects.create(

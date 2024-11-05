@@ -27,6 +27,7 @@ class LocationFinancial(models.Model):
     )
     frameBudget = models.PositiveIntegerField(blank=True, null=True, default=0)
     budgetChange = models.IntegerField(blank=True, null=True, default=0)
+    forFrameView = models.BooleanField(blank=False, default=False)
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
@@ -37,6 +38,7 @@ class LocationFinancial(models.Model):
                 fields=[
                     "locationRelation",
                     "year",
+                    "forFrameView",
                 ],
                 name="Unique together Constraint Location Financial",
             )

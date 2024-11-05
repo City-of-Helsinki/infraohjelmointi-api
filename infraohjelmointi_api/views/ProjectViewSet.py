@@ -3,16 +3,20 @@ import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
+    AppStateValueSerializer,
     ProjectHashtagSerializer,
     ProjectPhaseSerializer,
     ProjectGetSerializer,
     ProjectCreateSerializer,
     ProjectFinancialSerializer,
     ProjectGroupSerializer,
+    ProjectWithFinancesSerializer,
     SearchResultSerializer,
     ProjectNoteGetSerializer,
 )
 from infraohjelmointi_api.models import (
+    ClassFinancial,
+    LocationFinancial,
     Project,
     ProjectGroup,
     ProjectClass,
@@ -20,6 +24,7 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
 )
 from infraohjelmointi_api.services import (
+    AppStateValueService,
     ProjectWiseService,
     ProjectFinancialService,
     ProjectClassService,
@@ -37,8 +42,9 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, Prefetch
+from django.db.models import Count, Case, When, Q, Prefetch, F
 from django.db.models.signals import post_save
+from collections import defaultdict
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -124,16 +130,59 @@ class ProjectViewSet(BaseViewSet):
             finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
+        forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
+
+        if forced_to_frame_status.value and forced_to_frame is False:
+            if 'estPlanningStart' in request.data:
+                request.data['frameEstPlanningStart'] = request.data['estPlanningStart']
+            if 'estPlanningEnd' in request.data:
+                request.data['frameEstPlanningEnd'] = request.data['estPlanningEnd']
+            if 'estConstructionStart' in request.data:
+                request.data['frameEstConstructionStart'] = request.data['estConstructionStart']
+            if 'estConstructionEnd' in request.data:
+                request.data['frameEstConstructionEnd'] = request.data['estConstructionEnd']
+
         if finances is not None:
             finance_instances = self.get_finance_instances(finances, project, forced_to_frame, year)
             if len(finance_instances) > 0:
-                updatedFinanceInstance = ProjectFinancialService.update_or_create_bulk(
+                updated_finance_instance = ProjectFinancialService.update_or_create_bulk(
                     project_financials=finance_instances
                 )[0]
+                if forced_to_frame_status.value and forced_to_frame is False:
+                    existing_frame_view_map = defaultdict(dict)
+                    frame_view_finances = ProjectFinancial.objects.filter(forFrameView=True, project_id=project.id)
+
+                    for finance in frame_view_finances:
+                        existing_frame_view_map[(finance.project_id, finance.year)] = finance
+
+                    new_finances = []
+                    update_finances = []
+
+                    for finance in finance_instances:
+                        key = (finance.project_id, finance.year)
+                        if key in existing_frame_view_map:
+                            # Update existing frame-view entry
+                            frame_view_finance = existing_frame_view_map[key]
+                            frame_view_finance.value = finance.value
+                            update_finances.append(frame_view_finance)
+                        else:
+                            # Create new frame-view entry
+                            new_finance = ProjectFinancial(
+                                project_id=finance.project_id,
+                                year=finance.year,
+                                value=finance.value,
+                                forFrameView=True
+                            )
+                            new_finances.append(new_finance)
+
+                    ProjectFinancial.objects.bulk_create(new_finances)
+
+                    if update_finances:
+                            ProjectFinancial.objects.bulk_update(update_finances, ['value'])
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
-                updatedFinanceInstance.finance_year = year
+                updated_finance_instance.finance_year = year
                 post_save.send(
-                    ProjectFinancial, instance=updatedFinanceInstance, created=False
+                    ProjectFinancial, instance=updated_finance_instance, created=False
                 )
         # adding forcedToFrame here so that on save the instance that gets to the post_save signal has this value
         project.forcedToFrame = forced_to_frame
@@ -183,7 +232,7 @@ class ProjectViewSet(BaseViewSet):
                     and not ProjectFinancialService.instance_exists(
                         project_id=project.id,
                         year=finance_year,
-                        forFrameView=True,
+                        for_frame_view=True,
                     )
                 ):
                     frameViewFinanceObject = ProjectFinancial(
@@ -988,6 +1037,181 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+        
+    @transaction.atomic
+    @action(
+        methods=["patch"],
+        detail=False,
+        url_path=r"bulk-update/forced-to-frame",
+        serializer_class=ProjectWithFinancesSerializer,
+        name="patch_bulk_forced_to_frame",
+    )
+    def patch_bulk_forced_to_frame(self, request):
+        """
+        Custom action to get allow bulk forced to frame project updates in one PATCH request
+
+            Usage
+            ----------
+
+            projects/bulk-update/forced-to-frame
+            Request body format: [{id: project_id, data: {} }, ..]
+
+            Returns
+            -------
+
+            JSON
+                List of updated Project instances
+        """
+
+        def batch_process(queryset, batch_size):
+            total = len(queryset)
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                yield queryset[start:end]
+        
+        bulk_size = 100
+
+        new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
+
+        # Bulk create new ProjectFinancial entries
+        ProjectFinancial.objects.bulk_create(new_project_finances, bulk_size)
+
+        # Bulk update existing ProjectFinancial entries
+        if update_project_finances:
+            for batch in batch_process(update_project_finances, bulk_size):
+                ProjectFinancial.objects.bulk_update(batch, ['value'])
+
+        new_class_finances, update_class_finances = self.update_forced_to_frame_classes()
+
+        # Bulk create new ClassFinancial entries
+        ClassFinancial.objects.bulk_create(new_class_finances, bulk_size)
+
+        # Bulk update existing ClassFinancial entries
+        if update_class_finances:
+            for batch in batch_process(update_class_finances, bulk_size):
+                ClassFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
+
+        new_location_finances, update_location_finances = self.update_forced_to_frame_locations()
+
+        # Bulk create new LocationFinancial entries
+        LocationFinancial.objects.bulk_create(new_location_finances, bulk_size)
+
+        # Bulk update existing LocationFinancial entries
+        if update_location_finances:
+            for batch in batch_process(update_location_finances, bulk_size):
+                LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
+
+        forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
+
+        forced_to_frame_data_updated_serializer = AppStateValueSerializer(forced_to_frame_data_updated)
+
+        return Response(
+            data=forced_to_frame_data_updated_serializer.data,
+            status=200
+        )
+    
+    def update_forced_to_frame_projects(self):
+        # updating the forced to frame schedule
+        Project.objects.all().update(
+            frameEstPlanningStart=F('estPlanningStart'),
+            frameEstPlanningEnd=F('estPlanningEnd'),
+            frameEstConstructionStart=F('estConstructionStart'),
+            frameEstConstructionEnd=F('estConstructionEnd')
+        )
+
+        #updating the forced to frame finance data for projects
+        planning_view_finances = ProjectFinancial.objects.filter(forFrameView=False)
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = ProjectFinancial.objects.filter(forFrameView=True)
+
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.project_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in planning_view_finances:
+            key = (finance.project_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.value = finance.value
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = ProjectFinancial(
+                    project_id=finance.project_id,
+                    year=finance.year,
+                    value=finance.value,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+        return new_finances, update_finances
+    
+    def update_forced_to_frame_classes(self):
+        # updating forced to frame finance data for classes
+        coordination_view_finances = ClassFinancial.objects.filter(forFrameView=False)
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = ClassFinancial.objects.filter(forFrameView=True)
+
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.classRelation_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in coordination_view_finances:
+            key = (finance.classRelation_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.frameBudget = finance.frameBudget
+                frame_view_finance.budgetChange = finance.budgetChange
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = ClassFinancial(
+                    classRelation_id=finance.classRelation_id,
+                    year=finance.year,
+                    frameBudget=finance.frameBudget,
+                    budgetChange=finance.budgetChange,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+        return new_finances, update_finances
+    
+    def update_forced_to_frame_locations(self):
+        # updating forced to frame finance data for classes
+        coordination_view_finances = LocationFinancial.objects.filter(forFrameView=False)
+        existing_frame_view_map = defaultdict(dict)
+        frame_view_finances = LocationFinancial.objects.filter(forFrameView=True)
+
+        for finance in frame_view_finances:
+            existing_frame_view_map[(finance.locationRelation_id, finance.year)] = finance
+
+        new_finances = []
+        update_finances = []
+
+        for finance in coordination_view_finances:
+            key = (finance.locationRelation_id, finance.year)
+            if key in existing_frame_view_map:
+                # Update existing frame-view entry
+                frame_view_finance = existing_frame_view_map[key]
+                frame_view_finance.frameBudget = finance.frameBudget
+                frame_view_finance.budgetChange = finance.budgetChange
+                update_finances.append(frame_view_finance)
+            else:
+                # Create new frame-view entry
+                new_finance = LocationFinancial(
+                    locationRelation_id=finance.locationRelation_id,
+                    year=finance.year,
+                    frameBudget=finance.frameBudget,
+                    budgetChange=finance.budgetChange,
+                    forFrameView=True
+                )
+                new_finances.append(new_finance)
+        return new_finances, update_finances
+        
 
     @transaction.atomic
     @action(
@@ -1050,7 +1274,7 @@ class ProjectViewSet(BaseViewSet):
                             ) = ProjectFinancialService.get_or_create(
                                 year=finance_year,
                                 project_id=Project(id=financeData["project"]).id,
-                                forFrameView=forcedToFrame,
+                                for_frame_view=forcedToFrame,
                             )
                             financeSerializer = ProjectFinancialSerializer(
                                 projectFinancialObject,
