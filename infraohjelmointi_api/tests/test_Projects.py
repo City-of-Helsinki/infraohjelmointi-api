@@ -721,6 +721,10 @@ class ProjectTestCase(TestCase):
             "estPlanningEnd": "29.11.2022",
             "estConstructionStart": "21.11.2022",
             "estConstructionEnd": "29.11.2022",
+            "finances": {
+                "year": 2024,
+                "budgetProposalCurrentYearPlus1": 600
+            }
         }
         response = self.client.patch(
             "/projects/{}/".format(self.project_1_Id),
@@ -742,6 +746,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.json()["frameEstPlanningEnd"], data["estPlanningEnd"])
         self.assertEqual(response.json()["frameEstConstructionStart"], data["estConstructionStart"])
         self.assertEqual(response.json()["frameEstConstructionEnd"], data["estConstructionEnd"])
+        self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus1"], "600.00")
 
     def test_DELETE_project(self):
         response = self.client.delete("/projects/{}/".format(self.project_1_Id))
