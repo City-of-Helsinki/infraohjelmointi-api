@@ -141,7 +141,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             
-        forced_to_frame_status, created = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
+        forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
         # not using LocationFinancial Service here to manually be able to add finance_year to the instance which
         # will be sent to post_save signal
         try:
@@ -153,7 +153,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             obj.finance_year = startYear
             obj.save()
             if forced_to_frame_status.value and forced_to_frame is False:
-                obj, created = LocationFinancialService.update_or_create(
+                obj, _ = LocationFinancialService.update_or_create(
                     year=obj.year,
                     location_id=location_id,
                     for_frame_view=True,
@@ -169,7 +169,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             obj.finance_year = startYear
             obj.save()
             if forced_to_frame_status.value and forced_to_frame is False:
-                obj, created = LocationFinancialService.update_or_create(
+                obj, _ = LocationFinancialService.update_or_create(
                     year=obj.year,
                     location_id=location_id,
                     for_frame_view=True,

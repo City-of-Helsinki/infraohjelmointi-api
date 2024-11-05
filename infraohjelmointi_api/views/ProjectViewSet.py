@@ -130,7 +130,7 @@ class ProjectViewSet(BaseViewSet):
             finances.pop("forcedToFrame", False) if finances is not None else False
         )
 
-        forced_to_frame_status, created = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
+        forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
 
         if forced_to_frame_status.value and forced_to_frame is False:
             if 'estPlanningStart' in request.data:
@@ -1101,7 +1101,7 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
-        forced_to_frame_data_updated, created = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
+        forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
 
         forced_to_frame_data_updated_serializer = AppStateValueSerializer(forced_to_frame_data_updated)
 
