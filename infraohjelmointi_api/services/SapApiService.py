@@ -119,6 +119,7 @@ class SapApiService:
         """Method to fetch costs and commitments from SAP with given SAP project id"""
         logger.debug("in get_project_costs_and_commitments_from_sap")
         start_time = time.perf_counter()
+        date_format = "%Y-%m-%dT%H:%M:%S"
 
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
@@ -137,9 +138,9 @@ class SapApiService:
             api_url = f"{self.sap_api_url}{self.sap_api_costs_endpoint}".format(
                 posid=id,
                 budat_start=budat_start.replace(year=sap_start_year).strftime(
-                    "%Y-%m-%dT%H:%M:%S"
+                    date_format
                 ),
-                budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
+                budat_end=budat_end.strftime(date_format),
             )
 
             logger.debug("Requesting API {} for costs".format(api_url))
@@ -172,9 +173,9 @@ class SapApiService:
             api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
                 posid=id,
                 budat_start=budat_start.replace(year=sap_start_year).strftime(
-                    "%Y-%m-%dT%H:%M:%S"
+                    date_format
                 ),
-                budat_end=budat_end.strftime("%Y-%m-%dT%H:%M:%S"),
+                budat_end=budat_end.strftime(date_format),
             )
             logger.debug("Requesting API {} for commitments from {} to {}".format(api_url, sap_start_year, budat_end.year))
 
@@ -216,8 +217,8 @@ class SapApiService:
         costs_by_projects = len(costs_by_sap_id.keys()) > 1
         for sap_id in costs_by_sap_id:
             costs_and_commitments = costs_by_sap_id[sap_id]
-            costs = costs_and_commitments["costs"]
-            commitments = costs_and_commitments["commitments"]
+            costs = costs_and_commitments.get("costs", {"project_task": 0, "production_task": 0})
+            commitments = costs_and_commitments.get("commitments", {"project_task": 0, "production_task": 0})
 
             for project in projects_grouped_by_sap_id[sap_id]:
                 # store costs and commitments for project
@@ -257,7 +258,7 @@ class SapApiService:
                     )
         if project_group_id is not None:
             group_sap_cost, _ = SapCostService.get_or_create(
-                project_id=None,
+                project_id="",
                 group_id=project_group_id,
                 year=current_year,
             )
@@ -305,7 +306,7 @@ class SapApiService:
 
     def __group_costs_and_commitments(
         self, sap_costs_and_commitments: dict, sap_id: str
-    ) -> None:
+    ) -> dict:
         """Costs and commitments will be summed and grouped by task ids and will be stored to DB"""
 
         costs = sap_costs_and_commitments["costs"]
