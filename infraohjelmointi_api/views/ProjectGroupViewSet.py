@@ -89,6 +89,8 @@ class ProjectGroupViewSet(BaseViewSet):
                 List of ProjectGroup instances with financial sums for projects under each group
         """
         year = request.query_params.get("year", date.today().year)
+        forced_to_frame = request.query_params.get("forcedToFrame", False)
+        forced_to_frame_bool = False if forced_to_frame in ["false", False] else True
         qs = self.get_queryset().select_related(
             "classRelation",
             "locationRelation",
@@ -100,7 +102,7 @@ class ProjectGroupViewSet(BaseViewSet):
             "locationRelation__parent__parent__coordinatorLocation",
         )
         serializer = self.get_serializer(
-            qs, many=True, context={"finance_year": year, "for_coordinator": True}
+            qs, many=True, context={"finance_year": year, "for_coordinator": True, "forcedToFrame": forced_to_frame_bool}
         )
         return Response(serializer.data)
 
