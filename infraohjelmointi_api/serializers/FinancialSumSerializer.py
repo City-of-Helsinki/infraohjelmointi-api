@@ -29,7 +29,7 @@ from django.db.models.functions import Coalesce
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def get_frameBudget_and_budgetChange(self, instance, year: int) -> dict:
+    def get_frameBudget_and_budgetChange(self, instance, year: int, for_frame_view: bool) -> dict:
         """
         Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
         isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
@@ -52,14 +52,14 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
 
         finance_instance = None
-        if instance.finances.filter(year=year).exists():
+        if instance.finances.filter(year=year, forFrameView=for_frame_view).exists():
             if _type == "ProjectClass":
                 finance_instance = ClassFinancialService.get(
-                    class_id=instance.id, year=year
+                    class_id=instance.id, year=year, for_frame_view=for_frame_view
                 )
             if _type == "ProjectLocation":
                 finance_instance = LocationFinancialService.get(
-                    location_id=instance.id, year=year
+                    location_id=instance.id, year=year, for_frame_view=for_frame_view
                 )
 
         is_frame_budget_overlap = False
@@ -243,6 +243,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year0_plannedBudget")),
         }
@@ -250,6 +251,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 1,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year1_plannedBudget")),
         }
@@ -257,6 +259,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 2,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year2_plannedBudget")),
         }
@@ -264,6 +267,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 3,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year3_plannedBudget")),
         }
@@ -271,6 +275,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 4,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year4_plannedBudget")),
         }
@@ -278,6 +283,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 5,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year5_plannedBudget")),
         }
@@ -285,6 +291,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 6,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year6_plannedBudget")),
         }
@@ -292,6 +299,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 7,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year7_plannedBudget")),
         }
@@ -299,6 +307,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 8,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year8_plannedBudget")),
         }
@@ -306,6 +315,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 9,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year9_plannedBudget")),
         }
@@ -313,6 +323,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             **self.get_frameBudget_and_budgetChange(
                 instance=instance,
                 year=year + 10,
+                for_frame_view=forced_to_frame
             ),
             "plannedBudget": int(summed_finances.pop("year10_plannedBudget")),
         }

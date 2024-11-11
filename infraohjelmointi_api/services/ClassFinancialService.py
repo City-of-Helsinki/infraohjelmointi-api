@@ -4,20 +4,20 @@ from ..models import ClassFinancial, ProjectClass
 
 class ClassFinancialService:
     @staticmethod
-    def get_or_create(year: str, class_id: str) -> ClassFinancial:
+    def get_or_create(year: str, class_id: str, for_frame_view: bool) -> ClassFinancial:
         return ClassFinancial.objects.get_or_create(
-            year=year, classRelation_id=class_id
+            year=year, classRelation_id=class_id, forFrameView=for_frame_view
         )
 
     @staticmethod
-    def update_or_create(year: str, class_id: str, updatedData: dict) -> ClassFinancial:
+    def update_or_create(year: str, class_id: str, for_frame_view: bool, updatedData: dict) -> ClassFinancial:
         return ClassFinancial.objects.update_or_create(
-            year=year, classRelation_id=class_id, defaults=updatedData
+            year=year, classRelation_id=class_id, forFrameView=for_frame_view, defaults=updatedData
         )
 
     @staticmethod
-    def get(class_id: str, year: str) -> ClassFinancial:
-        return ClassFinancial.objects.get(classRelation_id=class_id, year=year)
+    def get(class_id: str, year: str, for_frame_view: bool) -> ClassFinancial:
+        return ClassFinancial.objects.get(classRelation_id=class_id, year=year, forFrameView=for_frame_view)
 
     @staticmethod
     def get_request_field_to_year_mapping(start_year: int):

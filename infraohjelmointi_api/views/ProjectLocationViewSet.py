@@ -3,6 +3,7 @@ from infraohjelmointi_api.serializers.ProjectLocationSerializer import (
     ProjectLocationSerializer,
 )
 from infraohjelmointi_api.services import (
+    AppStateValueService,
     ProjectLocationService,
     LocationFinancialService,
 )
@@ -112,6 +113,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             JSON
                 Patched coordinator ProjectLocation Instance
         """
+        forced_to_frame = request.data.get("forcedToFrame")
         if not ProjectLocationService.instance_exists(
             id=location_id, forCoordinatorOnly=True
         ):
@@ -138,22 +140,44 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
                     data={"message": "Invalid data format"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            
+        forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(name="forcedToFrameStatus")
         # not using LocationFinancial Service here to manually be able to add finance_year to the instance which
         # will be sent to post_save signal
         try:
             obj = LocationFinancial.objects.get(
-                year=year, locationRelation_id=location_id
+                year=year, locationRelation_id=location_id, forFrameView=forced_to_frame
             )
             for key, value in patchData.items():
                 setattr(obj, key, value)
             obj.finance_year = startYear
             obj.save()
+            if forced_to_frame_status.value and forced_to_frame is False:
+                obj, _ = LocationFinancialService.update_or_create(
+                    year=obj.year,
+                    location_id=location_id,
+                    for_frame_view=True,
+                    updatedData={
+                        "frameBudget": obj.frameBudget,
+                        "budgetChange": obj.budgetChange
+                    }
+                )
         except LocationFinancial.DoesNotExist:
             obj = LocationFinancial(
-                **patchData, year=year, locationRelation_id=location_id
+                **patchData, year=year, locationRelation_id=location_id, forFrameView=forced_to_frame
             )
             obj.finance_year = startYear
             obj.save()
+            if forced_to_frame_status.value and forced_to_frame is False:
+                obj, _ = LocationFinancialService.update_or_create(
+                    year=obj.year,
+                    location_id=location_id,
+                    for_frame_view=True,
+                    updatedData={
+                        "frameBudget": obj.frameBudget,
+                        "budgetChange": obj.budgetChange
+                    }
+                )
         return Response(
             ProjectLocationSerializer(
                 ProjectLocationService.get_by_id(id=location_id),
