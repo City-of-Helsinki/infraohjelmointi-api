@@ -258,7 +258,7 @@ class SapApiService:
                     )
         if project_group_id is not None:
             group_sap_cost, _ = SapCostService.get_or_create(
-                project_id="",
+                project_id=None,
                 group_id=project_group_id,
                 year=current_year,
             )
