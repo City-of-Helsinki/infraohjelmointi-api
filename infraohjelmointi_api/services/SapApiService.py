@@ -189,9 +189,6 @@ class SapApiService:
                 logger.error(
                     f"SAP responded for commitments with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
                 )
-                logger.error(
-                    f"Error for '{id}': '{response}'"
-                )
             else:
                 json_response["commitments"] = response.json()["d"]["results"]
 
