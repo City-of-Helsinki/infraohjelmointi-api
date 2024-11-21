@@ -27,7 +27,7 @@ class SapCostService:
         return SapCost.objects.filter(year=year)
 
     @staticmethod
-    def get_or_create(project_id: str, group_id: str, year: int) -> SapCost:
+    def get_or_create(project_id: str|None, group_id: str|None, year: int) -> SapCost:
         return SapCost.objects.get_or_create(
             project_id=project_id, project_group_id=group_id, year=year
         )
