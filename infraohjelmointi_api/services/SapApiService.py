@@ -174,6 +174,12 @@ class SapApiService:
                 logger.error(
                     f"SAP responded for costs with status code '{response._content}' for given id '{id}'"
                 )
+                logger.error(
+                    f"SAP responded for costs with status code '{response.json()}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for costs with status code '{response.raw}' for given id '{id}'"
+                )
             else:
                 json_response["costs"] = response.json()["d"]["results"]
 
