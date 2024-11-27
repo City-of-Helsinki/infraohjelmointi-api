@@ -166,19 +166,19 @@ class SapApiService:
                     f"SAP responded for costs with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
                 )
                 logger.error(
-                    f"SAP responded for costs with status code '{response.headers}' for given id '{id}'"
+                    f"SAP responded for costs with response.header: '{response.headers}' for given id '{id}'"
                 )
                 logger.error(
-                    f"SAP responded for costs with status code '{response.url}' for given id '{id}'"
+                    f"SAP responded for costs with response.url: '{response.url}' for given id '{id}'"
                 )
                 logger.error(
-                    f"SAP responded for costs with status code '{response._content}' for given id '{id}'"
+                    f"SAP responded for costs with response._content '{response._content}' for given id '{id}'"
                 )
                 logger.error(
-                    f"SAP responded for costs with status code '{response.json()}' for given id '{id}'"
+                    f"SAP responded for costs with response.json() '{response.json()}' for given id '{id}'"
                 )
                 logger.error(
-                    f"SAP responded for costs with status code '{response.raw}' for given id '{id}'"
+                    f"SAP responded for costs with response.raw '{response.raw}' for given id '{id}'"
                 )
             else:
                 json_response["costs"] = response.json()["d"]["results"]
