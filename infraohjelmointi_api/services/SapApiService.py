@@ -204,6 +204,24 @@ class SapApiService:
                 logger.error(
                     f"SAP responded for commitments with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
                 )
+                logger.error(
+                    f"SAP responded for commitments with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for commitments with response.header: '{response.headers}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for commitments with response.url: '{response.url}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for commitments with response._content '{response._content}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for commitments with response.json() '{response.json()}' for given id '{id}'"
+                )
+                logger.error(
+                    f"SAP responded for commitments with response.raw '{response.raw}' for given id '{id}'"
+                )
             else:
                 json_response["commitments"] = response.json()["d"]["results"]
 
