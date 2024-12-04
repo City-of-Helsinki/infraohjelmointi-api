@@ -106,7 +106,6 @@ class SapApiService:
                 group_id=group_id,
                 costs_by_sap_id=costs_by_sap_id_all,
                 projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                current_year=current_year,
             )
 
             self.__store_current_year_sap(
