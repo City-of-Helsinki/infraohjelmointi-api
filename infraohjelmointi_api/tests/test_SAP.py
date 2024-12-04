@@ -120,3 +120,31 @@ class TestSAPService(unittest.TestCase):
         expected_commitments_url_for_current_year_sap_data = f"{self.sap_service.sap_api_url}{self.sap_service.sap_api_commitments_endpoint}".format(posid=project_id, budat_start=start_date_current_year, budat_end= end_date)
         self.sap_service.session.get.assert_any_call(expected_costs_url_for_current_year_sap_data)
         self.sap_service.session.get.assert_any_call(expected_commitments_url_for_current_year_sap_data)
+
+    @patch('infraohjelmointi_api.services.ProjectService.ProjectService.get_by_sap_id')
+    def test_get_project_costs_and_commitments_sap_error(self, mock_get_by_sap_id):
+        # Mock a project to return from the project service
+        mock_project = MagicMock()
+        mock_project.planningStartYear = 2022
+        mock_get_by_sap_id.return_value = [mock_project]
+
+        # Mock the SAP API response to simulate an error
+        mock_response_error = MagicMock()
+        mock_response_error.status_code = 400
+        mock_response_error.reason = "Bad request"
+        self.sap_service.session.get.return_value = mock_response_error
+
+        # Call the function and assert an empty dict is returned due to the error
+        project_id = '123'
+        result = self.sap_service.get_project_costs_and_commitments_from_sap(project_id)
+        expected_result = {
+            'all_sap_data': {
+                'costs': {'project_task': Decimal('0'), 'production_task': Decimal('0')},
+                'commitments': {'project_task': Decimal('0'), 'production_task': Decimal('0')}
+            },
+            'current_year': {
+                'costs': {'project_task': Decimal('0'), 'production_task': Decimal('0')},
+                'commitments': {'project_task': Decimal('0'), 'production_task': Decimal('0')}
+            }
+        }
+        self.assertEqual(result, expected_result)
