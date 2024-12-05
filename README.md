@@ -94,25 +94,25 @@ Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_p
   ```
 Add phase indexes:
 
-    ```bash
+  ```bash
   psql $DATABASE_URL
   \i update-phase-indexes.sql
   ```
 Update costForecast:
 
-      ```bash
+  ```bash
   psql $DATABASE_URL
   \i update-costForecast.sql
   ```
 Add 'eri suurpiirejä' option:
 
-      ```bash
+  ```bash
   python manage.py locationimporter --eri-suurpiirejä
   ```
 
 Add 'eri kaupunginosia' option:
 
-      ```bash
+  ```bash
   python manage.py locationimporter --eri-kaupunginosia
   ```
 
