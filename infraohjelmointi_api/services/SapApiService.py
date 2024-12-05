@@ -106,6 +106,7 @@ class SapApiService:
                 group_id=group_id,
                 costs_by_sap_id=costs_by_sap_id_all,
                 projects_grouped_by_sap_id=projects_grouped_by_sap_id,
+                current_year=current_year,
             )
 
             self.__store_current_year_sap(
@@ -221,6 +222,7 @@ class SapApiService:
         group_id: str,
         costs_by_sap_id: dict,
         projects_grouped_by_sap_id: dict,
+        current_year: int,
     ) -> None:
         """Helper method fo store SAP cost values into DB"""
 
@@ -238,6 +240,7 @@ class SapApiService:
                 project_sap_cost, _ = SapCostService.get_or_create(
                     project_id=project.id,
                     group_id=project_group_id,
+                    year=current_year,
                 )
 
                 project_sap_cost.project_task_costs = costs["project_task"]
@@ -272,6 +275,7 @@ class SapApiService:
             group_sap_cost, _ = SapCostService.get_or_create(
                 project_id=None,
                 group_id=project_group_id,
+                year=current_year,
             )
             group_sap_cost.group_combined_commitments = project_group_costs[
                 "commitments"
