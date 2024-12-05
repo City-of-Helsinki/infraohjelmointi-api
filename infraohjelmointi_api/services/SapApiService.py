@@ -102,14 +102,16 @@ class SapApiService:
                         f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
                     )
 
-            self.__store_sap_costs(
+            self.__store_sap_data(
+                service_class = SapCostService,
                 group_id=group_id,
                 costs_by_sap_id=costs_by_sap_id_all,
                 projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                 current_year=current_year,
             )
 
-            self.__store_current_year_sap(
+            self.__store_sap_data(
+                service_class = SapCurrentYearService,
                 group_id=group_id,
                 costs_by_sap_id=costs_by_sap_id_current_year,
                 projects_grouped_by_sap_id=projects_grouped_by_sap_id,
@@ -216,9 +218,10 @@ class SapApiService:
         json_response["commitments"] = self.__fetch_commitments_from_SAP(api_url, id)
 
         return json_response
-
-    def __store_sap_costs(
+    
+    def __store_sap_data(
         self,
+        service_class,
         group_id: str,
         costs_by_sap_id: dict,
         projects_grouped_by_sap_id: dict,
@@ -237,7 +240,7 @@ class SapApiService:
 
             for project in projects_grouped_by_sap_id[sap_id]:
                 # store costs and commitments for project
-                project_sap_cost, _ = SapCostService.get_or_create(
+                project_sap_cost, _ = service_class.get_or_create(
                     project_id=project.id,
                     group_id=project_group_id,
                     year=current_year,
@@ -272,75 +275,7 @@ class SapApiService:
                         + project_sap_cost.production_task_commitments
                     )
         if project_group_id is not None:
-            group_sap_cost, _ = SapCostService.get_or_create(
-                project_id=None,
-                group_id=project_group_id,
-                year=current_year,
-            )
-            group_sap_cost.group_combined_commitments = project_group_costs[
-                "commitments"
-            ]
-            group_sap_cost.group_combined_costs = project_group_costs["costs"]
-            if not costs_by_projects:
-                group_sap_cost.sap_id = sap_id
-            group_sap_cost.save()
-
-    def __store_current_year_sap(
-        self,
-        group_id: str,
-        costs_by_sap_id: dict,
-        projects_grouped_by_sap_id: dict,
-        current_year: int,
-    ) -> None:
-        """Helper method fo store SAP cost values into DB"""
-
-        # store SAP costs for each project and calculate the total costs for project group
-        project_group_id = group_id if group_id != "nogroup" else None
-        project_group_costs = {"costs": 0, "commitments": 0}
-        costs_by_projects = len(costs_by_sap_id.keys()) > 1
-        for sap_id in costs_by_sap_id:
-            costs_and_commitments = costs_by_sap_id[sap_id]
-            costs = costs_and_commitments.get("costs", {"project_task": 0, "production_task": 0})
-            commitments = costs_and_commitments.get("commitments", {"project_task": 0, "production_task": 0})
-
-            for project in projects_grouped_by_sap_id[sap_id]:
-                # store costs and commitments for project
-                project_sap_cost, _ = SapCurrentYearService.get_or_create(
-                    project_id=project.id,
-                    group_id=project_group_id,
-                    year=current_year,
-                )
-
-                project_sap_cost.project_task_costs = costs["project_task"]
-                project_sap_cost.production_task_costs = costs["production_task"]
-                project_sap_cost.project_task_commitments = commitments["project_task"]
-                project_sap_cost.production_task_commitments = commitments[
-                    "production_task"
-                ]
-                project_sap_cost.sap_id = sap_id
-
-                project_sap_cost.save()
-
-                if costs_by_projects:
-                    project_group_costs["costs"] += (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] += (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
-                else:
-                    project_group_costs["costs"] = (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] = (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
-        if project_group_id is not None:
-            group_sap_cost, _ = SapCurrentYearService.get_or_create(
+            group_sap_cost, _ = service_class.get_or_create(
                 project_id=None,
                 group_id=project_group_id,
                 year=current_year,
