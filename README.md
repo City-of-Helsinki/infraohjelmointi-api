@@ -40,17 +40,11 @@ Then you can run docker image as detached mode with:
 - Done!
 
 ## What next?
-
-This list is a 'TL;DR'. Steps are described more detailed on this README file under [Populate database](#populate-database).
-
-- [Hierarchy and project data](#hierarchy-and-project-data)
-  - Import Location/Class hierarchy structure
-  - Import Planning (TS) and Budget (TAE) files in bulk together
-- [Populate database](#populate-database)
-  - [Import project location options](#import-project-location-options)
-  - [Update missing projectDistrict data](#update-missing-projectdistrict-data)
+TL;DR:
+Execute all commands under [Populate database](#populate-database) to get all data in local environment.
 
 ## Populate database
+Execute all commands under this title to get database fully functional. 
 
 ### Hierarchy and project data
 
@@ -82,17 +76,6 @@ Import project location options:
   python manage.py locationimporter --file path/to/locationdata.xlsx
   ```
 
-### Update missing projectDistrict data
-
-Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`.
-
-  ```bash
-  psql $DATABASE_URL
-  \i update-districts.sql
-  ```
-
-## Other optional file imports
-
 ### Import new persons
 
 Import new person information into responsible persons list. The list can be found from project form:
@@ -100,7 +83,38 @@ Import new person information into responsible persons list. The list can be fou
   ```bash
   python manage.py responsiblepersons --file path/to/filename.xlsx
   ```
-  
+
+### Updates to database
+
+Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`:
+
+  ```bash
+  psql $DATABASE_URL
+  \i update-districts.sql
+  ```
+Add phase indexes:
+
+    ```bash
+  psql $DATABASE_URL
+  \i update-phase-indexes.sql
+  ```
+Update costForecast:
+
+      ```bash
+  psql $DATABASE_URL
+  \i update-costForecast.sql
+  ```
+Add 'eri suurpiirejä' option:
+
+      ```bash
+  python manage.py locationimporter --eri-suurpiirejä
+  ```
+
+Add 'eri kaupunginosia' option:
+
+      ```bash
+  python manage.py locationimporter --eri-kaupunginosia
+  ```
 
 ---
 
@@ -206,34 +220,6 @@ Projects are also synced to PW service when a PATCH request is made to the proje
 Scripts were used when dev and prod environments were setup for the first time.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).
-
-## Other optional import scripts
-
-While populating the database the script file `import-excels.sh` was used to create the hierarchy (`/import-excels.sh -c path/to/hierarchy.xlsx`) and importing all Excels (`./import-excels.sh -d path/to/Excels/`).
-
-Import Location/Class hierarchy structure. File `import-excels.sh` uses this:
-
-  ```bash
-  python manage.py hierarchies --file path/to/hierarchy.xlsx
-  ```
-
-_In some contexts, hierarchy is known as "luokkajako"._
-
-<br>
-
-Import only Planning project data (files with "TS"):
-
-  ```bash
-  python manage.py  projectimporter --import-from-plan path/to/planningFile.xlsx
-  ```
-
-Import only Budget project data (files with "TAE"):
-
-  ```bash
-  python manage.py  projectimporter --import-from-budget path/to/budgetFile.xlsx
-  ```
-
-_`./import-excels.sh -d path/to/Excels` includes both of TS and TAE import commands._
 
 ## Production release
 
