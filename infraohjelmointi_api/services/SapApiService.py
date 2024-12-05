@@ -147,9 +147,9 @@ class SapApiService:
         if sap_start_year:
             start_year = datetime.now().year
             logger.debug("Starting to fetch all costs and commitments for SAP id {id} from {sap_start_year} to {budat_end}")
-            json_response_all = self.__fetch_costs_and_commitments_from_SAP(budat_start, budat_end, sap_start_year, id)
+            json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, sap_start_year, id)
             logger.debug("Starting to fetch current year's costs and commitments for SAP id {id} from {start_year} to {budat_end}")
-            json_response_current_year = self.__fetch_costs_and_commitments_from_SAP(budat_start, budat_end, start_year, id)
+            json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, start_year, id)
 
             grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
                 sap_costs_and_commitments=json_response_all,
@@ -174,7 +174,7 @@ class SapApiService:
             )
             return {}
 
-    def __fetch_costs_and_commitments_from_SAP(
+    def __fetch_costs_and_commitments_from_sap(
             self,
             budat_start: datetime,
             budat_end: datetime,
@@ -203,7 +203,7 @@ class SapApiService:
             budat_end=budat_end.strftime(date_format),
         )
 
-        json_response["costs"] = self.__fetch_costs_from_SAP(api_url, id)
+        json_response["costs"] = self.__fetch_costs_from_sap(api_url, id)
 
 
         # Fetch commitments from SAP
@@ -215,7 +215,7 @@ class SapApiService:
             budat_end=budat_end.strftime(date_format),
         )
 
-        json_response["commitments"] = self.__fetch_commitments_from_SAP(api_url, id)
+        json_response["commitments"] = self.__fetch_commitments_from_sap(api_url, id)
 
         return json_response
     
@@ -377,7 +377,7 @@ class SapApiService:
             f"SAP responded with response.json() '{response.json().error.message.value}' for given id '{id}'"
         )
 
-    def __fetch_costs_from_SAP(self, api_url, id):
+    def __fetch_costs_from_sap(self, api_url, id):
         """Helper method to fetch costs from SAP"""
         start_time = time.perf_counter()
         logger.debug("Requesting API {} for costs".format(api_url))
@@ -394,7 +394,7 @@ class SapApiService:
         else:
             return response.json()["d"]["results"]
         
-    def __fetch_commitments_from_SAP(self, api_url, id):
+    def __fetch_commitments_from_sap(self, api_url, id):
         """Helper method to fetch commitments from SAP"""
         start_time = time.perf_counter()
         logger.debug("Requesting API {} for commitments".format(api_url))
