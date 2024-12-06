@@ -37,21 +37,6 @@ class SapApiService:
         self.sap_api_costs_endpoint = env("SAP_COSTS_ENDPOINT")
         self.sap_api_commitments_endpoint = env("SAP_COMMITMENTS_ENDPOINT")
 
-    # def sync_all_projects_from_sap(self) -> None:
-    #     """Method to synchronise all projects in DB with SAP project costs and commitments.\n"""
-
-    #     logger.debug("Synchronizing all projects in DB with SAP")
-    #     self.__sync_projects_from_sap(
-    #         projects=ProjectService.list_with_non_null_sap_id()
-    #     )
-
-    # def sync_project_from_sap(self, sap_id: str) -> None:
-    #     """Method to synchronise project with given SAP id with SAP project costs and commitments.\n"""
-
-    #     logger.debug(f"Synchronizing project(s) with SAP Id '{sap_id}' with SAP")
-    #     projects = ProjectService.get_by_sap_id(sap_id=sap_id)
-    #     self.__sync_projects_from_sap(projects=projects)
-
     def sync_all_projects_from_sap(self) -> None:
         """Method to synchronise projects from SAP.\n
         Given projects must have sapProject otherwise project will not be syncrhonized.
@@ -205,8 +190,7 @@ class SapApiService:
             ),
             budat_end=budat_end.strftime(date_format),
         )
-
-        json_response["costs"] = self.__fetch_costs_from_sap(api_url, id)
+        json_response["costs"] = self.__make_sap_request(api_url, id, "costs")
 
 
         # Fetch commitments from SAP
@@ -217,8 +201,7 @@ class SapApiService:
             ),
             budat_end=budat_end.strftime(date_format),
         )
-
-        json_response["commitments"] = self.__fetch_commitments_from_sap(api_url, id)
+        json_response["commitments"] = self.__make_sap_request(api_url, id, "commitments")
 
         return json_response
     
@@ -379,29 +362,11 @@ class SapApiService:
         logger.error(
             f"SAP responded with response.json() '{response.json().error.message.value}' for given id '{id}'"
         )
-
-    def __fetch_costs_from_sap(self, api_url, id):
+   
+    def __make_sap_request(self, api_url, id, type):
         """Helper method to fetch costs from SAP"""
         start_time = time.perf_counter()
-        logger.debug("Requesting API {} for costs".format(api_url))
-        response = self.session.get(api_url)
-        response_time = time.perf_counter() - start_time
-
-        logger.debug(f"SAP responded in {response_time}s")
-
-        # Check if SAP responded with error
-        if response.status_code != 200:
-            self.__log_response_error(response, id)
-            return {}
-
-        else:
-            return response.json()["d"]["results"]
-        
-    def __fetch_commitments_from_sap(self, api_url, id):
-        """Helper method to fetch commitments from SAP"""
-        start_time = time.perf_counter()
-        logger.debug("Requesting API {} for commitments".format(api_url))
-
+        logger.debug(f"Requesting API for {type} from {api_url}")
         response = self.session.get(api_url)
         response_time = time.perf_counter() - start_time
 
