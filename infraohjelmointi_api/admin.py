@@ -27,6 +27,7 @@ admin.site.register(models.ProjectClass)
 admin.site.register(models.ProjectRisk)
 admin.site.register(models.ProjectLocation)
 admin.site.register(models.AppStateValue)
+admin.site.register(models.SapCurrentYear)
 
 
 # Register your models here.
