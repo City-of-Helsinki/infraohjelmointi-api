@@ -357,10 +357,10 @@ class SapApiService:
             f"SAP responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
         )
         logger.error(
-            f"SAP responded with response._content '{response._content.error.message.value}' for given id '{id}'"
+            f"SAP responded with response._content '{response._content}' for given id '{id}'"
         )
         logger.error(
-            f"SAP responded with response.json() '{response.json().error.message.value}' for given id '{id}'"
+            f"SAP responded with response.json() '{response.json()}' for given id '{id}'"
         )
    
     def __make_sap_request(self, api_url, id, type):
