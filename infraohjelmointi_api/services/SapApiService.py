@@ -77,34 +77,38 @@ class SapApiService:
                     self.get_project_costs_and_commitments_from_sap(sap_id)
                 )
 
-                costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
-                costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
+                if 'all_sap_data' in sap_costs_and_commitments and 'current_year' in sap_costs_and_commitments:
+                    costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
+                    costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
 
-                handling_time = time.perf_counter() - start_time
-                if sync_group:
-                    logger.debug(
-                        f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
+                    handling_time = time.perf_counter() - start_time
+                    if sync_group:
+                        logger.debug(
+                            f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
+                        )
+                    else:
+                        logger.info(
+                            f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
+                        )
+
+                    self.__store_sap_data(
+                        service_class = SapCostService,
+                        group_id=group_id,
+                        costs_by_sap_id=costs_by_sap_id_all,
+                        projects_grouped_by_sap_id=projects_grouped_by_sap_id,
+                        current_year=current_year,
+                    )
+
+                    self.__store_sap_data(
+                        service_class = SapCurrentYearService,
+                        group_id=group_id,
+                        costs_by_sap_id=costs_by_sap_id_current_year,
+                        projects_grouped_by_sap_id=projects_grouped_by_sap_id,
+                        current_year=current_year,
                     )
                 else:
-                    logger.info(
-                        f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
-                    )
-
-            self.__store_sap_data(
-                service_class = SapCostService,
-                group_id=group_id,
-                costs_by_sap_id=costs_by_sap_id_all,
-                projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                current_year=current_year,
-            )
-
-            self.__store_sap_data(
-                service_class = SapCurrentYearService,
-                group_id=group_id,
-                costs_by_sap_id=costs_by_sap_id_current_year,
-                projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                current_year=current_year,
-            )
+                    logger.error(
+                        f"Skipped SAP data fetch for id {id}")
 
     def get_project_costs_and_commitments_from_sap(
         self,
