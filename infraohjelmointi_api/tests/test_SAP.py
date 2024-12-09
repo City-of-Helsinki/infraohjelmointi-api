@@ -57,29 +57,6 @@ class TestSAPService(unittest.TestCase):
         mock_get_by_sap_id.return_value = [mock_project]
 
         # Call the function with a known SAP ID
-        # Model of the result from function:
-        # {
-        # 'all_sap_data': {
-        #     'costs': {
-        #         'project_task': Decimal('100.000'), 
-        #         'production_task': Decimal('0')
-        #     }, 
-        #     'commitments': {
-        #         'project_task': Decimal('50.000'), 
-        #         'production_task': Decimal('0')
-        #     }
-        # }, 
-        # 'current_year': {
-        #     'costs': {
-        #         'project_task': Decimal('100.000'), 
-        #         'production_task': Decimal('0')
-        #     }, 
-        #     'commitments': {
-        #         'project_task': Decimal('50.000'), 
-        #         'production_task': Decimal('0')
-        #     }
-        # }
-        # }
         project_id = '123'
         result = self.sap_service.get_project_costs_and_commitments_from_sap(project_id)
 
