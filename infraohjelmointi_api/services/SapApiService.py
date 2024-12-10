@@ -77,7 +77,7 @@ class SapApiService:
                     self.get_project_costs_and_commitments_from_sap(sap_id)
                 )
 
-                if 'all_sap_data' in sap_costs_and_commitments and 'current_year' in sap_costs_and_commitments:
+                if self.__validate_costs_and_commitments(sap_costs_and_commitments) :
                     costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
                     costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
 
@@ -106,9 +106,6 @@ class SapApiService:
                         projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                         current_year=current_year,
                     )
-                else:
-                    logger.error(
-                        f"Skipped SAP data fetch for id {id}")
 
     def get_project_costs_and_commitments_from_sap(
         self,
@@ -383,3 +380,10 @@ class SapApiService:
 
         else:
             return response.json()["d"]["results"]
+    
+    def __validate_costs_and_commitments(costs_and_commitments: list) -> bool:
+        if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
+            return True
+        
+        else:
+            return False
