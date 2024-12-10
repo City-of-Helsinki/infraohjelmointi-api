@@ -381,7 +381,7 @@ class SapApiService:
         else:
             return response.json()["d"]["results"]
     
-    def __validate_costs_and_commitments(costs_and_commitments: list) -> bool:
+    def __validate_costs_and_commitments(self, costs_and_commitments: list) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
             return True
         
