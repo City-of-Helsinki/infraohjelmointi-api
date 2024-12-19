@@ -135,6 +135,12 @@ router.register(
     basename="appStateValue",
 )
 
+router.register(
+    r"sap-current-year-costs",
+    views.SapCurrentYearViewSet,
+    basename="sapCurrentYear"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",

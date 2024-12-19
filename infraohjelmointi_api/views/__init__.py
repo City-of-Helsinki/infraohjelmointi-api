@@ -36,3 +36,4 @@ from .api.ApiGroupsViewSet import *
 from .api.ApiLocationsViewSet import *
 from .api.ApiProjectsViewSet import *
 from .AppStateValueViewSet import *
+from .SapCurrentYearViewSet import *
