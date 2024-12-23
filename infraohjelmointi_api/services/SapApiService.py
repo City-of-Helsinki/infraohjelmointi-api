@@ -135,10 +135,10 @@ class SapApiService:
 
         if sap_start_year:
             start_year = datetime.now().year
-            logger.debug("Starting to fetch all costs and commitments for SAP id {id} from {sap_start_year} to {budat_end}")
-            json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, sap_start_year, id)
+            logger.debug("Starting to fetch all costs for SAP id {id} from {sap_start_year} to {budat_end}, and all commitments from {sap_start_year} to {budat_end} +5 years")
+            json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, sap_start_year, id, all_sap_commitments=True)
             logger.debug("Starting to fetch current year's costs and commitments for SAP id {id} from {start_year} to {budat_end}")
-            json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, start_year, id)
+            json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, start_year, id, all_sap_commitments=False)
 
             grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
                 sap_costs_and_commitments=json_response_all,
@@ -168,7 +168,8 @@ class SapApiService:
             budat_start: datetime,
             budat_end: datetime,
             start_year: int,
-            id: str
+            id: str,
+            all_sap_commitments: bool
         )-> dict:
         date_format = "%Y-%m-%dT%H:%M:%S"
         # Init json_response, costs and commitments are zeros by default defaults
@@ -195,12 +196,21 @@ class SapApiService:
 
 
         # Fetch commitments from SAP
+        if all_sap_commitments:
+            # Fetch commitments from planning start year to current year end + 5 years
+            end_date_for_commitment_fetch = budat_end.replace(year=budat_end.year + 5)
+
+        else:
+            # Fetch commitments from planning start year to end of the current year
+            end_date_for_commitment_fetch = budat_end
+
+        logger.debug("In commitment-fetch: start year: {start_year} and end_year: {end_date_for_commitment_fetch}")
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
             posid=id,
             budat_start=budat_start.replace(year=start_year).strftime(
                 date_format
             ),
-            budat_end=budat_end.strftime(date_format),
+            budat_end=end_date_for_commitment_fetch.strftime(date_format),
         )
         json_response["commitments"] = self.__make_sap_request(api_url, id, "commitments")
 
