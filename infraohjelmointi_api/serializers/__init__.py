@@ -42,4 +42,5 @@ from .LocationFinancialSerializer import LocationFinancialSerializer
 from .WhoAmISerializer import WhoAmISerializer
 from .SapCostSerializer import SapCostSerializer
 from .AppStateValueSerializer import AppStateValueSerializer
+from .AuditLogSerializer import AuditLogSerializer
 from .SapCurrentYearSerializer import SapCurrentYearSerializer
