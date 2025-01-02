@@ -136,8 +136,13 @@ class ProjectViewSet(BaseViewSet):
             "estPlanningStart",
             "estPlanningEnd",
             "estConstructionStart",
-            "estConstructionEnd"
+            "estConstructionEnd",
+            "presenceStart",
+            "presenceEnd",
+            "visibilityStart",
+            "visibilityEnd",
         ]
+        logger.info(request.data)
         old_values_for_audit_log = {
             field: (
                 str(getattr(getattr(project, field), 'id', None))
