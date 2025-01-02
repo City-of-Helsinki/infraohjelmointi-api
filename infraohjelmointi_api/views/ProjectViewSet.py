@@ -15,6 +15,7 @@ from infraohjelmointi_api.serializers import (
     ProjectNoteGetSerializer,
 )
 from infraohjelmointi_api.models import (
+    AuditLog,
     ClassFinancial,
     LocationFinancial,
     Project,
@@ -121,6 +122,37 @@ class ProjectViewSet(BaseViewSet):
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
+
+        # chcking if request contains any data changes that needs to be audit logged
+        # and getting the previous values from the project object before it changes
+        audit_loggable_fields = [
+            "category",
+            "projectClass",
+            "name",
+            "phase",
+            "constructionPhaseDetail",
+            "planningStartYear",
+            "constructionEndYear",
+            "estPlanningStart",
+            "estPlanningEnd",
+            "estConstructionStart",
+            "estConstructionEnd",
+            "presenceStart",
+            "presenceEnd",
+            "visibilityStart",
+            "visibilityEnd",
+        ]
+        logger.info(request.data)
+        old_values_for_audit_log = {
+            field: (
+                str(getattr(getattr(project, field), 'id', None))
+                if hasattr(getattr(project, field), 'id')
+                else str(getattr(project, field))
+            )
+            for field in audit_loggable_fields 
+            if field in request.data
+        }
+
         year = (
             finances.pop("year", date.today().year)
             if finances is not None
@@ -197,10 +229,37 @@ class ProjectViewSet(BaseViewSet):
         )
         projectSerializer.is_valid(raise_exception=True)
         updated_project = projectSerializer.save()
+
+        # saving audit logs after project data was changed
+        if (old_values_for_audit_log):
+            new_values_for_audit_log = {field: request.data[field] for field in audit_loggable_fields if field in request.data}
+            self.audit_log_project_card_changes(
+                old_values_for_audit_log,
+                new_values_for_audit_log,
+                updated_project,
+                request.user,
+                request.build_absolute_uri()
+            )
+
+        # updating changed data to ProjectWise
         self.projectWiseService.sync_project_to_pw(
             data=request.data, project=updated_project
         )
         return Response(projectSerializer.data)
+    
+    def audit_log_project_card_changes(self, old_values, new_values, project, user, url):
+        audit_log = AuditLog(
+            actor=user,
+            operation="UPDATE",
+            log_level="INFO",
+            origin='infrahankkeiden_ohjelmointi',
+            status='SUCCESS',
+            project=project,
+            old_values=old_values,
+            new_values=new_values,
+            endpoint=url,
+        )
+        audit_log.save()
 
     def get_finance_instances(self, finances, project, forced_to_frame, year):
         finance_instances = []
