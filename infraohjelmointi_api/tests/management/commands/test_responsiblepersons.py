@@ -1,5 +1,7 @@
 from io import StringIO
+import os
 from os import path
+from openpyxl import Workbook
 import tempfile
 from unittest.mock import patch
 from django.core.management import call_command
@@ -7,7 +9,6 @@ from django.core.management.base import CommandError
 
 from django.test import TestCase
 import environ
-import pandas as pd
 
 from infraohjelmointi_api.services import PersonService
 
@@ -51,13 +52,18 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         self.assertIn(expected_error_message, command_output)
 
     def test_populate_db_with_excel(self):
-        # Script with mock data file
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-            mock_df = pd.DataFrame(self.mock_data)
-            mock_df.to_excel(tmp.name, index=False)
+            wb = Workbook()
+            ws = wb.active
+
+            for person_data in self.mock_data:
+                ws.append(list(person_data.values()))
+            wb.save(tmp.name)
 
         call_command("responsiblepersons", "--file", tmp.name)
 
         persons = PersonService.get_all_persons()
 
         self.assertEqual(len(persons), 3, "The count of successfully added person should be three")
+
+        os.remove(tmp.name)

@@ -23,8 +23,8 @@ RUN TZ="Europe/Helsinki" && \
     grep \
     cronie \
     libcap && \
-    # Install pip packages (pandas and uwsgi) instead of using yum
-    pip install pandas uwsgi && \
+    # Install pip packages (uwsgi) instead of using yum
+    pip install uwsgi && \
     # Ensure pip and python are accessible globally
     ln -s /usr/bin/pip3 /usr/local/bin/pip && \
     ln -s /usr/bin/python3 /usr/local/bin/python && \

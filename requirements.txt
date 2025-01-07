@@ -22,5 +22,4 @@ daphne                                      # application server
 django-helusers                               # Tunnistamo user inegration
 social-auth-app-django
 drf-yasg                                    # API Swagger documentation
-pandas
 numpy
