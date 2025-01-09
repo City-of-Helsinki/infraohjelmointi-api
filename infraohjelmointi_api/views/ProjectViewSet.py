@@ -23,6 +23,7 @@ from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectLocation,
     ProjectFinancial,
+    User,
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
@@ -264,7 +265,7 @@ class ProjectViewSet(BaseViewSet):
     
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url):
         audit_log = AuditLog(
-            actor=user,
+            actor=user if isinstance(user, User) else None,
             operation="UPDATE",
             log_level="INFO",
             origin='infrahankkeiden_ohjelmointi',

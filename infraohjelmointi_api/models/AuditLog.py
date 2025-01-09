@@ -22,7 +22,7 @@ class AuditLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     actor = models.ForeignKey(
-        User, on_delete=models.CASCADE, null=False, blank=False, editable=False
+        User, on_delete=models.CASCADE, null=True, blank=True, editable=False
     )
     operation = models.CharField(max_length=20, choices=OPERATION_CHOICES, blank=False, null=False, editable=False) # what was done e.g. update or delete
     log_level = models.CharField(max_length=20, choices=LOG_LEVEL_CHOICES, blank=False, null=False, editable=False) # INFO / ERROR
