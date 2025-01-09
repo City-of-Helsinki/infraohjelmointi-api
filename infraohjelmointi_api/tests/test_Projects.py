@@ -157,9 +157,6 @@ class ProjectTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(self):
-        self.user = User.objects.create(
-            uuid=self.user_id, first_name="John", last_name="Doe"
-        )
         self.budgetItem = BudgetItem.objects.create(
             id=self.budgetItemId,
             budgetMain=10000,
