@@ -58,7 +58,14 @@ class TestSAPService(unittest.TestCase):
 
         # Call the function with a known SAP ID
         project_id = '123'
-        result = self.sap_service.get_project_costs_and_commitments_from_sap(project_id)
+        result = {}
+
+        all_sap_data = self.sap_service.get_all_project_costs_and_commitments_from_sap(project_id)
+        current_year_data = self.sap_service.get_costs_and_commitments_by_year(project_id, datetime.now().year)
+        result = {
+            'all_sap_data': all_sap_data,
+            'current_year': current_year_data
+        }
 
         # Assertions to ensure the returned data structure is as expected
         # Assertions for all_sap_data
@@ -113,7 +120,15 @@ class TestSAPService(unittest.TestCase):
 
         # Call the function and assert an empty dict is returned due to the error
         project_id = '123'
-        result = self.sap_service.get_project_costs_and_commitments_from_sap(project_id)
+        result = {}
+
+        all_sap_data = self.sap_service.get_all_project_costs_and_commitments_from_sap(project_id)
+        current_year_data = self.sap_service.get_costs_and_commitments_by_year(project_id, datetime.now().year)
+        result = {
+            'all_sap_data': all_sap_data,
+            'current_year': current_year_data
+        }
+        
         expected_result = {
             'all_sap_data': {
                 'costs': {'project_task': Decimal('0'), 'production_task': Decimal('0')},
