@@ -33,8 +33,6 @@ class Command(BaseCommand):
         # Validate that the year is an integer and within a reasonable range
         try:
             year_int = int(year)
-        
-            # Additional year range check (2000 to current year+1)
             current_year = datetime.now().year
             if year_int < 2000 or year_int > current_year + 1:
                 raise ValueError("Year out of valid range.")
@@ -43,5 +41,4 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Invalid year argument: {year}. Error: {e}"))
             return
         
-        # If the year is valid, proceed with the SAP API service call
         SapApiService().sync_all_projects_from_sap(forFinancialStatement=True, sap_year=year)

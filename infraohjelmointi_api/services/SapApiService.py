@@ -76,7 +76,8 @@ class SapApiService:
                 start_time = time.perf_counter()
                 sap_costs_and_commitments = {}
                 
-                # all sap data is fetched only if function is called from sapsynchronizer.py
+                # all sap data is not fetched, if function is called for getting sap data for certain year, 
+                # f.g. for financial statement
                 if not forFinancialStatement:
                     sap_costs_and_commitments["all_sap_data"] = (
                         self.get_all_project_costs_and_commitments_from_sap(sap_id)
@@ -126,7 +127,7 @@ class SapApiService:
         start_year = year
 
         # Timeframe for fetching certain year's sap data is from 1.1.{start_year} to 1.1.{start_year+1}
-        logger.debug("Starting to fetch costs and commitments for SAP id {id} from {start_year} to {budat_end}")
+        logger.debug(f"Starting to fetch costs and commitments for SAP id {id} from {budat_start} to {budat_end}")
         json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, start_year, id, all_sap_commitments=False)
 
         grouped_costs_and_commitments_current_year = self.__group_costs_and_commitments( 
@@ -150,7 +151,7 @@ class SapApiService:
         ),
     ) -> dict:
         """Method to fetch costs and commitments from SAP with given SAP project id"""
-        logger.debug("in get_project_costs_and_commitments_from_sap")
+        logger.debug(f"in get_project_costs_and_commitments_from_sap")
 
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
@@ -166,8 +167,9 @@ class SapApiService:
                 sap_start_year = project.planningStartYear
 
         if sap_start_year:
-            # Timeframe for fetching all sap data is from 1.1.{planning_start_year_in_project} to 1.1.{currentyear+1}
-            logger.debug("Starting to fetch all costs for SAP id {id} from {sap_start_year} to {budat_end}, and all commitments from {sap_start_year} to {budat_end} +5 years")
+            # Timeframe for fetching all sap data costs is from 1.1.{planning_start_year_in_project} to 1.1.{currentyear+1},
+            # and for commitments from 1.1.{planning_start_year_in_project} to 1.1.{currentyear+1+5}
+            logger.debug(f"Starting to fetch all costs for SAP id {id} from {sap_start_year} to {budat_end.year}, and all commitments from {sap_start_year} to {budat_end.year}+5 years")
             json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, sap_start_year, id, all_sap_commitments=True)
 
             grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
@@ -226,7 +228,7 @@ class SapApiService:
             # Fetch commitments from planning start year to end of the current year
             end_date_for_commitment_fetch = budat_end
 
-        logger.debug("In commitment-fetch: start year: {start_year} and end_year: {end_date_for_commitment_fetch}")
+        logger.debug(f"In commitment-fetch: start year: {start_year} and end_year: {end_date_for_commitment_fetch}")
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
             posid=id,
             budat_start=budat_start.replace(year=start_year).strftime(
