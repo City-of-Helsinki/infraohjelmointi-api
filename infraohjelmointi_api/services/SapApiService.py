@@ -37,10 +37,10 @@ class SapApiService:
         self.sap_api_costs_endpoint = env("SAP_COSTS_ENDPOINT")
         self.sap_api_commitments_endpoint = env("SAP_COMMITMENTS_ENDPOINT")
 
-    def sync_all_projects_from_sap(self, forFinancialStatement: bool, sap_year=datetime.now().year) -> None:
+    def sync_all_projects_from_sap(self, for_financial_statement: bool, sap_year=datetime.now().year) -> None:
         """Method to synchronise projects from SAP.\n
         Given projects must have sapProject otherwise project will not be syncrhonized.
-        Will get forFinancialStatement as True if called for fetching sap data for certain year only, 
+        Will get for_financial_statement as True if called for fetching sap data for certain year only, 
         then also this certain year is given as parameter.
         """
 
@@ -78,7 +78,7 @@ class SapApiService:
                 
                 # all sap data is not fetched, if function is called for getting sap data for certain year, 
                 # f.g. for financial statement
-                if not forFinancialStatement:
+                if not for_financial_statement:
                     sap_costs_and_commitments["all_sap_data"] = (
                         self.get_all_project_costs_and_commitments_from_sap(sap_id)
                     )
@@ -151,7 +151,7 @@ class SapApiService:
         ),
     ) -> dict:
         """Method to fetch costs and commitments from SAP with given SAP project id"""
-        logger.debug(f"in get_project_costs_and_commitments_from_sap")
+        logger.debug("in get_project_costs_and_commitments_from_sap")
 
         # Fetch projects by SAP ID and get earliest planning start year
         projects = ProjectService.get_by_sap_id(id)
@@ -415,7 +415,7 @@ class SapApiService:
         else:
             return response.json()["d"]["results"]
     
-    def __validate_costs_and_commitments(self, costs_and_commitments: list) -> bool:
+    def __validate_costs_and_commitments(self, costs_and_commitments) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
             return True
         

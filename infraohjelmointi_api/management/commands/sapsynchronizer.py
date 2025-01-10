@@ -14,4 +14,4 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        SapApiService().sync_all_projects_from_sap(forFinancialStatement=False)
+        SapApiService().sync_all_projects_from_sap(for_financial_statement=False)

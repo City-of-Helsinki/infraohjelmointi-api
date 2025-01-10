@@ -41,4 +41,4 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Invalid year argument: {year}. Error: {e}"))
             return
         
-        SapApiService().sync_all_projects_from_sap(forFinancialStatement=True, sap_year=year)
+        SapApiService().sync_all_projects_from_sap(for_financial_statement=True, sap_year=year)
