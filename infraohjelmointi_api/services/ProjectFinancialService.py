@@ -42,6 +42,14 @@ class ProjectFinancialService:
             update_fields=["value"],
             unique_fields=["year", "project_id", "forFrameView"],
         )
+    
+    @staticmethod
+    def find_by_project_id_and_finance_years(
+        project_id: str, finance_years: list[int], for_frame_view: bool = False
+    ) -> list[ProjectFinancial]:
+        return ProjectFinancial.objects.filter(
+            project=project_id, year__in=finance_years, forFrameView=for_frame_view
+        )
 
     @staticmethod
     def find_by_project_id_and_max_year(
