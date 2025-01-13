@@ -23,11 +23,13 @@ logger = logging.getLogger("infraohjelmointi_api")
 class ResponsiblePersonsCommandTestCase(TestCase):
     # Columns does not have a header row.
     # Because of that, the first row includes person information
-    mock_data = {
-        'Matt': ["Sarah", "Max", "Peter", "John"],
-        'Smith': ["Example", "Test", "Incorrect-Email", "Empty-Email"],
-        'email1@example.com': ["email2@example.com", "email3@example.com", "email(at)example.com", ""]
-    }
+    mock_data = [
+        ['Matt', 'Smith', 'email1@example.com'],
+        ['Sarah', 'Example', 'email2@example.com'],
+        ['Max', 'Test', 'email3@example.com'],
+        ['Peter', 'Incorrect-Email', 'email(at)example.com'],
+        ['John', 'Empty-Email', '']
+    ]
 
     def test_without_arguments(self):
         # Script without arguments
@@ -57,7 +59,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
             ws = wb.active
 
             for person_data in self.mock_data:
-                ws.append(list(person_data.values()))
+                ws.append(person_data)
             wb.save(tmp.name)
 
         call_command("responsiblepersons", "--file", tmp.name)
