@@ -99,8 +99,17 @@ class ProjectViewSet(BaseViewSet):
         Overriding destroy action to get the deleted project id as a response
         """
         project = self.get_object()
+        old_project_values = {field: str(getattr(project, field)) for field in project.__dict__ if not field.startswith('_')}
         project_id = project.id
         project.delete()
+        self.audit_log_project_card_changes(
+            old_project_values,
+            {},
+            None,
+            request.user,
+            request.build_absolute_uri(),
+            "DELETE"
+        )
         return Response({"id": project_id})
 
     @transaction.atomic
@@ -193,7 +202,8 @@ class ProjectViewSet(BaseViewSet):
                     new_finance_values,
                     project,
                     request.user,
-                    request.build_absolute_uri()
+                    request.build_absolute_uri(),
+                    "UPDATE"
                 )
                 updated_finance_instance = updated_finance_instance[0]
                 if forced_to_frame_status.value and forced_to_frame is False:
@@ -254,7 +264,8 @@ class ProjectViewSet(BaseViewSet):
                 new_values_for_audit_log,
                 updated_project,
                 request.user,
-                request.build_absolute_uri()
+                request.build_absolute_uri(),
+                "UPDATE"
             )
 
         # updating changed data to ProjectWise
@@ -263,10 +274,10 @@ class ProjectViewSet(BaseViewSet):
         )
         return Response(project_serializer.data)
     
-    def audit_log_project_card_changes(self, old_values, new_values, project, user, url):
+    def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(
             actor=user if isinstance(user, User) else None,
-            operation="UPDATE",
+            operation=operation,
             log_level="INFO",
             origin='infrahankkeiden_ohjelmointi',
             status='SUCCESS',
