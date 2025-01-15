@@ -6,7 +6,7 @@ from ...services import SapApiService
 
 
 class Command(BaseCommand):
-    help = "Synchronize SAP costs after financial statement is locked. " + "\nUsage: python manage.py fetchsapdatabyyear"
+    help = "Synchronize SAP costs after financial statement is locked. " + "\nUsage: python manage.py fetchsapdatabyyear --year <year>"
 
     def add_arguments(self, parser):
         """

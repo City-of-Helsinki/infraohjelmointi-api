@@ -63,14 +63,7 @@ class SapApiService:
 
                 project_id_list = [p.id for p in projects_within_group]
 
-                if sync_group:
-                    logger.debug(
-                        f"Synchronizing given project group '{group_id}' with SAP Id '{sap_id}' from SAP"
-                    )
-                else:
-                    logger.debug(
-                        f"Synchronizing given project(s) '{project_id_list}' with SAP Id '{sap_id}' from SAP"
-                    )
+                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=True)
 
                 # fetch costs and commitments from SAP
                 start_time = time.perf_counter()
@@ -88,14 +81,8 @@ class SapApiService:
                 ) 
 
                 handling_time = time.perf_counter() - start_time
-                if sync_group:
-                    logger.debug(
-                        f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
-                    )
-                else:
-                    logger.info(
-                        f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
-                    )   
+
+                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)  
 
                 if self.__validate_costs_and_commitments(sap_costs_and_commitments):
                     costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
@@ -421,3 +408,23 @@ class SapApiService:
         
         else:
             return False
+        
+    def __start_and_finish_log_print(self, sync_group, group_id, sap_id, project_id_list, is_start, handling_time=None):
+        if (is_start):
+            if sync_group:
+                logger.debug(
+                    f"Synchronizing given project group '{group_id}' with SAP Id '{sap_id}' from SAP"
+                )
+            else:
+                logger.debug(
+                    f"Synchronizing given project(s) '{project_id_list}' with SAP Id '{sap_id}' from SAP"
+                )
+        else:
+            if sync_group:
+                logger.debug(
+                    f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
+                )
+            else:
+                logger.info(
+                    f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
+                )
