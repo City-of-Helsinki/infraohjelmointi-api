@@ -140,3 +140,16 @@ class TestSAPService(unittest.TestCase):
             }
         }
         self.assertEqual(result, expected_result)
+
+    def test_validate_costs_and_commitments(self):
+        costs_and_commitments = {
+            'all_sap_data': {},
+            'current_year': {}
+        }
+        response = self.sap_service.validate_costs_and_commitments(costs_and_commitments)
+
+        costs_and_commitments_not_valid = {}
+        response2 = self.sap_service.validate_costs_and_commitments(costs_and_commitments_not_valid)
+
+        self.assertEqual(response, True)
+        self.assertEqual(response2, False)

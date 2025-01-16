@@ -84,7 +84,7 @@ class SapApiService:
 
                 self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)  
 
-                if self.__validate_costs_and_commitments(sap_costs_and_commitments):
+                if self.validate_costs_and_commitments(sap_costs_and_commitments):
                     costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
 
                     self.__store_sap_data(
@@ -402,7 +402,7 @@ class SapApiService:
         else:
             return response.json()["d"]["results"]
     
-    def __validate_costs_and_commitments(self, costs_and_commitments) -> bool:
+    def validate_costs_and_commitments(self, costs_and_commitments) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
             return True
         
