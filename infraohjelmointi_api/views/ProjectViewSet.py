@@ -23,6 +23,7 @@ from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectLocation,
     ProjectFinancial,
+    User,
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
@@ -98,8 +99,17 @@ class ProjectViewSet(BaseViewSet):
         Overriding destroy action to get the deleted project id as a response
         """
         project = self.get_object()
+        old_project_values = {field: str(getattr(project, field)) for field in project.__dict__ if not field.startswith('_')}
         project_id = project.id
         project.delete()
+        self.audit_log_project_card_changes(
+            old_project_values,
+            {},
+            None,
+            request.user,
+            request.build_absolute_uri(),
+            "DELETE"
+        )
         return Response({"id": project_id})
 
     @transaction.atomic
@@ -142,7 +152,6 @@ class ProjectViewSet(BaseViewSet):
             "visibilityStart",
             "visibilityEnd",
         ]
-        logger.info(request.data)
         old_values_for_audit_log = {
             field: (
                 str(getattr(getattr(project, field), 'id', None))
@@ -175,11 +184,28 @@ class ProjectViewSet(BaseViewSet):
                 request.data['frameEstConstructionEnd'] = request.data['estConstructionEnd']
 
         if finances is not None:
-            finance_instances = self.get_finance_instances(finances, project, forced_to_frame, year)
+            finance_instances = self.create_updated_finance_instances(finances, project, forced_to_frame, year)
+            # saving old/previous values for audit log
+            old_finance_values = ProjectFinancialService.find_by_project_id_and_finance_years(
+                project_id=project.id,
+                finance_years=[instance.year for instance in finance_instances],
+                for_frame_view=forced_to_frame
+            )
+            old_finance_values = {obj.year: str(obj.value) for obj in old_finance_values}
             if len(finance_instances) > 0:
                 updated_finance_instance = ProjectFinancialService.update_or_create_bulk(
                     project_financials=finance_instances
-                )[0]
+                )
+                new_finance_values = {obj.year: obj.value for obj in updated_finance_instance}
+                self.audit_log_project_card_changes(
+                    old_finance_values,
+                    new_finance_values,
+                    project,
+                    request.user,
+                    request.build_absolute_uri(),
+                    "UPDATE"
+                )
+                updated_finance_instance = updated_finance_instance[0]
                 if forced_to_frame_status.value and forced_to_frame is False:
                     existing_frame_view_map = defaultdict(dict)
                     frame_view_finances = ProjectFinancial.objects.filter(forFrameView=True, project_id=project.id)
@@ -220,15 +246,15 @@ class ProjectViewSet(BaseViewSet):
         project.forcedToFrame = forced_to_frame
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
-        projectSerializer = self.get_serializer(
+        project_serializer = self.get_serializer(
             project,
             data=request.data,
             many=False,
             partial=True,
             context={"finance_year": year, "forcedToFrame": forced_to_frame},
         )
-        projectSerializer.is_valid(raise_exception=True)
-        updated_project = projectSerializer.save()
+        project_serializer.is_valid(raise_exception=True)
+        updated_project = project_serializer.save()
 
         # saving audit logs after project data was changed
         if (old_values_for_audit_log):
@@ -238,19 +264,20 @@ class ProjectViewSet(BaseViewSet):
                 new_values_for_audit_log,
                 updated_project,
                 request.user,
-                request.build_absolute_uri()
+                request.build_absolute_uri(),
+                "UPDATE"
             )
 
         # updating changed data to ProjectWise
         self.projectWiseService.sync_project_to_pw(
             data=request.data, project=updated_project
         )
-        return Response(projectSerializer.data)
+        return Response(project_serializer.data)
     
-    def audit_log_project_card_changes(self, old_values, new_values, project, user, url):
+    def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(
-            actor=user,
-            operation="UPDATE",
+            actor=user if isinstance(user, User) else None,
+            operation=operation,
             log_level="INFO",
             origin='infrahankkeiden_ohjelmointi',
             status='SUCCESS',
@@ -261,7 +288,7 @@ class ProjectViewSet(BaseViewSet):
         )
         audit_log.save()
 
-    def get_finance_instances(self, finances, project, forced_to_frame, year):
+    def create_updated_finance_instances(self, finances, project, forced_to_frame, year):
         finance_instances = []
         for field in finances.keys():
                 if hasattr(project, "lock"):

@@ -37,9 +37,14 @@ class SapApiService:
         self.sap_api_costs_endpoint = env("SAP_COSTS_ENDPOINT")
         self.sap_api_commitments_endpoint = env("SAP_COMMITMENTS_ENDPOINT")
 
-    def sync_all_projects_from_sap(self) -> None:
+        # Set the sap start year to be 2017 to get all data from sap
+        self.sap_fetch_all_data_start_year = 2017
+
+    def sync_all_projects_from_sap(self, for_financial_statement: bool, sap_year=datetime.now().year) -> None:
         """Method to synchronise projects from SAP.\n
         Given projects must have sapProject otherwise project will not be syncrhonized.
+        Will get for_financial_statement as True if called for fetching sap data for certain year only, 
+        then also this certain year is given as parameter.
         """
 
         logger.debug("Synchronizing all projects in DB with SAP")
@@ -47,7 +52,6 @@ class SapApiService:
 
         # group projects by sapProject, all projects belong to same group
         projects_grouped_by_groups = self.__group_projects_by_sap_id(projects=projects)
-        current_year = datetime.now().year
 
         # make only one call either for ungroupped project are all groupped projects
         for group_id in projects_grouped_by_groups.keys():
@@ -62,112 +66,97 @@ class SapApiService:
 
                 project_id_list = [p.id for p in projects_within_group]
 
-                if sync_group:
-                    logger.debug(
-                        f"Synchronizing given project group '{group_id}' with SAP Id '{sap_id}' from SAP"
-                    )
-                else:
-                    logger.debug(
-                        f"Synchronizing given project(s) '{project_id_list}' with SAP Id '{sap_id}' from SAP"
-                    )
+                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=True)
 
                 # fetch costs and commitments from SAP
                 start_time = time.perf_counter()
-                sap_costs_and_commitments = (
-                    self.get_project_costs_and_commitments_from_sap(sap_id)
-                )
+                sap_costs_and_commitments = {}
+                
+                # all sap data is not fetched, if function is called for getting sap data for certain year, 
+                # f.g. for financial statement
+                if not for_financial_statement:
+                    sap_costs_and_commitments["all_sap_data"] = (
+                        self.get_all_project_costs_and_commitments_from_sap(sap_id)
+                    )
+                
+                sap_costs_and_commitments["current_year"] = (
+                    self.get_costs_and_commitments_by_year(sap_id, sap_year)
+                ) 
 
-                if self.__validate_costs_and_commitments(sap_costs_and_commitments) :
+                handling_time = time.perf_counter() - start_time
+
+                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)  
+
+                if self.validate_costs_and_commitments(sap_costs_and_commitments):
                     costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
-                    costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
-
-                    handling_time = time.perf_counter() - start_time
-                    if sync_group:
-                        logger.debug(
-                            f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
-                        )
-                    else:
-                        logger.info(
-                            f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
-                        )
 
                     self.__store_sap_data(
                         service_class = SapCostService,
                         group_id=group_id,
                         costs_by_sap_id=costs_by_sap_id_all,
                         projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                        current_year=current_year,
+                        current_year=sap_year,
                     )
+                
+                costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
+                self.__store_sap_data(
+                    service_class = SapCurrentYearService,
+                    group_id=group_id,
+                    costs_by_sap_id=costs_by_sap_id_current_year,
+                    projects_grouped_by_sap_id=projects_grouped_by_sap_id,
+                    current_year=sap_year,
+                )
 
-                    self.__store_sap_data(
-                        service_class = SapCurrentYearService,
-                        group_id=group_id,
-                        costs_by_sap_id=costs_by_sap_id_current_year,
-                        projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                        current_year=current_year,
-                    )
+    def get_costs_and_commitments_by_year(self, id: str, year) -> dict:
+        """Method to fetch costs and commitments from SAP for given year"""
+        logger.debug(f"Fetching SAP costs and commitments for year {year}")
 
-    def get_project_costs_and_commitments_from_sap(
+        # Time frame for sap fetch is from 1.1.{year} to 1.1.{year+1}
+        budat_start = datetime.now().replace(year=year, month=1, day=1, hour=0, minute=0, second=0)
+        budat_end = datetime.now().replace(year=year+1, month=1, day=1, hour=0, minute=0, second=0)
+
+        # Timeframe for fetching certain year's sap data is from 1.1.{start_year} to 1.1.{start_year+1}
+        logger.debug(f"Starting to fetch costs and commitments for SAP id {id} from {budat_start} to {budat_end}")
+        json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, id, all_sap_commitments=False)
+
+        grouped_costs_and_commitments_current_year = self.__group_costs_and_commitments( 
+        sap_costs_and_commitments=json_response_current_year,
+        sap_id=id,
+        )
+
+        sap_costs_and_commitments = []
+        sap_costs_and_commitments = grouped_costs_and_commitments_current_year
+
+        return sap_costs_and_commitments
+
+    def get_all_project_costs_and_commitments_from_sap(
         self,
         id: str,
-        budat_start: datetime = datetime.now().replace(
-            month=1, day=1, hour=0, minute=0, second=0
-        ),
-        budat_end: datetime = datetime.now().replace(
-            year=datetime.now().year + 1, month=1, day=1, hour=0, minute=0, second=0
-        ),
     ) -> dict:
         """Method to fetch costs and commitments from SAP with given SAP project id"""
-        logger.debug("in get_project_costs_and_commitments_from_sap")
+        logger.debug("in get_all_project_costs_and_commitments_from_sap")
 
-        # Fetch projects by SAP ID and get earliest planning start year
-        projects = ProjectService.get_by_sap_id(id)
+        budat_start = datetime.now().replace(year=self.sap_fetch_all_data_start_year, month=1, day=1, hour=0, minute=0, second=0)
+        budat_end = datetime.now().replace(year=datetime.now().year + 1, month=1, day=1, hour=0, minute=0, second=0)
 
-        sap_start_year = None
+        # Timeframe for fetching all sap data costs is from 1.1.2017 to 1.1.{currentyear+1},
+        # and for commitments from 1.1.2017 to 1.1.{currentyear+1+5}
+        logger.debug(f"Starting to fetch all costs for SAP id {id} from {budat_start.year} to {budat_end.year}, and all commitments from {budat_start.year} to {budat_end.year}+5 years")
+        json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, id, all_sap_commitments=True)
 
-        for project in projects:
-            if not project.planningStartYear:
-                logger.debug(f"No planning start year set for project ID {project.id}.")
-            elif project.planningStartYear > budat_start.year:
-                logger.debug(f"Planning start year is set in the future for project ID {project.id}.")
-            elif (sap_start_year and sap_start_year > project.planningStartYear) or not sap_start_year:
-                sap_start_year = project.planningStartYear
+        grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
+            sap_costs_and_commitments=json_response_all,
+            sap_id=id,
+        )
+        sap_costs_and_commitments = []
+        sap_costs_and_commitments= grouped_costs_and_commitments_all
 
-        if sap_start_year:
-            start_year = datetime.now().year
-            logger.debug("Starting to fetch all costs for SAP id {id} from {sap_start_year} to {budat_end}, and all commitments from {sap_start_year} to {budat_end} +5 years")
-            json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, sap_start_year, id, all_sap_commitments=True)
-            logger.debug("Starting to fetch current year's costs and commitments for SAP id {id} from {start_year} to {budat_end}")
-            json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, start_year, id, all_sap_commitments=False)
-
-            grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
-                sap_costs_and_commitments=json_response_all,
-                sap_id=id,
-            )
-
-            grouped_costs_and_commitments_current_year = self.__group_costs_and_commitments(
-                sap_costs_and_commitments=json_response_current_year,
-                sap_id=id,
-            )
-
-            sap_costs_and_commitments = {
-                "all_sap_data": grouped_costs_and_commitments_all,
-                "current_year": grouped_costs_and_commitments_current_year
-            }
-
-            return sap_costs_and_commitments
-        
-        else:
-            logger.debug(
-                f"No planning start year set or planning start year in the future for project(s) with SAP id {id}. Skipping SAP data fetch for id {id}"
-            )
-            return {}
+        return sap_costs_and_commitments
 
     def __fetch_costs_and_commitments_from_sap(
             self,
             budat_start: datetime,
             budat_end: datetime,
-            start_year: int,
             id: str,
             all_sap_commitments: bool
         )-> dict:
@@ -187,7 +176,7 @@ class SapApiService:
         # Fetch costs from SAP
         api_url = f"{self.sap_api_url}{self.sap_api_costs_endpoint}".format(
             posid=id,
-            budat_start=budat_start.replace(year=start_year).strftime(
+            budat_start=budat_start.replace(year=budat_start.year).strftime(
                 date_format
             ),
             budat_end=budat_end.strftime(date_format),
@@ -197,17 +186,17 @@ class SapApiService:
 
         # Fetch commitments from SAP
         if all_sap_commitments:
-            # Fetch commitments from planning start year to current year end + 5 years
+            # Fetch commitments until the end fo the current year + 5 years
             end_date_for_commitment_fetch = budat_end.replace(year=budat_end.year + 5)
 
         else:
-            # Fetch commitments from planning start year to end of the current year
+            # Fetch commitments until the end of the current year
             end_date_for_commitment_fetch = budat_end
 
-        logger.debug("In commitment-fetch: start year: {start_year} and end_year: {end_date_for_commitment_fetch}")
+        logger.debug(f"In commitment-fetch: start year: {budat_start.year} and end_year: {end_date_for_commitment_fetch.year}")
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
             posid=id,
-            budat_start=budat_start.replace(year=start_year).strftime(
+            budat_start=budat_start.replace(year=budat_start.year).strftime(
                 date_format
             ),
             budat_end=end_date_for_commitment_fetch.strftime(date_format),
@@ -391,9 +380,29 @@ class SapApiService:
         else:
             return response.json()["d"]["results"]
     
-    def __validate_costs_and_commitments(self, costs_and_commitments: list) -> bool:
+    def validate_costs_and_commitments(self, costs_and_commitments) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
             return True
         
         else:
             return False
+        
+    def __start_and_finish_log_print(self, sync_group, group_id, sap_id, project_id_list, is_start, handling_time=None):
+        if (is_start):
+            if sync_group:
+                logger.debug(
+                    f"Synchronizing given project group '{group_id}' with SAP Id '{sap_id}' from SAP"
+                )
+            else:
+                logger.debug(
+                    f"Synchronizing given project(s) '{project_id_list}' with SAP Id '{sap_id}' from SAP"
+                )
+        else:
+            if sync_group:
+                logger.debug(
+                    f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
+                )
+            else:
+                logger.info(
+                    f"Finished fetching data from SAP for project {project_id_list} in {handling_time}s"
+                )
