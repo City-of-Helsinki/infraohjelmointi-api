@@ -25,6 +25,9 @@ class TestSAPService(TestCase):
         self.sap_service.session = MagicMock()
         self.sap_current_year_viewset = SapCurrentYearViewSet()
 
+        # Set the sap start year to be 2017 to get all data from sap
+        self.sap_fetch_all_data_start_year = 2017
+
     @classmethod
     @override
     def setUpTestData(self):
@@ -73,11 +76,6 @@ class TestSAPService(TestCase):
             mock_response_current_year_commitments
         ]
 
-        # Mock the ProjectService.get_by_sap_id to return a project with a planning start year
-        mock_project = MagicMock()
-        mock_project.planningStartYear = 2022
-        mock_get_by_sap_id.return_value = [mock_project]
-
         # Call the function with a known SAP ID
         project_id = '123'
         result = {}
@@ -109,7 +107,7 @@ class TestSAPService(TestCase):
         # Assert that the session.get was called with the correct URL and parameters
         start_date = datetime.now().replace(
             month=1, day=1, hour=0, minute=0, second=0
-        ).replace(year=mock_project.planningStartYear).strftime("%Y-%m-%dT%H:%M:%S")
+        ).replace(year=self.sap_fetch_all_data_start_year).strftime("%Y-%m-%dT%H:%M:%S")
         end_date = datetime.now().replace(
             year=datetime.now().year + 1, month=1, day=1, hour=0, minute=0, second=0
         ).strftime("%Y-%m-%dT%H:%M:%S")
