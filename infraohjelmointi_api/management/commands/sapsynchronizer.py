@@ -5,7 +5,7 @@ from ...services import SapApiService
 
 
 class Command(BaseCommand):
-    help = "Syncrhonize SAP costs. " + "\nUsage: python manage.py sapsynchronizer"
+    help = "Synchronize SAP costs. " + "\nUsage: python manage.py sapsynchronizer"
 
     def add_arguments(self, parser):
         """
@@ -14,4 +14,4 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        SapApiService().sync_all_projects_from_sap()
+        SapApiService().sync_all_projects_from_sap(for_financial_statement=False)

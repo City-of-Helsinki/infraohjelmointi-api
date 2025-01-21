@@ -1,4 +1,4 @@
-django==4.2                                    # web framework itself
+django==4.2.17                                    # web framework itself
 djangorestframework==3.14.0                    # creating rest APIs
 psycopg2-binary==2.9.6                         # postgres database adapter
 requests>=2.31.0
@@ -22,5 +22,4 @@ daphne                                      # application server
 django-helusers                               # Tunnistamo user inegration
 social-auth-app-django
 drf-yasg                                    # API Swagger documentation
-pandas
 numpy

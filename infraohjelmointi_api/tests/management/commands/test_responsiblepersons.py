@@ -1,5 +1,7 @@
 from io import StringIO
+import os
 from os import path
+from openpyxl import Workbook
 import tempfile
 from unittest.mock import patch
 from django.core.management import call_command
@@ -7,7 +9,6 @@ from django.core.management.base import CommandError
 
 from django.test import TestCase
 import environ
-import pandas as pd
 
 from infraohjelmointi_api.services import PersonService
 
@@ -22,11 +23,13 @@ logger = logging.getLogger("infraohjelmointi_api")
 class ResponsiblePersonsCommandTestCase(TestCase):
     # Columns does not have a header row.
     # Because of that, the first row includes person information
-    mock_data = {
-        'Matt': ["Sarah", "Max", "Peter", "John"],
-        'Smith': ["Example", "Test", "Incorrect-Email", "Empty-Email"],
-        'email1@example.com': ["email2@example.com", "email3@example.com", "email(at)example.com", ""]
-    }
+    mock_data = [
+        ['Matt', 'Smith', 'email1@example.com'],
+        ['Sarah', 'Example', 'email2@example.com'],
+        ['Max', 'Test', 'email3@example.com'],
+        ['Peter', 'Incorrect-Email', 'email(at)example.com'],
+        ['John', 'Empty-Email', '']
+    ]
 
     def test_without_arguments(self):
         # Script without arguments
@@ -51,13 +54,18 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         self.assertIn(expected_error_message, command_output)
 
     def test_populate_db_with_excel(self):
-        # Script with mock data file
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-            mock_df = pd.DataFrame(self.mock_data)
-            mock_df.to_excel(tmp.name, index=False)
+            wb = Workbook()
+            ws = wb.active
+
+            for person_data in self.mock_data:
+                ws.append(person_data)
+            wb.save(tmp.name)
 
         call_command("responsiblepersons", "--file", tmp.name)
 
         persons = PersonService.get_all_persons()
 
         self.assertEqual(len(persons), 3, "The count of successfully added person should be three")
+
+        os.remove(tmp.name)
