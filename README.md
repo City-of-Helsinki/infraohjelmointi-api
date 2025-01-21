@@ -86,24 +86,35 @@ Import new person information into responsible persons list. The list can be fou
 
 ### Updates to database
 
+These adds missing or modifies existing data.
+
 Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`:
 
   ```bash
   psql $DATABASE_URL
   \i update-districts.sql
   ```
+
 Add phase indexes:
 
   ```bash
   psql $DATABASE_URL
   \i update-phase-indexes.sql
   ```
+
 Update costForecast:
 
   ```bash
   psql $DATABASE_URL
   \i update-costForecast.sql
   ```
+
+Add a new project type `preConstruction`:
+  ```bash
+  psql $DATABASE_URL
+  \i update-projecttypes.sql
+  ```
+
 Add 'eri suurpiirejä' option:
 
   ```bash
