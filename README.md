@@ -5,17 +5,29 @@ Backend repository for infraohjelmointi API service in City of Helsinki.
 Instructions in this README.md assume that you know  what __docker__ and __docker-compose__ are, and you already have both installed locally. Also you understand what __docker-compose up -d__ means.
 This helps to keep the README.md concise.
 
-### Ways of working
-##### Commits
+Technical documentation can be found from [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/7895089196/Tekninen+dokumentaatio).
+
+**Table of Contents**
+- [Ways of working](#ways-of-working)
+- [Setting up local development environment with Docker](#setting-up-local-development-environment-with-docker)
+- [Populate database](#populate-database)
+- [Add or delete API token](#add-or-delete-api-token)
+- [Managing project packages](#managing-project-packages)
+- [Tests](#tests)
+- [External data sources](#external-data-sources)
+- [Production release](#production-release)
+
+## Ways of working
+### Commits
 
 To make our commits more informative those should be written in a format of Conventional Commits i.e. a suitable prefix should be added in the beginning
 of every commit e.g. **feat:** built a notification or **refactor**:... etc. The Conventional Commits could be properly configured to the project in the future.
 
-##### Hotfixes
+### Hotfixes
 
 Hotfixes should be done by creating a hotfix branch out of main and then merge that to main and develop to avoid doing any rebases.
 
-##### Merges
+### Merges
 
 The common way of merging branches is using normal merges i.e. not using squash merging unless there is a situation when squashing should be done.
 
@@ -39,7 +51,7 @@ Then you can run docker image as detached mode with:
 
 - Done!
 
-## What next?
+### What next?
 TL;DR:
 Execute all commands under [Populate database](#populate-database) to get all data in local environment.
 
@@ -67,7 +79,6 @@ Importing Location/Class hierarchy structure and Planning (TS) and Budget (TAE) 
   ./import-excels.sh -d path/to/Excels/
   ```
 
-
 ### Import project location options
 
 Import project location options:
@@ -86,24 +97,35 @@ Import new person information into responsible persons list. The list can be fou
 
 ### Updates to database
 
+These adds missing or modifies existing data.
+
 Update projects' missing `projectDistrict_id` value with `infraohjelmointi_api_projectdistrict.id`:
 
   ```bash
   psql $DATABASE_URL
   \i update-districts.sql
   ```
+
 Add phase indexes:
 
   ```bash
   psql $DATABASE_URL
   \i update-phase-indexes.sql
   ```
+
 Update costForecast:
 
   ```bash
   psql $DATABASE_URL
   \i update-costForecast.sql
   ```
+
+Add a new project type `preConstruction`:
+  ```bash
+  psql $DATABASE_URL
+  \i update-projecttypes.sql
+  ```
+
 Add 'eri suurpiirejä' option:
 
   ```bash
@@ -119,6 +141,10 @@ Add 'eri kaupunginosia' option:
 ---
 
 ## Add or delete API token
+
+The backend has own API for 3rd party use that can be used to fetch data.
+
+More information can be found from [Technical documentation](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8705671316/Rajapinta).
 
 Add new API token:
 
@@ -143,7 +169,7 @@ Delete API token:
   docker-compose up --build
   ```
 
-## Running tests
+## Tests
 
 Tests are written for django management commands and the endpoints. They can be found in the following location:
 
@@ -161,7 +187,7 @@ An optional verbosity parameter can be added to get a more descriptive view of t
   python manage.py test -v 1/2/3
   ```
 
-## Test coverage
+### Test coverage
 
 The codebase should always have a test coverage % higher than 65%. It is usualy measured with SonarCloud in the PR pipeline, but if needed to get
 the % locally, a report can be created with pytest-cov.
@@ -237,7 +263,3 @@ More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/
 
 - Steps on Confluence with pictures: [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Tuotantoonvienti)
 - Link to Azure DevOps services: [Azure DevOps](https://dev.azure.com/City-of-Helsinki/infraohjelmointi/_build/)
-
-## Technical documentation
-
-Technical documentation can be found from [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/7895089196/Tekninen+dokumentaatio).
