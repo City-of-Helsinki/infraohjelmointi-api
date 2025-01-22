@@ -177,6 +177,7 @@ project_type_map = {
     "park": "puisto",
     "bigTrafficProjects": "suuret liikennehankealueet",
     "spesialtyStructures": "taitorakenne",
+    "preConstruction": "esirakentaminen",
 }
 
 construction_phase_details_map = {
