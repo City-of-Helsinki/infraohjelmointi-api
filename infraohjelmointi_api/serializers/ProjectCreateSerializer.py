@@ -218,7 +218,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
         if phase is not None and (
             phase.value == "completed"
-            or phase.value == "warrantyPeriod"
             or phase.value == "proposal"
         ):
             data["programmed"] = False
