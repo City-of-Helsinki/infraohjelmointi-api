@@ -3282,7 +3282,11 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-        data = {"phase": self.projectPhase_6_Id}
+        data = {
+            "phase": self.projectPhase_6_Id,
+            "programmed": True
+        }
+
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
@@ -3310,6 +3314,7 @@ class ProjectTestCase(TestCase):
         data = {
             "constructionPhaseDetail": self.conPhaseDetail_2_Id,
             "phase": self.projectPhase_5_Id,
+            "programmed": False,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
