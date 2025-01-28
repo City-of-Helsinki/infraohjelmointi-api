@@ -1,5 +1,6 @@
 from uuid import UUID
 from infraohjelmointi_api.models import ProjectHashTag
+from infraohjelmointi_api.serializers import ProjectGroupSerializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
@@ -14,6 +15,7 @@ class SearchResultSerializer(serializers.Serializer):
     phase = serializers.SerializerMethodField()
     path = serializers.SerializerMethodField()
     programmed = serializers.SerializerMethodField()
+    group = serializers.SerializerMethodField()
 
     def get_path(self, obj):
         instanceType = obj._meta.model.__name__
@@ -118,3 +120,15 @@ class SearchResultSerializer(serializers.Serializer):
         if hasattr(obj, "programmed"):
             return obj.programmed
         return None
+    
+    def get_group(self, obj):
+        """
+        Gets the field `projectGroup_id` from a Project instance
+        This function only concerns instances of Project
+        """
+        if hasattr(obj, "projectGroup_id"):
+            return obj.projectGroup_id
+        return None
+        # if not hasattr(obj, "projectGroup_id") or obj.projectGroup_id is None:
+        #     return None
+        # return ProjectGroupSerializer(obj.projectGroup_id).data
