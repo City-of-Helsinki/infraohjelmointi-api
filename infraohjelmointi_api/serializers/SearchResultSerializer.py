@@ -23,6 +23,14 @@ class SearchResultSerializer(serializers.Serializer):
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
             locationInstance = getattr(obj, "projectLocation", None)
+            group = getattr(obj, "projectGroup", None)
+
+            if group:
+                # Ensure that the deepest class in the path is the same as the group's class.
+                group_class = getattr(group, "classRelation", None)
+                if group_class and classInstance and group_class != classInstance:
+                    classInstance = group_class
+
         elif instanceType == "ProjectClass":
             classInstance = obj
         elif instanceType == "ProjectLocation":
@@ -55,16 +63,18 @@ class SearchResultSerializer(serializers.Serializer):
         if locationInstance is None:
             return path
 
-        if locationInstance.parent is None:
+        if locationInstance.parent is None and group is None:
             path = path + "&district={}".format(str(locationInstance.id))
         if (
-            locationInstance.parent is not None
+            locationInstance.parent is not None 
             and locationInstance.parent.parent is not None
+            and group is None
         ):
             path = path + "&district={}".format(str(locationInstance.parent.parent.id))
         if (
             locationInstance.parent is not None
             and locationInstance.parent.parent is None
+            and group is None
         ):
             path = path + "&district={}".format(str(locationInstance.parent.id))
 
@@ -118,3 +128,4 @@ class SearchResultSerializer(serializers.Serializer):
         if hasattr(obj, "programmed"):
             return obj.programmed
         return None
+    
