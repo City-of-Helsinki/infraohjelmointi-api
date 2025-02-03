@@ -652,9 +652,7 @@ class ProjectViewSet(BaseViewSet):
             order = "new"
 
         if len(projectGroup) > 0:
-            groups = ProjectGroup.objects.filter(
-                id__in=queryset.values_list("projectGroup", flat=True).distinct()
-            ).select_related("classRelation")
+            groups = ProjectGroup.objects.filter(id__in=projectGroup).select_related("classRelation")
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
