@@ -2049,9 +2049,10 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "groups"]),
-            1,
-            msg="Filtered result should contain 1 group with id {}. Found: {}".format(
+            2,
+            msg="Filtered result should contain 2 group with id {} and {}. Found: {}".format(
                 self.projectGroup_1_Id,
+                self.projectGroup_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
