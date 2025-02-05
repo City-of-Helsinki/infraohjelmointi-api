@@ -652,7 +652,7 @@ class ProjectViewSet(BaseViewSet):
             order = "new"
 
         if len(projectGroup) > 0:
-            groups = ProjectGroup.objects.filter(id__in=projectGroup).select_related("classRelation")
+            groups = ProjectGroup.objects.filter(name__in=projectGroup).select_related("classRelation")
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
@@ -937,15 +937,15 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
         projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
-        projectName = self.request.query_params.get("projectName", None)
+        projectName = self.request.query_params.getlist("projectName", [])
 
         # This query param gives the projects which are directly under any given location or class if set to True
         # Else the queryset will also contain the projects containing the child locations/districts
         direct = self.request.query_params.get("direct", False)
 
         try:
-            if projectName is not None:
-                qs = qs.filter(name__icontains=projectName)
+            if projectName != []:
+                qs = qs.filter(name__in=projectName)
 
             if direct in ["true", "True"]:
                 direct = True
@@ -967,7 +967,7 @@ class ProjectViewSet(BaseViewSet):
                 qs, prYearMin=prYearMin, prYearMax=prYearMax
             )
             if len(projectGroups) > 0:
-                qs = qs.filter(projectGroup__in=projectGroups)
+                qs = qs.filter(projectGroup__name__in=projectGroups)
             if len(masterClass) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
