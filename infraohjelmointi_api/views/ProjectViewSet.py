@@ -935,7 +935,6 @@ class ProjectViewSet(BaseViewSet):
         overMillion = self.request.query_params.get("overMillion", False)
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
-        projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.getlist("projectName", [])
 
@@ -966,8 +965,6 @@ class ProjectViewSet(BaseViewSet):
             qs = self._filter_projects_by_programming_year(
                 qs, prYearMin=prYearMin, prYearMax=prYearMax
             )
-            if len(projectGroups) > 0:
-                qs = qs.filter(projectGroup__name__in=projectGroups)
             if len(masterClass) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
