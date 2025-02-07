@@ -20,6 +20,7 @@ class SearchResultSerializer(serializers.Serializer):
         classInstance = None
         locationInstance = None
         path = ""
+        group = None
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
             locationInstance = getattr(obj, "projectLocation", None)
