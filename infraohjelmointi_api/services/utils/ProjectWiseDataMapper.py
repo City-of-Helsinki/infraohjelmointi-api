@@ -133,7 +133,7 @@ to_pw_map = {
     },
 }
 
-phase_map = {
+phase_map_for_pw = {
     "proposal": "1. Hanke-ehdotus",
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
@@ -141,6 +141,19 @@ phase_map = {
         "3. Suunnittelun aloitus / Suunnitelmaluonnos",
         "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
     ],
+    "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
+    "constructionPlan": "5. Rakennussuunnitelma",
+    "constructionWait": "6. Odottaa rakentamista",
+    "construction": "7. Rakentaminen",
+    "warrantyPeriod": "8. Takuuaika",
+    "completed": "9. Valmis / ylläpidossa",
+}
+
+phase_map_for_infratool = {
+    "proposal": "1. Hanke-ehdotus",
+    "design": "1.5 Yleissuunnittelu",
+    "programming": "2. Ohjelmointi",
+    "draftInitiation": "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
     "constructionWait": "6. Odottaa rakentamista",
@@ -215,7 +228,7 @@ class ProjectWiseDataMapper:
             elif mapped_field["type"] == "listvalue":
                 field_mapper = None
                 if field == "phase":
-                    field_mapper = phase_map
+                    field_mapper = phase_map_for_infratool
                     value = (
                         ProjectPhaseService.get_by_id(value).value
                         if not value is None
@@ -252,10 +265,7 @@ class ProjectWiseDataMapper:
                 else:
                     raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
                 
-                if isinstance(field_mapper[value], list):
-                    result[mapped_field["field"]] = field_mapper[value][1] if value else None
-                else:
-                    result[mapped_field["field"]] = field_mapper[value] if value else None
+                result[mapped_field["field"]] = field_mapper[value] if value else None
             # Class/Location field handling
             elif mapped_field["type"] == "enum":
                 if field == "projectClass":
@@ -318,7 +328,7 @@ class ProjectWiseDataMapper:
         """Helper method to load phases from DB and transform to match PW format"""
         phases = {}
         for pph in ProjectPhaseService.list_all():
-            mapped_value = phase_map[pph.value]
+            mapped_value = phase_map_for_pw[pph.value]
             if isinstance(mapped_value, list):
                 for key in mapped_value:
                     phases[key] = pph
