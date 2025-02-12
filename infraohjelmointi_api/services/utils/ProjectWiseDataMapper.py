@@ -253,7 +253,7 @@ class ProjectWiseDataMapper:
                     raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
                 
                 if isinstance(field_mapper[value], list):
-                    result[mapped_field["field"]] = field_mapper[value][0] if value else None
+                    result[mapped_field["field"]] = field_mapper[value][1] if value else None
                 else:
                     result[mapped_field["field"]] = field_mapper[value] if value else None
             # Class/Location field handling
