@@ -37,9 +37,6 @@ from ..serializers import (
 )
 
 from infraohjelmointi_api.views import BaseViewSet
-import logging
-
-logger = logging.getLogger("infraohjelmointi_api")
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])

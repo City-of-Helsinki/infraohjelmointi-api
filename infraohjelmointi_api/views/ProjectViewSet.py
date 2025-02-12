@@ -716,8 +716,6 @@ class ProjectViewSet(BaseViewSet):
             "results": serializer.data,
         }
 
-        logger.info(response)
-
         return Response(response)
 
     @override
