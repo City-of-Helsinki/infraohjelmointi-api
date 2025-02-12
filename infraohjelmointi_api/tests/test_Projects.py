@@ -37,6 +37,9 @@ from ..serializers import (
 )
 
 from infraohjelmointi_api.views import BaseViewSet
+import logging
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -137,7 +140,9 @@ class ProjectTestCase(TestCase):
     projectSubDivision_4_Id = uuid.UUID("e65d7bc1-61f5-42f9-a52c-417cd1cf085b")
     projectSubDivision_5_Id = uuid.UUID("06004dd7-5b27-43c8-85ef-34d2b5115749")
     projectGroup_1_Id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
+    projectGroup1_name = "Test Group 1 rain"
     projectGroup_2_Id = uuid.UUID("bee657d4-a2cc-4c04-a75b-edc12275dd62")
+    projectGroup2_name = "Test Group 2"
     projectGroup_3_Id = uuid.UUID("b2e2808c-831b-4db2-b0a8-f6c6d270af1a")
     projectFinancial_1_Id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
     projectFinancial_2_Id = uuid.UUID("ec17c3c6-7414-4fec-ad2e-6e6f63a88bcb")
@@ -1151,11 +1156,11 @@ class ProjectTestCase(TestCase):
             path="Master Class 1/Test Class 1/Sub class 2",
         )
         projectGroup_1 = ProjectGroup.objects.create(
-            id=self.projectGroup_1_Id, name="Test Group 1 rain",
+            id=self.projectGroup_1_Id, name=self.projectGroup1_name,
             classRelation=subClass_2
         )
         projectGroup_2 = ProjectGroup.objects.create(
-            id=self.projectGroup_2_Id, name="Test Group 2",
+            id=self.projectGroup_2_Id, name=self.projectGroup2_name,
             classRelation=subClass_2
         )
         projectGroup_3 = ProjectGroup.objects.create(
@@ -1925,7 +1930,7 @@ class ProjectTestCase(TestCase):
             "/projects/search-results/?hashtag={}&hashtag={}&group={}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
-                self.projectGroup_1_Id,
+                self.projectGroup1_name,
             ),
         )
         self.assertEqual(
@@ -1936,7 +1941,7 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            2,
+            3,
             msg="Filtered result should contain 2 projects with hashTag: {} or {} and group: {}. Found: {}".format(
                 self.projectHashTag_3_Id,
                 self.projectHashTag_4_Id,
@@ -1954,8 +1959,8 @@ class ProjectTestCase(TestCase):
         )
         response = self.client.get(
             "/projects/search-results/?group={}&group={}".format(
-                self.projectGroup_2_Id,
-                self.projectGroup_1_Id,
+                self.projectGroup2_name,
+                self.projectGroup1_name,
             ),
         )
         self.assertEqual(

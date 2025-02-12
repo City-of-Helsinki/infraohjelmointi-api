@@ -115,6 +115,7 @@ class ProjectWiseService:
         if project.hkrId is None or str(project.hkrId).strip() == "":
             return
         try:
+            logger.info("PWDATA")
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
                 data=data, project=project
             )

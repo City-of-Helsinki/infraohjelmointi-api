@@ -581,6 +581,7 @@ class ProjectViewSet(BaseViewSet):
         response = {}
         freeSearch = request.query_params.get("freeSearch", None)
         projectGroup = request.query_params.getlist("group", [])
+        logger.info("GROUPIT:")
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
@@ -715,6 +716,8 @@ class ProjectViewSet(BaseViewSet):
             "count": searchPaginator.page.paginator.count,
             "results": serializer.data,
         }
+
+        logger.info(response)
 
         return Response(response)
 
@@ -937,15 +940,24 @@ class ProjectViewSet(BaseViewSet):
         projects = self.request.query_params.getlist("project", [])
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.getlist("projectName", [])
+        hash_tags = self.request.query_params.getlist("hashtag", [])
 
         # This query param gives the projects which are directly under any given location or class if set to True
         # Else the queryset will also contain the projects containing the child locations/districts
         direct = self.request.query_params.get("direct", False)
 
         try:
-            if projectName != []:
-                qs = qs.filter(name__in=projectName)
+            q_objects = Q()
 
+            if len(projectName) > 0:
+                q_objects |= Q(name__in=projectName)
+
+            if len(hash_tags) > 0:
+                q_objects |= Q(hashTags__id__in=hash_tags)
+
+            qs = qs.filter(q_objects)
+
+            
             if direct in ["true", "True"]:
                 direct = True
             elif direct in ["false", "False"]:
