@@ -936,9 +936,9 @@ class ProjectViewSet(BaseViewSet):
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
         inGroup = self.request.query_params.get("inGroup", None)
-        projectName = self.request.query_params.getlist("projectName", [])
+        project_name = self.request.query_params.getlist("projectName", [])
         hash_tags = self.request.query_params.getlist("hashtag", [])
-        projectGroup = self.request.query_params.getlist("group", [])
+        project_group = self.request.query_params.getlist("group", [])
 
         # This query param gives the projects which are directly under any given location or class if set to True
         # Else the queryset will also contain the projects containing the child locations/districts
@@ -947,9 +947,9 @@ class ProjectViewSet(BaseViewSet):
         try:
             q_objects = Q()
 
-            if len(projectName) > 0 or len(projectGroup) > 0:
-                q_objects |= Q(name__in=projectName)
-                q_objects |= Q(projectGroup__name__in=projectGroup)
+            if len(project_name) > 0 or len(project_group) > 0:
+                q_objects |= Q(name__in=project_name)
+                q_objects |= Q(projectGroup__name__in=project_group)
 
             if len(hash_tags) > 0:
                 q_objects |= Q(hashTags__id__in=hash_tags)
