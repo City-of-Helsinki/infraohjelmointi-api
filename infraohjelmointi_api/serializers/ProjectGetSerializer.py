@@ -141,7 +141,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     def get_projectReadiness(self, project):
         return project.projectReadiness()
 
-    def get_currentYearsSapValue(self):
+    def get_currentYearsSapValue(self, project: Project):
         #Get the current year sap-costs for project card
         current_year = datetime.datetime.now().year
 
