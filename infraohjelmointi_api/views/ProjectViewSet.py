@@ -581,7 +581,6 @@ class ProjectViewSet(BaseViewSet):
         response = {}
         freeSearch = request.query_params.get("freeSearch", None)
         projectGroup = request.query_params.getlist("group", [])
-        logger.info("GROUPIT:")
         masterClass = self.request.query_params.getlist("masterClass", [])
         _class = self.request.query_params.getlist("class", [])
         subClass = self.request.query_params.getlist("subClass", [])
@@ -941,6 +940,7 @@ class ProjectViewSet(BaseViewSet):
         inGroup = self.request.query_params.get("inGroup", None)
         projectName = self.request.query_params.getlist("projectName", [])
         hash_tags = self.request.query_params.getlist("hashtag", [])
+        projectGroup = self.request.query_params.getlist("group", [])
 
         # This query param gives the projects which are directly under any given location or class if set to True
         # Else the queryset will also contain the projects containing the child locations/districts
@@ -949,8 +949,9 @@ class ProjectViewSet(BaseViewSet):
         try:
             q_objects = Q()
 
-            if len(projectName) > 0:
+            if len(projectName) > 0 or len(projectGroup) > 0:
                 q_objects |= Q(name__in=projectName)
+                q_objects |= Q(projectGroup__name__in=projectGroup)
 
             if len(hash_tags) > 0:
                 q_objects |= Q(hashTags__id__in=hash_tags)

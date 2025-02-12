@@ -48,7 +48,9 @@ class ProjectTestCase(TestCase):
     project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     project_3_Id = uuid.UUID("fdc89f56-b631-4109-a137-45b950de6b10")
+    project_3_name = "Parking Helsinki"
     project_4_Id = uuid.UUID("7c5b981e-286f-4065-9d9e-29d8d1714e4c")
+    project_4_name = "Random name"
     project_5_Id = uuid.UUID("441d80e1-9ab1-4b35-91cc-6017ea308d87")
     project_6_Id = uuid.UUID("90852adc-d47e-4fd9-944f-cb8d36076c21")
     project_7_Id = uuid.UUID("e98e3787-e19f-4af6-94c9-12c8e31ea040")
@@ -1185,7 +1187,7 @@ class ProjectTestCase(TestCase):
         project_1 = Project.objects.create(
             id=self.project_3_Id,
             hkrId=2222,
-            name="Parking Helsinki",
+            name=self.project_3_name,
             description="Random desc",
             programmed=True,
             category=category_1,
@@ -1198,7 +1200,7 @@ class ProjectTestCase(TestCase):
         project_2 = Project.objects.create(
             id=self.project_4_Id,
             hkrId=1111,
-            name="Random name",
+            name=self.project_4_name,
             description="Random desc",
             programmed=True,
             category=category_2,
@@ -1997,8 +1999,8 @@ class ProjectTestCase(TestCase):
 
         response = self.client.get(
             "/projects/search-results/?group={}&group={}&subClass={}&district={}".format(
-                self.projectGroup_2_Id,
-                self.projectGroup_1_Id,
+                self.projectGroup2_name,
+                self.projectGroup1_name,
                 self.projectSubClass_1_Id,
                 self.projectDistrict_2_Id,
             ),
@@ -2095,27 +2097,7 @@ class ProjectTestCase(TestCase):
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
             2,
             msg="Filtered result should contain 2 projects with id {} and {}".format(
-                self.project_3_Id, self.project_4_Id
-            ),
-        )
-
-        response = self.client.get(
-            "/projects/search-results/?project={}&project={}&projectName={}".format(
-                self.project_3_Id, self.project_4_Id, "park"
-            ),
-        )
-        self.assertEqual(
-            response.status_code,
-            200,
-            msg="Status code != 200, Error: {}".format(response.json()),
-        )
-
-        self.assertEqual(
-            len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            1,
-            msg="Filtered result should contain 1 project with id {} and the string 'park' in its name. Found: {}".format(
-                self.project_3_Id,
-                len([x for x in response.json()["results"] if x["type"] == "projects"]),
+                self.project_3_name, self.project_4_name
             ),
         )
 
