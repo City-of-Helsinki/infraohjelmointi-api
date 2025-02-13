@@ -1089,15 +1089,6 @@ class ProjectTestCase(TestCase):
         )
 
     def test_search_results_endpoint_project(self):
-        projectGroup_1 = ProjectGroup.objects.create(
-            id=self.projectGroup_1_Id, name="Test Group 1 rain"
-        )
-        projectGroup_2 = ProjectGroup.objects.create(
-            id=self.projectGroup_2_Id, name="Test Group 2"
-        )
-        projectGroup_3 = ProjectGroup.objects.create(
-            id=self.projectGroup_3_Id, name="Test Group 3 park"
-        )
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_2_Id,
             name="District 1",
@@ -1158,6 +1149,18 @@ class ProjectTestCase(TestCase):
             id=self.projectSubClass_2_Id,
             name="Sub class 2",
             path="Master Class 1/Test Class 1/Sub class 2",
+        )
+        projectGroup_1 = ProjectGroup.objects.create(
+            id=self.projectGroup_1_Id, name="Test Group 1 rain",
+            classRelation=subClass_2
+        )
+        projectGroup_2 = ProjectGroup.objects.create(
+            id=self.projectGroup_2_Id, name="Test Group 2",
+            classRelation=subClass_2
+        )
+        projectGroup_3 = ProjectGroup.objects.create(
+            id=self.projectGroup_3_Id, name="Test Group 3 park",
+            classRelation=None
         )
         hashTag_1 = ProjectHashTag.objects.create(
             id=self.projectHashTag_3_Id, value="Jira"
@@ -2046,9 +2049,10 @@ class ProjectTestCase(TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "groups"]),
-            1,
-            msg="Filtered result should contain 1 group with id {}. Found: {}".format(
+            2,
+            msg="Filtered result should contain 2 group with id {} and {}. Found: {}".format(
                 self.projectGroup_1_Id,
+                self.projectGroup_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "groups"]),
             ),
         )
@@ -2127,7 +2131,7 @@ class ProjectTestCase(TestCase):
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
-
+        # click search result for project_3:
         response = self.client.get(
             "/projects/search-results/?project={}".format(self.project_5_Id),
         )
@@ -2136,15 +2140,18 @@ class ProjectTestCase(TestCase):
             200,
             msg="Status code != 200, Error: {}".format(response.json()),
         )
+        # project_3 belongs to projectGroup_2 (it's classRelation=subClass_2) and
+        # project's projectClass=subClass_2 and projectLocation=district_2
+        # When class of group is higher in hierarhcy than project's deepest class/location,
+        # path's last class is same as group's.
         self.assertEqual(
             response.json()["results"][0]["path"],
-            "masterClass={}&class={}&subClass={}&district={}".format(
+            "masterClass={}&class={}&subClass={}".format(
                 self.projectMasterClass_2_Id,
                 self.projectClass_2_Id,
                 self.projectSubClass_2_Id,
-                self.projectDistrict_3_Id,
             ),
-            msg="Path does not follow the format masterClass=&class=&subClass&district=",
+            msg="Path does not follow the format masterClass=&class=&subClass",
         )
 
         response = self.client.get(
@@ -3282,7 +3289,11 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-        data = {"phase": self.projectPhase_6_Id}
+        data = {
+            "phase": self.projectPhase_6_Id,
+            "programmed": True
+        }
+
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
@@ -3310,6 +3321,7 @@ class ProjectTestCase(TestCase):
         data = {
             "constructionPhaseDetail": self.conPhaseDetail_2_Id,
             "phase": self.projectPhase_5_Id,
+            "programmed": False,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
