@@ -313,21 +313,7 @@ class ProjectViewSet(BaseViewSet):
                 )
 
                 finance_instances.append(finance_instance)
-                if (
-                    forced_to_frame == False
-                    and not ProjectFinancialService.instance_exists(
-                        project_id=project.id,
-                        year=finance_year,
-                        for_frame_view=True,
-                    )
-                ):
-                    frameViewFinanceObject = ProjectFinancial(
-                        project=project,
-                        year=finance_year,
-                        value=finances[field],
-                        forFrameView=True,
-                    )
-                    finance_instances.append(frameViewFinanceObject)
+
         return finance_instances
 
     @override
