@@ -3801,6 +3801,8 @@ class ProjectTestCase(TestCase):
         )
 
     def test_planning_finances_to_frame_finances(self):
+        # lock the frame view
+        AppStateValueService.update_or_create(name="forcedToFrameStatus", value=False)
         data = {
             "name": "Test frame estDates copy Project",
             "description": "Test description",
@@ -3843,61 +3845,26 @@ class ProjectTestCase(TestCase):
             200,
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
-        # get project with frame finances
-        # check if finances patched initially to normal project finances have been also duplicated for frame view
-        response = self.client.get(
+        # get project's finances data from both forcedToFrame view and planning/coordinator view
+        # Finances datas are not the same because frame view is locked and 
+        # finances data is not moved to frame view from planning/coordinator view
+        responseForcedToFrame = self.client.get(
             "/projects/{}/?forcedToFrame=true".format(new_createdId),
             content_type="application/json",
         )
-        self.assertEqual(
-            response.json()["finances"],
-            patchData["finances"],
-        )
-
-        frameFinancesPatchData = {
-            "finances": {
-                "forcedToFrame": True,
-                "year": 2023,
-                "budgetProposalCurrentYearPlus0": "100.00",
-                "budgetProposalCurrentYearPlus1": "200.00",
-                "budgetProposalCurrentYearPlus2": "0.00",
-                "preliminaryCurrentYearPlus3": "0.00",
-                "preliminaryCurrentYearPlus4": "0.00",
-                "preliminaryCurrentYearPlus5": "0.00",
-                "preliminaryCurrentYearPlus6": "0.00",
-                "preliminaryCurrentYearPlus7": "0.00",
-                "preliminaryCurrentYearPlus8": "0.00",
-                "preliminaryCurrentYearPlus9": "0.00",
-                "preliminaryCurrentYearPlus10": "0.00",
-            }
-        }
-        # Once project frame finances have been initialized, any changes to it will not show on planning/coordinator project finances and vice versa
-        response = self.client.patch(
-            "/projects/{}/".format(new_createdId),
-            frameFinancesPatchData,
-            content_type="application/json",
-        )
-        frameFinancesPatchData["finances"].pop("forcedToFrame")
-        self.assertEqual(
-            response.json()["finances"],
-            frameFinancesPatchData["finances"],
-        )
-
-        response = self.client.get(
-            "/projects/{}/".format(new_createdId),
-            content_type="application/json",
-        )
-        # Planning/coordinator finances are now different to frame finances since frame finances have been patched above
-        self.assertNotEqual(
-            response.json()["finances"],
-            frameFinancesPatchData,
-        )
-
-        response = self.client.get(
-            "/projects/{}/?forcedToFrame=true".format(new_createdId),
+        responsePlanning = self.client.get(
+            "/projects/{}/?forcedToFrame=false".format(new_createdId),
             content_type="application/json",
         )
         self.assertNotEqual(
-            response.json()["finances"],
-            frameFinancesPatchData,
+            responseForcedToFrame.json()["finances"],
+            responsePlanning.json()["finances"],
+        )
+        self.assertEqual(
+            responsePlanning.json()["finances"],
+            patchData["finances"]
+        )
+        self.assertNotEqual(
+            responseForcedToFrame.json()["finances"],
+            patchData["finances"]
         )
