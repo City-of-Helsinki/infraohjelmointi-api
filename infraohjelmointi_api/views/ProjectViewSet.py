@@ -917,6 +917,10 @@ class ProjectViewSet(BaseViewSet):
         division = self.request.query_params.getlist("division", [])
         subDivision = self.request.query_params.getlist("subDivision", [])
 
+        project_districts = self.request.query_params.getlist("projectdistrict", [])
+        project_divisions = self.request.query_params.getlist("prjectdivision", [])
+        project_sub_divisions = self.request.query_params.getlist("projectsubDivision", [])
+
         prYearMin = self.request.query_params.get("prYearMin", None)
         overMillion = self.request.query_params.get("overMillion", False)
         prYearMax = self.request.query_params.get("prYearMax", None)
@@ -942,7 +946,15 @@ class ProjectViewSet(BaseViewSet):
 
             qs = qs.filter(q_objects)
 
+            if len(project_sub_divisions) > 0:
+                qs = qs.filter(projectDistrict__in=project_sub_divisions)
             
+            elif len(project_divisions) > 0:
+                qs = qs.filter(projectDistrict__in=project_divisions)
+
+            elif len(project_districts) > 0:
+                qs = qs.filter(projectDistrict__in=project_districts)
+
             if direct in ["true", "True"]:
                 direct = True
             elif direct in ["false", "False"]:
