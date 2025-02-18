@@ -1,11 +1,9 @@
-import logging
 from uuid import UUID
 from infraohjelmointi_api.models import ProjectHashTag
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
 from .ProjectPhaseSerializer import ProjectPhaseSerializer
-logger = logging.getLogger("infraohjelmointi_api")
 
 class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
