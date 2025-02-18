@@ -31,6 +31,9 @@ class SearchResultSerializer(serializers.Serializer):
                 group_district = getattr(group, "location", None)
                 group_location = getattr(group, "locationRelation", None)
                 group_has_location = (group_district is not None) and (group_location is not None)
+                group_class = getattr(group, "classRelation", None)
+                if group_class and classInstance and (group_class is not classInstance):
+                    classInstance = group_class
 
         elif instanceType == "ProjectClass":
             classInstance = obj
