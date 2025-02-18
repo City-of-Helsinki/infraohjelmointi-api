@@ -1,10 +1,11 @@
+import logging
 from uuid import UUID
 from infraohjelmointi_api.models import ProjectHashTag
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
 from .ProjectPhaseSerializer import ProjectPhaseSerializer
-
+logger = logging.getLogger("infraohjelmointi_api")
 
 class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
@@ -21,15 +22,15 @@ class SearchResultSerializer(serializers.Serializer):
         locationInstance = None
         path = ""
         group = None
+        group_has_location = False
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
             locationInstance = getattr(obj, "projectLocation", None)
             group = getattr(obj, "projectGroup", None)
 
             if group:
-                group_district = getattr(group, "location", None)
                 group_location = getattr(group, "locationRelation", None)
-                group_has_location = (group_district is not None) and (group_location is not None)
+                group_has_location = group_location is not None
 
         elif instanceType == "ProjectClass":
             classInstance = obj
