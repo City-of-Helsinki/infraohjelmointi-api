@@ -5,7 +5,6 @@ from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
 from .ProjectPhaseSerializer import ProjectPhaseSerializer
 
-
 class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     id = serializers.SerializerMethodField()
@@ -21,16 +20,15 @@ class SearchResultSerializer(serializers.Serializer):
         locationInstance = None
         path = ""
         group = None
+        group_has_location = False
         if instanceType == "Project":
             classInstance = getattr(obj, "projectClass", None)
             locationInstance = getattr(obj, "projectLocation", None)
             group = getattr(obj, "projectGroup", None)
 
             if group:
-                # Ensure that the deepest class in the path is the same as the group's class.
-                group_class = getattr(group, "classRelation", None)
-                if group_class and classInstance and group_class != classInstance:
-                    classInstance = group_class
+                group_location = getattr(group, "locationRelation", None)
+                group_has_location = group_location is not None
 
         elif instanceType == "ProjectClass":
             classInstance = obj
@@ -64,18 +62,18 @@ class SearchResultSerializer(serializers.Serializer):
         if locationInstance is None:
             return path
 
-        if locationInstance.parent is None and group is None:
+        if locationInstance.parent is None and (group is None or group_has_location):
             path = path + "&district={}".format(str(locationInstance.id))
         if (
             locationInstance.parent is not None 
             and locationInstance.parent.parent is not None
-            and group is None
+            and (group is None or group_has_location)
         ):
             path = path + "&district={}".format(str(locationInstance.parent.parent.id))
         if (
             locationInstance.parent is not None
             and locationInstance.parent.parent is None
-            and group is None
+            and (group is None or group_has_location)
         ):
             path = path + "&district={}".format(str(locationInstance.parent.id))
 
