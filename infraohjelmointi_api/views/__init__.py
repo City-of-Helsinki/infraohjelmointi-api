@@ -32,6 +32,7 @@ from .WhoAmIViewSet import *
 from .SapCostViewSet import *
 from .ProjectDistrictViewSet import *
 from .api.ApiClassesViewSet import *
+from .api.ApiDistrictsViewSet import *
 from .api.ApiGroupsViewSet import *
 from .api.ApiLocationsViewSet import *
 from .api.ApiProjectsViewSet import *

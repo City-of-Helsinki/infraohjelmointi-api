@@ -6,8 +6,8 @@ from django.urls import reverse
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectFinancial, ProjectGroup, ProjectLocation, User
-from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, User
+from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
 from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
 from rest_framework.permissions import IsAuthenticated
@@ -15,13 +15,14 @@ from rest_framework.permissions import IsAuthenticated
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 class ApiTestCase(TestCase):
+    project_district_id = uuid.UUID("a729e919-4556-4e2d-866b-dfaba470459e")
     project_id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     project_group_id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
+    project_financial_id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
     master_class_id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     class_id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
     division_id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     district_id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-    project_financial_id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
 
     incorrect_uuid = uuid.UUID("26ce9800-0828-4e60-80bd-150b009560ba")
 
@@ -38,16 +39,25 @@ class ApiTestCase(TestCase):
             name="Test Master Class",
             path="Test Master Class",
         )
+
         cls.project_class = cls.project_master_class.childClass.create(
-            name="Test Class",
             id=cls.class_id,
+            name="Test Class",
             path="Test Class",
         )
+
+        cls.project_district = ProjectDistrict.objects.create(
+            id=cls.project_district_id,
+            name="Test district B",
+            path="Test district B",
+            parent=None,
+        )
+
         cls.district = ProjectLocation.objects.create(
             id=cls.district_id,
-            name="Test district",
+            name="Test district A",
+            path="Test district A",
             parent=None,
-            path="Test district",
         )
 
         cls.project_location = cls.district.childLocation.create(
@@ -58,8 +68,8 @@ class ApiTestCase(TestCase):
         cls.project_group = ProjectGroup.objects.create(
             id=cls.project_group_id,
             name="Test Group",
-            locationRelation=cls.project_location,
             classRelation=cls.project_class,
+            locationRelation=cls.project_location,
         )
 
         cls.project = Project.objects.create(
@@ -67,6 +77,7 @@ class ApiTestCase(TestCase):
             name="Test project 1",
             description="description of the test project",
             projectClass=cls.project_class,
+            projectDistrict=cls.project_district,
             projectLocation=cls.project_location,
         )
 
@@ -146,6 +157,19 @@ class ApiTestCase(TestCase):
         class_data = ProjectClassSerializer(ProjectClass.objects.get(id=self.class_id)).data
         self.assertEqual(response_class.json()["id"], class_data["id"])
 
+    def test_api_GET_districts(self):
+        self = setup_client(self)
+
+        response_districts = self.client.get("/api/districts/")
+        response_district = self.client.get("/api/districts/{}/".format(self.project_district_id))
+
+        self.assertEqual(response_districts.status_code, 200, msg="Districts status code != 200")
+        self.assertEqual(response_district.status_code, 200, msg="District status code != 200")
+
+        district_data = ProjectDistrictSerializer(ProjectDistrict.objects.get(id=self.project_district_id)).data
+        self.assertEqual(response_district.json()["id"], district_data["id"])
+
+
     def test_class_viewset_configuration(self):
         viewset = ApiClassesViewSet()
         self.assertEqual(viewset.serializer_class, ProjectClassSerializer)
@@ -186,6 +210,7 @@ class ApiTestCase(TestCase):
         self.assertEqual(self.client.get("/api/projects/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Projects status code != 404")
         self.assertEqual(self.client.get("/api/groups/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Groups status code != 404")
         self.assertEqual(self.client.get("/api/classes/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Classes status code != 404")
+        self.assertEqual(self.client.get("/api/districts/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Districts status code != 404")
         self.assertEqual(self.client.get("/api/locations/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Locations status code != 404")
 
 
