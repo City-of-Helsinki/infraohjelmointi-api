@@ -121,6 +121,36 @@ PROJECT_GROUP_ALL_GET_ACTIONS = [
 ]
 PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 
+LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER = [
+    "finances",
+    "name", #* Kohde/hanke Ei (No) # name
+    "hkrId", # * PW hanketunnus Ei (No) # hkrId
+    "type", # * Hanketyyppi Ei (No) # type
+    "entityName", # * Hankekokonaisuuden nimi Ei (No) #entityName
+    "sapProject", # * Projektinumero Ei (No) # sapProject
+    "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
+    "programmed", # * Ohjelmoitu Ei (No) # programmed
+    "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
+    "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
+    "category", # * Kategoria Ei (No) # category
+    "effectHousing", # * Vaikutus asuntotuotantoon Ei (No) # effectHousing
+    "riskAssessment", # * Riskiarvio Ei (No) # riskAssessment
+    "projectClass", # luokka: value can be masterClass/class/subClass
+    "costForecast",
+    "realizedCost", # * Toteumatiedot Ei (No) # realizedCost
+    "comittedCost", # * Sidotut Ei (No) # comittedCost
+    "spentCost", # * Käytetty Ei (No) # spentCost
+    "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
+    "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
+    "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
+    "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
+    "projectLocation", # value can be district/division/subDivision
+
+    # preliminaryBudgetDivision is not yet implemented in UI
+    #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No)
+    # preliminaryBudgetDivision # ei löydy project.py
+]
+
 # ALL THE PERMISSION LOGIC GOES HERE, CAN BE REFACTORED LATER.
 # THESE CLASSES CAN BE ADDED TO BaseViewSet.py To APPLY THE REQUIRED PERMISSIONS AND ROLES
 # WORK STILL NEEDED
@@ -278,35 +308,7 @@ class IsProjectManager(permissions.BasePermission):
                     item
                     for item in request.data.keys()
                     if item
-                    in [
-                        "finances",
-                        "name", #* Kohde/hanke Ei (No) # name
-                        "hkrId", # * PW hanketunnus Ei (No) # hkrId
-                        "type", # * Hanketyyppi Ei (No) # type
-                        "entityName", # * Hankekokonaisuuden nimi Ei (No) #entityName
-                        "sapProject", # * Projektinumero Ei (No) # sapProject
-                        "sapNetwork", # * Verkkonumerot Ei (No) # sapNetwork
-                        "programmed", # * Ohjelmoitu Ei (No) # programmed
-                        "planningStartYear", # * Suunnittelun aloitusvuosi Ei (No) # planningStartYear
-                        "constructionEndYear", # * Rakentamisen valmistumisvuosi Ei (No) # constructionEndYear
-                        "category", # * Kategoria Ei (No) # category
-                        "effectHousing", # * Vaikutus asuntotuotantoon Ei (No) # effectHousing
-                        "riskAssessment", # * Riskiarvio Ei (No) # riskAssessment
-                        "projectClass", # luokka: value can be masterClass/class/subClass
-                        "costForecast",
-                        "realizedCost", # * Toteumatiedot Ei (No) # realizedCost
-                        "comittedCost", # * Sidotut Ei (No) # comittedCost
-                        "spentCost", # * Käytetty Ei (No) # spentCost
-                        "budgetOverrunYear", # ylistysoikeus vuosi Ei (No) # budgetOverrunYear
-                        "budgetOverrunAmount", # * Ylitysoikeus Ei (No) # budgetOverrunAmount
-                        "personProgramming", # * Ohjelmoija Ei (No) # personProgramming
-                        "responsibleZone", # * Alueen vastuujaon mukaan Ei (No) # responsibleZone
-                        "projectLocation", # value can be district/division/subDivision
-
-                        # preliminaryBudgetDivision is not yet implemented in UI
-                        #"preliminaryBudgetDivision", # * Kustannusarvion alustava jakautuminen Ei (No)
-                        # preliminaryBudgetDivision # ei löydy project.py
-                ]
+                    in LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER
             ]):
                 return False
 
@@ -391,8 +393,17 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
 
             if _type == "Note":
                 return True
+            
+            if _type == "Project" and any(
+                [
+                    item
+                    for item in request.data.keys()
+                    if item
+                    in LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER
+                ]):
+                return False
 
-        return False
+        return True
 
 class IsAdmin(permissions.BasePermission):
     def user_in_test_group(self, request):
