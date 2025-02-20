@@ -918,7 +918,7 @@ class ProjectViewSet(BaseViewSet):
         subDivision = self.request.query_params.getlist("subDivision", [])
 
         project_districts = self.request.query_params.getlist("projectdistrict", [])
-        project_divisions = self.request.query_params.getlist("prjectdivision", [])
+        project_divisions = self.request.query_params.getlist("projectdivision", [])
         project_sub_divisions = self.request.query_params.getlist("projectsubDivision", [])
 
         prYearMin = self.request.query_params.get("prYearMin", None)
@@ -950,10 +950,17 @@ class ProjectViewSet(BaseViewSet):
                 qs = qs.filter(projectDistrict__in=project_sub_divisions)
             
             elif len(project_divisions) > 0:
-                qs = qs.filter(projectDistrict__in=project_divisions)
+                qs = qs.filter(
+                    Q(projectDistrict__in=project_divisions) |
+                    Q(projectDistrict__parent__in=project_divisions)
+                )
 
             elif len(project_districts) > 0:
-                qs = qs.filter(projectDistrict__in=project_districts)
+                qs = qs.filter(
+                    Q(projectDistrict__in=project_districts) |
+                    Q(projectDistrict__parent__in=project_districts) |
+                    Q(projectDistrict__parent__parent__in=project_districts)
+                )
 
             if direct in ["true", "True"]:
                 direct = True
