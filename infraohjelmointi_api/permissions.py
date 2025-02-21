@@ -16,6 +16,10 @@ DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
 ]
 DJANGO_BASE_CREATE_ONLY_ACTIONS = ["create"]
 DJANGO_BASE_DELETE_ONLY_ACTIONS = ["destroy"]
+DJANGO_BASE_DELETE_OR_CREATE_ACTIONS = [
+    *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+    *DJANGO_BASE_DELETE_ONLY_ACTIONS
+]
 
 #### Project Class Custom Actions ####
 PROJECT_CLASS_COORDINATOR_GET_ACTIONS = ["get_coordinator_classes"]
@@ -378,32 +382,31 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
         _type = obj._meta.model.__name__
 
         if view.action in [
-            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-            *DJANGO_BASE_DELETE_ONLY_ACTIONS,
-            *DJANGO_BASE_CREATE_ONLY_ACTIONS,
-            *DJANGO_BASE_READ_ONLY_ACTIONS,
-            *PROJECT_NOTE_ALL_ACTIONS
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *DJANGO_BASE_DELETE_ONLY_ACTIONS,
+                *PROJECT_ALL_ACTIONS,
+                *PROJECT_NOTE_ALL_ACTIONS,
         ] and _type in ["Project", "ProjectGroup", "Note"]:
-
             if (
                 (_type == "Project" and self.project_belongs_to_808_main_class(obj, request))
                 or (_type == "ProjectGroup" and self.group_belongs_to_808_main_class(obj, request))
             ):
                 return True
 
-            if _type == "Note":
+            elif _type == "Note":
                 return True
             
-            if _type == "Project" and any(
+            elif _type == "Project" and view.action not in [*DJANGO_BASE_DELETE_OR_CREATE_ACTIONS] and not any(
                 [
                     item
                     for item in request.data.keys()
                     if item
                     in LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER
                 ]):
-                return False
-
-        return True
+                    return True
+        return False
 
 class IsAdmin(permissions.BasePermission):
     def user_in_test_group(self, request):
