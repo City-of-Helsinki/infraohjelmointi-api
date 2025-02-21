@@ -382,12 +382,12 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
         _type = obj._meta.model.__name__
 
         if view.action in [
-                *DJANGO_BASE_READ_ONLY_ACTIONS,
-                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
-                *DJANGO_BASE_DELETE_ONLY_ACTIONS,
-                *PROJECT_ALL_ACTIONS,
-                *PROJECT_NOTE_ALL_ACTIONS,
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+            *DJANGO_BASE_DELETE_ONLY_ACTIONS,
+            *PROJECT_ALL_ACTIONS,
+            *PROJECT_NOTE_ALL_ACTIONS,
         ] and _type in ["Project", "ProjectGroup", "Note"]:
             if (
                 (_type == "Project" and self.project_belongs_to_808_main_class(obj, request))
