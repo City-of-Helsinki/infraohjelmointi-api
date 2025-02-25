@@ -75,6 +75,7 @@ class ProjectFilter(django_filters.FilterSet):
             "category": ["exact"],
             "phase": ["exact"],
             "personPlanning": ["exact"],
+            "personConstruction": ["exact"],
         }
         model = Project
 
@@ -854,6 +855,7 @@ class ProjectViewSet(BaseViewSet):
                     "phase",
                     "category",
                     "personPlanning",
+                    "personConstruction",
                     "personProgramming",
                     "personConstruction",
                     "projectClass__coordinatorClass",
@@ -889,6 +891,7 @@ class ProjectViewSet(BaseViewSet):
                     "phase",
                     "category",
                     "personPlanning",
+                    "personConstruction",
                     "personProgramming",
                     "personConstruction",
                 )
