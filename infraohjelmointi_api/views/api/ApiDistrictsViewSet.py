@@ -3,8 +3,8 @@ from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from infraohjelmointi_api.models import ProjectGroup
-from infraohjelmointi_api.serializers import ProjectGroupSerializer
+from infraohjelmointi_api.models import ProjectDistrict
+from infraohjelmointi_api.serializers import ProjectDistrictSerializer
 import uuid
 from rest_framework import status
 
@@ -12,26 +12,26 @@ from drf_yasg.utils import swagger_auto_schema
 
 @method_decorator(name='list', decorator=swagger_auto_schema(
     operation_description="""
-    `GET /api/groups/`
+    `GET /api/districts/`
 
-    Get all projects.
+    Get all districts. A district is the lowest level of location where a project is situated.
     """
 ))
-class ApiGroupsViewSet(BaseViewSet):
+class ApiDistrictsViewSet(BaseViewSet):
     http_method_names = ['get']
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = ProjectGroup.objects.all()
-    serializer_class = ProjectGroupSerializer
+    queryset = ProjectDistrict.objects.all()
+    serializer_class = ProjectDistrictSerializer
 
 
     @swagger_auto_schema(
             operation_description = """
-            `GET /api/groups/{id}`
+            `GET /api/districts/{id}`
 
-            Get all project groups.
+            Get all project districts.
             """,
             )
     def retrieve(self, request, pk=None):
