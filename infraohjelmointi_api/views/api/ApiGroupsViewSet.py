@@ -3,7 +3,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from infraohjelmointi_api.models import ProjectGroup
+from infraohjelmointi_api.models import ProjectLocation
 from infraohjelmointi_api.serializers import ProjectGroupSerializer
 import uuid
 from rest_framework import status
@@ -23,7 +23,7 @@ class ApiGroupsViewSet(BaseViewSet):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = ProjectGroup.objects.all()
+    queryset = ProjectLocation.objects.all()
     serializer_class = ProjectGroupSerializer
 
 

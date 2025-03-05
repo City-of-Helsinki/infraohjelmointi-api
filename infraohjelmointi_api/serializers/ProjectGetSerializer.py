@@ -1,5 +1,4 @@
 from datetime import date
-import datetime
 from os import path
 from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import (
@@ -46,9 +45,7 @@ from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSe
 from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
-from infraohjelmointi_api.serializers.SapCurrentYearSerializer import SapCurrentYearSerializer
 from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
-from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
 from rest_framework import serializers
 import environ
 from overrides import override
@@ -95,7 +92,6 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     spentBudget = serializers.SerializerMethodField(method_name="get_spent_budget")
     pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
-    currentYearsSapValues = serializers.SerializerMethodField(method_name="get_currentYearsSapValue")
 
     class Meta(BaseMeta):
         model = Project
@@ -140,16 +136,6 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
 
     def get_projectReadiness(self, project):
         return project.projectReadiness()
-
-    def get_currentYearsSapValue(self, project: Project):
-        #Get the current year sap-costs for project card
-        current_year = datetime.datetime.now().year
-
-        sap_values = SapCurrentYearService.get_by_year(int(current_year))
-        sap_serializer = SapCurrentYearSerializer(sap_values, many=True)
-        sap_data = sap_serializer.data
-        
-        return sap_data
 
     @override
     def to_representation(self, instance):

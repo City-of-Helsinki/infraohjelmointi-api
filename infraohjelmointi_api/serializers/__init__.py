@@ -15,7 +15,7 @@ from .ProjectAreaSerializer import ProjectAreaSerializer
 from .ProjectCategorySerializer import ProjectCategorySerializer
 from .ProjectClassSerializer import ProjectClassSerializer
 from .ProjectCreateSerializer import ProjectCreateSerializer
-from .ProjectDistrictSerializer import ProjectDistrictSerializer
+from .ProjectDistrictSerializer import ProjectDistrict
 from .ProjectGetSerializer import ProjectGetSerializer
 from .ProjectGroupSerializer import ProjectGroupSerializer
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
