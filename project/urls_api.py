@@ -11,12 +11,6 @@ def api_router():
     )
 
     router.register(
-        r"api/districts",
-        views.ApiDistrictsViewSet,
-        basename="apiDistricts"
-    )
-
-    router.register(
         r"api/groups",
         views.ApiGroupsViewSet,
         basename="apiGroups"
