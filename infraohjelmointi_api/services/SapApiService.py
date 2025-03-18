@@ -272,16 +272,17 @@ class SapApiService:
                 group_id=project_group_id,
                 year=current_year,
                 )
+
+                group_sap_cost.group_combined_commitments = project_group_costs[
+                    "commitments"
+                ]
+                group_sap_cost.group_combined_costs = project_group_costs["costs"]
+                if not costs_by_projects:
+                    group_sap_cost.sap_id = sap_id
+                group_sap_cost.save()
+
             except MultipleObjectsReturned as e:
                 logger.error(f"Multiple SapCost objects returned from database for sap id '{sap_id}' / group id '{project_group_id}'. Error: {e}")
-
-            group_sap_cost.group_combined_commitments = project_group_costs[
-                "commitments"
-            ]
-            group_sap_cost.group_combined_costs = project_group_costs["costs"]
-            if not costs_by_projects:
-                group_sap_cost.sap_id = sap_id
-            group_sap_cost.save()
 
     def __group_projects_by_sap_id(self, projects: list[Project]) -> dict:
         """Projects with same SAP id belong to same group thus projects will be grouped by SAP id"""
