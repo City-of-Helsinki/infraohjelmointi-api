@@ -1,3 +1,4 @@
+import json
 from ..BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
@@ -39,7 +40,7 @@ class ApiGroupsViewSet(BaseViewSet):
             queryset = self.get_queryset()
             obj = queryset.get(pk=pk)
             serializer = self.get_serializer(obj)
-            return Response(serializer.data)
+            return StreamingHttpResponse((json.dumps(serializer.data, default=str) for _ in [0]), content_type="application/json")
         except Exception:
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
