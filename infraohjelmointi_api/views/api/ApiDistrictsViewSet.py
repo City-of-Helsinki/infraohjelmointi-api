@@ -3,10 +3,11 @@ from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from infraohjelmointi_api.models import ProjectDistrict
 from infraohjelmointi_api.serializers import ProjectDistrictSerializer
-import uuid
 from rest_framework import status
+from django.http import StreamingHttpResponse
+from .utils import generate_streaming_response
+import uuid
 
 from drf_yasg.utils import swagger_auto_schema
 
@@ -23,9 +24,7 @@ class ApiDistrictsViewSet(BaseViewSet):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = ProjectDistrict.objects.all()
     serializer_class = ProjectDistrictSerializer
-
 
     @swagger_auto_schema(
             operation_description = """
@@ -45,3 +44,10 @@ class ApiDistrictsViewSet(BaseViewSet):
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        return StreamingHttpResponse(
+            generate_streaming_response(queryset, self.serializer_class, endpoint="Districts"),
+            content_type='application/json'
+        )

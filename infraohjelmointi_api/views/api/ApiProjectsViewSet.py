@@ -7,6 +7,8 @@ from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import ProjectGetSerializer
 import uuid
 from rest_framework import status
+from django.http import StreamingHttpResponse
+from .utils import generate_streaming_response
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -35,17 +37,32 @@ class ApiProjectsViewSet(BaseViewSet):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = Project.objects.all()
+    queryset = Project.objects.all().select_related(
+        'projectClass',
+        'projectLocation',
+        'lock',
+        'phase',
+        'category',
+        'personPlanning',
+        'personConstruction',
+        'personProgramming',
+        'personConstruction'
+    ).prefetch_related(
+        'favPersons',
+        'hashTags',
+        'finances'
+    )
+
     serializer_class = ProjectGetSerializer
 
 
     @swagger_auto_schema(
-            operation_description = """
-            `GET /api/projects/{id}`
+        operation_description = """
+        `GET /api/projects/{id}`
 
-            Get a project.
-            """,
-            )
+        Get a project.
+        """,
+        )
     def retrieve(self, request, pk=None):
         try:
             uuid.UUID(str(pk))
@@ -58,7 +75,6 @@ class ApiProjectsViewSet(BaseViewSet):
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-
     def list(self, request, *args, **kwargs):
         project_class_id = self.request.query_params.get('class')
         queryset = self.queryset
@@ -67,5 +83,8 @@ class ApiProjectsViewSet(BaseViewSet):
         else:
             queryset = Project.objects.all()
         self.queryset = queryset
-        serializer = self.get_serializer(self.queryset, many=True)
-        return Response(serializer.data)
+
+        return StreamingHttpResponse(
+            generate_streaming_response(self.queryset, self.serializer_class, endpoint="Projects", chunk_size=500),
+            content_type='application/json'
+        )
