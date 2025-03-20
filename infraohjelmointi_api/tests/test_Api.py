@@ -134,8 +134,15 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_project_by_class.status_code, 200, msg="Project status code != 200")
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
-        self.assertEqual(response_project.json()["id"], project_data["id"])
-        self.assertEqual(response_project_by_class.json()[0]["id"], project_data["id"])
+
+        response_project_content = b"".join(response_project.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        response_project_by_class_content = b"".join(response_project_by_class.streaming_content).decode('utf-8')
+        response_project_by_class_json = json.loads(response_project_by_class_content)
+
+        self.assertEqual(response_project_json["id"], project_data["id"])
+        self.assertEqual(response_project_by_class_json[0]["id"], project_data["id"])
 
 
     def test_api_GET_groups(self):
@@ -148,7 +155,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_group.status_code, 200, msg="Groups status code != 200")
 
         group_data = ProjectGroupSerializer(ProjectGroup.objects.get(id=self.project_group_id)).data
-        self.assertEqual(response_group.json()["id"], group_data["id"])
+
+        response_project_content = b"".join(response_group.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], group_data["id"])
 
 
     def test_api_GET_classes(self):
@@ -161,7 +172,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_class.status_code, 200, msg="Classes status code != 200")
 
         class_data = ProjectClassSerializer(ProjectClass.objects.get(id=self.class_id)).data
-        self.assertEqual(response_class.json()["id"], class_data["id"])
+
+        response_project_content = b"".join(response_class.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], class_data["id"])
 
     def test_api_GET_districts(self):
         self = setup_client(self)
@@ -173,7 +188,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_district.status_code, 200, msg="District status code != 200")
 
         district_data = ProjectDistrictSerializer(ProjectDistrict.objects.get(id=self.project_district_id)).data
-        self.assertEqual(response_district.json()["id"], district_data["id"])
+
+        response_project_content = b"".join(response_district.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], district_data["id"])
 
 
     def test_class_viewset_configuration(self):
@@ -198,7 +217,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_location.status_code, 200, msg="Locations status code != 200")
 
         location_data = ProjectLocationSerializer(ProjectLocation.objects.get(id=self.division_id)).data
-        self.assertEqual(response_location.json()["id"], location_data["id"])
+
+        response_project_content = b"".join(response_location.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], location_data["id"])
 
     def test_retrieve_location_not_found(self):
         self = setup_client(self)
