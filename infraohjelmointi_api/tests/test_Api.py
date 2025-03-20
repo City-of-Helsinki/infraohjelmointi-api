@@ -1,8 +1,10 @@
 import datetime
+import json
 from unittest.mock import patch
 import uuid
 from django.test import TestCase
 from django.urls import reverse
+from infraohjelmointi_api.views.api.utils import generate_streaming_response
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -11,6 +13,7 @@ from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDist
 from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
 from rest_framework.permissions import IsAuthenticated
+from django.http import StreamingHttpResponse
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -85,6 +88,9 @@ class ApiTestCase(TestCase):
         year = int(datetime.date.today().year)
         for x in range(11):
             ProjectFinancial.objects.create(project=cls.project, year=str(year + x), value=str(x * 10))
+
+        cls.queryset = Project.objects.all()
+        cls.serializer_class = ProjectGetSerializer
 
 
     def test_api_custom_token_auth_init(self):
@@ -212,6 +218,20 @@ class ApiTestCase(TestCase):
         self.assertEqual(self.client.get("/api/classes/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Classes status code != 404")
         self.assertEqual(self.client.get("/api/districts/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Districts status code != 404")
         self.assertEqual(self.client.get("/api/locations/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Locations status code != 404")
+
+    def test_generate_streaming_response(self):
+        self = setup_client(self)
+
+        endpoint = "Projects"
+        chunk_size = 100
+
+        generator = generate_streaming_response(self.queryset, self.serializer_class, endpoint, chunk_size)
+        result = "".join(list(generator))
+
+        mock_http_response = StreamingHttpResponse((item.encode('utf-8') for item in result), content_type='application/json')
+        actual_result = b''.join(mock_http_response.streaming_content).decode('utf-8')
+
+        self.assertEqual(result, actual_result, msg="Generate streaming data != Project endpoint fetch")
 
 
 def setup_client(self):
