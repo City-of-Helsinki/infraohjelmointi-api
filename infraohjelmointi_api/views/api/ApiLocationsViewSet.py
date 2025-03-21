@@ -32,6 +32,9 @@ class ApiLocationsViewSet(BaseViewSet):
             `GET /api/locations/{id}`
 
             Get a location.
+
+            The projectLocation data on projects shows the lowest location category from the class hierarchy, and it might be empty.
+            To get detailed location information for projects, use the projectDistrict data and the endpoint `/api/districts/`.
             """,
             )
     def retrieve(self, request, pk=None):
