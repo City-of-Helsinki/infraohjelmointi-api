@@ -1,4 +1,3 @@
-import json
 from ..BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
@@ -9,7 +8,7 @@ from infraohjelmointi_api.serializers import ProjectGetSerializer
 import uuid
 from rest_framework import status
 from django.http import StreamingHttpResponse
-from .utils import generate_streaming_response
+from .utils import generate_response, generate_streaming_response
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -66,11 +65,7 @@ class ApiProjectsViewSet(BaseViewSet):
         )
     def retrieve(self, request, pk=None):
         try:
-            uuid.UUID(str(pk))
-            queryset = self.get_queryset()
-            obj = queryset.get(pk=pk)
-            serializer = self.get_serializer(obj)
-            return StreamingHttpResponse((json.dumps(serializer.data, default=str) for _ in [0]), content_type="application/json")
+            return generate_response(self, request.user.id, pk, request.path)
         except Exception:
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
@@ -86,6 +81,6 @@ class ApiProjectsViewSet(BaseViewSet):
         self.queryset = queryset
 
         return StreamingHttpResponse(
-            generate_streaming_response(self.queryset, self.serializer_class, endpoint="Projects", chunk_size=500),
+            generate_streaming_response(self.queryset, self.serializer_class, request.user.id, request.path, chunk_size=500),
             content_type='application/json'
         )

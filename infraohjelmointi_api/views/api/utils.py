@@ -3,15 +3,18 @@ import logging
 import time
 import uuid
 
+from rest_framework.response import Response
+
 logger = logging.getLogger("infraohjelmointi_api")
 
-def generate_streaming_response(queryset, serializer_class, endpoint, chunk_size=1000):
+def generate_streaming_response(queryset, serializer_class, user_id, endpoint, chunk_size=1000):
     """
     Generates a streaming response for a given queryset using the provided serializer with chunking.
 
     Args:
         queryset: The Django queryset to serialize.
         serializer_class: The Django REST Framework serializer class to use.
+        endpoint: The name for the endpoint that will be used on logging.
         chunk_size: The number of serialized items to include in each chunk.
 
     Yields:
@@ -21,7 +24,7 @@ def generate_streaming_response(queryset, serializer_class, endpoint, chunk_size
 
     def data_generator():
         logger.info(
-            "Started to generate endpoint {} data".format(endpoint)
+            "User {} requested to generate endpoint {} data".format(user_id, endpoint)
         )
         start = time.time()
         yield '['
@@ -47,6 +50,16 @@ def generate_streaming_response(queryset, serializer_class, endpoint, chunk_size
         yield ']'
         end = time.time()
         logger.info(
-            "Finished generating endpoint {} data in {} seconds".format(endpoint, round(end-start, 3))
+            "User {} request to generate endpoint {} data finished in {} seconds".format(user_id, endpoint, round(end-start, 3))
         )
     return data_generator()
+
+def generate_response(self, user_id, pk, endpoint):
+    uuid.UUID(str(pk))
+    queryset = self.get_queryset()
+    obj = queryset.get(pk=pk)
+    serializer = self.get_serializer(obj)
+    logger.info(
+        "User {} request to generate endpoint {} data finished".format(user_id, endpoint)
+    )
+    return Response(serializer.data)
