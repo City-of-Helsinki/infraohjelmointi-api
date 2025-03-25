@@ -14,55 +14,59 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 
 import logging
+
 logger = logging.getLogger("infraohjelmointi_api")
 
 class_parameter = openapi.Parameter(
-    'class',
+    "class",
     in_=openapi.IN_QUERY,
-    description='Get all projects by class ID',
-    type=openapi.TYPE_STRING
+    description="Get all projects by class ID",
+    type=openapi.TYPE_STRING,
 )
 
-@method_decorator(name='list', decorator=swagger_auto_schema(
-    operation_description="""
+
+@method_decorator(
+    name="list",
+    decorator=swagger_auto_schema(
+        operation_description="""
     `GET /api/projects/`
 
     Get all projects.
     """,
-    manual_parameters=[class_parameter]
-))
+        manual_parameters=[class_parameter],
+    ),
+)
 class ApiProjectsViewSet(BaseViewSet):
-    http_method_names = ['get']
+    http_method_names = ["get"]
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = Project.objects.all().select_related(
-        'projectClass',
-        'projectLocation',
-        'lock',
-        'phase',
-        'category',
-        'personPlanning',
-        'personConstruction',
-        'personProgramming',
-        'personConstruction'
-    ).prefetch_related(
-        'favPersons',
-        'hashTags',
-        'finances'
+    queryset = (
+        Project.objects.all()
+        .select_related(
+            "projectClass",
+            "projectLocation",
+            "lock",
+            "phase",
+            "category",
+            "personPlanning",
+            "personConstruction",
+            "personProgramming",
+            "personConstruction",
+        )
+        .prefetch_related("favPersons", "hashTags", "finances")
     )
 
     serializer_class = ProjectGetSerializer
 
-
     @swagger_auto_schema(
-        operation_description = """
+        operation_description="""
         `GET /api/projects/{id}`
 
         Get specific project data.
         """,
-        )
+    )
     def retrieve(self, request, pk=None):
         try:
             return generate_response(self, request.user.id, pk, request.path)
@@ -74,7 +78,7 @@ class ApiProjectsViewSet(BaseViewSet):
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
-                'class',
+                "class",
                 openapi.IN_QUERY,
                 description="The ID of the project class (UUID)",
                 type=openapi.TYPE_STRING,
@@ -93,7 +97,7 @@ class ApiProjectsViewSet(BaseViewSet):
         """,
     )
     def list(self, request, *args, **kwargs):
-        project_class_id = self.request.query_params.get('class')
+        project_class_id = self.request.query_params.get("class")
         queryset = self.queryset
         if project_class_id is not None:
             queryset = queryset.filter(projectClass__id=uuid.UUID(project_class_id))
@@ -102,6 +106,12 @@ class ApiProjectsViewSet(BaseViewSet):
         self.queryset = queryset
 
         return StreamingHttpResponse(
-            generate_streaming_response(self.queryset, self.serializer_class, request.user.id, request.path, chunk_size=500),
-            content_type='application/json'
+            generate_streaming_response(
+                self.queryset,
+                self.serializer_class,
+                request.user.id,
+                request.path,
+                chunk_size=500,
+            ),
+            content_type="application/json",
         )

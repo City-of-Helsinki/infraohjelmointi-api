@@ -7,7 +7,10 @@ from rest_framework.response import Response
 
 logger = logging.getLogger("infraohjelmointi_api")
 
-def generate_streaming_response(queryset, serializer_class, user_id, endpoint, chunk_size=1000):
+
+def generate_streaming_response(
+    queryset, serializer_class, user_id, endpoint, chunk_size=1000
+):
     """
     Generates a streaming response for a given queryset using the provided serializer with chunking.
 
@@ -28,32 +31,38 @@ def generate_streaming_response(queryset, serializer_class, user_id, endpoint, c
             "User {} requested to generate endpoint {} data".format(user_id, endpoint)
         )
         start = time.time()
-        yield '['
+        yield "["
         first = True
         item_buffer = []
         for item in queryset:
             serialized_data = serializer.to_representation(item)
+
             def convert_uuid_to_str(obj):
                 if isinstance(obj, uuid.UUID):
                     return str(obj)
                 return obj
+
             json_string = json.dumps(serialized_data, default=convert_uuid_to_str)
             item_buffer.append(json_string)
 
             if len(item_buffer) >= chunk_size:
-                yield (',' if not first else '') + ','.join(item_buffer)
+                yield ("," if not first else "") + ",".join(item_buffer)
                 item_buffer = []
                 first = False
 
         if item_buffer:
-            yield (',' if not first else '') + ','.join(item_buffer)
+            yield ("," if not first else "") + ",".join(item_buffer)
 
-        yield ']'
+        yield "]"
         end = time.time()
         logger.info(
-            "User {} request to generate endpoint {} data finished in {} seconds".format(user_id, endpoint, round(end-start, 3))
+            "User {} request to generate endpoint {} data finished in {} seconds".format(
+                user_id, endpoint, round(end - start, 3)
+            )
         )
+
     return data_generator()
+
 
 def generate_response(self, user_id, pk, endpoint):
     """
@@ -70,6 +79,8 @@ def generate_response(self, user_id, pk, endpoint):
     obj = queryset.get(pk=pk)
     serializer = self.get_serializer(obj)
     logger.info(
-        "User {} request to generate endpoint {} data finished".format(user_id, endpoint)
+        "User {} request to generate endpoint {} data finished".format(
+            user_id, endpoint
+        )
     )
     return Response(serializer.data)

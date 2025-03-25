@@ -10,29 +10,32 @@ from rest_framework import status
 
 from drf_yasg.utils import swagger_auto_schema
 
-@method_decorator(name='list', decorator=swagger_auto_schema(
-    operation_description="""
+
+@method_decorator(
+    name="list",
+    decorator=swagger_auto_schema(
+        operation_description="""
     `GET /api/classes/`
 
     Get all classes.
     """
-))
+    ),
+)
 class ApiClassesViewSet(BaseViewSet):
-    http_method_names = ['get']
+    http_method_names = ["get"]
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     serializer_class = ProjectClassSerializer
 
-
     @swagger_auto_schema(
-            operation_description = """
+        operation_description="""
             `GET /api/classes/{id}`
 
             Get specific project class data.
             """,
-            )
+    )
     def retrieve(self, request, pk=None):
         try:
             return generate_response(self, request.user.id, pk, request.path)
@@ -44,6 +47,8 @@ class ApiClassesViewSet(BaseViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         return StreamingHttpResponse(
-            generate_streaming_response(queryset, self.serializer_class, request.user.id, request.path),
-            content_type='application/json'
+            generate_streaming_response(
+                queryset, self.serializer_class, request.user.id, request.path
+            ),
+            content_type="application/json",
         )
