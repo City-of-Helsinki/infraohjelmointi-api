@@ -1,8 +1,10 @@
 import datetime
+import json
 from unittest.mock import patch
 import uuid
 from django.test import TestCase
 from django.urls import reverse
+from infraohjelmointi_api.views.api.utils import generate_streaming_response
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -11,6 +13,7 @@ from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDist
 from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
 from rest_framework.permissions import IsAuthenticated
+from django.http import StreamingHttpResponse
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -86,6 +89,9 @@ class ApiTestCase(TestCase):
         for x in range(11):
             ProjectFinancial.objects.create(project=cls.project, year=str(year + x), value=str(x * 10))
 
+        cls.queryset = Project.objects.all()
+        cls.serializer_class = ProjectGetSerializer
+
 
     def test_api_custom_token_auth_init(self):
         _ = CustomTokenAuth()
@@ -128,8 +134,15 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_project_by_class.status_code, 200, msg="Project status code != 200")
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
-        self.assertEqual(response_project.json()["id"], project_data["id"])
-        self.assertEqual(response_project_by_class.json()[0]["id"], project_data["id"])
+
+        response_project_content = b"".join(response_project.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        response_project_by_class_content = b"".join(response_project_by_class.streaming_content).decode('utf-8')
+        response_project_by_class_json = json.loads(response_project_by_class_content)
+
+        self.assertEqual(response_project_json["id"], project_data["id"])
+        self.assertEqual(response_project_by_class_json[0]["id"], project_data["id"])
 
 
     def test_api_GET_groups(self):
@@ -142,7 +155,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_group.status_code, 200, msg="Groups status code != 200")
 
         group_data = ProjectGroupSerializer(ProjectGroup.objects.get(id=self.project_group_id)).data
-        self.assertEqual(response_group.json()["id"], group_data["id"])
+
+        response_project_content = b"".join(response_group.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], group_data["id"])
 
 
     def test_api_GET_classes(self):
@@ -155,7 +172,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_class.status_code, 200, msg="Classes status code != 200")
 
         class_data = ProjectClassSerializer(ProjectClass.objects.get(id=self.class_id)).data
-        self.assertEqual(response_class.json()["id"], class_data["id"])
+
+        response_project_content = b"".join(response_class.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], class_data["id"])
 
     def test_api_GET_districts(self):
         self = setup_client(self)
@@ -167,7 +188,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_district.status_code, 200, msg="District status code != 200")
 
         district_data = ProjectDistrictSerializer(ProjectDistrict.objects.get(id=self.project_district_id)).data
-        self.assertEqual(response_district.json()["id"], district_data["id"])
+
+        response_project_content = b"".join(response_district.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], district_data["id"])
 
 
     def test_class_viewset_configuration(self):
@@ -192,7 +217,11 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_location.status_code, 200, msg="Locations status code != 200")
 
         location_data = ProjectLocationSerializer(ProjectLocation.objects.get(id=self.division_id)).data
-        self.assertEqual(response_location.json()["id"], location_data["id"])
+
+        response_project_content = b"".join(response_location.streaming_content).decode('utf-8')
+        response_project_json = json.loads(response_project_content)
+
+        self.assertEqual(response_project_json["id"], location_data["id"])
 
     def test_retrieve_location_not_found(self):
         self = setup_client(self)
@@ -212,6 +241,20 @@ class ApiTestCase(TestCase):
         self.assertEqual(self.client.get("/api/classes/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Classes status code != 404")
         self.assertEqual(self.client.get("/api/districts/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Districts status code != 404")
         self.assertEqual(self.client.get("/api/locations/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Locations status code != 404")
+
+    def test_generate_streaming_response(self):
+        self = setup_client(self)
+
+        endpoint = "Projects"
+        chunk_size = 100
+
+        generator = generate_streaming_response(self.queryset, self.serializer_class, endpoint, chunk_size)
+        result = "".join(list(generator))
+
+        mock_http_response = StreamingHttpResponse((item.encode('utf-8') for item in result), content_type='application/json')
+        actual_result = b''.join(mock_http_response.streaming_content).decode('utf-8')
+
+        self.assertEqual(result, actual_result, msg="Generate streaming data != Project endpoint fetch")
 
 
 def setup_client(self):
