@@ -29,7 +29,7 @@ class ApiDistrictsViewSet(BaseViewSet):
             operation_description = """
             `GET /api/districts/{id}`
 
-            Get all project districts.
+            Get specific project districts data.
             """,
             )
     def retrieve(self, request, pk=None):

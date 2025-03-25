@@ -15,6 +15,9 @@ from drf_yasg.utils import swagger_auto_schema
     `GET /api/locations/`
 
     Get all locations.
+
+    The projectLocation data on projects shows the lowest location category from the class hierarchy, and it might be empty.
+    To get detailed location information for projects, use the projectDistrict data and the endpoint `/api/districts/`.
     """
 ))
 class ApiLocationsViewSet(BaseViewSet):
@@ -29,7 +32,7 @@ class ApiLocationsViewSet(BaseViewSet):
         operation_description = """
         `GET /api/locations/{id}`
 
-        Get a location.
+        Get specific location data.
 
         The projectLocation data on projects shows the lowest location category from the class hierarchy, and it might be empty.
         To get detailed location information for projects, use the projectDistrict data and the endpoint `/api/districts/`.

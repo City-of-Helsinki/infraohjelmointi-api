@@ -30,7 +30,7 @@ class ApiClassesViewSet(BaseViewSet):
             operation_description = """
             `GET /api/classes/{id}`
 
-            Get all project classes.
+            Get specific project class data.
             """,
             )
     def retrieve(self, request, pk=None):

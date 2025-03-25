@@ -29,7 +29,7 @@ class ApiGroupsViewSet(BaseViewSet):
             operation_description = """
             `GET /api/groups/{id}`
 
-            Get all project groups.
+            Get specific project group data.
             """,
             )
     def retrieve(self, request, pk=None):

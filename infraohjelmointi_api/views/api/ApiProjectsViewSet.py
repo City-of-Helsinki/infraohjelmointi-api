@@ -60,7 +60,7 @@ class ApiProjectsViewSet(BaseViewSet):
         operation_description = """
         `GET /api/projects/{id}`
 
-        Get a project.
+        Get specific project data.
         """,
         )
     def retrieve(self, request, pk=None):
@@ -71,6 +71,27 @@ class ApiProjectsViewSet(BaseViewSet):
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'class',
+                openapi.IN_QUERY,
+                description="The ID of the project class (UUID)",
+                type=openapi.TYPE_STRING,
+                format=openapi.FORMAT_UUID,
+                required=False,
+            ),
+        ],
+        operation_description="""
+        `GET /api/projects/`
+
+        Get all projects.
+
+        `GET /api/projects/?class={id}`
+        
+        Get all projects filtered by the specified project class ID.
+        """,
+    )
     def list(self, request, *args, **kwargs):
         project_class_id = self.request.query_params.get('class')
         queryset = self.queryset

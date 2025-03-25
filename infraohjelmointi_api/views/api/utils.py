@@ -14,6 +14,7 @@ def generate_streaming_response(queryset, serializer_class, user_id, endpoint, c
     Args:
         queryset: The Django queryset to serialize.
         serializer_class: The Django REST Framework serializer class to use.
+        user_id: The id for the request user.
         endpoint: The name for the endpoint that will be used on logging.
         chunk_size: The number of serialized items to include in each chunk.
 
@@ -55,6 +56,15 @@ def generate_streaming_response(queryset, serializer_class, user_id, endpoint, c
     return data_generator()
 
 def generate_response(self, user_id, pk, endpoint):
+    """
+    Generates a serialized response.
+
+    Args:
+        self: The instance of the class.
+        user_id: The id for the request user.
+        pk: The primary key of the object to retrieve (UUID).
+        endpoint: The endpoint name for logging.
+    """
     uuid.UUID(str(pk))
     queryset = self.get_queryset()
     obj = queryset.get(pk=pk)
