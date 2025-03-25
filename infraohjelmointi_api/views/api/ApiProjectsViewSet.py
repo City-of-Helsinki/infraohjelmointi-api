@@ -1,3 +1,4 @@
+import json
 from ..BaseViewSet import BaseViewSet
 from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
@@ -7,6 +8,8 @@ from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import ProjectGetSerializer
 import uuid
 from rest_framework import status
+from django.http import StreamingHttpResponse
+from .utils import generate_streaming_response
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -35,29 +38,43 @@ class ApiProjectsViewSet(BaseViewSet):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    queryset = Project.objects.all()
+    queryset = Project.objects.all().select_related(
+        'projectClass',
+        'projectLocation',
+        'lock',
+        'phase',
+        'category',
+        'personPlanning',
+        'personConstruction',
+        'personProgramming',
+        'personConstruction'
+    ).prefetch_related(
+        'favPersons',
+        'hashTags',
+        'finances'
+    )
+
     serializer_class = ProjectGetSerializer
 
 
     @swagger_auto_schema(
-            operation_description = """
-            `GET /api/projects/{id}`
+        operation_description = """
+        `GET /api/projects/{id}`
 
-            Get a project.
-            """,
-            )
+        Get a project.
+        """,
+        )
     def retrieve(self, request, pk=None):
         try:
             uuid.UUID(str(pk))
             queryset = self.get_queryset()
             obj = queryset.get(pk=pk)
             serializer = self.get_serializer(obj)
-            return Response(serializer.data)
+            return StreamingHttpResponse((json.dumps(serializer.data, default=str) for _ in [0]), content_type="application/json")
         except Exception:
             return Response(
                 data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
             )
-
 
     def list(self, request, *args, **kwargs):
         project_class_id = self.request.query_params.get('class')
@@ -67,5 +84,8 @@ class ApiProjectsViewSet(BaseViewSet):
         else:
             queryset = Project.objects.all()
         self.queryset = queryset
-        serializer = self.get_serializer(self.queryset, many=True)
-        return Response(serializer.data)
+
+        return StreamingHttpResponse(
+            generate_streaming_response(self.queryset, self.serializer_class, endpoint="Projects", chunk_size=500),
+            content_type='application/json'
+        )
