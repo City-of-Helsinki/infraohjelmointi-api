@@ -25,17 +25,6 @@ class_parameter = openapi.Parameter(
 )
 
 
-@method_decorator(
-    name="list",
-    decorator=swagger_auto_schema(
-        operation_description="""
-    `GET /api/projects/`
-
-    Get all projects.
-    """,
-        manual_parameters=[class_parameter],
-    ),
-)
 class ApiProjectsViewSet(BaseViewSet):
     http_method_names = ["get"]
 
