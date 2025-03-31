@@ -4,6 +4,7 @@ import environ
 import logging
 import time
 from decimal import Decimal
+from django.core.exceptions import MultipleObjectsReturned
 
 from datetime import datetime
 
@@ -225,12 +226,16 @@ class SapApiService:
             commitments = costs_and_commitments.get("commitments", {"project_task": 0, "production_task": 0})
 
             for project in projects_grouped_by_sap_id[sap_id]:
+                try:
                 # store costs and commitments for project
-                project_sap_cost, _ = service_class.get_or_create(
-                    project_id=project.id,
-                    group_id=project_group_id,
-                    year=current_year,
-                )
+                    project_sap_cost, _ = service_class.get_or_create(
+                        project_id=project.id,
+                        group_id=project_group_id,
+                        year=current_year,
+                    )
+                except MultipleObjectsReturned as e:
+                    logger.error(f"Multiple SapCost objects returned for project '{project.id}' / sap id '{sap_id}' / group id '{project_group_id}'. Error: {e}")
+                    continue
 
                 project_sap_cost.project_task_costs = costs["project_task"]
                 project_sap_cost.production_task_costs = costs["production_task"]
@@ -261,18 +266,23 @@ class SapApiService:
                         + project_sap_cost.production_task_commitments
                     )
         if project_group_id is not None:
-            group_sap_cost, _ = service_class.get_or_create(
+            try:
+                group_sap_cost, _ = service_class.get_or_create(
                 project_id=None,
                 group_id=project_group_id,
                 year=current_year,
-            )
-            group_sap_cost.group_combined_commitments = project_group_costs[
-                "commitments"
-            ]
-            group_sap_cost.group_combined_costs = project_group_costs["costs"]
-            if not costs_by_projects:
-                group_sap_cost.sap_id = sap_id
-            group_sap_cost.save()
+                )
+
+                group_sap_cost.group_combined_commitments = project_group_costs[
+                    "commitments"
+                ]
+                group_sap_cost.group_combined_costs = project_group_costs["costs"]
+                if not costs_by_projects:
+                    group_sap_cost.sap_id = sap_id
+                group_sap_cost.save()
+
+            except MultipleObjectsReturned as e:
+                logger.error(f"Multiple SapCost objects returned from database for sap id '{sap_id}' / group id '{project_group_id}'. Error: {e}")
 
     def __group_projects_by_sap_id(self, projects: list[Project]) -> dict:
         """Projects with same SAP id belong to same group thus projects will be grouped by SAP id"""
@@ -357,9 +367,6 @@ class SapApiService:
             f"SAP responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
         )
         logger.error(
-            f"SAP responded with response._content '{response._content}' for given id '{id}'"
-        )
-        logger.error(
             f"SAP responded with response.json() '{response.json()}' for given id '{id}'"
         )
    
@@ -399,7 +406,7 @@ class SapApiService:
                 )
         else:
             if sync_group:
-                logger.debug(
+                logger.info(
                     f"Finished fetching data from SAP for project group '{group_id}' in {handling_time}s"
                 )
             else:

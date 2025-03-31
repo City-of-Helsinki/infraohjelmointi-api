@@ -756,10 +756,26 @@ class ProjectViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
+        
+        year = date.today().year if financeYear == None else int(financeYear)
+        finances = ProjectFinancialSerializer(
+            ProjectFinancial.objects.filter(
+                forFrameView=forFrameView,
+                year__in=range(year, year + 11)
+            ),
+            many=True,
+            context={"discard_FK": False}
+        ).data
+
+        projects_to_finances = defaultdict(list)
+        for f in finances:
+            projects_to_finances[f["project"]].append(f)
+
         serializerContext = {
             "finance_year": financeYear,
             "for_coordinator": for_coordinator,
             "forcedToFrame": forFrameView,
+            "projects_to_finances": projects_to_finances
         }
         if page is not None:
             serializer = self.get_serializer(
@@ -867,14 +883,6 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
-                    Prefetch(
-                        "finances",
-                        queryset=ProjectFinancial.objects.filter(
-                            year__in=range(year, year + 11),
-                            forFrameView=True
-                        ),
-                        to_attr="finances_filtered"
-                    ),
                 )
                 .filter(
                     Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
@@ -898,14 +906,6 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
-                    Prefetch(
-                        "finances",
-                        queryset=ProjectFinancial.objects.filter(
-                            year__in=range(year, year + 11),
-                            forFrameView=True
-                        ),
-                        to_attr="finances_filtered"
-                    )
                 )
             )
         masterClass = self.request.query_params.getlist("masterClass", [])

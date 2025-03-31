@@ -65,5 +65,6 @@ class ProjectFinancialSerializer(serializers.ModelSerializer):
     @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep.pop("project")
+        if self.context.get("discard_FK", True):
+            rep.pop("project")
         return rep
