@@ -1,14 +1,12 @@
+import json
 from ..BaseViewSet import BaseViewSet
-from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.serializers import ProjectGetSerializer
 import uuid
-from rest_framework import status
 from django.http import StreamingHttpResponse
-from .utils import generate_response, generate_streaming_response
+from .utils import generate_response, generate_response_not_found, generate_streaming_response, send_logger_api_generate_data_start
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -57,12 +55,8 @@ class ApiProjectsViewSet(BaseViewSet):
         """,
     )
     def retrieve(self, request, pk=None):
-        try:
-            return generate_response(self, request.user.id, pk, request.path)
-        except Exception:
-            return Response(
-                data={"message": "Not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+        return generate_response(self, request.user.id, pk, request.path)
+
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -86,10 +80,18 @@ class ApiProjectsViewSet(BaseViewSet):
         """,
     )
     def list(self, request, *args, **kwargs):
+        path = request.path
+        if self.request.query_params.get("class"):
+            path += "?class=" + self.request.query_params.get("class")
+
+        send_logger_api_generate_data_start(request.user.id, path)
         project_class_id = self.request.query_params.get("class")
         queryset = self.queryset
         if project_class_id is not None:
-            queryset = queryset.filter(projectClass__id=uuid.UUID(project_class_id))
+            try:
+                queryset = queryset.filter(projectClass__id=uuid.UUID(project_class_id))
+            except Exception:
+                return StreamingHttpResponse(json.dumps({"error":"Invalid UUID"}),status=400, content_type = "application/json")
         else:
             queryset = Project.objects.all()
         self.queryset = queryset
@@ -99,7 +101,7 @@ class ApiProjectsViewSet(BaseViewSet):
                 self.queryset,
                 self.serializer_class,
                 request.user.id,
-                request.path,
+                path,
                 chunk_size=500,
             ),
             content_type="application/json",

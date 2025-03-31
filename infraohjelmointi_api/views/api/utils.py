@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 
+from rest_framework import status
 from rest_framework.response import Response
 
 logger = logging.getLogger("infraohjelmointi_api")
@@ -27,9 +28,6 @@ def generate_streaming_response(
     serializer = serializer_class(many=False)
 
     def data_generator():
-        logger.info(
-            "User {} requested to generate endpoint {} data".format(user_id, endpoint)
-        )
         start = time.time()
         yield "["
         first = True
@@ -74,13 +72,46 @@ def generate_response(self, user_id, pk, endpoint):
         pk: The primary key of the object to retrieve (UUID).
         endpoint: The endpoint name for logging.
     """
-    uuid.UUID(str(pk))
-    queryset = self.get_queryset()
-    obj = queryset.get(pk=pk)
-    serializer = self.get_serializer(obj)
+    try:
+        uuid.UUID(str(pk))
+        queryset = self.get_queryset()
+        obj = queryset.get(pk=pk)
+        serializer = self.get_serializer(obj)
+    except ValueError:
+        return generate_response_value_error(user_id, endpoint)
+    except Exception as e:
+        return generate_response_not_found(user_id, endpoint)
+
     logger.info(
-        "User {} request to generate endpoint {} data finished".format(
+        "User {} request to fetch endpoint {} data finished".format(
             user_id, endpoint
         )
     )
     return Response(serializer.data)
+
+def generate_response_not_found(user_id, endpoint):
+    logger.warning(
+        "User {} request to fetch endpoint {} data failed".format(
+            user_id, endpoint
+        )
+    )
+
+    return Response(
+        data={"error": "Not found"}, status=status.HTTP_404_NOT_FOUND
+    )
+
+def generate_response_value_error(user_id, endpoint):
+    logger.warning(
+        "User {} request to fetch endpoint {} data failed".format(
+            user_id, endpoint
+        )
+    )
+
+    return Response(
+        data={"error":"Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+    )
+
+def send_logger_api_generate_data_start(user_id, endpoint):
+    return logger.info(
+        "User {} requested to generate endpoint {} data".format(user_id, endpoint)
+    )
