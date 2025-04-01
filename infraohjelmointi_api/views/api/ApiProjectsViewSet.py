@@ -1,9 +1,15 @@
 import json
+from collections import defaultdict
+from datetime import date
 from ..BaseViewSet import BaseViewSet
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from infraohjelmointi_api.models import Project
-from infraohjelmointi_api.serializers import ProjectGetSerializer
+from infraohjelmointi_api.models import (
+    Project, ProjectFinancial
+)
+from infraohjelmointi_api.serializers import (
+    ProjectGetSerializer, ProjectFinancialSerializer
+)
 import uuid
 from django.http import StreamingHttpResponse
 from .utils import generate_response, generate_response_not_found, generate_streaming_response, send_logger_api_generate_data_start
@@ -96,6 +102,24 @@ class ApiProjectsViewSet(BaseViewSet):
             queryset = Project.objects.all()
         self.queryset = queryset
 
+        year = date.today().year
+        finances = ProjectFinancialSerializer(
+            ProjectFinancial.objects.filter(
+                year__in=range(year, year + 11),
+                forFrameView=False,
+            ),
+            many=True,
+            context={"discard_FK": False}
+        ).data
+
+        projects_to_finances = defaultdict(list)
+        for f in finances:
+            projects_to_finances[f["project"]].append(f)
+
+        serializer_context = {
+            "projects_to_finances": projects_to_finances
+        }
+
         return StreamingHttpResponse(
             generate_streaming_response(
                 self.queryset,
@@ -103,6 +127,7 @@ class ApiProjectsViewSet(BaseViewSet):
                 request.user.id,
                 path,
                 chunk_size=500,
+                serializer_context=serializer_context
             ),
             content_type="application/json",
         )

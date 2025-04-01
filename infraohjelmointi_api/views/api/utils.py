@@ -10,7 +10,7 @@ logger = logging.getLogger("infraohjelmointi_api")
 
 
 def generate_streaming_response(
-    queryset, serializer_class, user_id, endpoint, chunk_size=1000
+    queryset, serializer_class, user_id, endpoint, chunk_size=1000, serializer_context={}
 ):
     """
     Generates a streaming response for a given queryset using the provided serializer with chunking.
@@ -21,11 +21,12 @@ def generate_streaming_response(
         user_id: The id for the request user.
         endpoint: The name for the endpoint that will be used on logging.
         chunk_size: The number of serialized items to include in each chunk.
+        serializer_context: Context that will be passed to the serializer.
 
     Yields:
         str: A chunk of the JSON response.
     """
-    serializer = serializer_class(many=False)
+    serializer = serializer_class(many=False, context=serializer_context)
 
     def data_generator():
         start = time.time()
@@ -79,7 +80,7 @@ def generate_response(self, user_id, pk, endpoint):
         serializer = self.get_serializer(obj)
     except ValueError:
         return generate_response_value_error(user_id, endpoint)
-    except Exception as e:
+    except Exception:
         return generate_response_not_found(user_id, endpoint)
 
     logger.info(
