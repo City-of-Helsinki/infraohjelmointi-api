@@ -12,6 +12,7 @@ from infraohjelmointi_api.services import (
     ClassFinancialService,
     LocationFinancialService,
 )
+from django.db.models import IntegerField
 from rest_framework import serializers
 from django.db.models import (
     IntegerField,
@@ -22,95 +23,11 @@ from django.db.models import (
     OuterRef,
     Subquery,
 )
-from django.db.models.manager import BaseManager
 from django.db.models.functions import Coalesce
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
-
-    def get_frameBudget_and_budgetChange_new(self, instance, year: int, for_frame_view: bool, frame_budgets: defaultdict) -> dict:
-        """
-        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
-        isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
-        """
-
-        for_coordinator = self.context.get("for_coordinator", False)
-        _type = instance._meta.model.__name__
-
-        if (
-            for_coordinator == False
-            or getattr(instance, "forCoordinatorOnly", False) == False
-        ):
-            # get coordinatorClass when planning classes/locations are being fetched
-            if _type == "ProjectClass":
-                instance = getattr(instance, "coordinatorClass", None)
-            if _type == "ProjectLocation":
-                instance = getattr(instance, "coordinatorLocation", None)
-
-        ret_val = {
-            f"year{y}": {
-                "frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False
-            }
-            for y in range(11)
-        }
-
-        if _type not in ["ProjectClass", "ProjectLocation"] or instance == None:
-            return ret_val
-        
-        for y in range(11):
-            finance_instance = None
-            if instance.finances.filter(year=year+y, forFrameView=for_frame_view).exists():
-                if _type == "ProjectClass":
-                    finance_instance = ClassFinancialService.get(
-                        class_id=instance.id, year=year+y, for_frame_view=for_frame_view
-                    )
-                if _type == "ProjectLocation":
-                    finance_instance = LocationFinancialService.get(
-                        location_id=instance.id, year=year+y, for_frame_view=for_frame_view
-                    )
-            if finance_instance != None:
-                ret_val[f"year{y}"]["frameBudget"] = finance_instance.frameBudget
-                ret_val[f"year{y}"]["budgetChange"] = finance_instance.budgetChange
-        
-        # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
-        if _type != "ProjectClass":
-            return ret_val
-
-        # get all childs with frameBudget for each level
-        child_classes = (
-            ProjectClass.objects.filter(
-                path__startswith=instance.path,
-                path__gt=instance.path,
-                forCoordinatorOnly=True,
-            )
-            .annotate(parentRelation=F("parent"))
-            .values("id", "parentRelation")
-        )
-        # get all locations with parentClass as childs and get frameBudgets
-        child_locations = (
-            ProjectLocation.objects.filter(
-                parentClass__in=[
-                    *child_classes.values_list("id", flat=True),
-                    instance.id,
-                ],
-                forCoordinatorOnly=True,
-            )
-            .annotate(parentRelation=F("parentClass"))
-            .values("id", "parentRelation")
-        )
-
-        # Combine all child relations of the current instance into one single queryset
-        all_child_relations = child_locations.union(child_classes)
-        if all_child_relations.exists():
-            for y in range(11):    
-                grouped = defaultdict(lambda: {'frameBudget': 0})
-                for relation in all_child_relations:
-                    grouped[relation['parentRelation']]['frameBudget'] += frame_budgets[f"{year+y}-{relation['id']}"] 
-                    if grouped[relation['parentRelation']]['frameBudget'] > frame_budgets[f"{year+y}-{relation['parentRelation']}"]:
-                        ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
-                        break
-        return ret_val
 
     def get_frameBudget_and_budgetChange(self, instance, year: int, for_frame_view: bool) -> dict:
         """
@@ -156,6 +73,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     path__gt=instance.path,
                     forCoordinatorOnly=True,
                 )
+                .prefetch_related("finances")
                 .annotate(
                     frameBudget=Coalesce(
                         Subquery(
@@ -229,7 +147,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             "budgetChange": finance_instance.budgetChange
             if finance_instance != None
             else 0,
-            "isFrameBudgetOverlap": is_frame_budget_overlap,
+            "isFrameBudgetOverlap": False
+            if _type == "ProjectLocation"
+            else is_frame_budget_overlap
+            ,
         }
 
     def get_finance_sums(self, instance):
@@ -241,19 +162,74 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         forced_to_frame = self.context.get("forcedToFrame", False)
 
         related_projects = self.get_related_projects(instance=instance, _type=_type)
-                
-        args = {
-            f"year{i}_plannedBudget": Sum(
+
+        summed_finances = related_projects.aggregate(
+            year0_plannedBudget=Sum(
                 "finances__value",
                 default=0,
                 filter=Q(finances__forFrameView=forced_to_frame)
-                & Q(finances__year=year+i),
-            )
-            for i in range(11)
-        }
-
-        summed_finances = related_projects.aggregate(
-            **args,
+                & Q(finances__year=year),
+            ),
+            year1_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 1),
+            ),
+            year2_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 2),
+            ),
+            year3_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 3),
+            ),
+            year4_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 4),
+            ),
+            year5_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 5),
+            ),
+            year6_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 6),
+            ),
+            year7_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 7),
+            ),
+            year8_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 8),
+            ),
+            year9_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 9),
+            ),
+            year10_plannedBudget=Sum(
+                "finances__value",
+                default=0,
+                filter=Q(finances__forFrameView=forced_to_frame)
+                & Q(finances__year=year + 10),
+            ),
             budgetOverrunAmount=Sum("budgetOverrunAmount", default=0),
         )
 
@@ -263,34 +239,98 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )["projectBudgets"]
 
         summed_finances["year"] = year
-      
-        frame_budgets = self.context.get("frame_budgets", None)
-        if frame_budgets == None:
-            for i in range(11):
-                summed_finances[f"year{i}"] = {
-                    **self.get_frameBudget_and_budgetChange(
-                        instance=instance,
-                        year=year + i,
-                        for_frame_view=forced_to_frame
-                    ),
-                    "plannedBudget": int(summed_finances.pop(f"year{i}_plannedBudget")),
-                }
-        else:
-            summed_finances = {
-                **summed_finances,
-                **self.get_frameBudget_and_budgetChange_new(
-                    instance=instance,
-                    year=year,
-                    for_frame_view=forced_to_frame,
-                    frame_budgets=frame_budgets
-                ),
-            }
-            for i in range(11):
-                summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
+        summed_finances["year0"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year0_plannedBudget")),
+        }
+        summed_finances["year1"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 1,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year1_plannedBudget")),
+        }
+        summed_finances["year2"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 2,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year2_plannedBudget")),
+        }
+        summed_finances["year3"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 3,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year3_plannedBudget")),
+        }
+        summed_finances["year4"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 4,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year4_plannedBudget")),
+        }
+        summed_finances["year5"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 5,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year5_plannedBudget")),
+        }
+        summed_finances["year6"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 6,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year6_plannedBudget")),
+        }
+        summed_finances["year7"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 7,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year7_plannedBudget")),
+        }
+        summed_finances["year8"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 8,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year8_plannedBudget")),
+        }
+        summed_finances["year9"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 9,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year9_plannedBudget")),
+        }
+        summed_finances["year10"] = {
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year + 10,
+                for_frame_view=forced_to_frame
+            ),
+            "plannedBudget": int(summed_finances.pop("year10_plannedBudget")),
+        }
 
         return summed_finances
 
-    def get_related_projects(self, instance, _type) -> BaseManager[Project]:
+    def get_related_projects(self, instance, _type) -> list[Project]:
         """
         Returns projects under the provided class | location | group instance.
         """
@@ -323,6 +363,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                             "projectLocation__parent",
                             "projectLocation__parent__parent",
                         )
+                        .prefetch_related("finances")
                         .filter(
                             Q(projectLocation=instance)
                             | Q(projectLocation__parent=instance)
@@ -339,6 +380,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         "projectClass__coordinatorClass",
                         "projectClass__parent__coordinatorClass",
                     )
+                    .prefetch_related("finances")
                     .filter(
                         (
                             Q(projectClass__name__icontains="suurpiiri")
