@@ -1,15 +1,16 @@
 from datetime import date
+from collections import defaultdict
 from .BaseClassLocationViewSet import BaseClassLocationViewSet
-from infraohjelmointi_api.serializers.ProjectClassSerializer import (
-    ProjectClassSerializer,
-)
+from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.models.ClassFinancial import ClassFinancial
+from infraohjelmointi_api.models import LocationFinancial
 from infraohjelmointi_api.services import AppStateValueService, ProjectClassService, ClassFinancialService
 from overrides import override
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.exceptions import ParseError
+from django.db.models import F
 
 
 class ProjectClassViewSet(BaseClassLocationViewSet):
@@ -63,7 +64,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                 List of ProjectClass instances with financial sums for projects under each class
         """
 
-        year = request.query_params.get("year", date.today().year)
+        year = int(request.query_params.get("year", date.today().year))
         forcedToFrame = request.query_params.get("forcedToFrame", False)
         if forcedToFrame in ["False", "false"]:
             forcedToFrame = False
@@ -75,6 +76,18 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             raise ParseError(
                 detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
             )
+        
+        class_financials = ClassFinancial.objects.filter(
+            year__in=range(year, year+11)
+        ).annotate(relation=F("classRelation")).values("year", "relation", "frameBudget")
+        location_financials = LocationFinancial.objects.filter(
+            year__in=range(year, year+11)
+        ).annotate(relation=F("locationRelation")).values("year", "relation", "frameBudget")
+        financials = class_financials.union(location_financials)
+        frame_budgets = defaultdict(lambda: 0)
+        for f in financials:
+            frame_budgets[f"{f['year']}-{f['relation']}"] = f["frameBudget"]
+
         serializer = ProjectClassSerializer(
             ProjectClassService.list_all_for_coordinator()
             .select_related(
@@ -88,6 +101,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                 "finance_year": year,
                 "for_coordinator": True,
                 "forcedToFrame": forcedToFrame,
+                "frame_budgets": frame_budgets
             },
         )
 
