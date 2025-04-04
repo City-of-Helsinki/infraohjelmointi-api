@@ -18,5 +18,5 @@ fi
 if [[ "$DEV_SERVER" = "True" ]]; then
     python /app/manage.py runserver 0.0.0.0:8000
 else
-    uvicorn project.asgi:application --host 0.0.0.0 --port 8000
+    uvicorn project.asgi:application --host 0.0.0.0 --port 8000 --workers $WORKERS_AMOUNT_FOR_UVICORN
 fi
