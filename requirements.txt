@@ -18,9 +18,9 @@ django-filter                                 # DRF package to add filtering on 
 drf-standardized-errors                       # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
 django-eventstream                            # For server sent events
-daphne                                      # application server
 django-helusers                               # Tunnistamo user inegration
 social-auth-app-django
 drf-yasg                                    # API Swagger documentation
 numpy
-setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=70.0.0                              # not directly required, pinned by Snyk to avoid a vulnerability
+uvicorn
