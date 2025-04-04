@@ -49,7 +49,7 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         call_command("responsiblepersons", "--file", "unknown-file.xlsx", stdout=out)
         command_output = out.getvalue()
 
-        expected_error_message = "Excel file path is incorrect or missing. Usage: --file path/to/file.xlsx"
+        expected_error_message = "\x1b[31;1mExcel file path is incorrect or missing. Usage: --file path/to/file.xlsx\x1b[0m\n"
 
         self.assertIn(expected_error_message, command_output)
 

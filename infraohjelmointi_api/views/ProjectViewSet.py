@@ -75,7 +75,6 @@ class ProjectFilter(django_filters.FilterSet):
             "category": ["exact"],
             "phase": ["exact"],
             "personPlanning": ["exact"],
-            "personConstruction": ["exact"],
         }
         model = Project
 
@@ -314,7 +313,21 @@ class ProjectViewSet(BaseViewSet):
                 )
 
                 finance_instances.append(finance_instance)
-
+                if (
+                    forced_to_frame == False
+                    and not ProjectFinancialService.instance_exists(
+                        project_id=project.id,
+                        year=finance_year,
+                        for_frame_view=True,
+                    )
+                ):
+                    frameViewFinanceObject = ProjectFinancial(
+                        project=project,
+                        year=finance_year,
+                        value=finances[field],
+                        forFrameView=True,
+                    )
+                    finance_instances.append(frameViewFinanceObject)
         return finance_instances
 
     @override
@@ -639,7 +652,7 @@ class ProjectViewSet(BaseViewSet):
             order = "new"
 
         if len(projectGroup) > 0:
-            groups = ProjectGroup.objects.filter(name__in=projectGroup).select_related("classRelation")
+            groups = ProjectGroup.objects.filter(id__in=projectGroup).select_related("classRelation")
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
@@ -855,7 +868,6 @@ class ProjectViewSet(BaseViewSet):
                     "phase",
                     "category",
                     "personPlanning",
-                    "personConstruction",
                     "personProgramming",
                     "personConstruction",
                     "projectClass__coordinatorClass",
@@ -891,7 +903,6 @@ class ProjectViewSet(BaseViewSet):
                     "phase",
                     "category",
                     "personPlanning",
-                    "personConstruction",
                     "personProgramming",
                     "personConstruction",
                 )
@@ -920,50 +931,21 @@ class ProjectViewSet(BaseViewSet):
         division = self.request.query_params.getlist("division", [])
         subDivision = self.request.query_params.getlist("subDivision", [])
 
-        project_districts = self.request.query_params.getlist("projectdistrict", [])
-        project_divisions = self.request.query_params.getlist("projectdivision", [])
-        project_sub_divisions = self.request.query_params.getlist("projectsubDivision", [])
-
         prYearMin = self.request.query_params.get("prYearMin", None)
         overMillion = self.request.query_params.get("overMillion", False)
         prYearMax = self.request.query_params.get("prYearMax", None)
         projects = self.request.query_params.getlist("project", [])
+        projectGroups = self.request.query_params.getlist("group", [])
         inGroup = self.request.query_params.get("inGroup", None)
-        project_name = self.request.query_params.getlist("projectName", [])
-        hash_tags = self.request.query_params.getlist("hashtag", [])
-        project_group = self.request.query_params.getlist("group", [])
+        projectName = self.request.query_params.get("projectName", None)
 
         # This query param gives the projects which are directly under any given location or class if set to True
         # Else the queryset will also contain the projects containing the child locations/districts
         direct = self.request.query_params.get("direct", False)
 
         try:
-            q_objects = Q()
-
-            if len(project_name) > 0 or len(project_group) > 0:
-                q_objects |= Q(name__in=project_name)
-                q_objects |= Q(projectGroup__name__in=project_group)
-
-            if len(hash_tags) > 0:
-                q_objects |= Q(hashTags__id__in=hash_tags)
-
-            qs = qs.filter(q_objects)
-
-            if len(project_sub_divisions) > 0:
-                qs = qs.filter(projectDistrict__in=project_sub_divisions)
-            
-            elif len(project_divisions) > 0:
-                qs = qs.filter(
-                    Q(projectDistrict__in=project_divisions) |
-                    Q(projectDistrict__parent__in=project_divisions)
-                )
-
-            elif len(project_districts) > 0:
-                qs = qs.filter(
-                    Q(projectDistrict__in=project_districts) |
-                    Q(projectDistrict__parent__in=project_districts) |
-                    Q(projectDistrict__parent__parent__in=project_districts)
-                )
+            if projectName is not None:
+                qs = qs.filter(name__icontains=projectName)
 
             if direct in ["true", "True"]:
                 direct = True
@@ -984,6 +966,8 @@ class ProjectViewSet(BaseViewSet):
             qs = self._filter_projects_by_programming_year(
                 qs, prYearMin=prYearMin, prYearMax=prYearMax
             )
+            if len(projectGroups) > 0:
+                qs = qs.filter(projectGroup__in=projectGroups)
             if len(masterClass) > 0:
                 qs = self._filter_projects_by_hierarchy(
                     qs=qs,
