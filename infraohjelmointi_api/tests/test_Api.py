@@ -10,9 +10,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
-from infraohjelmointi_api.views import BaseViewSet, ApiClassesViewSet
+from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
-from rest_framework.permissions import IsAuthenticated
 from django.http import StreamingHttpResponse
 
 
@@ -24,6 +23,7 @@ class ApiTestCase(TestCase):
     project_financial_id = uuid.UUID("0ace4e90-4318-4282-8bb7-a0b152888642")
     master_class_id = uuid.UUID("78570e7c-58b8-4d08-a341-a6c95ad58fed")
     class_id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241")
+    class_not_found_id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb1775461234")
     division_id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     district_id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
 
@@ -135,13 +135,10 @@ class ApiTestCase(TestCase):
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
 
-        response_project_content = b"".join(response_project.streaming_content).decode('utf-8')
-        response_project_json = json.loads(response_project_content)
-
         response_project_by_class_content = b"".join(response_project_by_class.streaming_content).decode('utf-8')
         response_project_by_class_json = json.loads(response_project_by_class_content)
 
-        self.assertEqual(response_project_json["id"], project_data["id"])
+        self.assertEqual(response_project.json()["id"], project_data["id"])
         self.assertEqual(response_project_by_class_json[0]["id"], project_data["id"])
 
 
@@ -156,10 +153,7 @@ class ApiTestCase(TestCase):
 
         group_data = ProjectGroupSerializer(ProjectGroup.objects.get(id=self.project_group_id)).data
 
-        response_project_content = b"".join(response_group.streaming_content).decode('utf-8')
-        response_project_json = json.loads(response_project_content)
-
-        self.assertEqual(response_project_json["id"], group_data["id"])
+        self.assertEqual(response_group.json()["id"], group_data["id"])
 
 
     def test_api_GET_classes(self):
@@ -173,10 +167,15 @@ class ApiTestCase(TestCase):
 
         class_data = ProjectClassSerializer(ProjectClass.objects.get(id=self.class_id)).data
 
-        response_project_content = b"".join(response_class.streaming_content).decode('utf-8')
-        response_project_json = json.loads(response_project_content)
+        self.assertEqual(response_class.json()["id"], class_data["id"])
 
-        self.assertEqual(response_project_json["id"], class_data["id"])
+
+    def test_api_GET_classes_with_not_existing_class_uuid(self):
+        self = setup_client(self)
+
+        response_class = self.client.get("/api/classes/{}/".format(self.class_not_found_id))
+        self.assertEqual(response_class.status_code, 404)
+
 
     def test_api_GET_districts(self):
         self = setup_client(self)
@@ -189,22 +188,7 @@ class ApiTestCase(TestCase):
 
         district_data = ProjectDistrictSerializer(ProjectDistrict.objects.get(id=self.project_district_id)).data
 
-        response_project_content = b"".join(response_district.streaming_content).decode('utf-8')
-        response_project_json = json.loads(response_project_content)
-
-        self.assertEqual(response_project_json["id"], district_data["id"])
-
-
-    def test_class_viewset_configuration(self):
-        viewset = ApiClassesViewSet()
-        self.assertEqual(viewset.serializer_class, ProjectClassSerializer)
-        self.assertEqual(ApiClassesViewSet.http_method_names, ['get'])
-        self.assertIn(IsAuthenticated, ApiClassesViewSet.permission_classes)
-
-    def test_class_not_found_returns_404(self):
-        viewset = ApiClassesViewSet()
-        response = viewset.retrieve('faulty request')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response_district.json()["id"], district_data["id"])
 
 
     def test_api_GET_locations(self):
@@ -218,10 +202,7 @@ class ApiTestCase(TestCase):
 
         location_data = ProjectLocationSerializer(ProjectLocation.objects.get(id=self.division_id)).data
 
-        response_project_content = b"".join(response_location.streaming_content).decode('utf-8')
-        response_project_json = json.loads(response_project_content)
-
-        self.assertEqual(response_project_json["id"], location_data["id"])
+        self.assertEqual(response_location.json()["id"], location_data["id"])
 
     def test_retrieve_location_not_found(self):
         self = setup_client(self)

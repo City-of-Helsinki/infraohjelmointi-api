@@ -151,6 +151,56 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         
         return sap_data
 
+    def get_finances(self, project):
+        """
+        A function used to get financial fields of a project using context passed to the serializer.
+        If no year is passed to the serializer using either the project id or finance_year as key
+        the current year is used as the default.
+        """
+
+        allFinances = self.context.get("projects_to_finances", None)
+        if allFinances is None:
+            return super().get_finances(project)
+
+        year = self.context.get(
+            str(project.id), self.context.get("finance_year", date.today().year)
+        )
+        if year is None:
+            year = date.today().year
+        year = int(year)
+        yearToFieldMapping = {
+            year: "budgetProposalCurrentYearPlus0",
+            year + 1: "budgetProposalCurrentYearPlus1",
+            year + 2: "budgetProposalCurrentYearPlus2",
+            year + 3: "preliminaryCurrentYearPlus3",
+            year + 4: "preliminaryCurrentYearPlus4",
+            year + 5: "preliminaryCurrentYearPlus5",
+            year + 6: "preliminaryCurrentYearPlus6",
+            year + 7: "preliminaryCurrentYearPlus7",
+            year + 8: "preliminaryCurrentYearPlus8",
+            year + 9: "preliminaryCurrentYearPlus9",
+            year + 10: "preliminaryCurrentYearPlus10",
+        }
+        serializedFinances = {
+            "year": year,
+            "budgetProposalCurrentYearPlus0": "0.00",
+            "budgetProposalCurrentYearPlus1": "0.00",
+            "budgetProposalCurrentYearPlus2": "0.00",
+            "preliminaryCurrentYearPlus3": "0.00",
+            "preliminaryCurrentYearPlus4": "0.00",
+            "preliminaryCurrentYearPlus5": "0.00",
+            "preliminaryCurrentYearPlus6": "0.00",
+            "preliminaryCurrentYearPlus7": "0.00",
+            "preliminaryCurrentYearPlus8": "0.00",
+            "preliminaryCurrentYearPlus9": "0.00",
+            "preliminaryCurrentYearPlus10": "0.00",
+        }
+
+        for finance in allFinances[project.id]:
+            serializedFinances[yearToFieldMapping[finance["year"]]] = finance["value"]
+
+        return serializedFinances
+
     @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)

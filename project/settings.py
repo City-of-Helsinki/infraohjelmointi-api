@@ -246,7 +246,7 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
-        "OPTIONS": {"MAX_ENTRIES": 6000},
+        "OPTIONS": {"MAX_ENTRIES": 300},
     }
 }
 
