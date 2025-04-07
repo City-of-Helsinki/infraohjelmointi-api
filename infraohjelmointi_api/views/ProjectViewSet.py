@@ -796,9 +796,9 @@ class ProjectViewSet(BaseViewSet):
             "projects_to_finances": projects_to_finances
         }
         logger.info(f"Serializer context created: {serializerContext}")
-
+        serialization_start_time = time.time()
         if page is not None:
-            serialization_start_time = time.time()
+            
             serializer = self.get_serializer(
                 page,
                 many=True,
