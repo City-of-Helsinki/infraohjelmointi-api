@@ -1,5 +1,6 @@
 from datetime import date
 import logging
+import time
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -739,25 +740,38 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
-
+        start_time = time.time()
+        logger.info(f"{request.user.id}: Starting get_projects with for_coordinator={for_coordinator}, forFrameView={forFrameView}")
+        filter_start_time = time.time()
+        logger.info(f"{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
+
+        filter_end_time = time.time()
+        logger.info(f"{request.user.id}: Queryset after initial filtering: {queryset.count()} projects (took {filter_end_time - filter_start_time:.4f} seconds)")
+
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
+        logger.info(f"{request.user.id}: Received query parameters: year={financeYear}, limit={limit}")
         if limit is None:
             querySetCount = queryset.count()
             limit = querySetCount if querySetCount > 0 else 1
+            logger.info(f"{request.user.id}: Limit not provided, set to: {limit}")
 
         if financeYear is not None and not financeYear.isnumeric():
-            raise ParseError(detail={"limit": "Invalid value"}, code="invalid")
+            logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")
+            raise ParseError(detail={f"{request.user.id}: limit": "Invalid value"}, code="invalid")
 
         # pagination
+        logger.info(f"{request.user.id}: Initializing pagination with page size: {limit}")
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
         
         year = date.today().year if financeYear == None else int(financeYear)
+        logger.info(f"{request.user.id}: Determined finance year: {year}")
+        logger.info(f"{request.user.id}: Fetching project finances for year range: {year} to {year + 11}, forFrameView={forFrameView}")
         finances = ProjectFinancialSerializer(
             ProjectFinancial.objects.filter(
                 forFrameView=forFrameView,
@@ -766,10 +780,14 @@ class ProjectViewSet(BaseViewSet):
             many=True,
             context={"discard_FK": False}
         ).data
+        logger.info(f"{request.user.id}: Retrieved {len(finances)} project finances")
 
+        mapping_start_time = time.time()
         projects_to_finances = defaultdict(list)
         for f in finances:
             projects_to_finances[f["project"]].append(f)
+        mapping_end_time = time.time()
+        logger.info(f"{request.user.id}: Mapped finances to projects for {len(projects_to_finances)} projects (took {mapping_end_time - mapping_start_time:.4f} seconds)")
 
         serializerContext = {
             "finance_year": financeYear,
@@ -777,20 +795,31 @@ class ProjectViewSet(BaseViewSet):
             "forcedToFrame": forFrameView,
             "projects_to_finances": projects_to_finances
         }
+        logger.info(f"{request.user.id}: Serializer context created: {serializerContext}")
+        serialization_start_time = time.time()
         if page is not None:
+            
             serializer = self.get_serializer(
                 page,
                 many=True,
                 context=serializerContext,
             )
+            serialization_end_time = time.time()
+            logger.info(f"{request.user.id}: Returning paginated response (serialization took {serialization_end_time - serialization_start_time:.4f} seconds)")
+            total_time = time.time() - start_time
+            logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
             return paginator.get_paginated_response(serializer.data)
-
+        
+        logger.info(f"{request.user.id}: Serializing all results (no pagination)")
         serializer = self.get_serializer(
             queryset,
             many=True,
             context=serializerContext,
         )
-
+        serialization_end_time = time.time()
+        logger.info(f"{request.user.id}: Returning all results (serialization took {serialization_end_time - serialization_start_time:.4f} seconds)")
+        total_time = time.time() - start_time
+        logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
         return serializer
 
     @override
