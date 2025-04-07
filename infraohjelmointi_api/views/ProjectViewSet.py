@@ -743,7 +743,7 @@ class ProjectViewSet(BaseViewSet):
         start_time = time.time()
         logger.info(f"{request.user.id}: Starting get_projects with for_coordinator={for_coordinator}, forFrameView={forFrameView}")
         filter_start_time = time.time()
-        logger.info("{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
+        logger.info("f{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
@@ -761,7 +761,7 @@ class ProjectViewSet(BaseViewSet):
 
         if financeYear is not None and not financeYear.isnumeric():
             logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")
-            raise ParseError(detail={"{request.user.id}: limit": "Invalid value"}, code="invalid")
+            raise ParseError(detail={f"{request.user.id}: limit": "Invalid value"}, code="invalid")
 
         # pagination
         logger.info(f"{request.user.id}: Initializing pagination with page size: {limit}")
@@ -810,7 +810,7 @@ class ProjectViewSet(BaseViewSet):
             logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
             return paginator.get_paginated_response(serializer.data)
         
-        logger.info("{request.user.id}: Serializing all results (no pagination)")
+        logger.info(f"{request.user.id}: Serializing all results (no pagination)")
         serializer = self.get_serializer(
             queryset,
             many=True,
