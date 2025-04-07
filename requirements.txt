@@ -1,4 +1,4 @@
-django==4.2.17                                    # web framework itself
+django==5.0.14                                    # web framework itself
 djangorestframework==3.14.0                    # creating rest APIs
 psycopg2-binary==2.9.6                         # postgres database adapter
 requests>=2.31.0
@@ -24,3 +24,4 @@ drf-yasg                                    # API Swagger documentation
 numpy
 setuptools>=70.0.0                              # not directly required, pinned by Snyk to avoid a vulnerability
 uvicorn
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
