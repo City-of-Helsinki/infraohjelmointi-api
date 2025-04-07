@@ -743,7 +743,7 @@ class ProjectViewSet(BaseViewSet):
         start_time = time.time()
         logger.info(f"{request.user.id}: Starting get_projects with for_coordinator={for_coordinator}, forFrameView={forFrameView}")
         filter_start_time = time.time()
-        logger.info("f{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
+        logger.info(f"{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
