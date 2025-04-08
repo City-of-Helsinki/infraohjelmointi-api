@@ -794,15 +794,17 @@ class ProjectViewSet(BaseViewSet):
 
         current_year = datetime.datetime.now().year
         sap_values = SapCurrentYearService.get_by_year(current_year)
-
-        sap_values_by_project = {sap_value.project_id: sap_value for sap_value in sap_values}
+        projects_to_sap_values = defaultdict(list)
+        for sap_value in sap_values:
+            # Append the SAP value to the list of SAP values for the corresponding project_id
+            projects_to_sap_values[sap_value.project_id].append(sap_value)
 
         serializerContext = {
             "finance_year": financeYear,
             "for_coordinator": for_coordinator,
             "forcedToFrame": forFrameView,
             "projects_to_finances": projects_to_finances,
-            "sap_values_by_project": sap_values_by_project
+            "sap_values_by_project": projects_to_sap_values
         }
         logger.info(f"{request.user.id}: Serializer context created: {serializerContext}")
         serialization_start_time = time.time()
