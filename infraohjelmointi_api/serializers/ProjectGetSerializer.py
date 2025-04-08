@@ -147,7 +147,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         
         if not sap_values:
             current_year = datetime.datetime.now().year
-            sap_values = SapCurrentYearService.get_by_year(int(current_year))
+            sap_values = SapCurrentYearService.get_by_project_id_year(project.id, int(current_year))
 
         if sap_values:
             sap_serializer = SapCurrentYearSerializer(sap_values, many=True)
