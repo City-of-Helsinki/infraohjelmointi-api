@@ -1,4 +1,5 @@
 from datetime import date
+import datetime
 import logging
 import time
 from django_filters.rest_framework import DjangoFilterBackend
@@ -33,6 +34,8 @@ from infraohjelmointi_api.services import (
     ProjectClassService,
 )
 import json
+
+from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
 from .BaseViewSet import BaseViewSet
 from distutils.util import strtobool
 from ..paginations import StandardResultsSetPagination
@@ -789,11 +792,17 @@ class ProjectViewSet(BaseViewSet):
         mapping_end_time = time.time()
         logger.info(f"{request.user.id}: Mapped finances to projects for {len(projects_to_finances)} projects (took {mapping_end_time - mapping_start_time:.4f} seconds)")
 
+        current_year = datetime.datetime.now().year
+        sap_values = SapCurrentYearService.get_by_year(current_year)
+
+        sap_values_by_project = {sap_value.project_id: sap_value for sap_value in sap_values}
+
         serializerContext = {
             "finance_year": financeYear,
             "for_coordinator": for_coordinator,
             "forcedToFrame": forFrameView,
-            "projects_to_finances": projects_to_finances
+            "projects_to_finances": projects_to_finances,
+            "sap_values_by_project": sap_values_by_project
         }
         logger.info(f"{request.user.id}: Serializer context created: {serializerContext}")
         serialization_start_time = time.time()
