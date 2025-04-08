@@ -142,12 +142,17 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         return project.projectReadiness()
 
     def get_currentYearsSapValue(self, project: Project):
-        sap_values_by_project = self.context.get('sap_values_by_project', {})
+        projects_to_sap_values = self.context.get('projects_to_sap_values', {})
+        sap_values = projects_to_sap_values.get(project.id)
+        
+        if not sap_values:
+            current_year = datetime.datetime.now().year
+            sap_values = SapCurrentYearService.get_by_year(int(current_year))
 
-        sap_value = sap_values_by_project.get(project.id)
-        if sap_value:
-            sap_serializer = SapCurrentYearSerializer(sap_value)
+        if sap_values:
+            sap_serializer = SapCurrentYearSerializer(sap_values, many=True)
             return sap_serializer.data
+
         return None
 
     def get_finances(self, project):
