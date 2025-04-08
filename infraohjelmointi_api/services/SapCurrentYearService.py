@@ -27,6 +27,10 @@ class SapCurrentYearService:
         return SapCurrentYear.objects.filter(year=year)
 
     @staticmethod
+    def get_by_project_id_year(project_id: str, year: int) -> list[SapCurrentYear]:
+        return SapCurrentYear.objects.filter(project__id=project_id, year=year)
+
+    @staticmethod
     def get_or_create(project_id: str|None, group_id: str|None, year: int) -> SapCurrentYear:
         return SapCurrentYear.objects.get_or_create(
             project_id=project_id, project_group_id=group_id, year=year
