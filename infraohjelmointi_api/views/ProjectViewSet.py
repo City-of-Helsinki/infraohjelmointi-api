@@ -804,10 +804,10 @@ class ProjectViewSet(BaseViewSet):
                 many=True,
                 context=serializerContext,
             )
-            logger.info("Get serializer phase done")
+            logger.info(f"{request.user.id}: Get serializer phase done")
             serializer_data = serializer.data
             serialization_end_time = time.time()
-            logger.info(f"Serialized data: {serializer_data} in {serialization_end_time - serialization_start_time:.4f} seconds")
+            logger.info(f"{request.user.id}: Serialized data: {serializer_data} in {serialization_end_time - serialization_start_time:.4f} seconds")
             total_time = time.time() - start_time
             logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
             return paginator.get_paginated_response(serializer_data)
