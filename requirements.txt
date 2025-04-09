@@ -1,4 +1,4 @@
-django==5.0.14                                    # web framework itself
+django==4.2.20                                 # web framework itself
 djangorestframework==3.14.0                    # creating rest APIs
 psycopg2-binary==2.9.6                         # postgres database adapter
 requests>=2.31.0
@@ -7,21 +7,21 @@ django_db_logger==0.1.12
 tzdata==2022.6
 dj_database_url==1.0.0
 django-environ==0.9.0                          # environment variables utility
-pyyaml==6.0.1                                    # yml parser
+pyyaml==6.0.1                                  # yml parser
 whitenoise==6.2.0                              # enabling Django to serve its own static files
 coverage==6.5.0                                # for test coverage
-django-simple-history                         # To maintain history of table data
-overrides                                     # Decorators to assert function overrides
-openpyxl                                      # dependency for reading excel files through pandas
+django-simple-history                          # To maintain history of table data
+overrides                                      # Decorators to assert function overrides
+openpyxl                                       # dependency for reading excel files through pandas
 Twisted>=22.4                                  # daphne dependency package with specific version to fix CVE vulnerability
-django-filter                                 # DRF package to add filtering on viewsets
-drf-standardized-errors                       # DRF package to standerdize all 5xx and 4xx errors
+django-filter                                  # DRF package to add filtering on viewsets
+drf-standardized-errors                        # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
-django-eventstream                            # For server sent events
-django-helusers                               # Tunnistamo user inegration
+django-eventstream                             # For server sent events
+django-helusers                                # Tunnistamo user inegration
 social-auth-app-django
-drf-yasg                                    # API Swagger documentation
+drf-yasg                                       # API Swagger documentation
 numpy
-setuptools>=70.0.0                              # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=70.0.0                             # not directly required, pinned by Snyk to avoid a vulnerability
 uvicorn
-zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1                                   # not directly required, pinned by Snyk to avoid a vulnerability
