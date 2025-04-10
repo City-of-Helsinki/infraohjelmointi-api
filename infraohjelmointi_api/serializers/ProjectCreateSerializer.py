@@ -51,6 +51,7 @@ from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionPhaseDetailValidator,
     EstConstructionEndValidator,
     EstConstructionStartValidator,
+    EstWarrantyPhaseStartValidator,
     EstPlanningEndValidator,
     LockedFieldsValidator,
     PlanningStartYearValidator,
@@ -103,6 +104,18 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         required=False,
         allow_null=True,
     )
+    estWarrantyPhaseStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    estWarrantyPhaseEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
     frameEstPlanningStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
@@ -122,6 +135,18 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         allow_null=True,
     )
     frameEstConstructionEnd = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    frameEstWarrantyPhaseStart = serializers.DateField(
+        format="%d.%m.%Y",
+        input_formats=["%d.%m.%Y", "iso-8601"],
+        required=False,
+        allow_null=True,
+    )
+    frameEstWarrantyPhaseEnd = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],
         required=False,
@@ -176,6 +201,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             VisibilityStartValidator(),
             VisibilityEndValidator(),
             EstConstructionStartValidator(),
+            EstWarrantyPhaseStartValidator(),
             EstConstructionEndValidator(),
             ProjectClassValidator(),
             ProjectLocationValidator(),

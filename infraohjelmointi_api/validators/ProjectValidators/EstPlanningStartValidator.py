@@ -7,52 +7,51 @@ from rest_framework.exceptions import ValidationError
 class EstPlanningStartValidator(BaseValidator):
     requires_context = True
 
-    def __call__(self, allFields, serializer) -> None:
+    def __call__(self, all_fields, serializer) -> None:
         # in case of multiple projects being patched at the same time
         # this is then required
-        projectId = allFields.get("projectId", None)
-        project = self.getProjectInstance(projectId, serializer=serializer)
+        project_id = all_fields.get("projectId", None)
+        project = self.getProjectInstance(project_id, serializer=serializer)
 
-        estPlanningStart = allFields.get("estPlanningStart", None)
+        est_planning_start = all_fields.get("estPlanningStart", None)
         if (
-            estPlanningStart is None
+            est_planning_start is None
             and project is not None
-            and "estPlanningStart" not in allFields
+            and "estPlanningStart" not in all_fields
         ):
-            estPlanningStart = project.estPlanningStart
+            est_planning_start = project.estPlanningStart
 
-        if estPlanningStart is None:
+        if est_planning_start is None:
             return
 
-        planningStartYear = allFields.get("planningStartYear", None)
+        planning_start_year = all_fields.get("planningStartYear", None)
         if (
-            planningStartYear is None
+            planning_start_year is None
             and project is not None
-            and "planningStartYear" not in allFields
+            and "planningStartYear" not in all_fields
         ):
-            planningStartYear = project.planningStartYear
+            planning_start_year = project.planningStartYear
 
-        if project is not None and hasattr(project, "lock"):
-            if planningStartYear is not None and estPlanningStart is not None:
-                if estPlanningStart.year < planningStartYear:
-                    raise ValidationError(
-                        detail={
-                            "estPlanningStart": "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked"
-                        },
-                        code="estPlanningStart_et_planningStartYear_locked",
-                    )
+        if planning_start_year is not None and est_planning_start is not None:
+            if est_planning_start.year != planning_start_year:
+                raise ValidationError(
+                    detail={
+                        "estPlanningStart": "estPlanningStart date cannot be set to a earlier or later date than Start year of planning"
+                    },
+                    code="estPlanningStart_df_planningStartYear",
+                )
 
-        estPlanningEnd = allFields.get("estPlanningEnd", None)
+        est_planning_end = all_fields.get("estPlanningEnd", None)
 
         if (
-            estPlanningEnd is None
+            est_planning_end is None
             and project is not None
-            and "estPlanningEnd" not in allFields
+            and "estPlanningEnd" not in all_fields
         ):
-            estPlanningEnd = project.estPlanningEnd
+            est_planning_end = project.estPlanningEnd
 
-        if estPlanningEnd is not None and estPlanningStart is not None:
-            if estPlanningStart > estPlanningEnd:
+        if est_planning_end is not None and est_planning_start is not None:
+            if est_planning_start > est_planning_end:
                 raise ValidationError(
                     detail={
                         "estPlanningStart": "Date cannot be later than estPlanningEnd"

@@ -7,30 +7,30 @@ from rest_framework.exceptions import ValidationError
 class EstConstructionStartValidator(BaseValidator):
     requires_context = True
 
-    def __call__(self, allFields, serializer) -> None:
+    def __call__(self, all_fields, serializer) -> None:
         # in case of multiple projects being patched at the same time
         # this is then required
-        projectId = allFields.get("projectId", None)
-        project = self.getProjectInstance(projectId, serializer=serializer)
+        project_id = all_fields.get("projectId", None)
+        project = self.getProjectInstance(project_id, serializer=serializer)
 
-        estConstructionStart = allFields.get("estConstructionStart", None)
-        if estConstructionStart is None and project is not None:
-            estConstructionStart = project.estConstructionStart
+        est_construction_start = all_fields.get("estConstructionStart", None)
+        if est_construction_start is None and project is not None:
+            est_construction_start = project.estConstructionStart
 
-        if estConstructionStart is None:
+        if est_construction_start is None:
             return
 
-        estConstructionEnd = allFields.get("estConstructionEnd", None)
+        est_construction_end = all_fields.get("estConstructionEnd", None)
 
         if (
-            estConstructionEnd is None
+            est_construction_end is None
             and project is not None
-            and "estConstructionEnd" not in allFields
+            and "estConstructionEnd" not in all_fields
         ):
-            estConstructionEnd = project.estConstructionEnd
+            est_construction_end = project.estConstructionEnd
 
-        if estConstructionEnd is not None and estConstructionStart is not None:
-            if estConstructionStart > estConstructionEnd:
+        if est_construction_end is not None and est_construction_start is not None:
+            if est_construction_start > est_construction_end:
                 raise ValidationError(
                     detail={
                         "estConstructionStart": "Date cannot be later than estConstructionEnd"

@@ -148,6 +148,8 @@ class ProjectViewSet(BaseViewSet):
             "estPlanningEnd",
             "estConstructionStart",
             "estConstructionEnd",
+            "estWarrantyPhaseStart",
+            "estWarrantyPhaseEnd",
             "presenceStart",
             "presenceEnd",
             "visibilityStart",
