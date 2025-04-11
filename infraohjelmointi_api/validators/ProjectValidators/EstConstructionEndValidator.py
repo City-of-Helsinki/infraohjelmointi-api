@@ -68,7 +68,7 @@ class EstConstructionEndValidator(BaseValidator):
             est_warranty_phase_start = project.estWarrantyPhaseStart
 
         if est_warranty_phase_start is not None and est_construction_end is not None:
-            if est_warranty_phase_start > est_construction_end:
+            if est_warranty_phase_start < est_construction_end:
                 raise ValidationError(
                     detail={
                         "estConstructionEnd": "Date cannot be later than estWarrantyPhaseStart"
