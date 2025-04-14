@@ -2,9 +2,8 @@ import datetime
 import json
 from unittest.mock import patch
 import uuid
-from django.test import TestCase
+from django.test import TestCase, AsyncClient
 from django.urls import reverse
-from infraohjelmointi_api.views.api.utils import generate_streaming_response
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -12,7 +11,65 @@ from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, 
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
 from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
-from django.http import StreamingHttpResponse
+from asgiref.sync import sync_to_async
+
+
+def perform_shared_api_setup(cls):
+    cls.user = User.objects.create(
+            username="AppName"
+        )
+    cls.token = Token.objects.create(user=cls.user)
+
+    cls.project_master_class = ProjectClass.objects.create(
+        id=ApiTestCase.master_class_id,
+        name="Test Master Class",
+        path="Test Master Class",
+    )
+
+    cls.project_class = cls.project_master_class.childClass.create(
+        id=ApiTestCase.class_id,
+        name="Test Class",
+        path="Test Class",
+    )
+
+    cls.project_district = ProjectDistrict.objects.create(
+        id=ApiTestCase.project_district_id,
+        name="Test district B",
+        path="Test district B",
+        parent=None,
+    )
+
+    cls.district = ProjectLocation.objects.create(
+        id=ApiTestCase.district_id,
+        name="Test district A",
+        path="Test district A",
+        parent=None,
+    )
+
+    cls.project_location = cls.district.childLocation.create(
+        id=ApiTestCase.division_id,
+        name="Test division",
+    )
+
+    cls.project_group = ProjectGroup.objects.create(
+        id=ApiTestCase.project_group_id,
+        name="Test Group",
+        classRelation=cls.project_class,
+        locationRelation=cls.project_location,
+    )
+
+    cls.project = Project.objects.create(
+        id=ApiTestCase.project_id,
+        name="Test project 1",
+        description="description of the test project",
+        projectClass=cls.project_class,
+        projectDistrict=cls.project_district,
+        projectLocation=cls.project_location,
+    )
+
+    year = int(datetime.date.today().year)
+    for x in range(11):
+        ProjectFinancial.objects.create(project=cls.project, year=str(year + x), value=str(x * 10))
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -32,65 +89,7 @@ class ApiTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(cls):
-        cls.user = User.objects.create(
-            username="AppName"
-        )
-        cls.token = Token.objects.create(user=cls.user)
-
-        cls.project_master_class = ProjectClass.objects.create(
-            id=cls.master_class_id,
-            name="Test Master Class",
-            path="Test Master Class",
-        )
-
-        cls.project_class = cls.project_master_class.childClass.create(
-            id=cls.class_id,
-            name="Test Class",
-            path="Test Class",
-        )
-
-        cls.project_district = ProjectDistrict.objects.create(
-            id=cls.project_district_id,
-            name="Test district B",
-            path="Test district B",
-            parent=None,
-        )
-
-        cls.district = ProjectLocation.objects.create(
-            id=cls.district_id,
-            name="Test district A",
-            path="Test district A",
-            parent=None,
-        )
-
-        cls.project_location = cls.district.childLocation.create(
-            id=cls.division_id,
-            name="Test division",
-        )
-
-        cls.project_group = ProjectGroup.objects.create(
-            id=cls.project_group_id,
-            name="Test Group",
-            classRelation=cls.project_class,
-            locationRelation=cls.project_location,
-        )
-
-        cls.project = Project.objects.create(
-            id=cls.project_id,
-            name="Test project 1",
-            description="description of the test project",
-            projectClass=cls.project_class,
-            projectDistrict=cls.project_district,
-            projectLocation=cls.project_location,
-        )
-
-        # Create financial data for the project
-        year = int(datetime.date.today().year)
-        for x in range(11):
-            ProjectFinancial.objects.create(project=cls.project, year=str(year + x), value=str(x * 10))
-
-        cls.queryset = Project.objects.all()
-        cls.serializer_class = ProjectGetSerializer
+        perform_shared_api_setup(cls)
 
 
     def test_api_custom_token_auth_init(self):
@@ -112,7 +111,7 @@ class ApiTestCase(TestCase):
 
 
     def test_api_correct_token(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response = self.client.get("/api/projects/")
 
@@ -122,28 +121,18 @@ class ApiTestCase(TestCase):
         self.assertEqual(CustomTokenAuth.keyword, "Bearer")
 
 
-    def test_api_GET_projects(self):
-        self = setup_client(self)
+    def test_api_GET_project_detail_sync(self):
+        setup_sync_client(self)
+        response_project = self.client.get(f"/api/projects/{self.project_id}/")
 
-        response_projects = self.client.get("/api/projects/")
-        response_project = self.client.get("/api/projects/{}/".format(self.project_id))
-        response_project_by_class = self.client.get("/api/projects/?class={}".format(self.class_id))
-
-        self.assertEqual(response_projects.status_code, 200, msg="Projects status code != 200")
-        self.assertEqual(response_project.status_code, 200, msg="Project status code != 200")
-        self.assertEqual(response_project_by_class.status_code, 200, msg="Project status code != 200")
+        self.assertEqual(response_project.status_code, 200)
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
-
-        response_project_by_class_content = b"".join(response_project_by_class.streaming_content).decode('utf-8')
-        response_project_by_class_json = json.loads(response_project_by_class_content)
-
         self.assertEqual(response_project.json()["id"], project_data["id"])
-        self.assertEqual(response_project_by_class_json[0]["id"], project_data["id"])
 
 
     def test_api_GET_groups(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response_groups = self.client.get("/api/groups/")
         response_group = self.client.get("/api/groups/{}/".format(self.project_group_id))
@@ -157,7 +146,7 @@ class ApiTestCase(TestCase):
 
 
     def test_api_GET_classes(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response_classes = self.client.get("/api/classes/")
         response_class = self.client.get("/api/classes/{}/".format(self.class_id))
@@ -171,14 +160,14 @@ class ApiTestCase(TestCase):
 
 
     def test_api_GET_classes_with_not_existing_class_uuid(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response_class = self.client.get("/api/classes/{}/".format(self.class_not_found_id))
         self.assertEqual(response_class.status_code, 404)
 
 
     def test_api_GET_districts(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response_districts = self.client.get("/api/districts/")
         response_district = self.client.get("/api/districts/{}/".format(self.project_district_id))
@@ -192,7 +181,7 @@ class ApiTestCase(TestCase):
 
 
     def test_api_GET_locations(self):
-        self = setup_client(self)
+        setup_sync_client(self)
 
         response_locations = self.client.get("/api/locations/")
         response_location = self.client.get("/api/locations/{}/".format(self.division_id))
@@ -205,8 +194,8 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_location.json()["id"], location_data["id"])
 
     def test_retrieve_location_not_found(self):
-        self = setup_client(self)
         # Test to ensure that a 404 is returned if the class does not exist
+        setup_sync_client(self)
         non_existent_uuid = uuid.uuid4()
         url = reverse('apiLocations-detail', kwargs={'pk': non_existent_uuid})
         response = self.client.get(url)
@@ -215,7 +204,7 @@ class ApiTestCase(TestCase):
 
     def test_api_GET_incorrect_uuid(self):
         # Test endpoints returns 404 if object with request ID not found
-        self = setup_client(self)
+        setup_sync_client(self)
 
         self.assertEqual(self.client.get("/api/projects/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Projects status code != 404")
         self.assertEqual(self.client.get("/api/groups/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Groups status code != 404")
@@ -223,22 +212,62 @@ class ApiTestCase(TestCase):
         self.assertEqual(self.client.get("/api/districts/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Districts status code != 404")
         self.assertEqual(self.client.get("/api/locations/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Locations status code != 404")
 
-    def test_generate_streaming_response(self):
-        self = setup_client(self)
 
-        endpoint = "Projects"
-        chunk_size = 100
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+class AsyncApiTestCase(TestCase):
+    client_class = AsyncClient
 
-        generator = generate_streaming_response(self.queryset, self.serializer_class, endpoint, chunk_size)
-        result = "".join(list(generator))
+    @classmethod
+    def setUpTestData(cls):
+        perform_shared_api_setup(cls)
 
-        mock_http_response = StreamingHttpResponse((item.encode('utf-8') for item in result), content_type='application/json')
-        actual_result = b''.join(mock_http_response.streaming_content).decode('utf-8')
+    async def test_api_GET_streaming_projects(self):
+        token = getattr(AsyncApiTestCase, 'token', None)
+        auth_header = f"Bearer {token.key}"
 
-        self.assertEqual(result, actual_result, msg="Generate streaming data != Project endpoint fetch")
+        projects_url = "/api/projects/"
+        projects_by_class_url = f"/api/projects/?class={ApiTestCase.class_id}"
+
+        response_projects = await self.client.get(projects_url, AUTHORIZATION=auth_header)
+        response_projects_by_class = await self.client.get(projects_by_class_url, AUTHORIZATION=auth_header)
+
+        self.assertEqual(response_projects.status_code, 200, msg="Streaming Projects status code != 200")
+        self.assertEqual(response_projects_by_class.status_code, 200, msg="Streaming Projects by class status code != 200")
+
+        all_projects_qs = Project.objects.all()
+        expected_projects_data_raw = await sync_to_async(
+            lambda: ProjectGetSerializer(all_projects_qs, many=True).data
+        )()
+
+        filtered_projects_qs = Project.objects.filter(projectClass=ApiTestCase.class_id)
+        expected_projects_by_class_data_raw = await sync_to_async(
+            lambda: ProjectGetSerializer(filtered_projects_qs, many=True).data
+        )()
+
+        streamed_chunks_all = []
+        async for chunk in response_projects.streaming_content:
+            streamed_chunks_all.append(chunk)
+
+        streamed_content_str_all = b"".join(streamed_chunks_all).decode('utf-8')
+        actual_projects_list = json.loads(streamed_content_str_all)
+
+        streamed_chunks_class = []
+        async for chunk in response_projects_by_class.streaming_content:
+            streamed_chunks_class.append(chunk)
+
+        streamed_content_str_class = b"".join(streamed_chunks_class).decode('utf-8')
+        actual_projects_by_class_list = json.loads(streamed_content_str_class)
+
+        expected_projects_json_str = json.dumps(expected_projects_data_raw, default=str)
+        comparable_expected_projects = json.loads(expected_projects_json_str)
+
+        expected_projects_by_class_json_str = json.dumps(expected_projects_by_class_data_raw, default=str)
+        comparable_expected_projects_by_class = json.loads(expected_projects_by_class_json_str)
+
+        self.assertListEqual(actual_projects_list, comparable_expected_projects, msg="Data mismatch for streaming /api/projects/")
+        self.assertListEqual(actual_projects_by_class_list, comparable_expected_projects_by_class, msg="Data mismatch for streaming /api/projects/?class=...")
 
 
-def setup_client(self):
+def setup_sync_client(self):
     self.client = APIClient()
     self.client.credentials(HTTP_AUTHORIZATION="Bearer {}".format(self.token.key))
-    return self
