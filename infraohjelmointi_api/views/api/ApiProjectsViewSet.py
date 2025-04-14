@@ -12,7 +12,7 @@ from infraohjelmointi_api.serializers import (
 )
 import uuid
 from django.http import StreamingHttpResponse
-from .utils import generate_response, generate_response_not_found, generate_streaming_response, send_logger_api_generate_data_start
+from .utils import generate_response, generate_streaming_response, send_logger_api_generate_data_start
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema

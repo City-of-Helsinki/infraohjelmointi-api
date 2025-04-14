@@ -3,7 +3,6 @@ from django.utils.decorators import method_decorator
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from infraohjelmointi_api.serializers import ProjectGroupSerializer
-from rest_framework import status
 from django.http import StreamingHttpResponse
 from .utils import generate_response, generate_streaming_response, send_logger_api_generate_data_start
 
