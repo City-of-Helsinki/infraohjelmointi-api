@@ -152,6 +152,8 @@ class ProjectViewSet(BaseViewSet):
             "estPlanningEnd",
             "estConstructionStart",
             "estConstructionEnd",
+            "estWarrantyPhaseStart",
+            "estWarrantyPhaseEnd",
             "presenceStart",
             "presenceEnd",
             "visibilityStart",
@@ -187,6 +189,10 @@ class ProjectViewSet(BaseViewSet):
                 request.data['frameEstConstructionStart'] = request.data['estConstructionStart']
             if 'estConstructionEnd' in request.data:
                 request.data['frameEstConstructionEnd'] = request.data['estConstructionEnd']
+            if 'estWarrantyPhaseStart' in request.data:
+                request.data['frameEstWarrantyPhaseStart'] = request.data['estWarrantyPhaseStart']
+            if 'estWarrantyPhaseEnd' in request.data:
+                request.data['frameEstWarrantyPhaseEnd'] = request.data['estWarrantyPhaseEnd']
 
         if finances is not None:
             finance_instances = self.create_updated_finance_instances(finances, project, forced_to_frame, year)
@@ -1258,7 +1264,9 @@ class ProjectViewSet(BaseViewSet):
             frameEstPlanningStart=F('estPlanningStart'),
             frameEstPlanningEnd=F('estPlanningEnd'),
             frameEstConstructionStart=F('estConstructionStart'),
-            frameEstConstructionEnd=F('estConstructionEnd')
+            frameEstConstructionEnd=F('estConstructionEnd'),
+            frameEstWarrantyPhaseStart=F('estWarrantyPhaseStart'),
+            frameEstWarrantyPhaseEnd=F('estWarrantyPhaseEnd')
         )
 
         #updating the forced to frame finance data for projects
