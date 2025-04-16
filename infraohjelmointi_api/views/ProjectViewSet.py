@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 import logging
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
@@ -27,6 +27,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
+    ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
     ProjectClassService,
@@ -47,6 +48,7 @@ from itertools import chain
 from django.db.models import Count, Case, When, Q, Prefetch, F
 from django.db.models.signals import post_save
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -253,6 +255,24 @@ class ProjectViewSet(BaseViewSet):
         project.forcedToFrame = forced_to_frame
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
+
+        
+        # when project is moved to warrantyPeriod, we need to automatically set warranty phase end and start dates so that warranty period
+        # lasts two years from construction end if no warranty period dates aren't already set for the project
+        phase_from_data = request.data.get('phase')
+        if phase_from_data:
+            phase = ProjectPhaseService.get_by_id(phase_from_data)
+            if phase.value == 'warrantyPeriod':
+                project_warranty_phase_start = request.data.get('estWarrantyPhaseStart') or project.estWarrantyPhaseStart
+                project_has_warranty_phase_end = request.data.get('estWarrantyPhaseEnd') or project.estWarrantyPhaseEnd
+                if project_warranty_phase_start is None:
+                    est_construction_end = request.data.get('estConstructionEnd') or project.estConstructionEnd
+                    project_warranty_phase_start = est_construction_end + timedelta(days=1)
+                    request.data['estWarrantyPhaseStart'] = project_warranty_phase_start.isoformat()
+                if project_has_warranty_phase_end is None:
+                    project_has_warranty_phase_end = project_warranty_phase_start + relativedelta(years=2)
+                    request.data['estWarrantyPhaseEnd'] = project_has_warranty_phase_end.isoformat()
+
         project_serializer = self.get_serializer(
             project,
             data=request.data,
