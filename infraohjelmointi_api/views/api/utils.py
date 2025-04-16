@@ -1,17 +1,19 @@
 import json
 import logging
 import time
+from typing import AsyncGenerator
 import uuid
 
 from rest_framework import status
 from rest_framework.response import Response
+from asgiref.sync import sync_to_async
 
 logger = logging.getLogger("infraohjelmointi_api")
 
 
-def generate_streaming_response(
+async def generate_streaming_response(
     queryset, serializer_class, user_id, endpoint, chunk_size=1000, serializer_context={}
-):
+) -> AsyncGenerator[str, None]:
     """
     Generates a streaming response for a given queryset using the provided serializer with chunking.
 
@@ -27,40 +29,50 @@ def generate_streaming_response(
         str: A chunk of the JSON response.
     """
     serializer = serializer_class(many=False, context=serializer_context)
+    async_to_representation = sync_to_async(serializer.to_representation, thread_sensitive=True)
 
-    def data_generator():
-        start = time.time()
-        yield "["
-        first = True
-        item_buffer = []
-        for item in queryset:
-            serialized_data = serializer.to_representation(item)
+    start = time.time()
+    yield "["
+    first = True
+    item_buffer = []
+    item_index = 0
 
-            def convert_uuid_to_str(obj):
-                if isinstance(obj, uuid.UUID):
-                    return str(obj)
-                return obj
+    try:
+        async for item in queryset:
+            item_index += 1
 
-            json_string = json.dumps(serialized_data, default=convert_uuid_to_str)
-            item_buffer.append(json_string)
+            try:
+                serialized_data = await async_to_representation(item)
 
-            if len(item_buffer) >= chunk_size:
-                yield ("," if not first else "") + ",".join(item_buffer)
-                item_buffer = []
-                first = False
+                json_string = json.dumps(serialized_data, default=str)
+                item_buffer.append(json_string)
+
+                if len(item_buffer) >= chunk_size:
+                    yield ("," if not first else "") + ",".join(item_buffer)
+                    item_buffer = []
+                    first = False
+
+            except Exception as item_error:
+                item_id = getattr(item, 'id', 'N/A')
+                logger.error(f"Error serializing item {item_index} (ID: {item_id}) in endpoint {endpoint}: {item_error}", exc_info=True)
+
+                raise item_error
 
         if item_buffer:
             yield ("," if not first else "") + ",".join(item_buffer)
 
         yield "]"
+
+    except Exception as outer_error:
+        logger.error(f"Error during queryset iteration for endpoint {endpoint}: {outer_error}", exc_info=True)
+
+    finally:
         end = time.time()
         logger.info(
             "User {} request to generate endpoint {} data finished in {} seconds".format(
                 user_id, endpoint, round(end - start, 3)
             )
         )
-
-    return data_generator()
 
 
 def generate_response(self, user_id, pk, endpoint):
