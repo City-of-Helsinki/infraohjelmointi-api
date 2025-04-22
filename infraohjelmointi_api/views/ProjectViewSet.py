@@ -1,7 +1,6 @@
 from datetime import date, timedelta, datetime
 import datetime as dt_module
 import logging
-import time
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -49,7 +48,7 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, Prefetch, F
+from django.db.models import Count, Case, When, Q, F
 from django.db.models.signals import post_save
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
