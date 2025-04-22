@@ -285,7 +285,7 @@ class ProjectTestCase(TestCase):
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
-            estConstructionEnd="2022-11-28",
+            estConstructionEnd="2030-11-28",
             presenceStart="2022-11-20",
             presenceEnd="2022-11-20",
             visibilityStart="2022-11-20",
@@ -724,7 +724,7 @@ class ProjectTestCase(TestCase):
             "estPlanningStart": "21.11.2022",
             "estPlanningEnd": "29.11.2022",
             "estConstructionStart": "21.11.2022",
-            "estConstructionEnd": "29.11.2022",
+            "estConstructionEnd": "29.11.2030",
             "finances": {
                 "year": 2024,
                 "budgetProposalCurrentYearPlus1": 600
@@ -2723,7 +2723,10 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-        data = {"estPlanningStart": "05.05.2020"}
+        data = {
+            "planningStartYear": 2020,
+            "estPlanningStart": "05.05.2020"
+        }
         response = self.client.patch(
             "/projects/{}/".format(self.project_8_Id),
             data,
@@ -2736,11 +2739,14 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "estPlanningStart date cannot be set to a earlier date than Start year of planning when project is locked",
-            response.json()["estPlanningStart"][0],
+            "The field planningStartYear cannot be modified when the project is locked",
+            response.json()["planningStartYear"][0],
         )
 
-        data = {"estConstructionEnd": "05.05.2030"}
+        data = {
+            "constructionEndYear": 2030,
+            "estConstructionEnd": "05.05.2030"
+        }
         response = self.client.patch(
             "/projects/{}/".format(self.project_8_Id),
             data,
@@ -2752,8 +2758,8 @@ class ProjectTestCase(TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "estConstructionEnd date cannot be set to a later date than End year of construction when project is locked",
-            response.json()["estConstructionEnd"][0],
+            "The field constructionEndYear cannot be modified when the project is locked",
+            response.json()["constructionEndYear"][0],
         )
 
     def test_class_location_validation(self):
@@ -3171,8 +3177,8 @@ class ProjectTestCase(TestCase):
         )
 
         data = {
-            "estPlanningStart": "01.01.2023",
-            "estPlanningEnd": "01.01.2024",
+            "estPlanningStart": "01.01.2021",
+            "estPlanningEnd": "31.12.2023",
             "personPlanning": self.person_1_Id,
         }
         response = self.client.patch(
@@ -3370,7 +3376,7 @@ class ProjectTestCase(TestCase):
             "programmed": True,
             "phase": self.projectPhase_2_Id,
             "planningStartYear": 2021,
-            "constructionEndYear": 2022,
+            "constructionEndYear": 2024,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
@@ -3396,10 +3402,19 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "Year cannot be earlier than planningStartYear",
-            response.json()["constructionEndYear"][0],
+            "estPlanningStart date cannot be set to a earlier or later date than Start year of planning",
+            response.json()["estPlanningStart"][0],
         )
-        data = {"planningStartYear": 2050, "constructionEndYear": 2060}
+        data = {
+            "planningStartYear": 2050,
+            "constructionEndYear": 2060,
+            "estPlanningStart": "1.1.2050",
+            "estPlanningEnd": "31.12.2055",
+            "estConstructionStart": "1.1.2056",
+            "estConstructionEnd": "31.12.2060",
+            "estWarrantyPhaseStart": "1.1.2061",
+            "estWarrantyPhaseEnd": "31.12.2063"
+        }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
@@ -3423,11 +3438,16 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "Year cannot be earlier than planningStartYear",
-            response.json()["constructionEndYear"][0],
+            "estConstructionEnd date cannot be set to a later or earlier date than End year of construction",
+            response.json()["estConstructionEnd"][0],
         )
 
-        data = {"constructionEndYear": 2055}
+        data = {
+            "constructionStartYear": 2053,
+            "estConstructionStart": "1.1.2053",
+            "constructionEndYear": 2055,
+            "estConstructionEnd": "31.12.2055",
+        }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
@@ -3452,10 +3472,15 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "Date cannot be later than estPlanningEnd",
+            "estPlanningStart date cannot be set to a earlier or later date than Start year of planning",
             response.json()["estPlanningStart"][0],
         )
-        data = {"estPlanningStart": "01.01.2023", "estPlanningEnd": "01.01.2025"}
+        data = {
+            "estPlanningStart": "01.01.2023",
+            "planningStartYear": 2023,
+            "estPlanningEnd": "01.01.2025",
+            "planningEndYear": 2025
+        }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
@@ -3541,7 +3566,9 @@ class ProjectTestCase(TestCase):
             response.json()["estConstructionStart"][0],
         )
         data = {
+            "constructionStartYear": 2023,
             "estConstructionStart": "01.01.2023",
+            "constructionEndYear": 2025,
             "estConstructionEnd": "01.01.2025",
         }
         response = self.client.patch(
