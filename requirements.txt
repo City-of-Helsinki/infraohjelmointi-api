@@ -25,3 +25,4 @@ numpy
 setuptools>=70.0.0                             # not directly required, pinned by Snyk to avoid a vulnerability
 uvicorn
 zipp>=3.19.1                                   # not directly required, pinned by Snyk to avoid a vulnerability
+python-dateutil

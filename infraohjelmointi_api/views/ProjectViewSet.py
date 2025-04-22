@@ -1,5 +1,5 @@
-from datetime import date
-import datetime
+from datetime import date, timedelta, datetime
+import datetime as dt_module
 import logging
 import time
 from django_filters.rest_framework import DjangoFilterBackend
@@ -29,6 +29,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
+    ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
     ProjectClassService,
@@ -51,6 +52,7 @@ from itertools import chain
 from django.db.models import Count, Case, When, Q, Prefetch, F
 from django.db.models.signals import post_save
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -257,6 +259,24 @@ class ProjectViewSet(BaseViewSet):
         project.forcedToFrame = forced_to_frame
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
+
+        
+        # when project is moved to warrantyPeriod, we need to automatically set warranty phase end and start dates so that warranty period
+        # lasts two years from construction end if no warranty period dates aren't already set for the project
+        phase_from_data = request.data.get('phase')
+        if phase_from_data:
+            phase = ProjectPhaseService.get_by_id(phase_from_data)
+            if phase.value == 'warrantyPeriod':
+                project_warranty_phase_start = request.data.get('estWarrantyPhaseStart') or project.estWarrantyPhaseStart
+                project_has_warranty_phase_end = request.data.get('estWarrantyPhaseEnd') or project.estWarrantyPhaseEnd
+                if project_warranty_phase_start is None:
+                    est_construction_end = request.data.get('estConstructionEnd') or project.estConstructionEnd
+                    project_warranty_phase_start = self.parse_date(est_construction_end) + timedelta(days=1)
+                    request.data['estWarrantyPhaseStart'] = project_warranty_phase_start.isoformat()
+                if project_has_warranty_phase_end is None:
+                    project_has_warranty_phase_end = self.parse_date(project_warranty_phase_start) + relativedelta(years=2)
+                    request.data['estWarrantyPhaseEnd'] = project_has_warranty_phase_end.isoformat()
+
         project_serializer = self.get_serializer(
             project,
             data=request.data,
@@ -284,6 +304,11 @@ class ProjectViewSet(BaseViewSet):
             data=request.data, project=updated_project
         )
         return Response(project_serializer.data)
+
+    def parse_date(self, date):
+        if isinstance(date, str):
+            return datetime.strptime(date, '%d.%m.%Y').date()
+        return date
     
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(
@@ -798,7 +823,7 @@ class ProjectViewSet(BaseViewSet):
         mapping_end_time = time.time()
         logger.info(f"{request.user.id}: Mapped finances to projects for {len(projects_to_finances)} projects (took {mapping_end_time - mapping_start_time:.4f} seconds)")
 
-        current_year = datetime.datetime.now().year
+        current_year = dt_module.datetime.now().year
         sap_values = SapCurrentYearService.get_by_year(current_year)
         projects_to_sap_values = defaultdict(list)
         for sap_value in sap_values:
