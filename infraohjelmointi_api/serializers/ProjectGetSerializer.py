@@ -49,6 +49,7 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
 from infraohjelmointi_api.serializers.SapCurrentYearSerializer import SapCurrentYearSerializer
 from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
+from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
 from rest_framework import serializers
 import environ
 from overrides import override
@@ -100,6 +101,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     pwFolderLink = serializers.SerializerMethodField(method_name="get_pw_folder_link")
     projectWiseService = None
     currentYearsSapValues = serializers.SerializerMethodField(method_name="get_currentYearsSapValue")
+    budgetOverrunReason = BudgetOverrunReasonSerializer(read_only=True)
 
     class Meta(BaseMeta):
         model = Project

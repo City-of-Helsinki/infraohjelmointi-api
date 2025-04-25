@@ -919,6 +919,7 @@ class ProjectViewSet(BaseViewSet):
                     "personConstruction",
                     "personProgramming",
                     "personConstruction",
+                    "budgetOverrunReason",
                     "projectClass__coordinatorClass",
                     "projectLocation__coordinatorLocation",
                     "projectClass__parent__coordinatorClass",
@@ -947,6 +948,7 @@ class ProjectViewSet(BaseViewSet):
                     "personConstruction",
                     "personProgramming",
                     "personConstruction",
+                    "budgetOverrunReason",
                 )
                 .prefetch_related(
                     "favPersons",

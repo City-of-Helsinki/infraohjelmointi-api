@@ -1,7 +1,6 @@
-import random
 import uuid
 from django.db import models
-from django.utils.translation import gettext_lazy as lazy
+
 
 from .ProjectLocation import ProjectLocation
 from .ProjectDistrict import ProjectDistrict
@@ -22,6 +21,7 @@ from .ProjectClass import ProjectClass
 from .ResponsibleZone import ResponsibleZone
 from .ProjectHashTag import ProjectHashTag
 from .ProjectGroup import ProjectGroup
+from .BudgetOverrunReason import BudgetOverrunReason
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
 
@@ -230,6 +230,10 @@ class Project(models.Model):
     hashTags = models.ManyToManyField(
         ProjectHashTag, related_name="relatedProject", blank=True
     )
+    budgetOverrunReason = models.ForeignKey(
+        BudgetOverrunReason, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    otherBudgetOverrunReason = models.TextField(max_length=200, blank=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
