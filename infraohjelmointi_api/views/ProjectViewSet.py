@@ -1,7 +1,6 @@
-from datetime import date
-import datetime
+from datetime import date, timedelta, datetime
+import datetime as dt_module
 import logging
-import time
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from infraohjelmointi_api.serializers import (
@@ -29,6 +28,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
+    ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
     ProjectClassService,
@@ -48,9 +48,10 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, Prefetch, F
+from django.db.models import Count, Case, When, Q, F
 from django.db.models.signals import post_save
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -152,6 +153,8 @@ class ProjectViewSet(BaseViewSet):
             "estPlanningEnd",
             "estConstructionStart",
             "estConstructionEnd",
+            "estWarrantyPhaseStart",
+            "estWarrantyPhaseEnd",
             "presenceStart",
             "presenceEnd",
             "visibilityStart",
@@ -187,6 +190,10 @@ class ProjectViewSet(BaseViewSet):
                 request.data['frameEstConstructionStart'] = request.data['estConstructionStart']
             if 'estConstructionEnd' in request.data:
                 request.data['frameEstConstructionEnd'] = request.data['estConstructionEnd']
+            if 'estWarrantyPhaseStart' in request.data:
+                request.data['frameEstWarrantyPhaseStart'] = request.data['estWarrantyPhaseStart']
+            if 'estWarrantyPhaseEnd' in request.data:
+                request.data['frameEstWarrantyPhaseEnd'] = request.data['estWarrantyPhaseEnd']
 
         if finances is not None:
             finance_instances = self.create_updated_finance_instances(finances, project, forced_to_frame, year)
@@ -251,6 +258,24 @@ class ProjectViewSet(BaseViewSet):
         project.forcedToFrame = forced_to_frame
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
+
+        
+        # when project is moved to warrantyPeriod, we need to automatically set warranty phase end and start dates so that warranty period
+        # lasts two years from construction end if no warranty period dates aren't already set for the project
+        phase_from_data = request.data.get('phase')
+        if phase_from_data:
+            phase = ProjectPhaseService.get_by_id(phase_from_data)
+            if phase.value == 'warrantyPeriod':
+                project_warranty_phase_start = request.data.get('estWarrantyPhaseStart') or project.estWarrantyPhaseStart
+                project_has_warranty_phase_end = request.data.get('estWarrantyPhaseEnd') or project.estWarrantyPhaseEnd
+                if project_warranty_phase_start is None:
+                    est_construction_end = request.data.get('estConstructionEnd') or project.estConstructionEnd
+                    project_warranty_phase_start = self.parse_date(est_construction_end) + timedelta(days=1)
+                    request.data['estWarrantyPhaseStart'] = project_warranty_phase_start.isoformat()
+                if project_has_warranty_phase_end is None:
+                    project_has_warranty_phase_end = self.parse_date(project_warranty_phase_start) + relativedelta(years=2)
+                    request.data['estWarrantyPhaseEnd'] = project_has_warranty_phase_end.isoformat()
+
         project_serializer = self.get_serializer(
             project,
             data=request.data,
@@ -278,6 +303,11 @@ class ProjectViewSet(BaseViewSet):
             data=request.data, project=updated_project
         )
         return Response(project_serializer.data)
+
+    def parse_date(self, date):
+        if isinstance(date, str):
+            return datetime.strptime(date, '%d.%m.%Y').date()
+        return date
     
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(
@@ -743,38 +773,26 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
-        start_time = time.time()
-        logger.info(f"{request.user.id}: Starting get_projects with for_coordinator={for_coordinator}, forFrameView={forFrameView}")
-        filter_start_time = time.time()
-        logger.info(f"{request.user.id}: Filtering queryset using self.filter_queryset and self.get_queryset")
         queryset = self.filter_queryset(
             self.get_queryset(for_coordinator=for_coordinator)
         )
 
-        filter_end_time = time.time()
-        logger.info(f"{request.user.id}: Queryset after initial filtering: {queryset.count()} projects (took {filter_end_time - filter_start_time:.4f} seconds)")
-
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
-        logger.info(f"{request.user.id}: Received query parameters: year={financeYear}, limit={limit}")
         if limit is None:
             querySetCount = queryset.count()
             limit = querySetCount if querySetCount > 0 else 1
-            logger.info(f"{request.user.id}: Limit not provided, set to: {limit}")
 
         if financeYear is not None and not financeYear.isnumeric():
             logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")
             raise ParseError(detail={f"{request.user.id}: limit": "Invalid value"}, code="invalid")
 
         # pagination
-        logger.info(f"{request.user.id}: Initializing pagination with page size: {limit}")
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
         
         year = date.today().year if financeYear == None else int(financeYear)
-        logger.info(f"{request.user.id}: Determined finance year: {year}")
-        logger.info(f"{request.user.id}: Fetching project finances for year range: {year} to {year + 11}, forFrameView={forFrameView}")
         finances = ProjectFinancialSerializer(
             ProjectFinancial.objects.filter(
                 forFrameView=forFrameView,
@@ -783,16 +801,12 @@ class ProjectViewSet(BaseViewSet):
             many=True,
             context={"discard_FK": False}
         ).data
-        logger.info(f"{request.user.id}: Retrieved {len(finances)} project finances")
 
-        mapping_start_time = time.time()
         projects_to_finances = defaultdict(list)
         for f in finances:
             projects_to_finances[f["project"]].append(f)
-        mapping_end_time = time.time()
-        logger.info(f"{request.user.id}: Mapped finances to projects for {len(projects_to_finances)} projects (took {mapping_end_time - mapping_start_time:.4f} seconds)")
 
-        current_year = datetime.datetime.now().year
+        current_year = dt_module.datetime.now().year
         sap_values = SapCurrentYearService.get_by_year(current_year)
         projects_to_sap_values = defaultdict(list)
         for sap_value in sap_values:
@@ -806,33 +820,22 @@ class ProjectViewSet(BaseViewSet):
             "projects_to_finances": projects_to_finances,
             "sap_values_by_project": projects_to_sap_values
         }
-        logger.info(f"{request.user.id}: Serializer context created: {serializerContext}")
-        serialization_start_time = time.time()
+
         if page is not None:
-            
             serializer = self.get_serializer(
                 page,
                 many=True,
                 context=serializerContext,
             )
-            logger.info(f"{request.user.id}: Get serializer phase done")
             serializer_data = serializer.data
-            serialization_end_time = time.time()
-            logger.info(f"{request.user.id}: Serialized data: {serializer_data} in {serialization_end_time - serialization_start_time:.4f} seconds")
-            total_time = time.time() - start_time
-            logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
             return paginator.get_paginated_response(serializer_data)
         
-        logger.info(f"{request.user.id}: Serializing all results (no pagination)")
         serializer = self.get_serializer(
             queryset,
             many=True,
             context=serializerContext,
         )
-        serialization_end_time = time.time()
-        logger.info(f"{request.user.id}: Returning all results (serialization took {serialization_end_time - serialization_start_time:.4f} seconds)")
-        total_time = time.time() - start_time
-        logger.info(f"{request.user.id}: Total execution time for get_projects: {total_time:.4f} seconds")
+
         return serializer
 
     @override
@@ -1258,7 +1261,9 @@ class ProjectViewSet(BaseViewSet):
             frameEstPlanningStart=F('estPlanningStart'),
             frameEstPlanningEnd=F('estPlanningEnd'),
             frameEstConstructionStart=F('estConstructionStart'),
-            frameEstConstructionEnd=F('estConstructionEnd')
+            frameEstConstructionEnd=F('estConstructionEnd'),
+            frameEstWarrantyPhaseStart=F('estWarrantyPhaseStart'),
+            frameEstWarrantyPhaseEnd=F('estWarrantyPhaseEnd')
         )
 
         #updating the forced to frame finance data for projects
