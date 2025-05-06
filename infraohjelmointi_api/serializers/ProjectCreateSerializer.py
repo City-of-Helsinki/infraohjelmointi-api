@@ -45,10 +45,10 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
 from infraohjelmointi_api.serializers.UpdateListSerializer import UpdateListSerializer
+from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
 from infraohjelmointi_api.services import ProjectWiseService
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,
-    ConstructionPhaseDetailValidator,
     EstConstructionEndValidator,
     EstConstructionStartValidator,
     EstWarrantyPhaseStartValidator,
@@ -358,6 +358,11 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         rep["responsibleZone"] = (
             ProjectResponsibleZoneSerializer(instance.responsibleZone).data
             if instance.responsibleZone != None
+            else None
+        )
+        rep["budgetOverrunReason"] = (
+            BudgetOverrunReasonSerializer(instance.budgetOverrunReason).data
+            if instance.budgetOverrunReason != None
             else None
         )
         return rep
