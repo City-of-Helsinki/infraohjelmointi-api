@@ -375,6 +375,7 @@ class SapApiService:
         start_time = time.perf_counter()
         logger.debug(f"Requesting API for {type} from {api_url}")
         response = self.session.get(api_url)
+        logger.info(response.json())
         response_time = time.perf_counter() - start_time
 
         logger.debug(f"SAP responded in {response_time}s")

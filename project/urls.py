@@ -141,6 +141,12 @@ router.register(
     basename="sapCurrentYear"
 )
 
+router.register(
+    r"budget-overrun-reasons",
+    views.BudgetOverrunReasonViewSet,
+    basename="budgetOverrunReasons"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
