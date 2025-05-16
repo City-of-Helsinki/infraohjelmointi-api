@@ -245,10 +245,10 @@ class ProjectViewSet(BaseViewSet):
                             )
                             new_finances.append(new_finance)
 
-                    ProjectFinancial.objects.bulk_create(new_finances)
+                    ProjectFinancialService.update_or_create_bulk(project_financials=new_finances)
 
                     if update_finances:
-                            ProjectFinancial.objects.bulk_update(update_finances, ['value'])
+                        ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
                 post_save.send(
