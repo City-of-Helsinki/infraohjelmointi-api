@@ -39,7 +39,7 @@ class ProjectFinancialService:
         return ProjectFinancial.objects.bulk_create(
             project_financials,
             update_conflicts=True,
-            update_fields=["value"],
+            update_fields=["value", "updatedDate"],
             unique_fields=["year", "project_id", "forFrameView"],
         )
     
