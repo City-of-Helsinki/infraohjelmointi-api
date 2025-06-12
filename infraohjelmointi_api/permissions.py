@@ -165,6 +165,8 @@ class IsViewer(permissions.BasePermission):
             "name", flat=True
         ) or "sg_kymp_sso_io_katselijat_muut" in request.user.ad_groups.all().values_list(
             "name", flat=True
+        ) or "az_kymp_asgd_u_infraohjelmointi_ulkopuoliset" in request.user.ad_groups.all().values_list(
+            "name", flat=True
         ):
             return True
 
