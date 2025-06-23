@@ -1,7 +1,7 @@
-django==4.2.21                                 # web framework itself
+django==4.2.22                                 # web framework itself
 djangorestframework==3.14.0                    # creating rest APIs
 psycopg2-binary==2.9.6                         # postgres database adapter
-requests>=2.31.0
+requests>=2.32.4
 django-cors-headers==3.13.0
 django_db_logger==0.1.12
 tzdata==2022.6
@@ -26,3 +26,4 @@ setuptools>=78.1.1                             # not directly required, pinned b
 uvicorn
 zipp>=3.19.1                                   # not directly required, pinned by Snyk to avoid a vulnerability
 python-dateutil
+h11>=0.16.0                                    # not directly required, pinned by Snyk to avoid a vulnerability
