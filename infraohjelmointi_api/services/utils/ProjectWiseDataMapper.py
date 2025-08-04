@@ -171,6 +171,12 @@ project_area_map = {
     "malminLentokenttaalue": "Malmin lentokenttäalue",
     "pasila": "Pasila",
     "ostersundom": "Östersundom",
+    "kamppiToolonlahti": "Kamppi-Töölönlahti",
+    "kuninkaankolmio": "Kuninkaankolmio",
+    "uudetProjektialueetJaMuuTaydennysrakentaminen": "Uudet projektialueet ja muu täydennysrakentaminen",
+    "lantinenBulevardikaupunki": "Läntinen bulevardikaupunki",
+    "makasiiniranta": "Makasiiniranta",
+    "koivusaari": "Koivusaari",
 }
 
 responsible_zone_map = {
