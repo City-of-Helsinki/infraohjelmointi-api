@@ -183,6 +183,7 @@ responsible_zone_map = {
     "east": "Itä",
     "west": "Länsi",
     "north": "Pohjoinen",
+    "variousAreas": "Eri alueita",
 }
 
 project_type_map = {
