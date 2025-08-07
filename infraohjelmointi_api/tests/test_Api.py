@@ -7,8 +7,8 @@ from django.urls import reverse
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, User
-from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, User
+from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer, ProjectHashtagSerializer
 from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
 from asgiref.sync import sync_to_async
@@ -44,6 +44,12 @@ def perform_shared_api_setup(cls):
         name="Test district A",
         path="Test district A",
         parent=None,
+    )
+
+    
+    cls.project_hashtag = ProjectHashTag.objects.create(
+        id=ApiTestCase.project_hashtag_id,
+        value="Test hashtag",
     )
 
     cls.project_location = cls.district.childLocation.create(
@@ -83,7 +89,7 @@ class ApiTestCase(TestCase):
     class_not_found_id = uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb1775461234")
     division_id = uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166")
     district_id = uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256")
-
+    project_hashtag_id = uuid.UUID("1017cb1d-5da2-4b6b-a02d-3d4fec169c70")
     incorrect_uuid = uuid.UUID("26ce9800-0828-4e60-80bd-150b009560ba")
 
     @classmethod
@@ -180,6 +186,20 @@ class ApiTestCase(TestCase):
         self.assertEqual(response_district.json()["id"], district_data["id"])
 
 
+    def test_api_GET_hashtags(self):
+        setup_sync_client(self)
+
+        response_hashtags = self.client.get("/api/hashtags/")
+        response_hashtag = self.client.get("/api/hashtags/{}/".format(self.project_hashtag_id))
+
+        self.assertEqual(response_hashtags.status_code, 200, msg="Hashtags status code != 200")
+        self.assertEqual(response_hashtag.status_code, 200, msg="Hashtag status code != 200")
+
+        hashtag_data = ProjectHashtagSerializer(ProjectHashTag.objects.get(id=self.project_hashtag_id)).data
+
+        self.assertEqual(response_hashtag.json()["id"], hashtag_data["id"])
+
+
     def test_api_GET_locations(self):
         setup_sync_client(self)
 
@@ -211,6 +231,7 @@ class ApiTestCase(TestCase):
         self.assertEqual(self.client.get("/api/classes/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Classes status code != 404")
         self.assertEqual(self.client.get("/api/districts/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Districts status code != 404")
         self.assertEqual(self.client.get("/api/locations/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Locations status code != 404")
+        self.assertEqual(self.client.get("/api/hashtags/{}/".format(self.incorrect_uuid)).status_code, 404, msg="Hashtags status code != 404")
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])

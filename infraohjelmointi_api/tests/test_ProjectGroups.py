@@ -188,9 +188,10 @@ class ProjectGroupTestCase(TestCase):
         )
 
         errorMessage = response.json()["detail"]
-        self.assertEqual(
+        # Handle both English and Finnish error messages
+        self.assertIn(
             errorMessage,
-            "Not found.",
+            ["Not found.", "Ei löydy."],
             msg="Should throw error if project is not found in DB",
         )
 
