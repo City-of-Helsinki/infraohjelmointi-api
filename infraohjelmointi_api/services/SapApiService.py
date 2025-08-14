@@ -375,7 +375,14 @@ class SapApiService:
         start_time = time.perf_counter()
         logger.debug(f"Requesting API for {type} from {api_url}")
         response = self.session.get(api_url)
-        logger.info(response.json())
+        logger.debug(f"Response: {response}")
+        logger.debug(f"Response.raw: {response.raw}")
+        logger.debug(f"Response status code: {response.status_code}")
+        logger.debug(f"Response content: {response.content}")
+        try:
+            logger.info(response.json())
+        except Exception as e:
+            logger.error(f"Error parsing JSON response for id '{id}': {e}")
         response_time = time.perf_counter() - start_time
 
         logger.debug(f"SAP responded in {response_time}s")
