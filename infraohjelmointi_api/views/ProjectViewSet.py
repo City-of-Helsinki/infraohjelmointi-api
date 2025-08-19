@@ -299,9 +299,7 @@ class ProjectViewSet(BaseViewSet):
             )
 
         # updating changed data to ProjectWise
-        self.projectWiseService.sync_project_to_pw(
-            data=request.data, project=updated_project
-        )
+        self._sync_project_to_projectwise(request.data, project, updated_project)
         return Response(project_serializer.data)
 
     def parse_date(self, date):
@@ -1666,3 +1664,66 @@ class ProjectViewSet(BaseViewSet):
             qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         return qs
+
+    def _sync_project_to_projectwise(self, request_data: dict, original_project: Project, updated_project: Project):
+        """
+        Handle ProjectWise synchronization with automatic update logic.
+        
+        Args:
+            request_data: The data from the PATCH request
+            original_project: Project state before update
+            updated_project: Project state after update
+        """
+        # Check if hkrId is being added for the first time (automatic update)
+        hkr_id_added_first_time = (
+            'hkrId' in request_data and 
+            request_data['hkrId'] and 
+            (not original_project.hkrId or str(original_project.hkrId).strip() == "")
+        )
+        
+        if hkr_id_added_first_time:
+            # This is the first time PW ID is added - perform automatic update with all project data
+            logger.info(f"HKR ID added for first time to project '{updated_project.name}' - performing automatic PW update")
+            
+            # Create comprehensive data dict for automatic update
+            automatic_update_data = self._create_comprehensive_project_data(updated_project)
+            
+            self.projectWiseService.sync_project_to_pw(
+                data=automatic_update_data, project=updated_project
+            )
+        else:
+            # Regular update - only sync the changed data
+            self.projectWiseService.sync_project_to_pw(
+                data=request_data, project=updated_project
+            )
+
+    def _create_comprehensive_project_data(self, project: Project) -> dict:
+        """
+        Create a comprehensive data dictionary for automatic PW updates.
+        
+        Args:
+            project: The project object to extract data from
+            
+        Returns:
+            Dictionary with all relevant project fields, excluding None values
+        """
+        comprehensive_data = {
+            'name': project.name,
+            'description': project.description,
+            'address': project.address,
+            'entityName': project.entityName,
+            'estPlanningStart': project.estPlanningStart,
+            'estPlanningEnd': project.estPlanningEnd,
+            'estConstructionStart': project.estConstructionStart,
+            'estConstructionEnd': project.estConstructionEnd,
+            'presenceStart': project.presenceStart,
+            'presenceEnd': project.presenceEnd,
+            'visibilityStart': project.visibilityStart,
+            'visibilityEnd': project.visibilityEnd,
+            'masterPlanAreaNumber': project.masterPlanAreaNumber,
+            'trafficPlanNumber': project.trafficPlanNumber,
+            'bridgeNumber': project.bridgeNumber,
+        }
+        
+        # Remove None values to avoid unnecessary processing
+        return {k: v for k, v in comprehensive_data.items() if v is not None}
