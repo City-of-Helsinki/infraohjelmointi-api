@@ -17,6 +17,12 @@ def api_router():
     )
 
     router.register(
+        r"api/hashtags",
+        views.ApiHashtagsViewSet,
+        basename="apiHashtags"
+    )
+
+    router.register(
         r"api/groups",
         views.ApiGroupsViewSet,
         basename="apiGroups"
