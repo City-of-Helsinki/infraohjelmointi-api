@@ -620,44 +620,52 @@ class ProjectWiseService:
             ]
 
         if "PROJECT_Hankkeen_rakentaminen_alkaa" in project_properties:
-            project.estConstructionStart = project_properties[
-                "PROJECT_Hankkeen_rakentaminen_alkaa"
-            ]
+            project.estConstructionStart = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_rakentaminen_alkaa"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Hankkeen_rakentaminen_pttyy" in project_properties:
-            project.estConstructionEnd = project_properties[
-                "PROJECT_Hankkeen_rakentaminen_pttyy"
-            ]
+            project.estConstructionEnd = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_rakentaminen_pttyy"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Nhtvillolo_alku" in project_properties:
-            project.visibilityStart = project_properties[
-                "PROJECT_Nhtvillolo_alku"
-            ]
+            project.visibilityStart = datetime.strptime(
+                project_properties["PROJECT_Nhtvillolo_alku"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Nhtvillolo_loppu" in project_properties:
-            project.visibilityEnd = project_properties[
-                "PROJECT_Nhtvillolo_loppu"
-            ]
+            project.visibilityEnd = datetime.strptime(
+                project_properties["PROJECT_Nhtvillolo_loppu"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Esillaolo_alku" in project_properties:
-            project.presenceStart = project_properties[
-                "PROJECT_Esillaolo_alku"
-            ]
+            project.presenceStart = datetime.strptime(
+                project_properties["PROJECT_Esillaolo_alku"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Esillaolo_loppu" in project_properties:
-            project.presenceEnd = project_properties[
-                "PROJECT_Esillaolo_loppu"
-            ]
+            project.presenceEnd = datetime.strptime(
+                project_properties["PROJECT_Esillaolo_loppu"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Hankkeen_suunnittelu_alkaa" in project_properties:
-            project.estPlanningStart = project_properties[
-                "PROJECT_Hankkeen_suunnittelu_alkaa"
-            ]
+            project.estPlanningStart = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_suunnittelu_alkaa"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if "PROJECT_Hankkeen_suunnittelu_pttyy" in project_properties:
-            project.estPlanningEnd = project_properties[
-                "PROJECT_Hankkeen_suunnittelu_pttyy"
-            ]
+            project.estPlanningEnd = datetime.strptime(
+                project_properties["PROJECT_Hankkeen_suunnittelu_pttyy"],
+                "%Y-%m-%dT%H:%M:%S",
+            )
 
         if not project.personPlanning:
             planning_person_data = "{}, {}, {}, {}".format(

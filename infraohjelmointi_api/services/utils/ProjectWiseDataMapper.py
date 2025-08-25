@@ -272,7 +272,7 @@ class ProjectWiseDataMapper:
                     )
                 else:
                     raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
-                
+
                 result[mapped_field["field"]] = field_mapper[value] if value else None
             # Class/Location field handling
             elif mapped_field["type"] == "enum":
@@ -323,10 +323,7 @@ class ProjectWiseDataMapper:
 
             # Date field handling
             elif mapped_field["type"] == "date":
-                result[mapped_field["field"]] = datetime.strptime(
-                    value,
-                    mapped_field["fromFormat"],
-                ).strftime(mapped_field["toFormat"]) if value else ""
+                result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"]) if value else ""
             else:
                 raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
 
