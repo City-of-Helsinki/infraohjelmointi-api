@@ -13,8 +13,11 @@ class Command(BaseCommand):
         + "\nUsage: python manage.py projectimporter"
         + " --import-from-budget /path/to/budget.xsls"
         + " --import-from-plan /path/to/plan.xsls"
-        + " --sync-projects-with-pw"
-        + " --sync-project-with-pw pwid"
+        + " --sync-projects-from-pw"
+        + " --sync-project-from-pw pwid"
+        + " --sync-projects-to-pw"
+        + " --sync-project-to-pw pwid"
+        + " --sync-projects-to-pw-test-scope"
     )
 
     def add_arguments(self, parser):
@@ -68,10 +71,42 @@ class Command(BaseCommand):
             default="",
         )
 
+        parser.add_argument(
+            "--sync-projects-to-pw",
+            action="store_true",
+            help=(
+                    "Argument to give to synchronize all projects to PW if they have a PW id. "
+                    + "Usage: --sync-projects-to-pw"
+            ),
+        )
+
+        parser.add_argument(
+            "--sync-project-to-pw",
+            type=str,
+            help=(
+                    "Argument to give to synchronize given project to PW with PW id. "
+                    + "Usage: --sync-project-to-pw pw_id"
+            ),
+            default="",
+        )
+
+        parser.add_argument(
+            "--sync-projects-to-pw-test-scope",
+            action="store_true",
+            help=(
+                "Mass update programmed projects to PW with test scope filtering and overwrite rules. "
+                + "Only processes projects under: 8 04 Puistot ja liikunta-alueet Puistojen peruskorjaus Keskinen suurpiiri. "
+                + "Usage: --sync-projects-to-pw-test-scope"
+            ),
+        )
+
     def handle(self, *args, **options):
         if (
             not options["sync_projects_from_pw"]
             and not options["sync_project_from_pw"]
+            and not options["sync_projects_to_pw"]
+            and not options["sync_project_to_pw"]
+            and not options["sync_projects_to_pw_test_scope"]
             and not options["import_from_budget"]
             and not options["import_from_plan"]
         ):
@@ -83,6 +118,9 @@ class Command(BaseCommand):
                     + " --import-from-plan /path/to/plan.xsls\n"
                     + " [--sync-projects-from-pw]\n"
                     + " [--sync-project-from-pw pwid]\n"
+                    + " [--sync-projects-to-pw]\n"
+                    + " [--sync-project-to-pw pwid]\n"
+                    + " [--sync-projects-to-pw-test-scope]\n"
                 )
             )
             return
@@ -93,6 +131,69 @@ class Command(BaseCommand):
 
         if options["sync_project_from_pw"] != "":
             ProjectWiseService().sync_project_from_pw(options["sync_project_from_pw"])
+            return
+
+        if options["sync_projects_to_pw"] == True:
+            service = ProjectWiseService()
+            update_log = service.sync_all_projects_to_pw()
+            
+            # Print comprehensive summary
+            successful = len([log for log in update_log if log['status'] == 'success'])
+            skipped = len([log for log in update_log if log['status'] == 'skipped'])
+            errors = len([log for log in update_log if log['status'] == 'error'])
+            
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"PRODUCTION mass update completed: {successful} successful, {skipped} skipped, {errors} errors"
+                )
+            )
+            
+            # Print detailed log for errors
+            if errors > 0:
+                self.stdout.write(self.style.WARNING(f"\n{errors} projects failed to update:"))
+                for log in update_log:
+                    if log['status'] == 'error':
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"  - {log['project_name']} (HKR ID: {log['hkr_id']}): {log.get('error', 'Unknown error')}"
+                            )
+                        )
+            
+            # Print summary of successful updates
+            if successful > 0:
+                self.stdout.write(self.style.SUCCESS(f"\n{successful} projects updated successfully"))
+                
+            if skipped > 0:
+                self.stdout.write(self.style.WARNING(f"{skipped} projects skipped (no data to update)"))
+                
+            return
+
+        if options["sync_project_to_pw"] != "":
+            ProjectWiseService().sync_project_to_pw(options["sync_project_to_pw"])
+            return
+
+        if options["sync_projects_to_pw_test_scope"] == True:
+            service = ProjectWiseService()
+            update_log = service.sync_all_projects_to_pw_with_test_scope()
+            
+            # Print summary
+            successful = len([log for log in update_log if log['status'] == 'success'])
+            errors = len([log for log in update_log if log['status'] == 'error'])
+            
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Test scope mass update completed: {successful} processed successfully, {errors} errors"
+                )
+            )
+            
+            # Print detailed log for errors
+            for log in update_log:
+                if log['status'] == 'error':
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Error updating {log['project_name']} (HKR ID: {log['hkr_id']}): {log.get('error', 'Unknown error')}"
+                        )
+                    )
             return
 
         if options["import_from_budget"] != "":
