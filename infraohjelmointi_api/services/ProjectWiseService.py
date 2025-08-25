@@ -81,7 +81,7 @@ class ProjectWiseService:
 
     def __sync_project_from_pw(self, project: Project) -> None:
         """Method to synchronise given project from PW project data.\n
-        Given project must have hkrId otherwise project will not be syncrhonized.
+        Given project must have hkrId otherwise project will not be synchronized.
         """
 
         logger.debug(
@@ -110,19 +110,46 @@ class ProjectWiseService:
                 )
             )
 
-    def sync_project_to_pw(self, data: dict, project: Project) -> None:
-        """Method to synchronise given product field value to PW"""
+    def sync_project_to_pw(self, pw_id: str = None, data: dict = None, project: Project = None) -> None:
+        """Method to synchronise project with given PW id to PW, or sync given project with data.\n"""
+
+        if pw_id:
+            # Legacy usage: sync by PW ID
+            logger.debug(f"Synchronizing given project with PW Id '{pw_id}' to PW")
+            project_obj = ProjectService.get_by_hkr_id(hkr_id=pw_id)
+            self.__sync_project_to_pw(data={}, project=project_obj)
+        elif project and data is not None:
+            # New usage: sync with data and project object
+            logger.debug(f"Synchronizing project '{project.name}' (ID: {project.id}) to PW")
+            self.__sync_project_to_pw(data=data, project=project)
+        else:
+            logger.error("sync_project_to_pw called without proper parameters")
+
+    def __sync_project_to_pw(self, data: dict, project: Project) -> None:
+        """Method to synchronise given project to PW
+        Given project must have hkrId otherwise project will not be synchronized.
+        Implements overwrite rules: only update if infra tool field is empty, except for protected fields.
+        """
         if project.hkrId is None or str(project.hkrId).strip() == "":
             return
         try:
+            # Get current PW data to apply overwrite rules
+            current_pw_data = self.get_project_from_pw(project.hkrId)
+            current_pw_properties = current_pw_data.get("relationshipInstances", [{}])[0].get("relatedInstance", {}).get("properties", {})
+            
+            # Apply overwrite rules to filter data
+            filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
+            
+            if not filtered_data:
+                logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
+                return
+            
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
-                data=data, project=project
+                data=filtered_data, project=project
             )
 
             if pw_project_data:
-                pw_instance_id = self.get_project_from_pw(project.hkrId)[
-                    "relationshipInstances"
-                ][0]["relatedInstance"]["instanceId"]
+                pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
 
                 (
                     schema_name,
@@ -142,12 +169,15 @@ class ProjectWiseService:
 
                 api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
 
+                logger.info(f"Updating project '{project.name}' (HKR ID: {project.hkrId}) to PW with fields: {list(filtered_data.keys())}")
                 logger.debug(f"PW update endpoint {api_url}")
                 logger.debug(f"Update request data: {pw_update_data}")
 
                 response = self.session.post(url=api_url, json=pw_update_data)
                 logger.debug("PW responded to Update request")
                 logger.debug(response.json())
+            else:
+                logger.info(f"No PW data generated for project '{project.name}' (HKR ID: {project.hkrId})")
         except (
             ProjectWiseDataFieldNotFound,
             PWProjectResponseError,
@@ -156,6 +186,265 @@ class ProjectWiseService:
             logger.error(
                 f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
             )
+
+    def _apply_overwrite_rules(self, data: dict, project: Project, current_pw_properties: dict) -> dict:
+        """
+        Apply overwrite rules to filter data before sending to PW.
+        
+        Rules:
+        - Only update if infrastructure tool field is empty BUT PW has data
+        - Never overwrite protected fields if they have data in PW
+        """
+        filtered_data = {}
+        
+        for field_name, field_value in data.items():
+            try:
+                should_include_field = self._should_include_field_in_update(
+                    field_name, field_value, project, current_pw_properties
+                )
+                
+                if should_include_field:
+                    filtered_data[field_name] = field_value
+                    
+            except Exception as e:
+                logger.error(f"Error processing field '{field_name}': {str(e)}")
+                # On error, include the field to be safe
+                filtered_data[field_name] = field_value
+                
+        return filtered_data
+
+    def _should_include_field_in_update(self, field_name: str, field_value, project: Project, current_pw_properties: dict) -> bool:
+        """
+        Determine if a specific field should be included in the PW update based on overwrite rules.
+        """
+        # Protected fields (never overwrite if PW has data)
+        protected_fields = {
+            'description', 'type', 'presenceStart', 'presenceEnd',
+            'visibilityStart', 'visibilityEnd', 'projectDistrict',
+            'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
+        }
+        
+        # Get PW field mapping
+        pw_field_name = self._get_pw_field_mapping().get(field_name)
+        if not pw_field_name:
+            # No mapping found, include the field (might be handled by other logic)
+            return True
+        
+        # Get current values
+        project_value = getattr(project, field_name, None)
+        pw_value = current_pw_properties.get(pw_field_name, '')
+        
+        # Check if values are empty
+        project_empty = not project_value or (isinstance(project_value, str) and not project_value.strip())
+        pw_has_data = pw_value and (not isinstance(pw_value, str) or pw_value.strip())
+        
+        # Apply overwrite rules
+        if field_name in protected_fields:
+            # Protected field: never overwrite if PW has data
+            if pw_has_data:
+                logger.debug(f"Skipping protected field '{field_name}' - PW has data: '{pw_value}'")
+                return False
+            else:
+                logger.debug(f"Including protected field '{field_name}' - PW has no data")
+                return True
+        else:
+            # Regular field: only skip if infra tool is empty but PW has data
+            if project_empty and pw_has_data:
+                logger.debug(f"Skipping field '{field_name}' - infra tool empty but PW has data: '{pw_value}'")
+                return False
+            else:
+                if not project_empty:
+                    logger.debug(f"Including field '{field_name}' - infra tool has data")
+                else:
+                    logger.debug(f"Including field '{field_name}' - both infra tool and PW are empty")
+                return True
+
+    def _get_pw_field_mapping(self) -> dict:
+        """Get the mapping from project fields to PW field names."""
+        return {
+            'name': 'PROJECT_Kohde',
+            'description': 'PROJECT_Hankkeen_kuvaus',
+            'address': 'PROJECT_Kadun_tai_puiston_nimi',
+            'entityName': 'PROJECT_Aluekokonaisuuden_nimi',
+            'estPlanningStart': 'PROJECT_Hankkeen_suunnittelu_alkaa',
+            'estPlanningEnd': 'PROJECT_Hankkeen_suunnittelu_pttyy',
+            'estConstructionStart': 'PROJECT_Hankkeen_rakentaminen_alkaa',
+            'estConstructionEnd': 'PROJECT_Hankkeen_rakentaminen_pttyy',
+            'presenceStart': 'PROJECT_Esillaolo_alku',
+            'presenceEnd': 'PROJECT_Esillaolo_loppu',
+            'visibilityStart': 'PROJECT_Nhtvillolo_alku',
+            'visibilityEnd': 'PROJECT_Nhtvillolo_loppu',
+        }
+
+    def _filter_projects_for_test_scope(self, projects):
+        """
+        Filter projects for the test scope: 8 04 Puistot ja liikunta-alueet Puistojen peruskorjaus Keskinen suurpiiri
+        Uses hardcoded UUIDs: masterClass=612422a9-3e14-40c7-854a-8dca2fd6d3fe&class=047bd151-cd06-4206-8383-e239376d7f67&subClass=6182f067-b442-4788-b663-69a63c7380f9
+        """
+        test_scope_subclass_id = "6182f067-b442-4788-b663-69a63c7380f9"
+        
+        try:
+            filtered_projects = projects.filter(projectClass__id=test_scope_subclass_id)
+            logger.info(f"Filtered projects for test scope: {filtered_projects.count()} projects found under subClass {test_scope_subclass_id}")
+            return filtered_projects
+        except Exception as e:
+            logger.error(f"Error filtering projects for test scope: {str(e)}")
+            return projects
+
+    def sync_all_projects_to_pw(self):
+        """
+        PRODUCTION-READY mass update of all programmed projects to ProjectWise.
+        Implements overwrite rules and comprehensive logging.
+        Only processes programmed projects with HKR IDs.
+        """
+        return self._mass_update_projects_to_pw(use_test_scope=False)
+
+    def sync_all_projects_to_pw_with_test_scope(self):
+        """
+        TEST-SCOPE mass update of programmed projects to PW.
+        Only processes projects under the specific test scope class hierarchy.
+        """
+        return self._mass_update_projects_to_pw(use_test_scope=True)
+
+    def _mass_update_projects_to_pw(self, use_test_scope: bool = False):
+        """
+        Core mass update implementation with overwrite rules and comprehensive logging.
+        
+        Args:
+            use_test_scope: If True, only process test scope projects. If False, process all programmed projects.
+            
+        Returns:
+            List of update logs with detailed results for each project
+        """
+        # Get all programmed projects with HKR IDs
+        all_projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
+        
+        # Apply test scope filter if requested
+        if use_test_scope:
+            projects = self._filter_projects_for_test_scope(all_projects)
+            scope_description = "test scope"
+        else:
+            projects = all_projects
+            scope_description = "all programmed projects"
+        
+        total_projects = projects.count()
+        logger.info(f"Starting mass update of {total_projects} {scope_description} to PW")
+        
+        if total_projects == 0:
+            logger.warning(f"No projects found for mass update ({scope_description})")
+            return []
+        
+        update_log = []
+        successful_updates = 0
+        skipped_updates = 0
+        errors = 0
+        
+        for i, project in enumerate(projects, 1):
+            logger.info(f"Processing project {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
+            
+            try:
+                # Create comprehensive project data for mass update
+                project_data = self._create_project_data_for_mass_update(project)
+                
+                if not project_data:
+                    logger.info(f"No data to sync for project '{project.name}' - all fields are None")
+                    update_log.append({
+                        'project_id': str(project.id),
+                        'project_name': project.name,
+                        'hkr_id': project.hkrId,
+                        'status': 'skipped',
+                        'reason': 'no_data'
+                    })
+                    skipped_updates += 1
+                    continue
+                
+                # Use the existing sync method which has overwrite rules
+                self.__sync_project_to_pw(data=project_data, project=project)
+                
+                update_log.append({
+                    'project_id': str(project.id),
+                    'project_name': project.name,
+                    'hkr_id': project.hkrId,
+                    'updated_fields': list(project_data.keys()),
+                    'status': 'success'
+                })
+                successful_updates += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to update project {project.name}: {str(e)}")
+                update_log.append({
+                    'project_id': str(project.id),
+                    'project_name': project.name,
+                    'hkr_id': project.hkrId,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                errors += 1
+        
+        # Log comprehensive summary
+        logger.info(f"Mass update completed ({scope_description}): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
+        
+        if errors > 0:
+            logger.warning(f"{errors} projects failed to update - check logs for details")
+        
+        return update_log
+
+    def _create_project_data_for_mass_update(self, project: Project) -> dict:
+        """
+        Create project data dictionary for mass updates.
+        Includes all relevant fields that should be synchronized to PW.
+        
+        Args:
+            project: The project object to extract data from
+            
+        Returns:
+            Dictionary with project fields, excluding None values
+            
+        Raises:
+            ValueError: If project is invalid or missing required attributes
+            TypeError: If project is not a Project instance
+        """
+        # Type validation
+        if not isinstance(project, Project):
+            raise TypeError("project must be a Project instance")
+            
+        # Required attributes validation
+        if not project.id:
+            raise ValueError("project must have an ID")
+        if not project.programmed:
+            raise ValueError("project must be programmed")
+        if not project.hkrId:
+            raise ValueError("project must have an hkrId")
+        if not project.name:
+            raise ValueError("project must have a name")
+            
+        # Data type validation for critical fields
+        if project.hkrId:
+            project.hkrId = str(project.hkrId)  # Convert to string if needed
+        if project.name and not isinstance(project.name, str):
+            raise TypeError("name must be a string")
+        if project.description and not isinstance(project.description, str):
+            raise TypeError("description must be a string")
+        project_data = {
+            'name': project.name,
+            'description': project.description,
+            'address': project.address,
+            'entityName': project.entityName,
+            'estPlanningStart': project.estPlanningStart,
+            'estPlanningEnd': project.estPlanningEnd,
+            'estConstructionStart': project.estConstructionStart,
+            'estConstructionEnd': project.estConstructionEnd,
+            'presenceStart': project.presenceStart,
+            'presenceEnd': project.presenceEnd,
+            'visibilityStart': project.visibilityStart,
+            'visibilityEnd': project.visibilityEnd,
+            'masterPlanAreaNumber': project.masterPlanAreaNumber,
+            'trafficPlanNumber': project.trafficPlanNumber,
+            'bridgeNumber': project.bridgeNumber,
+        }
+        
+        # Remove None values to avoid unnecessary processing
+        return {k: v for k, v in project_data.items() if v is not None}
 
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""

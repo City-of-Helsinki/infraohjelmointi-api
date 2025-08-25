@@ -229,19 +229,40 @@ More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/
 
 ### ProjectWise
 
-Sync all project data in the DB with ProjectWise:
+ProjectWise integration provides document management and project folder synchronization capabilities. The integration works in two directions:
 
-  ```bash
-  python manage.py projectimporter --sync-projects-with-pw
-  ```
+1. **From ProjectWise to Infra Tool**:
 
-Sync project by PW id in the DB with ProjectWise
+   - Sync all projects in the database from ProjectWise:
+     ```bash
+     python manage.py projectimporter --sync-projects-from-pw
+     ```
+   - Sync a specific project by its PW ID:
+     ```bash
+     python manage.py projectimporter --sync-project-from-pw pw_id
+     ```
 
-  ```bash
-  python manage.py projectimporter --sync-project-from-pw pw_id
-  ```
+2. **From Infra Tool to ProjectWise**:
 
-Projects are also synced to PW service when a PATCH request is made to the projecs endpoint.
+   - Sync all projects in the database to ProjectWise:
+     ```bash
+     python manage.py projectimporter --sync-projects-to-pw
+     ```
+   - Sync a specific project by its PW ID:
+     ```bash
+     python manage.py projectimporter --sync-project-to-pw pw_id
+     ```
+***FOR TESTING***
+   - Only sync specified project class (8 04 Puistot ja liikunta-alueet - Puistojen peruskorjaus - Keskinen suurpiiri):
+     ```bash
+     python manage.py projectimporter --sync-projects-to-pw-test-scope
+     ``` 
+
+   - Projects are automatically synced to ProjectWise when:
+       - A PATCH request is made to the projects endpoint
+       - Project data is updated through the API
+   - Only projects with a valid `hkrId` will be synchronized
+   - The sync follows overwrite rules to protect certain fields and avoid overwriting existing data
 
 Scripts were used when dev and prod environments were setup for the first time.
 

@@ -16,6 +16,7 @@ from datetime import datetime
 logger = logging.getLogger("infraohjelmointi_api")
 
 to_pw_map = {
+    "name": "PROJECT_Kohde",
     "address": "PROJECT_Kadun_tai_puiston_nimi",
     "description": "PROJECT_Hankkeen_kuvaus",
     "entityName": "PROJECT_Aluekokonaisuuden_nimi",
