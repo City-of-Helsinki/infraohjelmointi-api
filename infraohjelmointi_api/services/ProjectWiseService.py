@@ -136,14 +136,14 @@ class ProjectWiseService:
             # Get current PW data to apply overwrite rules
             current_pw_data = self.get_project_from_pw(project.hkrId)
             current_pw_properties = current_pw_data.get("relationshipInstances", [{}])[0].get("relatedInstance", {}).get("properties", {})
-            
+
             # Apply overwrite rules to filter data
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
-            
+
             if not filtered_data:
                 logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
                 return
-            
+
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
                 data=filtered_data, project=project
             )
@@ -190,27 +190,27 @@ class ProjectWiseService:
     def _apply_overwrite_rules(self, data: dict, project: Project, current_pw_properties: dict) -> dict:
         """
         Apply overwrite rules to filter data before sending to PW.
-        
+
         Rules:
         - Only update if infrastructure tool field is empty BUT PW has data
         - Never overwrite protected fields if they have data in PW
         """
         filtered_data = {}
-        
+
         for field_name, field_value in data.items():
             try:
                 should_include_field = self._should_include_field_in_update(
                     field_name, field_value, project, current_pw_properties
                 )
-                
+
                 if should_include_field:
                     filtered_data[field_name] = field_value
-                    
+
             except Exception as e:
                 logger.error(f"Error processing field '{field_name}': {str(e)}")
                 # On error, include the field to be safe
                 filtered_data[field_name] = field_value
-                
+
         return filtered_data
 
     def _should_include_field_in_update(self, field_name: str, field_value, project: Project, current_pw_properties: dict) -> bool:
@@ -223,21 +223,21 @@ class ProjectWiseService:
             'visibilityStart', 'visibilityEnd', 'projectDistrict',
             'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
         }
-        
+
         # Get PW field mapping
         pw_field_name = self._get_pw_field_mapping().get(field_name)
         if not pw_field_name:
             # No mapping found, include the field (might be handled by other logic)
             return True
-        
+
         # Get current values
         project_value = getattr(project, field_name, None)
         pw_value = current_pw_properties.get(pw_field_name, '')
-        
+
         # Check if values are empty
         project_empty = not project_value or (isinstance(project_value, str) and not project_value.strip())
         pw_has_data = pw_value and (not isinstance(pw_value, str) or pw_value.strip())
-        
+
         # Apply overwrite rules
         if field_name in protected_fields:
             # Protected field: never overwrite if PW has data
@@ -282,7 +282,7 @@ class ProjectWiseService:
         Uses hardcoded UUIDs: masterClass=612422a9-3e14-40c7-854a-8dca2fd6d3fe&class=047bd151-cd06-4206-8383-e239376d7f67&subClass=6182f067-b442-4788-b663-69a63c7380f9
         """
         test_scope_subclass_id = "6182f067-b442-4788-b663-69a63c7380f9"
-        
+
         try:
             filtered_projects = projects.filter(projectClass__id=test_scope_subclass_id)
             logger.info(f"Filtered projects for test scope: {filtered_projects.count()} projects found under subClass {test_scope_subclass_id}")
@@ -309,16 +309,16 @@ class ProjectWiseService:
     def _mass_update_projects_to_pw(self, use_test_scope: bool = False):
         """
         Core mass update implementation with overwrite rules and comprehensive logging.
-        
+
         Args:
             use_test_scope: If True, only process test scope projects. If False, process all programmed projects.
-            
+
         Returns:
             List of update logs with detailed results for each project
         """
         # Get all programmed projects with HKR IDs
         all_projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
-        
+
         # Apply test scope filter if requested
         if use_test_scope:
             projects = self._filter_projects_for_test_scope(all_projects)
@@ -326,26 +326,26 @@ class ProjectWiseService:
         else:
             projects = all_projects
             scope_description = "all programmed projects"
-        
+
         total_projects = projects.count()
         logger.info(f"Starting mass update of {total_projects} {scope_description} to PW")
-        
+
         if total_projects == 0:
             logger.warning(f"No projects found for mass update ({scope_description})")
             return []
-        
+
         update_log = []
         successful_updates = 0
         skipped_updates = 0
         errors = 0
-        
+
         for i, project in enumerate(projects, 1):
             logger.info(f"Processing project {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
-            
+
             try:
                 # Create comprehensive project data for mass update
                 project_data = self._create_project_data_for_mass_update(project)
-                
+
                 if not project_data:
                     logger.info(f"No data to sync for project '{project.name}' - all fields are None")
                     update_log.append({
@@ -357,10 +357,10 @@ class ProjectWiseService:
                     })
                     skipped_updates += 1
                     continue
-                
+
                 # Use the existing sync method which has overwrite rules
                 self.__sync_project_to_pw(data=project_data, project=project)
-                
+
                 update_log.append({
                     'project_id': str(project.id),
                     'project_name': project.name,
@@ -369,7 +369,7 @@ class ProjectWiseService:
                     'status': 'success'
                 })
                 successful_updates += 1
-                
+
             except Exception as e:
                 logger.error(f"Failed to update project {project.name}: {str(e)}")
                 update_log.append({
@@ -380,26 +380,26 @@ class ProjectWiseService:
                     'error': str(e)
                 })
                 errors += 1
-        
+
         # Log comprehensive summary
         logger.info(f"Mass update completed ({scope_description}): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
-        
+
         if errors > 0:
             logger.warning(f"{errors} projects failed to update - check logs for details")
-        
+
         return update_log
 
     def _create_project_data_for_mass_update(self, project: Project) -> dict:
         """
         Create project data dictionary for mass updates.
         Includes all relevant fields that should be synchronized to PW.
-        
+
         Args:
             project: The project object to extract data from
-            
+
         Returns:
             Dictionary with project fields, excluding None values
-            
+
         Raises:
             ValueError: If project is invalid or missing required attributes
             TypeError: If project is not a Project instance
@@ -407,7 +407,7 @@ class ProjectWiseService:
         # Type validation
         if not isinstance(project, Project):
             raise TypeError("project must be a Project instance")
-            
+
         # Required attributes validation
         if not project.id:
             raise ValueError("project must have an ID")
@@ -417,7 +417,7 @@ class ProjectWiseService:
             raise ValueError("project must have an hkrId")
         if not project.name:
             raise ValueError("project must have a name")
-            
+
         # Data type validation for critical fields
         if project.hkrId:
             project.hkrId = str(project.hkrId)  # Convert to string if needed
@@ -442,7 +442,7 @@ class ProjectWiseService:
             'trafficPlanNumber': project.trafficPlanNumber,
             'bridgeNumber': project.bridgeNumber,
         }
-        
+
         # Remove None values to avoid unnecessary processing
         return {k: v for k, v in project_data.items() if v is not None}
 
@@ -620,52 +620,44 @@ class ProjectWiseService:
             ]
 
         if "PROJECT_Hankkeen_rakentaminen_alkaa" in project_properties:
-            project.estConstructionStart = datetime.strptime(
-                project_properties["PROJECT_Hankkeen_rakentaminen_alkaa"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.estConstructionStart = project_properties[
+                "PROJECT_Hankkeen_rakentaminen_alkaa"
+            ]
 
         if "PROJECT_Hankkeen_rakentaminen_pttyy" in project_properties:
-            project.estConstructionEnd = datetime.strptime(
-                project_properties["PROJECT_Hankkeen_rakentaminen_pttyy"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.estConstructionEnd = project_properties[
+                "PROJECT_Hankkeen_rakentaminen_pttyy"
+            ]
 
         if "PROJECT_Nhtvillolo_alku" in project_properties:
-            project.visibilityStart = datetime.strptime(
-                project_properties["PROJECT_Nhtvillolo_alku"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.visibilityStart = project_properties[
+                "PROJECT_Nhtvillolo_alku"
+            ]
 
         if "PROJECT_Nhtvillolo_loppu" in project_properties:
-            project.visibilityEnd = datetime.strptime(
-                project_properties["PROJECT_Nhtvillolo_loppu"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.visibilityEnd = project_properties[
+                "PROJECT_Nhtvillolo_loppu"
+            ]
 
         if "PROJECT_Esillaolo_alku" in project_properties:
-            project.presenceStart = datetime.strptime(
-                project_properties["PROJECT_Esillaolo_alku"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.presenceStart = project_properties[
+                "PROJECT_Esillaolo_alku"
+            ]
 
         if "PROJECT_Esillaolo_loppu" in project_properties:
-            project.presenceEnd = datetime.strptime(
-                project_properties["PROJECT_Esillaolo_loppu"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.presenceEnd = project_properties[
+                "PROJECT_Esillaolo_loppu"
+            ]
 
         if "PROJECT_Hankkeen_suunnittelu_alkaa" in project_properties:
-            project.estPlanningStart = datetime.strptime(
-                project_properties["PROJECT_Hankkeen_suunnittelu_alkaa"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.estPlanningStart = project_properties[
+                "PROJECT_Hankkeen_suunnittelu_alkaa"
+            ]
 
         if "PROJECT_Hankkeen_suunnittelu_pttyy" in project_properties:
-            project.estPlanningEnd = datetime.strptime(
-                project_properties["PROJECT_Hankkeen_suunnittelu_pttyy"],
-                "%Y-%m-%dT%H:%M:%S",
-            )
+            project.estPlanningEnd = project_properties[
+                "PROJECT_Hankkeen_suunnittelu_pttyy"
+            ]
 
         if not project.personPlanning:
             planning_person_data = "{}, {}, {}, {}".format(
