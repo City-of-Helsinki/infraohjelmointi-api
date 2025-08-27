@@ -8,6 +8,7 @@ from infraohjelmointi_api.serializers import (
     PersonSerializer,
     ProjectLockSerializer,
 )
+from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import ProjectProgrammerSerializer
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
     PWProjectResponseError,
@@ -70,7 +71,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     priority = ProjectPrioritySerializer(read_only=True)
     phase = ProjectPhaseSerializer(read_only=True)
     personPlanning = PersonSerializer(read_only=True)
-    personProgramming = PersonSerializer(read_only=True)
+    personProgramming = ProjectProgrammerSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")

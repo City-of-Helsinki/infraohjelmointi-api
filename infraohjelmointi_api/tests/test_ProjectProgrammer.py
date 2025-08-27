@@ -113,8 +113,8 @@ class ProjectProgrammerTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
         self.assertEqual(
             len(response.json()),
-            2,
-            msg="Number of returned programmers != 2"
+            3,
+            msg="Number of returned programmers != 3 (2 test ones + empty one)"
         )
 
     def test_GET_one_programmer(self):
@@ -174,4 +174,79 @@ class ProjectProgrammerTestCase(TestCase):
             response.status_code,
             405,
             msg="DELETE request should not be allowed"
+        )
+
+    def test_empty_programmer_exists(self):
+        """Test that exactly one 'Ei Valintaa' programmer exists and has correct attributes."""
+        empty_programmers = ProjectProgrammer.objects.filter(firstName="Ei", lastName="Valintaa")
+        self.assertEqual(
+            empty_programmers.count(),
+            1,
+            msg="There should be exactly one 'Ei Valintaa' programmer"
+        )
+
+        empty_programmer = empty_programmers.first()
+        self.assertIsNone(
+            empty_programmer.person,
+            msg="Empty programmer should not have a person assigned"
+        )
+        self.assertTrue(
+            empty_programmer.is_empty_programmer(),
+            msg="is_empty_programmer() should return True for 'Ei Valintaa' programmer"
+        )
+
+    def test_empty_programmer_can_be_assigned(self):
+        """Test that the empty programmer can be assigned to projects and project classes."""
+        empty_programmer = ProjectProgrammer.objects.get(firstName="Ei", lastName="Valintaa")
+
+        # Test assigning to project class
+        project_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="Test Class with Empty Programmer",
+            defaultProgrammer=empty_programmer
+        )
+        self.assertEqual(
+            project_class.defaultProgrammer,
+            empty_programmer,
+            msg="Empty programmer should be assignable as default programmer"
+        )
+
+        # Test assigning to project
+        project = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Test Project with Empty Programmer",
+            description="Test Description",
+            projectClass=self.project_class_1,
+            personProgramming=empty_programmer,
+            programmed=False,
+            louhi=False,
+            gravel=False,
+            effectHousing=False
+        )
+        self.assertEqual(
+            project.personProgramming,
+            empty_programmer,
+            msg="Empty programmer should be assignable as project programmer"
+        )
+
+    def test_GET_empty_programmer(self):
+        """Test that the empty programmer is included in GET responses."""
+        response = self.client.get("/project-programmers/")
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        # Should now have 3 programmers (2 test ones + empty one)
+        self.assertEqual(
+            len(response.json()),
+            3,
+            msg="Number of returned programmers != 3 (should include empty programmer)"
+        )
+
+        # Verify empty programmer is in the response
+        empty_programmer = next(
+            (p for p in response.json() if p["firstName"] == "Ei" and p["lastName"] == "Valintaa"),
+            None
+        )
+        self.assertIsNotNone(
+            empty_programmer,
+            msg="Empty programmer should be included in GET response"
         )
