@@ -167,6 +167,8 @@ class IsViewer(permissions.BasePermission):
             "name", flat=True
         ) or "az_kymp_asgd_u_infraohjelmointi_ulkopuoliset" in request.user.ad_groups.all().values_list(
             "name", flat=True
+        ) or "952da398-75b3-404a-b274-c8f351d7f5a7" in request.user.ad_groups.all().values_list(
+            "name", flat=True
         ):
             return True
 
@@ -196,7 +198,7 @@ class IsViewer(permissions.BasePermission):
 
         if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
             return True
-        
+
         return False
 
 class IsCoordinator(permissions.BasePermission):
@@ -398,7 +400,7 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
 
             elif _type == "Note":
                 return True
-            
+
             elif _type == "Project" and view.action not in [*DJANGO_BASE_DELETE_OR_CREATE_ACTIONS] and not any(
                 [
                     item
