@@ -323,7 +323,18 @@ class ProjectWiseDataMapper:
 
             # Date field handling
             elif mapped_field["type"] == "date":
-                result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"]) if value else ""
+                if value:
+                    if isinstance(value, str):
+                        result[mapped_field["field"]] = datetime.strptime(
+                            value,
+                            mapped_field["fromFormat"],
+                        ).strftime(mapped_field["toFormat"])
+                    elif isinstance(value, datetime):
+                        result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"])
+                    else:
+                        ""
+                else:
+                    ""
             else:
                 raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
 
