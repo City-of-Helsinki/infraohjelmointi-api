@@ -166,7 +166,7 @@ class ProjectViewSet(BaseViewSet):
                 if hasattr(getattr(project, field), 'id')
                 else str(getattr(project, field))
             )
-            for field in audit_loggable_fields 
+            for field in audit_loggable_fields
             if field in request.data
         }
 
@@ -259,7 +259,7 @@ class ProjectViewSet(BaseViewSet):
         # adding finance_year here so that on save the instance that gets to the post_save signal has this value
         project.finance_year = year
 
-        
+
         # when project is moved to warrantyPeriod, we need to automatically set warranty phase end and start dates so that warranty period
         # lasts two years from construction end if no warranty period dates aren't already set for the project
         phase_from_data = request.data.get('phase')
@@ -306,7 +306,7 @@ class ProjectViewSet(BaseViewSet):
         if isinstance(date, str):
             return datetime.strptime(date, '%d.%m.%Y').date()
         return date
-    
+
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(
             actor=user if isinstance(user, User) else None,
@@ -789,7 +789,7 @@ class ProjectViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
-        
+
         year = date.today().year if financeYear == None else int(financeYear)
         finances = ProjectFinancialSerializer(
             ProjectFinancial.objects.filter(
@@ -827,7 +827,7 @@ class ProjectViewSet(BaseViewSet):
             )
             serializer_data = serializer.data
             return paginator.get_paginated_response(serializer_data)
-        
+
         serializer = self.get_serializer(
             queryset,
             many=True,
@@ -996,7 +996,7 @@ class ProjectViewSet(BaseViewSet):
 
             if len(project_sub_divisions) > 0:
                 qs = qs.filter(projectDistrict__in=project_sub_divisions)
-            
+
             elif len(project_divisions) > 0:
                 qs = qs.filter(
                     Q(projectDistrict__in=project_divisions) |
@@ -1182,7 +1182,7 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
     @transaction.atomic
     @action(
         methods=["patch"],
@@ -1213,7 +1213,7 @@ class ProjectViewSet(BaseViewSet):
             for start in range(0, total, batch_size):
                 end = min(start + batch_size, total)
                 yield queryset[start:end]
-        
+
         bulk_size = 100
 
         new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
@@ -1254,7 +1254,7 @@ class ProjectViewSet(BaseViewSet):
             data=forced_to_frame_data_updated_serializer.data,
             status=200
         )
-    
+
     def update_forced_to_frame_projects(self):
         # updating the forced to frame schedule
         Project.objects.all().update(
@@ -1294,7 +1294,7 @@ class ProjectViewSet(BaseViewSet):
                 )
                 new_finances.append(new_finance)
         return new_finances, update_finances
-    
+
     def update_forced_to_frame_classes(self):
         # updating forced to frame finance data for classes
         coordination_view_finances = ClassFinancial.objects.filter(forFrameView=False)
@@ -1326,7 +1326,7 @@ class ProjectViewSet(BaseViewSet):
                 )
                 new_finances.append(new_finance)
         return new_finances, update_finances
-    
+
     def update_forced_to_frame_locations(self):
         # updating forced to frame finance data for classes
         coordination_view_finances = LocationFinancial.objects.filter(forFrameView=False)
@@ -1358,7 +1358,7 @@ class ProjectViewSet(BaseViewSet):
                 )
                 new_finances.append(new_finance)
         return new_finances, update_finances
-        
+
 
     @transaction.atomic
     @action(
@@ -1668,7 +1668,7 @@ class ProjectViewSet(BaseViewSet):
     def _sync_project_to_projectwise(self, request_data: dict, original_project: Project, updated_project: Project):
         """
         Handle ProjectWise synchronization with automatic update logic.
-        
+
         Args:
             request_data: The data from the PATCH request
             original_project: Project state before update
@@ -1676,34 +1676,29 @@ class ProjectViewSet(BaseViewSet):
         """
         # Check if hkrId is being added for the first time (automatic update)
         hkr_id_added_first_time = (
-            'hkrId' in request_data and 
-            request_data['hkrId'] and 
+            'hkrId' in request_data and
+            request_data['hkrId'] and
             (not original_project.hkrId or str(original_project.hkrId).strip() == "")
         )
-        
+
         if hkr_id_added_first_time:
             # This is the first time PW ID is added - perform automatic update with all project data
             logger.info(f"HKR ID added for first time to project '{updated_project.name}' - performing automatic PW update")
-            
+
             # Create comprehensive data dict for automatic update
             automatic_update_data = self._create_comprehensive_project_data(updated_project)
-            
+
             self.projectWiseService.sync_project_to_pw(
                 data=automatic_update_data, project=updated_project
-            )
-        else:
-            # Regular update - only sync the changed data
-            self.projectWiseService.sync_project_to_pw(
-                data=request_data, project=updated_project
             )
 
     def _create_comprehensive_project_data(self, project: Project) -> dict:
         """
         Create a comprehensive data dictionary for automatic PW updates.
-        
+
         Args:
             project: The project object to extract data from
-            
+
         Returns:
             Dictionary with all relevant project fields, excluding None values
         """
@@ -1724,6 +1719,6 @@ class ProjectViewSet(BaseViewSet):
             'trafficPlanNumber': project.trafficPlanNumber,
             'bridgeNumber': project.bridgeNumber,
         }
-        
+
         # Remove None values to avoid unnecessary processing
         return {k: v for k, v in comprehensive_data.items() if v is not None}
