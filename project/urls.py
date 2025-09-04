@@ -147,6 +147,12 @@ router.register(
     basename="budgetOverrunReasons"
 )
 
+router.register(
+    r"project-programmers",
+    views.ProjectProgrammerViewSet,
+    basename="projectProgrammers"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",

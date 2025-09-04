@@ -10,6 +10,7 @@ from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
 )
+from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import ProjectProgrammerSerializer
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
 from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
     ConstructionPhaseDetailSerializer,
@@ -236,8 +237,15 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         return obj.projectReadiness()
 
     def run_pre_create_update_validation(self, data: dict, instance=None):
-        # remove projectId as it doesn not exist on the Project model
+        # remove projectId as it does not exist on the Project model
         data.pop("projectId", None)
+
+        # Set default programmer from project class if one is selected and no programmer is set
+        project_class = data.get("projectClass", None)
+        if project_class and not data.get("personProgramming", None):
+            if project_class.defaultProgrammer:
+                data["personProgramming"] = project_class.defaultProgrammer
+
         phase = data.get("phase", None)
         if phase is not None and phase.value == "programming":
             data["programmed"] = True
@@ -316,7 +324,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             else None
         )
         rep["personProgramming"] = (
-            PersonSerializer(instance.personProgramming).data
+            ProjectProgrammerSerializer(instance.personProgramming).data
             if instance.personProgramming != None
             else None
         )

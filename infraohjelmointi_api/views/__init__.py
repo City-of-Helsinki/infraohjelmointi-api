@@ -40,3 +40,4 @@ from .api.ApiHashtagsViewSet import *
 from .AppStateValueViewSet import *
 from .SapCurrentYearViewSet import *
 from .BudgetOverrunReasonViewSet import *
+from .ProjectProgrammerViewSet import *
