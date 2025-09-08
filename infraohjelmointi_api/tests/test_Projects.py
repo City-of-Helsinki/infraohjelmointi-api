@@ -29,6 +29,7 @@ from ..models import (
     ProjectGroup,
     ProjectFinancial,
     User,
+    ProjectProgrammer,
 )
 from ..serializers import (
     ProjectGetSerializer,
@@ -259,6 +260,13 @@ class ProjectTestCase(TestCase):
             id=self.projectPriorityId, value="High"
         )
 
+        self.programmer_1 = ProjectProgrammer.objects.create(
+            id=uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042"),
+            firstName="John",
+            lastName="Doe",
+            person=self.person_1
+        )
+
         self.project = Project.objects.create(
             otherPersons="Other Test Person",
             projectClass=self.projectClass,
@@ -276,7 +284,7 @@ class ProjectTestCase(TestCase):
             address="Insinoorinkatu 60 D",
             description="description of the test project",
             personPlanning=self.person_2,
-            personProgramming=self.person_1,
+            personProgramming=self.programmer_1,
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=False,
@@ -404,7 +412,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertDictEqual(
-            self.person_1.programming.all().values()[0],
+            self.programmer_1.programming.all().values()[0],
             Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="personProgramming foreign key does not exist in Project with id {}".format(
                 self.project_1_Id
@@ -499,7 +507,7 @@ class ProjectTestCase(TestCase):
             name="Test project 2",
             description="description of the test project 2",
             personPlanning=self.person_2,
-            personProgramming=self.person_1,
+            personProgramming=self.programmer_1,
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
@@ -570,7 +578,7 @@ class ProjectTestCase(TestCase):
             set(project["finances"]["year"] for project in response.json()["results"]),
             msg="Project Data in response must have the financial data from year 2025",
         )
-    
+
     def test_get_projects_list(self):
         # Test retrieving a list of projects
         url = reverse('projects-list')
@@ -3583,6 +3591,7 @@ class ProjectTestCase(TestCase):
         )
 
     def test_pw_folder_project(self):
+
         data = {
             "name": "Test Project for PW folder",
             "description": "Test description",
@@ -3873,7 +3882,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
         # get project's finances data from both forcedToFrame view and planning/coordinator view
-        # Finances datas are not the same because frame view is locked and 
+        # Finances datas are not the same because frame view is locked and
         # finances data is not moved to frame view from planning/coordinator view
         responseForcedToFrame = self.client.get(
             "/projects/{}/?forcedToFrame=true".format(new_createdId),
