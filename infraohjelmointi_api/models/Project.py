@@ -235,6 +235,7 @@ class Project(models.Model):
         BudgetOverrunReason, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     otherBudgetOverrunReason = models.TextField(max_length=200, null=True, blank=True)
+    onSchedule = models.BooleanField(blank=True, null=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
