@@ -1,6 +1,6 @@
 from django.test import TestCase
 from datetime import (date, datetime)
-from infraohjelmointi_api.services import AppStateValueService, ProjectFinancialService
+from infraohjelmointi_api.services import AppStateValueService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
@@ -150,8 +150,8 @@ class ProjectTestCase(TestCase):
     pwInstanceId = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
     pwInstanceId_hkrId_1 = 1461
     pwInstanceId_hkrId_2 = 1500
-    pwInstanceId_hkrId_1_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
-    pwInstanceId_hkrId_2_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{9d14d060-56c8-45c0-9323-303ab440e652}/"
+    pwInstanceId_hkrId_1_folder = "https://pwlink.bentley.com/link?ds=HELS000601.helsinki1.hki.local~3APWPRJBANK&fld=instance-1461&app=pwe"
+    pwInstanceId_hkrId_2_folder = "https://pwlink.bentley.com/link?ds=HELS000601.helsinki1.hki.local~3APWPRJBANK&fld=instance-1500&app=pwe"
     notePerson_1_Id = uuid.UUID("22dc6826-e34c-4079-a748-9e8699f99a09")
 
     fixtures = []
@@ -590,9 +590,11 @@ class ProjectTestCase(TestCase):
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
-        # serialize the model instances
+        # serialize the model instances with the same context as the API
         serializer = ProjectGetSerializer(
-            Project.objects.get(id=self.project_1_Id), many=False
+            Project.objects.get(id=self.project_1_Id),
+            many=False,
+            context={'get_pw_link': True}
         )
 
         # convert the serialized data to JSON
@@ -3590,7 +3592,20 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-    def test_pw_folder_project(self):
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class):
+        # Mock both serializers' ProjectWise service classes
+        def mock_get_pw_response(id):
+            return {"instanceId": f"instance-{id}"}
+
+        # Mock the CreateSerializer's service instance
+        mock_create_instance = mock_pw_create_class.return_value
+        mock_create_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
+        # Mock the GetSerializer's service instance
+        mock_get_instance = mock_pw_get_class.return_value
+        mock_get_instance.get_project_from_pw.side_effect = mock_get_pw_response
 
         data = {
             "name": "Test Project for PW folder",

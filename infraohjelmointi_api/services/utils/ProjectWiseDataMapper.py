@@ -6,7 +6,6 @@ from ..ResponsibleZoneService import ResponsibleZoneService
 from ..ProjectTypeService import ProjectTypeService
 from ..ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from ..ProjectClassService import ProjectClassService
-from ..ProjectLocationService import ProjectLocationService
 from ..PersonService import PersonService
 
 import logging
@@ -331,10 +330,14 @@ class ProjectWiseDataMapper:
                         ).strftime(mapped_field["toFormat"])
                     elif isinstance(value, datetime):
                         result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"])
+                    elif hasattr(value, 'year'):  # Handle datetime.date objects
+                        # Convert date to datetime with midnight time, then format
+                        dt = datetime.combine(value, datetime.min.time())
+                        result[mapped_field["field"]] = dt.strftime(mapped_field["toFormat"])
                     else:
-                        ""
+                        result[mapped_field["field"]] = ""
                 else:
-                    ""
+                    result[mapped_field["field"]] = ""
             else:
                 raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
 

@@ -186,6 +186,8 @@ class ProjectWiseService:
             logger.error(
                 f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
             )
+            # Re-raise the exception so mass update can count it as an error
+            raise
 
     def _apply_overwrite_rules(self, data: dict, project: Project, current_pw_properties: dict) -> dict:
         """
@@ -217,12 +219,18 @@ class ProjectWiseService:
         """
         Determine if a specific field should be included in the PW update based on overwrite rules.
         """
-        # Protected fields (never overwrite if PW has data)
+        # Protected fields (never overwrite if PW has data) - Based on IO-396 ticket requirements
         protected_fields = {
-            'description', 'type', 'presenceStart', 'presenceEnd',
-            'visibilityStart', 'visibilityEnd', 'projectDistrict',
-            'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
+            'description',           # "Write: when added/edited" but should be protected per ticket
+            'presenceStart',         # Esilläolo - never overwrite per ticket requirements
+            'presenceEnd',           # Esilläolo - never overwrite per ticket requirements
+            'visibilityStart',       # Nähtävilläolo - never overwrite per ticket requirements
+            'visibilityEnd',         # Nähtävilläolo - never overwrite per ticket requirements
+            'masterPlanAreaNumber',  # "Write: never" per ticket
+            'trafficPlanNumber',     # "Write: never" per ticket
+            'bridgeNumber'           # "Write: never" per ticket
         }
+        # REMOVED from protected: 'type', 'projectDistrict' - these should update per ticket!
 
         # Get PW field mapping
         pw_field_name = self._get_pw_field_mapping().get(field_name)
@@ -279,9 +287,14 @@ class ProjectWiseService:
     def _filter_projects_for_test_scope(self, projects):
         """
         Filter projects for the test scope: 8 04 Puistot ja liikunta-alueet Puistojen peruskorjaus Keskinen suurpiiri
-        Uses hardcoded UUIDs: masterClass=612422a9-3e14-40c7-854a-8dca2fd6d3fe&class=047bd151-cd06-4206-8383-e239376d7f67&subClass=6182f067-b442-4788-b663-69a63c7380f9
+        Uses environment variable PW_TEST_SCOPE_CLASS_ID for flexibility between environments.
         """
-        test_scope_subclass_id = "6182f067-b442-4788-b663-69a63c7380f9"
+        # Get test scope class ID from environment variable
+        test_scope_subclass_id = env("PW_TEST_SCOPE_CLASS_ID", default=None)
+        
+        if not test_scope_subclass_id:
+            logger.warning("PW_TEST_SCOPE_CLASS_ID environment variable not set - returning empty queryset")
+            return projects.none()
 
         try:
             filtered_projects = projects.filter(projectClass__id=test_scope_subclass_id)
@@ -289,7 +302,9 @@ class ProjectWiseService:
             return filtered_projects
         except Exception as e:
             logger.error(f"Error filtering projects for test scope: {str(e)}")
-            return projects
+            logger.error(f"Make sure PW_TEST_SCOPE_CLASS_ID environment variable is set to a valid ProjectClass UUID")
+            logger.warning("Returning empty queryset due to filtering error")
+            return projects.none()
 
     def sync_all_projects_to_pw(self):
         """
@@ -426,10 +441,23 @@ class ProjectWiseService:
         if project.description and not isinstance(project.description, str):
             raise TypeError("description must be a string")
         project_data = {
+            # Basic info
             'name': project.name,
             'description': project.description,
             'address': project.address,
             'entityName': project.entityName,
+
+            # Status and classification - THE MISSING FIELDS (IO-396 fixes)
+            'phase': str(project.phase.id) if project.phase else None,                           # FIX Issue 1: Hankkeen vaihe (UUID)
+            'type': str(project.type.id) if project.type else None,                            # FIX: Hanketyyppi (UUID)
+            'projectClass': str(project.projectClass.id) if project.projectClass else None,            # FIX Issue 2: Pääluokka/Luokka/Alaluokka (UUID)
+            'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,      # FIX Issue 4: Suurpiiri/Kaupunginosa (UUID)
+            'area': str(project.area.id) if project.area else None,                            # FIX: Projektialue (UUID)
+            'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,      # FIX: Vastuualue (UUID)
+            'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None, # FIX: Rakentamisvaiheen tarkenne (UUID)
+            'programmed': project.programmed,                # FIX: Ohjelmoitu
+
+            # Dates
             'estPlanningStart': project.estPlanningStart,
             'estPlanningEnd': project.estPlanningEnd,
             'estConstructionStart': project.estConstructionStart,
@@ -438,6 +466,16 @@ class ProjectWiseService:
             'presenceEnd': project.presenceEnd,
             'visibilityStart': project.visibilityStart,
             'visibilityEnd': project.visibilityEnd,
+
+            # Year fields - FIX Issue 3
+            'planningStartYear': project.planningStartYear,   # FIX Issue 3a: Suunnittelun aloitusvuosi
+            'constructionEndYear': project.constructionEndYear, # FIX Issue 3b: Rakentamisen valmistumisvuosi
+
+            # Booleans
+            'gravel': project.gravel,                        # FIX: Sorakatu
+            'louhi': project.louhi,                          # FIX: Louheen
+
+            # Protected fields (only update if empty in PW)
             'masterPlanAreaNumber': project.masterPlanAreaNumber,
             'trafficPlanNumber': project.trafficPlanNumber,
             'bridgeNumber': project.bridgeNumber,
