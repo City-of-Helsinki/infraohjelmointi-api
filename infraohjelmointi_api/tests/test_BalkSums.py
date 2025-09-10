@@ -743,7 +743,7 @@ class BalkSumTestCase(TestCase):
         self.runFinancesAssertTests(response, index=0, name="frameBudget", values=[100,50,0,0,0,0,0,0,0,0,0])
 
         self.assertEqual(response.json()[1]["id"], self.projectCoordinatorClass_1_Id.__str__())
-        self.assertEqual(response.json()[1]["finances"]["year0"]["isFrameBudgetOverlap"], True)
+        self.assertEqual(response.json()[1]["finances"]["year0"]["isFrameBudgetOverlap"], False)
 
         self.runFinancesAssertTests(response, index=1, name="plannedBudget", values=[160,150,150,30,15,0,0,10,18,20,0])
         self.runFinancesAssertTests(response, index=1, name="frameBudget", values=[2000,0,0,0,0,0,0,0,0,0,0])

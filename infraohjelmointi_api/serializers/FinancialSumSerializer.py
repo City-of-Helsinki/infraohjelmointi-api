@@ -102,14 +102,21 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         # Combine all child relations of the current instance into one single queryset
         all_child_relations = child_locations.union(child_classes)
+        
         if all_child_relations.exists():
             for y in range(11):    
-                grouped = defaultdict(lambda: {'frameBudget': 0})
+                # Sum up the frame budgets of direct children of the current instance
+                children_budget_sum = 0
+                current_instance_budget = frame_budgets[f"{year+y}-{instance.id}"]
+                
                 for relation in all_child_relations:
-                    grouped[relation['parentRelation']]['frameBudget'] += frame_budgets[f"{year+y}-{relation['id']}"] 
-                    if grouped[relation['parentRelation']]['frameBudget'] > frame_budgets[f"{year+y}-{relation['parentRelation']}"]:
-                        ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
-                        break
+                    # Only consider direct children of the current instance
+                    if relation['parentRelation'] == instance.id:
+                        children_budget_sum += frame_budgets[f"{year+y}-{relation['id']}"]
+                
+                # Check if children's budget sum exceeds current instance's budget
+                if children_budget_sum > current_instance_budget:
+                    ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
         return ret_val
 
     def get_frameBudget_and_budgetChange(self, instance, year: int, for_frame_view: bool) -> dict:
