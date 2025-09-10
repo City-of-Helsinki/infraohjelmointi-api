@@ -730,6 +730,42 @@ class ProjectWiseServiceEdgeCaseTestCase(TestCase):
         except Exception as e:
             self.fail(f"Should handle special characters: {e}")
 
+    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
+    def test_filter_projects_for_test_scope_missing_env_var(self, mock_env):
+        """Test that missing PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
+        # Mock environment to return None for PW_TEST_SCOPE_CLASS_ID
+        def env_side_effect(key, default=None):
+            if key == 'PW_TEST_SCOPE_CLASS_ID':
+                return default
+            return 'mock-value'  # For other required env vars
+
+        mock_env.side_effect = env_side_effect
+
+        service = ProjectWiseService()
+        projects = Project.objects.filter(programmed=True)
+
+        result = service._filter_projects_for_test_scope(projects)
+
+        self.assertEqual(result.count(), 0)
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
+    def test_filter_projects_for_test_scope_invalid_uuid(self, mock_env):
+        """Test that invalid UUID in PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
+        # Mock environment to return invalid UUID
+        def env_side_effect(key, default=None):
+            if key == 'PW_TEST_SCOPE_CLASS_ID':
+                return 'invalid-uuid'
+            return 'mock-value'  # For other required env vars
+
+        mock_env.side_effect = env_side_effect
+
+        service = ProjectWiseService()
+        projects = Project.objects.filter(programmed=True)
+
+        result = service._filter_projects_for_test_scope(projects)
+
+        self.assertEqual(result.count(), 0)
+
 
 class ProjectWiseConcurrencyTestCase(TestCase):
     """
@@ -1241,6 +1277,43 @@ class ProjectWiseDataMapperTestCase(TestCase):
                     self.assertEqual(to_pw_map[field], expected_mapping)
                 else:
                     self.assertEqual(to_pw_map[field]['field'], expected_mapping)
+
+    def test_date_format_handling(self):
+        """Test that datetime.date objects are properly handled"""
+        from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
+        from datetime import date
+
+        mapper = ProjectWiseDataMapper()
+
+        # Test date conversion
+        test_data = {
+            'estPlanningStart': date(2025, 1, 15),
+            'estConstructionEnd': date(2025, 12, 31)
+        }
+
+        result = mapper.convert_to_pw_data(test_data, None)
+
+        # Should convert to ISO datetime format
+        self.assertEqual(result['PROJECT_Hankkeen_suunnittelu_alkaa'], '2025-01-15T00:00:00')
+        self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '2025-12-31T00:00:00')
+
+    def test_date_format_handling_none_values(self):
+        """Test that None date values are handled gracefully"""
+        from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
+
+        mapper = ProjectWiseDataMapper()
+
+        # Test with None values
+        test_data = {
+            'estPlanningStart': None,
+            'estConstructionEnd': None
+        }
+
+        result = mapper.convert_to_pw_data(test_data, None)
+
+        # Should have empty strings for None values
+        self.assertEqual(result['PROJECT_Hankkeen_suunnittelu_alkaa'], '')
+        self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '')
 
 
 class ProjectImporterCommandTestCase(TestCase):
