@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  mock-pw:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+    container_name: mock-projectwise
+    
+volumes:
+  data:
