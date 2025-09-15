@@ -586,7 +586,12 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 4)
 
-    def test_GET_one_project(self):
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    def test_GET_one_project(self, mock_pw_service):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
@@ -613,7 +618,11 @@ class ProjectTestCase(TestCase):
             msg="Project data in response != Project data in DB",
         )
 
-    def test_POST_project(self):
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_POST_project(self, mock_pw_service):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
         data = {
             "siteId": None,
             "hkrId": 12345,
@@ -725,7 +734,11 @@ class ProjectTestCase(TestCase):
             msg="Project created using POST request does not exist in DB",
         )
 
-    def test_PATCH_project(self):
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_PATCH_project(self, mock_pw_service):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
         AppStateValueService.update_or_create(name="forcedToFrameStatus", value=True)
         data = {
             "name": "Test Project 1 patched",
@@ -782,7 +795,11 @@ class ProjectTestCase(TestCase):
             msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
-    def test_PATCH_multiple_projects(self):
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_PATCH_multiple_projects(self, mock_pw_service):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
         data = {"name": "Test name", "description": "Test description"}
         response = self.client.post(
             "/projects/",
@@ -2989,7 +3006,11 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(response.status_code, 400, msg=response.json())
 
-    def test_project_finances(self):
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    def test_project_finances(self, mock_pw_service):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
             content_type="application/json",

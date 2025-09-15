@@ -37,9 +37,34 @@ class BaseClassLocationViewSet(BaseViewSet):
             JSON
                 List of ProjectClass/ProjectLocation instances with financial sums for projects under each instance
         """
-        year = request.query_params.get("year", date.today().year)
+        from collections import defaultdict
+        from infraohjelmointi_api.models import ClassFinancial, LocationFinancial
+        from django.db.models import F
+        
+        year = int(request.query_params.get("year", date.today().year))
         qs = self.get_queryset()
-        serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
+        
+        # Build frame_budgets context for consistent budget overlap logic
+        # This ensures programming and coordination views use the same method
+        class_financials = ClassFinancial.objects.filter(
+            year__in=range(year, year+11)
+        ).annotate(relation=F("classRelation")).values("year", "relation", "frameBudget")
+        location_financials = LocationFinancial.objects.filter(
+            year__in=range(year, year+11)
+        ).annotate(relation=F("locationRelation")).values("year", "relation", "frameBudget")
+        financials = class_financials.union(location_financials)
+        frame_budgets = defaultdict(lambda: 0)
+        for f in financials:
+            frame_budgets[f"{f['year']}-{f['relation']}"] = f["frameBudget"]
+        
+        serializer = self.get_serializer(
+            qs, 
+            many=True, 
+            context={
+                "finance_year": year,
+                "frame_budgets": frame_budgets
+            }
+        )
 
         return Response(serializer.data)
 
