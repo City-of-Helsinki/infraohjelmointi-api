@@ -306,34 +306,65 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         if _type == "ProjectLocation":
             if instance.parent is None:
                 if for_coordinator == True:
+                    # Base filter: projects that belong to this coordinatorLocation or its children
+                    coordinator_base_filter = Q(
+                        Q(projectLocation__coordinatorLocation=instance)
+                        | Q(projectLocation__parent__coordinatorLocation=instance)
+                        | Q(projectLocation__parent__parent__coordinatorLocation=instance)
+                    )
+                    
+                    # Group filter for coordinator: either no group OR group belongs to this location hierarchy
+                    coordinator_group_filter = Q(projectGroup__isnull=True) | Q(
+                        Q(projectGroup__locationRelation__coordinatorLocation=instance)
+                        | Q(projectGroup__locationRelation__parent__coordinatorLocation=instance)
+                        | Q(projectGroup__locationRelation__parent__parent__coordinatorLocation=instance)
+                    )
+                    
                     return (
                         Project.objects.select_related(
                             "projectLocation",
                             "projectLocation__coordinatorLocation",
                             "projectLocation__parent__coordinatorLocation",
                             "projectLocation__parent__parent__coordinatorLocation",
+                            "projectGroup",
+                            "projectGroup__locationRelation__coordinatorLocation",
+                            "projectGroup__locationRelation__parent__coordinatorLocation",
+                            "projectGroup__locationRelation__parent__parent__coordinatorLocation",
                         )
                         .prefetch_related("finances")
                         .filter(
-                            Q(projectLocation__coordinatorLocation=instance)
-                            | Q(projectLocation__parent__coordinatorLocation=instance)
-                            | Q(
-                                projectLocation__parent__parent__coordinatorLocation=instance
-                            ),
+                            coordinator_base_filter & coordinator_group_filter,
                             programmed=True,
                         )
                     )
                 else:
+                    # Base filter: projects that belong to this location or its children
+                    base_filter = Q(
+                        Q(projectLocation=instance)
+                        | Q(projectLocation__parent=instance)  
+                        | Q(projectLocation__parent__parent=instance)
+                    )
+
+                    # Group filter: either no group OR group belongs to this location hierarchy
+                    group_filter = Q(projectGroup__isnull=True) | Q(
+                        Q(projectGroup__locationRelation=instance)
+                        | Q(projectGroup__locationRelation__parent=instance)
+                        | Q(projectGroup__locationRelation__parent__parent=instance)
+                    )
+                    
                     return (
                         Project.objects.select_related(
                             "projectLocation",
                             "projectLocation__parent",
                             "projectLocation__parent__parent",
+                            "projectGroup",
+                            "projectGroup__locationRelation",
+                            "projectGroup__locationRelation__parent",
+                            "projectGroup__locationRelation__parent__parent",
                         )
+                        .prefetch_related("finances")
                         .filter(
-                            Q(projectLocation=instance)
-                            | Q(projectLocation__parent=instance)
-                            | Q(projectLocation__parent__parent=instance),
+                            base_filter & group_filter,
                             programmed=True,
                         )
                     )
