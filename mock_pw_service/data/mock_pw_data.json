@@ -1,0 +1,1705 @@
+{
+  "projects": {
+    "12345": {
+      "instanceId": "instance-12345",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-12345",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "12345",
+              "PROJECT_Kohde": "Test Programmed Project",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "8",
+              "PROJECT_Luokka": "04",
+              "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Kadun_tai_puiston_nimi": "Test Address 1",
+              "PROJECT_Toimiala": "puisto",
+              "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+              "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+              "PROJECT_Esillaolo_alku": "2024-02-01T00:00:00",
+              "PROJECT_Nhtvillolo_alku": "2024-03-01T00:00:00"
+            }
+          }
+        }
+      ]
+    },
+    "20001": {
+      "instanceId": "instance-20001",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-20001",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "20001",
+              "PROJECT_Kohde": "Concurrent Test Project",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "liikenne"
+            }
+          }
+        }
+      ]
+    },
+    "10003": {
+      "instanceId": "instance-10003",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-10003",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "10003",
+              "PROJECT_Kohde": "Out of Scope Project",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Other",
+              "PROJECT_Luokka": "Production",
+              "PROJECT_Alaluokka": "Class",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "puisto"
+            }
+          }
+        }
+      ]
+    },
+    "10002": {
+      "instanceId": "instance-10002",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-10002",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "10002",
+              "PROJECT_Kohde": "Partial Data Project",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "8",
+              "PROJECT_Luokka": "04",
+              "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Aluekokonaisuuden_nimi": "Partial Entity",
+              "PROJECT_Toimiala": "puisto",
+              "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00"
+            }
+          }
+        }
+      ]
+    },
+    "10001": {
+      "instanceId": "instance-10001",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-10001",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "10001",
+              "PROJECT_Kohde": "Perfect Test Project",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "8",
+              "PROJECT_Luokka": "04",
+              "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Kadun_tai_puiston_nimi": "Perfect Address 123",
+              "PROJECT_Aluekokonaisuuden_nimi": "Perfect Entity",
+              "PROJECT_Toimiala": "puisto",
+              "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+              "PROJECT_Hankkeen_suunnittelu_pttyy": "2024-03-01T00:00:00",
+              "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+              "PROJECT_Hankkeen_rakentaminen_pttyy": "2024-12-01T00:00:00",
+              "PROJECT_Esillaolo_alku": "2024-02-01T00:00:00",
+              "PROJECT_Esillaolo_loppu": "2024-02-28T00:00:00",
+              "PROJECT_Nhtvillolo_alku": "2024-03-01T00:00:00",
+              "PROJECT_Nhtvillolo_loppu": "2024-03-31T00:00:00"
+            }
+          }
+        }
+      ]
+    },
+    "30000": {
+      "instanceId": "instance-30000",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-30000",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "30000",
+              "PROJECT_Kohde": "Batch Project 1",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "taitorakenne"
+            }
+          }
+        }
+      ]
+    },
+    "30001": {
+      "instanceId": "instance-30001",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-30001",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "30001",
+              "PROJECT_Kohde": "Batch Project 2",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "taitorakenne"
+            }
+          }
+        }
+      ]
+    },
+    "30002": {
+      "instanceId": "instance-30002",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-30002",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "30002",
+              "PROJECT_Kohde": "Batch Project 3",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "taitorakenne"
+            }
+          }
+        }
+      ]
+    },
+    "30004": {
+      "instanceId": "instance-30004",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-30004",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "30004",
+              "PROJECT_Kohde": "Batch Project 5",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "taitorakenne"
+            }
+          }
+        }
+      ]
+    },
+    "30003": {
+      "instanceId": "instance-30003",
+      "className": "Project",
+      "schemaName": "PW_WSG",
+      "relationshipInstances": [
+        {
+          "relatedInstance": {
+            "instanceId": "instance-30003",
+            "properties": {
+              "PROJECT_HKRHanketunnus": "30003",
+              "PROJECT_Kohde": "Batch Project 4",
+              "PROJECT_Hankkeen_kuvaus": "Will be updated by sync",
+              "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+              "PROJECT_Pluokka": "Original Class",
+              "PROJECT_Luokka": "Original Subclass",
+              "PROJECT_Alaluokka": "Original Sub-subclass",
+              "PROJECT_Suurpiirin_nimi": "Original District",
+              "PROJECT_Kaupunginosan_nimi": "Original Area",
+              "PROJECT_Louhi__hankkeen_aloitusvuosi": "2025",
+              "PROJECT_Louhi__hankkeen_valmistumisvuosi": "2026",
+              "PROJECT_Ohjelmoitu": "Kyllä",
+              "PROJECT_Sorakatu": "Ei",
+              "PROJECT_Louheen": "Ei",
+              "PROJECT_Toimiala": "taitorakenne"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "sync_log": [
+    {
+      "timestamp": "2025-09-15T08:52:53.327283",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:52:53.387289",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:52:53.422571",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:52:55.541141",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:52:55.656936",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:18.334170",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:18.347716",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:53.516902",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:53.551966",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:54.187534",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:54.318896",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:54.369448",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:54.389071",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:56.405818",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:53:56.527656",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:54:18.497669",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:54:18.526735",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:04.258750",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:04.294167",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:04.939741",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:05.080783",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:05.137861",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:05.162096",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:07.246609",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:07.379841",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:30.241259",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T08:59:30.267922",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:03.702956",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:03.733563",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:04.399953",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:04.526285",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:04.576337",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:04.598327",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:06.693037",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:06.810918",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:24.761357",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:04:24.772126",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:24.032438",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:24.211086",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:25.208093",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:25.837073",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:25.994408",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:26.040862",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:29.721078",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:29.862013",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:52.183784",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:10:52.199192",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.821769",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "10003",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.824906",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10003",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10003"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.839161",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10003",
+      "details": {
+        "instance_id": "instance-10003",
+        "changes_count": 7,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 10003",
+            "to": "Out of Scope Project"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "puisto"
+          },
+          "PROJECT_Pluokka": {
+            "from": "Original Class",
+            "to": "Other"
+          },
+          "PROJECT_Luokka": {
+            "from": "Original Subclass",
+            "to": "Production"
+          },
+          "PROJECT_Alaluokka": {
+            "from": "Original Sub-subclass",
+            "to": "Class"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Out of Scope Project",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "Other",
+          "PROJECT_Luokka": "Production",
+          "PROJECT_Alaluokka": "Class",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.854741",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "10002",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.857514",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10002",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10002"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.869995",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10002",
+      "details": {
+        "instance_id": "instance-10002",
+        "changes_count": 9,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 10002",
+            "to": "Partial Data Project"
+          },
+          "PROJECT_Aluekokonaisuuden_nimi": {
+            "from": null,
+            "to": "Partial Entity"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "puisto"
+          },
+          "PROJECT_Pluokka": {
+            "from": "Original Class",
+            "to": "8"
+          },
+          "PROJECT_Luokka": {
+            "from": "Original Subclass",
+            "to": "04"
+          },
+          "PROJECT_Alaluokka": {
+            "from": "Original Sub-subclass",
+            "to": "Puistot ja liikunta-alueet"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          },
+          "PROJECT_Hankkeen_suunnittelu_alkaa": {
+            "from": null,
+            "to": "2024-01-01T00:00:00"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Partial Data Project",
+          "PROJECT_Aluekokonaisuuden_nimi": "Partial Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.886944",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "10001",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.890106",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.902974",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10001",
+      "details": {
+        "instance_id": "instance-10001",
+        "changes_count": 17,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 10001",
+            "to": "Perfect Test Project"
+          },
+          "PROJECT_Kadun_tai_puiston_nimi": {
+            "from": null,
+            "to": "Perfect Address 123"
+          },
+          "PROJECT_Aluekokonaisuuden_nimi": {
+            "from": null,
+            "to": "Perfect Entity"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "puisto"
+          },
+          "PROJECT_Pluokka": {
+            "from": "Original Class",
+            "to": "8"
+          },
+          "PROJECT_Luokka": {
+            "from": "Original Subclass",
+            "to": "04"
+          },
+          "PROJECT_Alaluokka": {
+            "from": "Original Sub-subclass",
+            "to": "Puistot ja liikunta-alueet"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          },
+          "PROJECT_Hankkeen_suunnittelu_alkaa": {
+            "from": null,
+            "to": "2024-01-01T00:00:00"
+          },
+          "PROJECT_Hankkeen_suunnittelu_pttyy": {
+            "from": null,
+            "to": "2024-03-01T00:00:00"
+          },
+          "PROJECT_Hankkeen_rakentaminen_alkaa": {
+            "from": null,
+            "to": "2024-06-01T00:00:00"
+          },
+          "PROJECT_Hankkeen_rakentaminen_pttyy": {
+            "from": null,
+            "to": "2024-12-01T00:00:00"
+          },
+          "PROJECT_Esillaolo_alku": {
+            "from": null,
+            "to": "2024-02-01T00:00:00"
+          },
+          "PROJECT_Esillaolo_loppu": {
+            "from": null,
+            "to": "2024-02-28T00:00:00"
+          },
+          "PROJECT_Nhtvillolo_alku": {
+            "from": null,
+            "to": "2024-03-01T00:00:00"
+          },
+          "PROJECT_Nhtvillolo_loppu": {
+            "from": null,
+            "to": "2024-03-31T00:00:00"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Perfect Test Project",
+          "PROJECT_Kadun_tai_puiston_nimi": "Perfect Address 123",
+          "PROJECT_Aluekokonaisuuden_nimi": "Perfect Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Hankkeen_suunnittelu_pttyy": "2024-03-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_pttyy": "2024-12-01T00:00:00",
+          "PROJECT_Esillaolo_alku": "2024-02-01T00:00:00",
+          "PROJECT_Esillaolo_loppu": "2024-02-28T00:00:00",
+          "PROJECT_Nhtvillolo_alku": "2024-03-01T00:00:00",
+          "PROJECT_Nhtvillolo_loppu": "2024-03-31T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.956689",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10003",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10003"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.968871",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10003",
+      "details": {
+        "instance_id": "instance-10003",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Out of Scope Project",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "Other",
+          "PROJECT_Luokka": "Production",
+          "PROJECT_Alaluokka": "Class",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:12.988788",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.005183",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10001",
+      "details": {
+        "instance_id": "instance-10001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Perfect Test Project",
+          "PROJECT_Kadun_tai_puiston_nimi": "Perfect Address 123",
+          "PROJECT_Aluekokonaisuuden_nimi": "Perfect Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Hankkeen_suunnittelu_pttyy": "2024-03-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_pttyy": "2024-12-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.114246",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10003",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10003"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.128414",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10003",
+      "details": {
+        "instance_id": "instance-10003",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Out of Scope Project",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "Other",
+          "PROJECT_Luokka": "Production",
+          "PROJECT_Alaluokka": "Class",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.144686",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.160232",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10001",
+      "details": {
+        "instance_id": "instance-10001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Perfect Test Project",
+          "PROJECT_Kadun_tai_puiston_nimi": "Perfect Address 123",
+          "PROJECT_Aluekokonaisuuden_nimi": "Perfect Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Hankkeen_suunnittelu_pttyy": "2024-03-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_pttyy": "2024-12-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.177312",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10002",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10002"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.191029",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10002",
+      "details": {
+        "instance_id": "instance-10002",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Partial Data Project",
+          "PROJECT_Aluekokonaisuuden_nimi": "Partial Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.244463",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.257028",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10001",
+      "details": {
+        "instance_id": "instance-10001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Perfect Test Project",
+          "PROJECT_Kadun_tai_puiston_nimi": "Perfect Address 123",
+          "PROJECT_Aluekokonaisuuden_nimi": "Perfect Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Hankkeen_suunnittelu_pttyy": "2024-03-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_pttyy": "2024-12-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.272847",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "10002",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 10002"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.285026",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "10002",
+      "details": {
+        "instance_id": "instance-10002",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Partial Data Project",
+          "PROJECT_Aluekokonaisuuden_nimi": "Partial Entity",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.405128",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.417147",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.505295",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "30000",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.518167",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "30000",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 30000"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.533631",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "30000",
+      "details": {
+        "instance_id": "instance-30000",
+        "changes_count": 4,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 30000",
+            "to": "Batch Project 1"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "taitorakenne"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Batch Project 1",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "taitorakenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.549112",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "30001",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.553627",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "30001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 30001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.564993",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "30001",
+      "details": {
+        "instance_id": "instance-30001",
+        "changes_count": 4,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 30001",
+            "to": "Batch Project 2"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "taitorakenne"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Batch Project 2",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "taitorakenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.581254",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "30002",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.586033",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "30002",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 30002"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.598877",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "30002",
+      "details": {
+        "instance_id": "instance-30002",
+        "changes_count": 4,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 30002",
+            "to": "Batch Project 3"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "taitorakenne"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Batch Project 3",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "taitorakenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.613943",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "30004",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.618527",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "30004",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 30004"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.632652",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "30004",
+      "details": {
+        "instance_id": "instance-30004",
+        "changes_count": 4,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 30004",
+            "to": "Batch Project 5"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "taitorakenne"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Batch Project 5",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "taitorakenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.656217",
+      "operation": "PROJECT_CREATED",
+      "hkr_id": "30003",
+      "details": {
+        "reason": "Auto-created for GET request"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.661538",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "30003",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 30003"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.679852",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "30003",
+      "details": {
+        "instance_id": "instance-30003",
+        "changes_count": 4,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 30003",
+            "to": "Batch Project 4"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "taitorakenne"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Batch Project 4",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "taitorakenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.953457",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:13.970362",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "12345",
+      "details": {
+        "instance_id": "instance-12345",
+        "changes_count": 12,
+        "changes": {
+          "PROJECT_Kohde": {
+            "from": "Project 12345",
+            "to": "Test Programmed Project"
+          },
+          "PROJECT_Kadun_tai_puiston_nimi": {
+            "from": null,
+            "to": "Test Address 1"
+          },
+          "PROJECT_Hankkeen_vaihe": {
+            "from": "1. hanke-ehdotus",
+            "to": "2. Ohjelmointi"
+          },
+          "PROJECT_Toimiala": {
+            "from": null,
+            "to": "puisto"
+          },
+          "PROJECT_Pluokka": {
+            "from": "Original Class",
+            "to": "8"
+          },
+          "PROJECT_Luokka": {
+            "from": "Original Subclass",
+            "to": "04"
+          },
+          "PROJECT_Alaluokka": {
+            "from": "Original Sub-subclass",
+            "to": "Puistot ja liikunta-alueet"
+          },
+          "PROJECT_Ohjelmoitu": {
+            "from": "Ei",
+            "to": "Kyllä"
+          },
+          "PROJECT_Hankkeen_suunnittelu_alkaa": {
+            "from": null,
+            "to": "2024-01-01T00:00:00"
+          },
+          "PROJECT_Hankkeen_rakentaminen_alkaa": {
+            "from": null,
+            "to": "2024-06-01T00:00:00"
+          },
+          "PROJECT_Esillaolo_alku": {
+            "from": null,
+            "to": "2024-02-01T00:00:00"
+          },
+          "PROJECT_Nhtvillolo_alku": {
+            "from": null,
+            "to": "2024-03-01T00:00:00"
+          }
+        },
+        "all_properties": {
+          "PROJECT_Kohde": "Test Programmed Project",
+          "PROJECT_Kadun_tai_puiston_nimi": "Test Address 1",
+          "PROJECT_Hankkeen_vaihe": "2. Ohjelmointi",
+          "PROJECT_Toimiala": "puisto",
+          "PROJECT_Pluokka": "8",
+          "PROJECT_Luokka": "04",
+          "PROJECT_Alaluokka": "Puistot ja liikunta-alueet",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Hankkeen_suunnittelu_alkaa": "2024-01-01T00:00:00",
+          "PROJECT_Hankkeen_rakentaminen_alkaa": "2024-06-01T00:00:00",
+          "PROJECT_Esillaolo_alku": "2024-02-01T00:00:00",
+          "PROJECT_Nhtvillolo_alku": "2024-03-01T00:00:00",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:14.041914",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:14.086706",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:54.343587",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:54.373230",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:15:55.209819",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:18:26.455865",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:18:46.200824",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:18:46.218575",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:32:39.657810",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "20001",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 20001"
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:32:39.688782",
+      "operation": "PROJECT_UPDATED",
+      "hkr_id": "20001",
+      "details": {
+        "instance_id": "instance-20001",
+        "changes_count": 0,
+        "changes": {},
+        "all_properties": {
+          "PROJECT_Kohde": "Concurrent Test Project",
+          "PROJECT_Hankkeen_vaihe": "7. Rakentaminen",
+          "PROJECT_Toimiala": "liikenne",
+          "PROJECT_Ohjelmoitu": "Kyllä",
+          "PROJECT_Sorakatu": "Ei",
+          "PROJECT_Louheen": "Ei"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-09-15T09:32:40.499622",
+      "operation": "PROJECT_QUERY",
+      "hkr_id": "12345",
+      "details": {
+        "filter": "@projAttr.PROJECT_HKRHanketunnus eq 12345"
+      }
+    }
+  ],
+  "last_updated": "2025-09-15T09:32:40.499823"
+}
