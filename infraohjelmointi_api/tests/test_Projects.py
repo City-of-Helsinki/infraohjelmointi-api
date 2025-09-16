@@ -5,6 +5,7 @@ from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
 import uuid
+from functools import wraps
 from django.urls import reverse
 from rest_framework import status
 
@@ -38,6 +39,30 @@ from ..serializers import (
 )
 
 from infraohjelmointi_api.views import BaseViewSet
+
+
+def mock_projectwise_get_service(func):
+    """Decorator to mock ProjectWiseService in ProjectGetSerializer"""
+    @wraps(func)
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    def wrapper(self, mock_pw_service, *args, **kwargs):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_projectwise_create_service(func):
+    """Decorator to mock ProjectWiseService in ProjectCreateSerializer"""
+    @wraps(func)
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def wrapper(self, mock_pw_service, *args, **kwargs):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -586,7 +611,9 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 4)
 
+    @mock_projectwise_get_service
     def test_GET_one_project(self):
+        
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
@@ -613,6 +640,7 @@ class ProjectTestCase(TestCase):
             msg="Project data in response != Project data in DB",
         )
 
+    @mock_projectwise_create_service
     def test_POST_project(self):
         data = {
             "siteId": None,
@@ -725,6 +753,7 @@ class ProjectTestCase(TestCase):
             msg="Project created using POST request does not exist in DB",
         )
 
+    @mock_projectwise_create_service
     def test_PATCH_project(self):
         AppStateValueService.update_or_create(name="forcedToFrameStatus", value=True)
         data = {
@@ -782,6 +811,7 @@ class ProjectTestCase(TestCase):
             msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
+    @mock_projectwise_create_service
     def test_PATCH_multiple_projects(self):
         data = {"name": "Test name", "description": "Test description"}
         response = self.client.post(
@@ -2989,6 +3019,7 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(response.status_code, 400, msg=response.json())
 
+    @mock_projectwise_get_service
     def test_project_finances(self):
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
