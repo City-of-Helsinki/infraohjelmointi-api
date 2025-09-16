@@ -88,15 +88,6 @@ class BalkSumTestCase(TestCase):
     def setUpTestData(self):
         year = date.today().year
 
-        projectGroup_1 = ProjectGroup.objects.create(
-            id=self.projectGroup_1_Id, name="Test Group 1 rain"
-        )
-        projectGroup_2 = ProjectGroup.objects.create(
-            id=self.projectGroup_2_Id, name="Test Group 2"
-        )
-        projectGroup_3 = ProjectGroup.objects.create(
-            id=self.projectGroup_3_Id, name="Test Group 3 park"
-        )
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_1_Id,
             name="District 1",
@@ -108,6 +99,12 @@ class BalkSumTestCase(TestCase):
             name="District 2",
             parent=None,
             path="District 2",
+        )
+        district_3 = ProjectLocation.objects.create(
+            id=self.projectDistrict_3_Id,
+            name="District 3",
+            parent=None,
+            path="District 3",
         )
         division = district_1.childLocation.create(
             id=self.projectDivision_2_Id,
@@ -137,10 +134,21 @@ class BalkSumTestCase(TestCase):
             parent=None,
             path="Master Class 2",
         )
+        masterClass_3 = ProjectClass.objects.create(
+            id=self.projectMasterClass_3_Id,
+            name="Master Class 3",
+            parent=None,
+            path="Master Class 3",
+        )
         _class = masterClass_1.childClass.create(
             name="Test Class 1",
             id=self.projectClass_1_Id,
             path="Master Class 1/Test Class 1",
+        )
+        _class_2 = masterClass_3.childClass.create(
+            name="Test Class 2",
+            id=self.projectClass_2_Id,
+            path="Master Class 3/Test Class 1",
         )
 
         subClass_1 = _class.childClass.create(
@@ -152,6 +160,17 @@ class BalkSumTestCase(TestCase):
             id=self.projectSubClass_2_Id,
             name="Sub class 2",
             path="Master Class 1/Test Class 1/Sub class 2",
+        )
+        projectGroup_1 = ProjectGroup.objects.create(
+            id=self.projectGroup_1_Id,
+            name="Test Group 1 rain",
+            locationRelation=district_1
+        )
+        projectGroup_2 = ProjectGroup.objects.create(
+            id=self.projectGroup_2_Id, name="Test Group 2"
+        )
+        projectGroup_3 = ProjectGroup.objects.create(
+            id=self.projectGroup_3_Id, name="Test Group 3 park"
         )
 
         project_1 = Project.objects.create(
@@ -236,6 +255,16 @@ class BalkSumTestCase(TestCase):
             description="Random desc",
             programmed=True,
             projectClass=masterClass_2,
+            costForecast=100,
+        )
+        project_9 = Project.objects.create(
+            id=self.project_9_Id,
+            hkrId=1111,
+            name="Random name",
+            description="Random desc",
+            programmed=True,
+            projectLocation=district_3,
+            projectClass=_class_2,
             costForecast=100,
         )
         # for project_1
@@ -341,6 +370,19 @@ class BalkSumTestCase(TestCase):
         ProjectFinancial.objects.create(project=project_8, year=year + 8, value=9)
         ProjectFinancial.objects.create(project=project_8, year=year + 9, value=10)
         ProjectFinancial.objects.create(project=project_8, year=year + 10, value=0)
+
+        # for project_9
+        ProjectFinancial.objects.create(project=project_9, year=year, value=100)
+        ProjectFinancial.objects.create(project=project_9, year=year + 1, value=50)
+        ProjectFinancial.objects.create(project=project_9, year=year + 2, value=50)
+        ProjectFinancial.objects.create(project=project_9, year=year + 3, value=10)
+        ProjectFinancial.objects.create(project=project_9, year=year + 4, value=5)
+        ProjectFinancial.objects.create(project=project_9, year=year + 5, value=5)
+        ProjectFinancial.objects.create(project=project_9, year=year + 6, value=0)
+        ProjectFinancial.objects.create(project=project_9, year=year + 7, value=5)
+        ProjectFinancial.objects.create(project=project_9, year=year + 8, value=9)
+        ProjectFinancial.objects.create(project=project_9, year=year + 9, value=10)
+        ProjectFinancial.objects.create(project=project_9, year=year + 10, value=0)
 
         ##### Frame Financials #####
         # for project_1
@@ -822,6 +864,11 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
         self.runFinancesAssertTests(response, index=None, name="plannedBudget", values=[0,0,0,0,0,0,0,0,0,0,0])
+
+        response = self.client.get("/project-locations/{}/".format(self.projectDistrict_3_Id))
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+
+        self.runFinancesAssertTests(response, index=None, name="plannedBudget", values=[100,50,50,10,5,5,0,5,9,10,0])
 
     def test_GET_coordinator_location_with_sums(self):
         response = self.client.get("/project-locations/coordinator/")
