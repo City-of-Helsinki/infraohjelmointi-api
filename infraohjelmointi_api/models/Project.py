@@ -21,6 +21,7 @@ from .ProjectClass import ProjectClass
 from .ResponsibleZone import ResponsibleZone
 from .ProjectHashTag import ProjectHashTag
 from .ProjectGroup import ProjectGroup
+from .ProjectProgrammer import ProjectProgrammer
 from .BudgetOverrunReason import BudgetOverrunReason
 from django.core.validators import MaxValueValidator, MinValueValidator
 from overrides import override
@@ -79,7 +80,7 @@ class Project(models.Model):
         blank=True,
     )
     personProgramming = models.ForeignKey(
-        Person,
+        ProjectProgrammer,
         related_name="programming",
         on_delete=models.DO_NOTHING,
         null=True,
@@ -234,6 +235,7 @@ class Project(models.Model):
         BudgetOverrunReason, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     otherBudgetOverrunReason = models.TextField(max_length=200, null=True, blank=True)
+    onSchedule = models.BooleanField(blank=True, null=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 

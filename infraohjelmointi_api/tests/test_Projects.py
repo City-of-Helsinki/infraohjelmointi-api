@@ -1,10 +1,11 @@
 from django.test import TestCase
 from datetime import (date, datetime)
-from infraohjelmointi_api.services import AppStateValueService, ProjectFinancialService
+from infraohjelmointi_api.services import AppStateValueService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
 import uuid
+from functools import wraps
 from django.urls import reverse
 from rest_framework import status
 
@@ -29,6 +30,7 @@ from ..models import (
     ProjectGroup,
     ProjectFinancial,
     User,
+    ProjectProgrammer,
 )
 from ..serializers import (
     ProjectGetSerializer,
@@ -37,6 +39,30 @@ from ..serializers import (
 )
 
 from infraohjelmointi_api.views import BaseViewSet
+
+
+def mock_projectwise_get_service(func):
+    """Decorator to mock ProjectWiseService in ProjectGetSerializer"""
+    @wraps(func)
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    def wrapper(self, mock_pw_service, *args, **kwargs):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_projectwise_create_service(func):
+    """Decorator to mock ProjectWiseService in ProjectCreateSerializer"""
+    @wraps(func)
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def wrapper(self, mock_pw_service, *args, **kwargs):
+        # Mock the ProjectWise service to avoid external dependency
+        mock_instance = mock_pw_service.return_value
+        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -149,8 +175,8 @@ class ProjectTestCase(TestCase):
     pwInstanceId = "d4a5e51c-2aa5-449a-aa13-a362eb578fd6"
     pwInstanceId_hkrId_1 = 1461
     pwInstanceId_hkrId_2 = 1500
-    pwInstanceId_hkrId_1_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{d4a5e51c-2aa5-449a-aa13-a362eb578fd6}/"
-    pwInstanceId_hkrId_2_folder = "pw://HELS000601.helsinki1.hki.local:PWHKIKOUL/Documents/P{9d14d060-56c8-45c0-9323-303ab440e652}/"
+    pwInstanceId_hkrId_1_folder = "https://pwlink.bentley.com/link?ds=HELS000601.helsinki1.hki.local~3APWPRJBANK&fld=instance-1461&app=pwe"
+    pwInstanceId_hkrId_2_folder = "https://pwlink.bentley.com/link?ds=HELS000601.helsinki1.hki.local~3APWPRJBANK&fld=instance-1500&app=pwe"
     notePerson_1_Id = uuid.UUID("22dc6826-e34c-4079-a748-9e8699f99a09")
 
     fixtures = []
@@ -259,6 +285,13 @@ class ProjectTestCase(TestCase):
             id=self.projectPriorityId, value="High"
         )
 
+        self.programmer_1 = ProjectProgrammer.objects.create(
+            id=uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042"),
+            firstName="John",
+            lastName="Doe",
+            person=self.person_1
+        )
+
         self.project = Project.objects.create(
             otherPersons="Other Test Person",
             projectClass=self.projectClass,
@@ -276,7 +309,7 @@ class ProjectTestCase(TestCase):
             address="Insinoorinkatu 60 D",
             description="description of the test project",
             personPlanning=self.person_2,
-            personProgramming=self.person_1,
+            personProgramming=self.programmer_1,
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=False,
@@ -404,7 +437,7 @@ class ProjectTestCase(TestCase):
             ),
         )
         self.assertDictEqual(
-            self.person_1.programming.all().values()[0],
+            self.programmer_1.programming.all().values()[0],
             Project.objects.filter(id=self.project_1_Id).values()[0],
             msg="personProgramming foreign key does not exist in Project with id {}".format(
                 self.project_1_Id
@@ -499,7 +532,7 @@ class ProjectTestCase(TestCase):
             name="Test project 2",
             description="description of the test project 2",
             personPlanning=self.person_2,
-            personProgramming=self.person_1,
+            personProgramming=self.programmer_1,
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
@@ -570,7 +603,7 @@ class ProjectTestCase(TestCase):
             set(project["finances"]["year"] for project in response.json()["results"]),
             msg="Project Data in response must have the financial data from year 2025",
         )
-    
+
     def test_get_projects_list(self):
         # Test retrieving a list of projects
         url = reverse('projects-list')
@@ -578,13 +611,17 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 4)
 
+    @mock_projectwise_get_service
     def test_GET_one_project(self):
+        
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
-        # serialize the model instances
+        # serialize the model instances with the same context as the API
         serializer = ProjectGetSerializer(
-            Project.objects.get(id=self.project_1_Id), many=False
+            Project.objects.get(id=self.project_1_Id),
+            many=False,
+            context={'get_pw_link': True}
         )
 
         # convert the serialized data to JSON
@@ -603,6 +640,7 @@ class ProjectTestCase(TestCase):
             msg="Project data in response != Project data in DB",
         )
 
+    @mock_projectwise_create_service
     def test_POST_project(self):
         data = {
             "siteId": None,
@@ -715,6 +753,7 @@ class ProjectTestCase(TestCase):
             msg="Project created using POST request does not exist in DB",
         )
 
+    @mock_projectwise_create_service
     def test_PATCH_project(self):
         AppStateValueService.update_or_create(name="forcedToFrameStatus", value=True)
         data = {
@@ -772,6 +811,7 @@ class ProjectTestCase(TestCase):
             msg="Project with Id {} still exists in DB".format(self.project_1_Id),
         )
 
+    @mock_projectwise_create_service
     def test_PATCH_multiple_projects(self):
         data = {"name": "Test name", "description": "Test description"}
         response = self.client.post(
@@ -2979,6 +3019,7 @@ class ProjectTestCase(TestCase):
 
         self.assertEqual(response.status_code, 400, msg=response.json())
 
+    @mock_projectwise_get_service
     def test_project_finances(self):
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
@@ -3582,7 +3623,21 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-    def test_pw_folder_project(self):
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class):
+        # Mock both serializers' ProjectWise service classes
+        def mock_get_pw_response(id):
+            return {"instanceId": f"instance-{id}"}
+
+        # Mock the CreateSerializer's service instance
+        mock_create_instance = mock_pw_create_class.return_value
+        mock_create_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
+        # Mock the GetSerializer's service instance
+        mock_get_instance = mock_pw_get_class.return_value
+        mock_get_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
         data = {
             "name": "Test Project for PW folder",
             "description": "Test description",
@@ -3873,7 +3928,7 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
         # get project's finances data from both forcedToFrame view and planning/coordinator view
-        # Finances datas are not the same because frame view is locked and 
+        # Finances datas are not the same because frame view is locked and
         # finances data is not moved to frame view from planning/coordinator view
         responseForcedToFrame = self.client.get(
             "/projects/{}/?forcedToFrame=true".format(new_createdId),
