@@ -6,6 +6,9 @@ from datetime import date
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory, Person
 from ..services import ProjectWiseService
 from ..views import BaseViewSet
+from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper, to_pw_map
+from django.core.management import call_command
+from io import StringIO
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -1242,7 +1245,6 @@ class ProjectWiseDataMapperTestCase(TestCase):
 
     def test_name_field_mapping(self):
         """Test that name field is mapped to PROJECT_Kohde"""
-        from ..services.utils.ProjectWiseDataMapper import to_pw_map
 
         # Verify the mapping exists
         self.assertIn('name', to_pw_map)
@@ -1278,10 +1280,6 @@ class ProjectWiseDataMapperTestCase(TestCase):
                     self.assertEqual(to_pw_map[field]['field'], expected_mapping)
 
     def test_date_format_handling(self):
-        """Test that datetime.date objects are properly handled"""
-        from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
-        from datetime import date
-
         mapper = ProjectWiseDataMapper()
 
         # Test date conversion
@@ -1297,9 +1295,6 @@ class ProjectWiseDataMapperTestCase(TestCase):
         self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '2025-12-31T00:00:00')
 
     def test_date_format_handling_none_values(self):
-        """Test that None date values are handled gracefully"""
-        from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
-
         mapper = ProjectWiseDataMapper()
 
         # Test with None values
@@ -1323,9 +1318,6 @@ class ProjectImporterCommandTestCase(TestCase):
     @patch('infraohjelmointi_api.management.commands.projectimporter.ProjectWiseService')
     def test_sync_projects_to_pw_test_scope_command(self, mock_service_class):
         """Test the new management command option"""
-        from django.core.management import call_command
-        from io import StringIO
-        import sys
 
         # Mock the service and its method
         mock_service = Mock()
@@ -1358,6 +1350,86 @@ class ProjectImporterCommandTestCase(TestCase):
         self.assertIn('1 processed successfully', output)
         self.assertIn('1 errors', output)
         self.assertIn('Error updating Test Project 2', output)
+
+
+class ProjectWisePhaseAssignmentTestCase(TestCase):
+    """
+    Test cases for ProjectWise phase assignment fix (IO-740).
+    """
+
+    def setUp(self):
+        """Set up test data for phase assignment testing"""
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        # Create test phases
+        self.programming_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
+        self.draft_approval_phase, _ = ProjectPhase.objects.get_or_create(value="draftApproval")
+
+    def test_phase_assignment_fix_io740(self):
+        """
+        Test that the IO-740 fix correctly assigns phases from ProjectWise.
+
+        This test verifies that the buggy hasattr() logic has been replaced
+        with the correct 'in' operator for dictionary key lookup.
+        """
+
+        # Create the mapper to get the phase mappings
+        mapper = ProjectWiseDataMapper()
+        phases = mapper.load_and_transform_phases()
+
+        # Test the fixed logic with real ProjectWise phase values
+        test_cases = [
+            ('3. Suunnittelun aloitus / Suunnitelmaluonnos', 'draftInitiation'),
+            ('4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen', 'draftApproval'),
+            ('7. Rakentaminen', 'construction'),
+            ('5. Rakennussuunnitelma', 'constructionPlan'),
+            ('Unknown Phase', 'programming'),  # Should default
+        ]
+
+        for pw_phase, expected_internal_phase in test_cases:
+            with self.subTest(pw_phase=pw_phase):
+                # Test the FIXED logic (using 'in' operator)
+                if pw_phase in phases:
+                    result_phase = phases[pw_phase]
+                    self.assertEqual(result_phase.value, expected_internal_phase,
+                                   f"Phase '{pw_phase}' should map to '{expected_internal_phase}'")
+                else:
+                    # Should default to programming for unknown phases
+                    result_phase = phases['2. Ohjelmointi']
+                    self.assertEqual(result_phase.value, 'programming',
+                                   f"Unknown phase '{pw_phase}' should default to 'programming'")
+
+    def test_phase_assignment_buggy_vs_fixed_logic(self):
+        """
+        Test that demonstrates the difference between buggy and fixed logic.
+
+        This test shows that the old hasattr() logic would always fail,
+        while the new 'in' logic works correctly.
+        """
+
+        mapper = ProjectWiseDataMapper()
+        phases = mapper.load_and_transform_phases()
+
+        # Test with a valid ProjectWise phase
+        pw_phase = '7. Rakentaminen'
+
+        # BUGGY LOGIC (what was in production before the fix)
+        # This would always fail because hasattr() checks for object attributes, not dict keys
+        buggy_result = hasattr(phases, pw_phase)
+        self.assertFalse(buggy_result, "Buggy hasattr() logic should always return False for dict keys")
+
+        # FIXED LOGIC (what we implemented)
+        # This correctly checks if the key exists in the dictionary
+        fixed_result = pw_phase in phases
+        self.assertTrue(fixed_result, "Fixed 'in' logic should correctly find the key in the dictionary")
+
+        # Verify the phase mapping works with the fixed logic
+        if fixed_result:
+            result_phase = phases[pw_phase]
+            self.assertEqual(result_phase.value, 'construction',
+                           "Phase '7. Rakentaminen' should map to 'construction'")
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])

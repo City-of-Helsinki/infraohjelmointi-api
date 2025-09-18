@@ -631,9 +631,7 @@ class ProjectWiseService:
         if project_properties["PROJECT_Hankkeen_vaihe"]:
             project.phase = (
                 self.project_phases[project_properties["PROJECT_Hankkeen_vaihe"]]
-                if hasattr(
-                    self.project_phases, project_properties["PROJECT_Hankkeen_vaihe"]
-                )
+                if project_properties["PROJECT_Hankkeen_vaihe"] in self.project_phases
                 else self.project_phases["2. Ohjelmointi"]
             )
 
