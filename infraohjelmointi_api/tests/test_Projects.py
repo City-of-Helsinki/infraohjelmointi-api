@@ -42,13 +42,18 @@ from infraohjelmointi_api.views import BaseViewSet
 
 
 def mock_projectwise_get_service(func):
-    """Decorator to mock ProjectWiseService in ProjectGetSerializer"""
+    """Decorator to mock ProjectWiseService in both serializers"""
     @wraps(func)
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
     @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
-    def wrapper(self, mock_pw_service, *args, **kwargs):
-        # Mock the ProjectWise service to avoid external dependency
-        mock_instance = mock_pw_service.return_value
-        mock_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+    def wrapper(self, mock_create_service, mock_get_service, *args, **kwargs):
+        # Mock both service instances to avoid external dependency
+        mock_create_instance = mock_create_service.return_value
+        mock_create_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        
+        mock_get_instance = mock_get_service.return_value  
+        mock_get_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
+        
         return func(self, *args, **kwargs)
     return wrapper
 

@@ -15,22 +15,33 @@ class BaseClassLocationViewSet(BaseViewSet):
     """
 
     @staticmethod
-    def build_frame_budgets_context(year: int) -> defaultdict:
+    def build_frame_budgets_context(year: int, for_frame_view: bool = False) -> defaultdict:
         """
         Build frame_budgets context for consistent budget overlap logic.
         
         Args:
             year: Starting year for frame budget collection
+            for_frame_view: Whether to filter for frame view (forFrameView=True) or standard view (forFrameView=False)
             
         Returns:
             defaultdict: Dictionary with keys "{year}-{relation_id}" and frameBudget values
+            
+        Note:
+            The for_frame_view parameter helps avoid counting duplicate records created by IO-353.
+            IO-353 introduced forFrameView field and created duplicate financial records.
+            Use for_frame_view=False to count only original records (recommended for budget overlap).
         """
+        # Filter financial records by year and forFrameView to avoid counting duplicates
         class_financials = ClassFinancial.objects.filter(
-            year__in=range(year, year+11)
+            year__in=range(year, year+11),
+            forFrameView=for_frame_view
         ).annotate(relation=F("classRelation")).values("year", "relation", "frameBudget")
+        
         location_financials = LocationFinancial.objects.filter(
-            year__in=range(year, year+11)
+            year__in=range(year, year+11),
+            forFrameView=for_frame_view
         ).annotate(relation=F("locationRelation")).values("year", "relation", "frameBudget")
+        
         financials = class_financials.union(location_financials)
         frame_budgets = defaultdict(lambda: 0)
         for f in financials:
@@ -316,7 +327,7 @@ class BaseClassLocationViewSet(BaseViewSet):
         
         # Build frame_budgets context for consistent budget overlap logic
         # This ensures programming and coordination views use the same method
-        frame_budgets = self.build_frame_budgets_context(year)
+        frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
         
         serializer = self.get_serializer(
             qs, 
