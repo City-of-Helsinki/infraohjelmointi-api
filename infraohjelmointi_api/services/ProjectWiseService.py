@@ -19,6 +19,7 @@ from .ProjectService import ProjectService
 from .ProjectLocationService import ProjectLocationService
 
 from .utils import ProjectWiseDataMapper, ProjectWiseDataFieldNotFound
+from .utils.ProjectWiseDataMapper import to_pw_map
 
 env = environ.Env()
 env.escape_proxy = True
@@ -268,21 +269,28 @@ class ProjectWiseService:
                 return True
 
     def _get_pw_field_mapping(self) -> dict:
-        """Get the mapping from project fields to PW field names."""
-        return {
-            'name': 'PROJECT_Kohde',
-            'description': 'PROJECT_Hankkeen_kuvaus',
-            'address': 'PROJECT_Kadun_tai_puiston_nimi',
-            'entityName': 'PROJECT_Aluekokonaisuuden_nimi',
-            'estPlanningStart': 'PROJECT_Hankkeen_suunnittelu_alkaa',
-            'estPlanningEnd': 'PROJECT_Hankkeen_suunnittelu_pttyy',
-            'estConstructionStart': 'PROJECT_Hankkeen_rakentaminen_alkaa',
-            'estConstructionEnd': 'PROJECT_Hankkeen_rakentaminen_pttyy',
-            'presenceStart': 'PROJECT_Esillaolo_alku',
-            'presenceEnd': 'PROJECT_Esillaolo_loppu',
-            'visibilityStart': 'PROJECT_Nhtvillolo_alku',
-            'visibilityEnd': 'PROJECT_Nhtvillolo_loppu',
-        }
+        """
+        Get the mapping from project fields to PW field names.
+        Uses ProjectWiseDataMapper.to_pw_map for complete and accurate mappings.
+        """
+        
+        # Build simplified mapping for _should_include_field_in_update logic
+        # Extract the actual PW field names from the complex mapping structure
+        field_mapping = {}
+        
+        for field_name, mapping in to_pw_map.items():
+            if isinstance(mapping, str):
+                # Simple string mapping
+                field_mapping[field_name] = mapping
+            elif isinstance(mapping, dict) and 'field' in mapping:
+                # Complex mapping with 'field' key
+                field_mapping[field_name] = mapping['field']
+            elif isinstance(mapping, dict) and 'values' in mapping:
+                # Enum mapping - use first field name from values list
+                if isinstance(mapping['values'], list) and mapping['values']:
+                    field_mapping[field_name] = mapping['values'][0]
+                    
+        return field_mapping
 
     def _filter_projects_for_test_scope(self, projects):
         """
@@ -440,22 +448,23 @@ class ProjectWiseService:
             raise TypeError("name must be a string")
         if project.description and not isinstance(project.description, str):
             raise TypeError("description must be a string")
-        project_data = {
+        # Build raw project data with UUIDs for transformation
+        raw_project_data = {
             # Basic info
             'name': project.name,
             'description': project.description,
             'address': project.address,
             'entityName': project.entityName,
 
-            # Status and classification - THE MISSING FIELDS (IO-396 fixes)
-            'phase': str(project.phase.id) if project.phase else None,                           # FIX Issue 1: Hankkeen vaihe (UUID)
-            'type': str(project.type.id) if project.type else None,                            # FIX: Hanketyyppi (UUID)
-            'projectClass': str(project.projectClass.id) if project.projectClass else None,            # FIX Issue 2: Pääluokka/Luokka/Alaluokka (UUID)
-            'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,      # FIX Issue 4: Suurpiiri/Kaupunginosa (UUID)
-            'area': str(project.area.id) if project.area else None,                            # FIX: Projektialue (UUID)
-            'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,      # FIX: Vastuualue (UUID)
-            'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None, # FIX: Rakentamisvaiheen tarkenne (UUID)
-            'programmed': project.programmed,                # FIX: Ohjelmoitu
+            # Status and classification - IO-396 fixes: Use UUIDs for transformation
+            'phase': str(project.phase.id) if project.phase else None,
+            'type': str(project.type.id) if project.type else None,
+            'projectClass': str(project.projectClass.id) if project.projectClass else None,
+            'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,
+            'area': str(project.area.id) if project.area else None,
+            'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
+            'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
+            'programmed': project.programmed,
 
             # Dates
             'estPlanningStart': project.estPlanningStart,
@@ -467,22 +476,33 @@ class ProjectWiseService:
             'visibilityStart': project.visibilityStart,
             'visibilityEnd': project.visibilityEnd,
 
-            # Year fields - FIX Issue 3
-            'planningStartYear': project.planningStartYear,   # FIX Issue 3a: Suunnittelun aloitusvuosi
-            'constructionEndYear': project.constructionEndYear, # FIX Issue 3b: Rakentamisen valmistumisvuosi
+            # Years
+            'planningStartYear': project.planningStartYear,
+            'constructionEndYear': project.constructionEndYear,
 
-            # Booleans
-            'gravel': project.gravel,                        # FIX: Sorakatu
-            'louhi': project.louhi,                          # FIX: Louheen
+            # Boolean flags
+            'gravel': project.gravel,
+            'louhi': project.louhi,
 
             # Protected fields (only update if empty in PW)
             'masterPlanAreaNumber': project.masterPlanAreaNumber,
             'trafficPlanNumber': project.trafficPlanNumber,
             'bridgeNumber': project.bridgeNumber,
+
+            # Person fields (UUIDs for transformation)
+            'personPlanning': str(project.personPlanning.id) if project.personPlanning else None,
+            'personConstruction': str(project.personConstruction.id) if project.personConstruction else None,
         }
 
-        # Remove None values to avoid unnecessary processing
-        return {k: v for k, v in project_data.items() if v is not None}
+        # Remove None values before transformation
+        cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
+        
+        # Transform to PW format using ProjectWiseDataMapper
+        # This handles UUID->name conversion, boolean->text conversion, date formatting, etc.
+        project_data = self.project_wise_data_mapper.convert_to_pw_data(cleaned_data, project)
+        
+        logger.debug(f"Built and transformed project data for {project.name}: {project_data}")
+        return project_data
 
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
