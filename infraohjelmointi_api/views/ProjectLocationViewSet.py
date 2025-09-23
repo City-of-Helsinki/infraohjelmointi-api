@@ -39,7 +39,7 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             request.query_params.get("forcedToFrame", False)
         )
 
-        frame_budgets = self.build_frame_budgets_context(year)
+        frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
 
         serializer = ProjectLocationSerializer(
             ProjectLocationService.list_all_for_coordinator(),
