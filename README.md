@@ -87,6 +87,26 @@ Import project location options:
   python manage.py locationimporter --file path/to/locationdata.xlsx
   ```
 
+### Import programmers
+
+Import programmer assignments from Excel file:
+
+  ```bash
+  python manage.py programmerimporter --file path/to/programmers.xlsx
+  ```
+
+Or using the import script:
+
+  ```bash
+  ./import-excels.sh -p path/to/programmers.xlsx
+  ```
+
+Use `--dry-run` to preview changes before importing:
+
+  ```bash
+  python manage.py programmerimporter --file path/to/programmers.xlsx --dry-run
+  ```
+
 ### Import new persons
 
 Import new person information into responsible persons list. The list can be found from project form:
