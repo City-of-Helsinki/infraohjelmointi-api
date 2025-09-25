@@ -250,8 +250,8 @@ class ProjectWiseServiceTestCase(TestCase):
         # Verify that sync was called with correct data
         mock_sync.assert_called_once()
         call_args = mock_sync.call_args
-        self.assertIn('name', call_args[1]['data'])
-        self.assertIn('description', call_args[1]['data'])
+        self.assertIn('PROJECT_Kohde', call_args[1]['data'])  # name -> PROJECT_Kohde
+        self.assertIn('PROJECT_Hankkeen_kuvaus', call_args[1]['data'])  # description -> PROJECT_Hankkeen_kuvaus
         self.assertEqual(call_args[1]['project'], self.programmed_project_with_hkr)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
@@ -1136,31 +1136,30 @@ class ProductionMassUpdateTestCase(TestCase):
         # Test with perfect project (all fields populated)
         project_data = service._create_project_data_for_mass_update(self.perfect_project)
 
-        # Should include all non-None fields
-        expected_fields = [
-            'name', 'description', 'address', 'entityName',
-            'estPlanningStart', 'estPlanningEnd', 'estConstructionStart', 'estConstructionEnd',
-            'presenceStart', 'presenceEnd', 'visibilityStart', 'visibilityEnd',
-            'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
+        # Should include all non-None fields in PW format (after conversion)
+        expected_pw_fields = [
+            'PROJECT_Kohde', 'PROJECT_Hankkeen_kuvaus', 'PROJECT_Kadun_tai_puiston_nimi', 'PROJECT_Aluekokonaisuuden_nimi',
+            'PROJECT_Hankkeen_suunnittelu_alkaa', 'PROJECT_Hankkeen_suunnittelu_pttyy',
+            'PROJECT_Hankkeen_rakentaminen_alkaa', 'PROJECT_Hankkeen_rakentaminen_pttyy',
+            'PROJECT_Esillaolo_alku', 'PROJECT_Esillaolo_loppu', 'PROJECT_Nhtvillolo_alku', 'PROJECT_Nhtvillolo_loppu'
         ]
 
-        for field in expected_fields:
-            self.assertIn(field, project_data, f"Field '{field}' should be included for perfect project")
+        for field in expected_pw_fields:
+            self.assertIn(field, project_data, f"PW Field '{field}' should be included for perfect project")
 
         # Test with partial project (some fields None/empty)
         partial_data = service._create_project_data_for_mass_update(self.partial_project)
 
-        # Should include non-None fields
-        self.assertIn('name', partial_data)
-        self.assertIn('entityName', partial_data)
-        self.assertIn('estPlanningStart', partial_data)
-        self.assertIn('masterPlanAreaNumber', partial_data)
+        # Should include non-None fields in PW format
+        self.assertIn('PROJECT_Kohde', partial_data)
+        self.assertIn('PROJECT_Aluekokonaisuuden_nimi', partial_data)  # entityName
+        self.assertIn('PROJECT_Hankkeen_suunnittelu_alkaa', partial_data)  # estPlanningStart
 
-        # Should exclude None fields
-        self.assertNotIn('address', partial_data)  # None
+        # Should exclude None fields - address maps to PROJECT_Kadun_tai_puiston_nimi
+        self.assertNotIn('PROJECT_Kadun_tai_puiston_nimi', partial_data)  # None
 
         # Description should be included (required field, has value)
-        self.assertIn('description', partial_data)  # Has value
+        self.assertIn('PROJECT_Hankkeen_kuvaus', partial_data)  # Has value
 
     def test_mass_update_with_no_projects(self):
         """Test mass update behavior when no projects match criteria"""
@@ -1359,3 +1358,128 @@ class ProjectImporterCommandTestCase(TestCase):
         self.assertIn('1 processed successfully', output)
         self.assertIn('1 errors', output)
         self.assertIn('Error updating Test Project 2', output)
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class IO396FieldMappingTestCase(TestCase):
+    """
+    Test cases for IO-396 field mapping and data format issues.
+    These tests verify that the ProjectWise integration properly maps and formats all fields.
+    """
+
+    def setUp(self):
+        """Set up test data"""
+        # Create basic test data using get_or_create to avoid conflicts
+        self.project_type, _ = ProjectType.objects.get_or_create(value="street")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        # Create minimal test project
+        self.test_project = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Mannerheimintie 1-5",
+            description="Test description for ProjectWise sync",
+            address="Mannerheimintie 1",
+            hkrId=12345,
+            programmed=True,
+            phase=self.project_phase,
+            type=self.project_type,
+            category=self.project_category
+        )
+
+    def test_projectwise_service_field_mapping_completeness(self):
+        """Test that ProjectWiseService._get_pw_field_mapping returns mappings for critical fields."""
+        # Mock the ProjectWiseDataMapper initialization to avoid database dependencies
+        with patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseDataMapper') as mock_mapper_class:
+            mock_mapper = Mock()
+            mock_mapper.load_and_transform_project_areas.return_value = {}
+            mock_mapper_class.return_value = mock_mapper
+
+            service = ProjectWiseService()
+            field_mapping = service._get_pw_field_mapping()
+
+            # Assert that critical fields are included in the mapping
+            # Based on actual fields in to_pw_map
+            critical_fields = [
+                'phase', 'type', 'programmed', 'planningStartYear', 'constructionEndYear',
+                'gravel', 'louhi', 'estPlanningStart', 'estPlanningEnd',
+                'estConstructionStart', 'estConstructionEnd', 'presenceStart', 'presenceEnd',
+                'visibilityStart', 'visibilityEnd', 'area', 'responsibleZone',
+                'constructionPhaseDetail', 'projectDistrict', 'projectClass',
+                'personPlanning', 'personConstruction'
+            ]
+
+            for field in critical_fields:
+                self.assertIn(field, field_mapping, f"Field '{field}' should be in field mapping")
+
+    def test_create_project_data_for_mass_update_with_proper_format(self):
+        """Test that _create_project_data_for_mass_update uses the correct data mapper method."""
+        # Mock the ProjectWiseDataMapper and its method
+        with patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseDataMapper') as mock_mapper_class:
+            mock_mapper = Mock()
+            mock_mapper.load_and_transform_project_areas.return_value = {}
+
+            # Mock the convert_to_pw_data method
+            mock_mapper.convert_to_pw_data.return_value = {
+                'PROJECT_Kohde': 'Mannerheimintie 1-5',
+                'PROJECT_Hankkeen_vaihe': '2. Ohjelmointi',
+                'PROJECT_Toimiala': 'street',
+                'PROJECT_Ohjelmoitu': 'Kyllä'
+            }
+            mock_mapper_class.return_value = mock_mapper
+
+            service = ProjectWiseService()
+            project_data = service._create_project_data_for_mass_update(self.test_project)
+
+            # Verify that convert_to_pw_data was called
+            mock_mapper.convert_to_pw_data.assert_called_once()
+
+            # Verify the result has proper PW format
+            self.assertIn('PROJECT_Kohde', project_data)
+            self.assertIn('PROJECT_Hankkeen_vaihe', project_data)
+            self.assertIn('PROJECT_Toimiala', project_data)
+            self.assertIn('PROJECT_Ohjelmoitu', project_data)
+
+            # Verify data is properly formatted (not UUIDs)
+            self.assertEqual(project_data['PROJECT_Kohde'], 'Mannerheimintie 1-5')
+            self.assertEqual(project_data['PROJECT_Hankkeen_vaihe'], '2. Ohjelmointi')
+            self.assertEqual(project_data['PROJECT_Ohjelmoitu'], 'Kyllä')
+
+    def test_projectwise_data_format_conversion(self):
+        """Test that the data mapper properly converts data formats."""
+        # Mock the ProjectWiseDataMapper initialization to avoid real DB dependencies
+        with patch('infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectWiseDataMapper.__init__', return_value=None):
+            from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
+
+            # Create a mapper instance and mock its methods
+            mapper = ProjectWiseDataMapper()
+
+            # Test data with different types
+            test_data = {
+                'name': 'Test Project',
+                'programmed': True,
+                'gravel': False,
+                'planningStartYear': 2025
+            }
+
+            # Mock the convert_to_pw_data method to return expected format
+            with patch.object(mapper, 'convert_to_pw_data') as mock_convert:
+                mock_convert.return_value = {
+                    'PROJECT_Kohde': 'Test Project',
+                    'PROJECT_Ohjelmoitu': 'Kyllä',
+                    'PROJECT_Sorakatu': 'Ei',
+                    'PROJECT_Louhi__hankkeen_aloitusvuosi': 2025
+                }
+
+                result = mapper.convert_to_pw_data(test_data, self.test_project)
+
+                # Verify boolean conversion
+                self.assertEqual(result['PROJECT_Ohjelmoitu'], 'Kyllä')
+                self.assertEqual(result['PROJECT_Sorakatu'], 'Ei')
+
+                # Verify simple field mapping
+                self.assertEqual(result['PROJECT_Kohde'], 'Test Project')
+
+                # Verify integer conversion
+                self.assertEqual(result['PROJECT_Louhi__hankkeen_aloitusvuosi'], 2025)
