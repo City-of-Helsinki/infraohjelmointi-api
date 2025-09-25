@@ -1,9 +1,13 @@
+"""
+Tests for ProjectClassSerializer to ensure defaultProgrammer field serialization works correctly.
+This addresses the IO-411 frontend integration requirements.
+"""
+
 from django.test import TestCase
 from rest_framework.renderers import JSONRenderer
 from infraohjelmointi_api.models import ProjectClass, ProjectProgrammer, Person
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 import uuid
-from overrides import override
 
 
 class ProjectClassSerializerTestCase(TestCase):
@@ -14,7 +18,6 @@ class ProjectClassSerializerTestCase(TestCase):
     person_id = uuid.UUID("fdc89f56-b631-4109-a137-45b950de6b10")
 
     @classmethod
-    @override
     def setUpTestData(cls):
         # Create test person
         cls.person = Person.objects.create(
@@ -154,3 +157,115 @@ class ProjectClassSerializerTestCase(TestCase):
         self.assertIn(b'"lastName"', json_output)
         self.assertIn(b'Alice', json_output)
         self.assertIn(b'Smith', json_output)
+
+    def test_programmer_person_relationship_serialization(self):
+        """Test that programmer's person relationship is properly serialized"""
+        serializer = ProjectClassSerializer(self.project_class)
+        data = serializer.data
+        
+        programmer_data = data['defaultProgrammer']
+        
+        # Should include person field
+        self.assertIn('person', programmer_data)
+        
+        # Person field should contain the person ID (since person is linked)
+        # The serializer returns UUID objects, so we need to convert to string for comparison
+        if programmer_data['person']:
+            self.assertEqual(str(programmer_data['person']), str(self.person_id))
+        else:
+            self.assertEqual(programmer_data['person'], str(self.person_id))
+
+    def test_empty_programmer_serialization(self):
+        """Test serialization when defaultProgrammer is the 'Ei Valintaa' empty programmer"""
+        # Create empty programmer
+        empty_programmer = ProjectProgrammer.objects.create(
+            firstName="Ei",
+            lastName="Valintaa",
+            person=None
+        )
+        
+        # Create class with empty programmer
+        class_with_empty = ProjectClass.objects.create(
+            name="Class with Empty Programmer",
+            path="test/empty",
+            forCoordinatorOnly=False,
+            defaultProgrammer=empty_programmer
+        )
+        
+        serializer = ProjectClassSerializer(class_with_empty)
+        data = serializer.data
+        
+        # Should still serialize the empty programmer
+        self.assertIsNotNone(data['defaultProgrammer'])
+        self.assertEqual(data['defaultProgrammer']['firstName'], 'Ei')
+        self.assertEqual(data['defaultProgrammer']['lastName'], 'Valintaa')
+        self.assertIsNone(data['defaultProgrammer']['person'])
+
+    def test_serializer_context_compatibility(self):
+        """Test that serializer works with different context configurations"""
+        # Test with empty context
+        serializer = ProjectClassSerializer(self.project_class, context={})
+        data = serializer.data
+        self.assertIn('defaultProgrammer', data)
+        
+        # Test with request context (simulating API call)
+        mock_request = type('MockRequest', (), {'user': None})()
+        serializer = ProjectClassSerializer(
+            self.project_class, 
+            context={'request': mock_request}
+        )
+        data = serializer.data
+        self.assertIn('defaultProgrammer', data)
+
+    def test_io411_specific_programmer_assignments(self):
+        """Test serialization of specific IO-411 programmer assignments"""
+        # Create programmers from IO-411 assignments
+        satu = ProjectProgrammer.objects.create(
+            firstName="Satu",
+            lastName="Järvinen"
+        )
+        
+        hanna = ProjectProgrammer.objects.create(
+            firstName="Hanna", 
+            lastName="Mikkola"
+        )
+        
+        # Create classes with IO-411 assignments
+        esirakentaminen = ProjectClass.objects.create(
+            name="8 01 03 Esirakentaminen, täyttötyöt, rakentamiskelpoiseksi saattaminen, Kaupunkiympäristölautakunnan käytettäväksi",
+            path="8/8 01/8 01 03",
+            forCoordinatorOnly=True,
+            defaultProgrammer=satu
+        )
+        
+        liikuntapaikat = ProjectClass.objects.create(
+            name="8 02 Liikuntapaikat",
+            path="8/8 02",
+            forCoordinatorOnly=True,
+            defaultProgrammer=hanna
+        )
+        
+        # Test serialization
+        esirakentaminen_serializer = ProjectClassSerializer(esirakentaminen)
+        esirakentaminen_data = esirakentaminen_serializer.data
+        
+        self.assertEqual(
+            esirakentaminen_data['defaultProgrammer']['firstName'],
+            'Satu'
+        )
+        self.assertEqual(
+            esirakentaminen_data['defaultProgrammer']['lastName'],
+            'Järvinen'
+        )
+        
+        liikuntapaikat_serializer = ProjectClassSerializer(liikuntapaikat)
+        liikuntapaikat_data = liikuntapaikat_serializer.data
+        
+        self.assertEqual(
+            liikuntapaikat_data['defaultProgrammer']['firstName'],
+            'Hanna'
+        )
+        self.assertEqual(
+            liikuntapaikat_data['defaultProgrammer']['lastName'],
+            'Mikkola'
+        )
