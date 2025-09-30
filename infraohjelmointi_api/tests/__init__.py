@@ -2,3 +2,4 @@ from .test_Projects import ProjectTestCase
 from .test_Notes import NoteTestCase
 from .management.commands.test_managehierarchies import ManageHierarchiesCommandTestCase
 from .management.commands.test_responsiblepersons import ResponsiblePersonsCommandTestCase
+from .management.commands.test_programmerimporter import ProgrammerImporterCommandTestCase
