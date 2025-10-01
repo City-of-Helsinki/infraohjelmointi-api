@@ -4,6 +4,7 @@ from django.test import TestCase
 from datetime import date
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory, Person
+from ..serializers import ProjectCreateSerializer
 from ..services import ProjectWiseService
 from ..views import BaseViewSet
 
@@ -1483,3 +1484,129 @@ class IO396FieldMappingTestCase(TestCase):
 
                 # Verify integer conversion
                 self.assertEqual(result['PROJECT_Louhi__hankkeen_aloitusvuosi'], 2025)
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectCreationPWIntegrationTestCase(TestCase):
+    """
+    This addresses the gap where creating a new project with PW ID doesn't trigger automatic sync.
+    """
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="Test Class Creation",
+            defaults={'path': "Test/Class/Creation"}
+        )
+
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_with_pw_id_triggers_automatic_sync(self, mock_post, mock_get_pw):
+        # Mock PW responses
+        mock_get_pw.return_value = {
+            "relationshipInstances": [{
+                "relatedInstance": {
+                    "instanceId": "test-instance-id",
+                    "properties": {}
+                }
+            }]
+        }
+        mock_post.return_value.json.return_value = {"success": True}
+
+        # Create project data with PW ID
+        project_data = {
+            "name": "New Project with PW ID",
+            "description": "Test project created with PW ID",
+            "hkrId": 54321,
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer (simulating the create flow)
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        # This is where the automatic PW sync should happen
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertEqual(created_project.hkrId, 54321)
+        self.assertEqual(created_project.name, "New Project with PW ID")
+
+        # Verify that PW sync was called automatically
+        mock_get_pw.assert_called_once_with(54321)
+        mock_post.assert_called_once()
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_without_pw_id_no_sync(self, mock_post, mock_get_pw):
+        # Create project data without PW ID
+        project_data = {
+            "name": "New Project without PW ID",
+            "description": "Test project created without PW ID",
+            "hkrId": None,  # No PW ID
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertIsNone(created_project.hkrId)
+        self.assertEqual(created_project.name, "New Project without PW ID")
+
+        # Verify that PW sync was NOT called
+        mock_get_pw.assert_not_called()
+        mock_post.assert_not_called()
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_with_empty_pw_id_no_sync(self, mock_post, mock_get_pw):
+        # Create project data with empty PW ID
+        project_data = {
+            "name": "New Project with empty PW ID",
+            "description": "Test project created with empty PW ID",
+            "hkrId": None,  # Empty PW ID
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertIsNone(created_project.hkrId)
+        self.assertEqual(created_project.name, "New Project with empty PW ID")
+
+        # Verify that PW sync was NOT called
+        mock_get_pw.assert_not_called()
+        mock_post.assert_not_called()
