@@ -151,7 +151,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     def get_currentYearsSapValue(self, project: Project):
         projects_to_sap_values = self.context.get('projects_to_sap_values', {})
         sap_values = projects_to_sap_values.get(project.id)
-        
+
         if not sap_values:
             current_year = datetime.datetime.now().year
             sap_values = SapCurrentYearService.get_by_project_id_year(project.id, int(current_year))
@@ -215,6 +215,11 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
+
+        # Fix for projectLocation: if projectLocation is null but projectDistrict exists, use projectDistrict
+        if rep.get("projectLocation") is None and instance.projectDistrict_id is not None:
+            rep["projectLocation"] = instance.projectDistrict_id
+
         # use context to check if coordinator class/locations are needed
         for_coordinator = self.context.get("for_coordinator", False)
         if for_coordinator == True:

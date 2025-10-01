@@ -26,6 +26,7 @@ from ..models import (
     ConstructionPhase,
     ProjectClass,
     ProjectLocation,
+    ProjectDistrict,
     ProjectHashTag,
     ProjectGroup,
     ProjectFinancial,
@@ -50,10 +51,10 @@ def mock_projectwise_get_service(func):
         # Mock both service instances to avoid external dependency
         mock_create_instance = mock_create_service.return_value
         mock_create_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
-        
-        mock_get_instance = mock_get_service.return_value  
+
+        mock_get_instance = mock_get_service.return_value
         mock_get_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
-        
+
         return func(self, *args, **kwargs)
     return wrapper
 
@@ -618,7 +619,7 @@ class ProjectTestCase(TestCase):
 
     @mock_projectwise_get_service
     def test_GET_one_project(self):
-        
+
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
@@ -3954,4 +3955,186 @@ class ProjectTestCase(TestCase):
         self.assertNotEqual(
             responseForcedToFrame.json()["finances"],
             patchData["finances"]
+        )
+
+
+class ProjectLocationFallbackTestCase(TestCase):
+    """
+    Test case for the projectLocation fallback fix.
+
+    This tests the fix for the issue where projects with projectDistrict but no projectLocation
+    would return projectLocation: null in the API, even though the project card showed the
+    correct location from projectDistrict.
+    """
+
+    def setUp(self):
+        """Set up test data."""
+        # Create test district
+        self.district = ProjectDistrict.objects.create(
+            name="Test District",
+            level="district",
+            path="test-district"
+        )
+
+        # Create test locations
+        self.district_location = ProjectLocation.objects.create(
+            name="Test District Location",
+            forCoordinatorOnly=False
+        )
+
+        self.division_location = ProjectLocation.objects.create(
+            name="Test Division Location",
+            parent=self.district_location,
+            forCoordinatorOnly=False
+        )
+
+        # Create test project class
+        self.project_class = ProjectClass.objects.create(
+            name="Test Class",
+            forCoordinatorOnly=False
+        )
+
+        # Create test project phase
+        self.project_phase = ProjectPhase.objects.create(
+            value="test"
+        )
+
+        # Create test project type
+        self.project_type = ProjectType.objects.create(
+            value="test_type"
+        )
+
+        # Create test project category
+        self.project_category = ProjectCategory.objects.create(
+            value="test"
+        )
+
+        # Create test person
+        self.person = Person.objects.create(
+            firstName="Test",
+            lastName="Person"
+        )
+
+    def test_project_location_fallback_when_project_location_is_null(self):
+        """
+        Test that projectLocation falls back to projectDistrict when projectLocation is null.
+
+        This is the main fix for the "Kannelpolku ja Kaustisenpolku" issue.
+        """
+        # Create a project with projectDistrict but no projectLocation (the problematic scenario)
+        project = Project.objects.create(
+            name="Test Project with District Only",
+            description="Test project with projectDistrict but no projectLocation",
+            projectClass=self.project_class,
+            projectDistrict=self.district,
+            projectLocation=None,  # This is the key - projectLocation is null
+            phase=self.project_phase,
+            type=self.project_type,
+            category=self.project_category,
+            personPlanning=self.person,
+            programmed=False
+        )
+
+        # Test regular endpoint (for_coordinator=False)
+        serializer = ProjectGetSerializer(project, context={"for_coordinator": False})
+        data = serializer.data
+
+        # The fix should return projectDistrict_id as projectLocation
+        self.assertEqual(
+            str(data.get("projectLocation")),
+            str(self.district.id),
+            "projectLocation should fall back to projectDistrict_id when projectLocation is null"
+        )
+
+    def test_project_location_no_fallback_when_project_location_exists(self):
+        """
+        Test that projectLocation is not overridden when it already has a value.
+        """
+        # Create a project with both projectLocation and projectDistrict
+        project = Project.objects.create(
+            name="Test Project with Both Locations",
+            description="Test project with both projectLocation and projectDistrict",
+            projectClass=self.project_class,
+            projectDistrict=self.district,
+            projectLocation=self.division_location,  # This has a value
+            phase=self.project_phase,
+            type=self.project_type,
+            category=self.project_category,
+            personPlanning=self.person,
+            programmed=False
+        )
+
+        # Test regular endpoint (for_coordinator=False)
+        serializer = ProjectGetSerializer(project, context={"for_coordinator": False})
+        data = serializer.data
+
+        # Should return the actual projectLocation, not fall back to projectDistrict
+        self.assertEqual(
+            str(data.get("projectLocation")),
+            str(self.division_location.id),
+            "projectLocation should not fall back when it already has a value"
+        )
+        self.assertNotEqual(
+            str(data.get("projectLocation")),
+            str(self.district.id),
+            "projectLocation should not be the projectDistrict when projectLocation exists"
+        )
+
+    def test_project_location_remains_null_when_both_are_null(self):
+        """
+        Test that projectLocation remains null when both projectLocation and projectDistrict are null.
+        """
+        # Create a project with neither projectLocation nor projectDistrict
+        project = Project.objects.create(
+            name="Test Project with No Locations",
+            description="Test project with no location data",
+            projectClass=self.project_class,
+            projectDistrict=None,
+            projectLocation=None,  # Both are null
+            phase=self.project_phase,
+            type=self.project_type,
+            category=self.project_category,
+            personPlanning=self.person,
+            programmed=False
+        )
+
+        # Test regular endpoint (for_coordinator=False)
+        serializer = ProjectGetSerializer(project, context={"for_coordinator": False})
+        data = serializer.data
+
+        # Should remain null
+        self.assertIsNone(
+            data.get("projectLocation"),
+            "projectLocation should remain null when both projectLocation and projectDistrict are null"
+        )
+
+    def test_project_location_fallback_does_not_affect_coordinator_endpoint(self):
+        """
+        Test that the fallback fix does not interfere with coordinator endpoint logic.
+        """
+        # Create a project with projectDistrict but no projectLocation
+        project = Project.objects.create(
+            name="Test Project for Coordinator",
+            description="Test project for coordinator endpoint",
+            projectClass=self.project_class,
+            projectDistrict=self.district,
+            projectLocation=None,
+            phase=self.project_phase,
+            type=self.project_type,
+            category=self.project_category,
+            personPlanning=self.person,
+            programmed=False
+        )
+
+        # Test coordinator endpoint (for_coordinator=True)
+        serializer = ProjectGetSerializer(project, context={"for_coordinator": True})
+        data = serializer.data
+
+        # The coordinator endpoint has its own logic, so we just verify it doesn't crash
+        # and returns some value (could be None or a coordinator location ID)
+        # The coordinator endpoint might return None if no coordinator location is found
+        # This is expected behavior, so we just verify the endpoint doesn't crash
+        self.assertIsInstance(
+            data.get("projectLocation"), (str, type(None)),
+            "Coordinator endpoint should return string or None for projectLocation"
         )
