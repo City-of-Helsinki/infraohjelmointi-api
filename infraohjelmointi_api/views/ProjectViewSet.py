@@ -33,6 +33,7 @@ from infraohjelmointi_api.services import (
     ProjectFinancialService,
     ProjectClassService,
 )
+from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 import json
 
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
@@ -1686,39 +1687,9 @@ class ProjectViewSet(BaseViewSet):
             logger.info(f"HKR ID added for first time to project '{updated_project.name}' - performing automatic PW update")
 
             # Create comprehensive data dict for automatic update
-            automatic_update_data = self._create_comprehensive_project_data(updated_project)
+            automatic_update_data = create_comprehensive_project_data(updated_project)
 
             self.projectWiseService.sync_project_to_pw(
                 data=automatic_update_data, project=updated_project
             )
 
-    def _create_comprehensive_project_data(self, project: Project) -> dict:
-        """
-        Create a comprehensive data dictionary for automatic PW updates.
-
-        Args:
-            project: The project object to extract data from
-
-        Returns:
-            Dictionary with all relevant project fields, excluding None values
-        """
-        comprehensive_data = {
-            'name': project.name,
-            'description': project.description,
-            'address': project.address,
-            'entityName': project.entityName,
-            'estPlanningStart': project.estPlanningStart,
-            'estPlanningEnd': project.estPlanningEnd,
-            'estConstructionStart': project.estConstructionStart,
-            'estConstructionEnd': project.estConstructionEnd,
-            'presenceStart': project.presenceStart,
-            'presenceEnd': project.presenceEnd,
-            'visibilityStart': project.visibilityStart,
-            'visibilityEnd': project.visibilityEnd,
-            'masterPlanAreaNumber': project.masterPlanAreaNumber,
-            'trafficPlanNumber': project.trafficPlanNumber,
-            'bridgeNumber': project.bridgeNumber,
-        }
-
-        # Remove None values to avoid unnecessary processing
-        return {k: v for k, v in comprehensive_data.items() if v is not None}

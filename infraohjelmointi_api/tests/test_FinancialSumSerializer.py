@@ -89,37 +89,18 @@ class FinancialSumSerializerTestCase(TestCase):
         frame_budgets[f"{year}-{self.child_class_1.id}"] = 30000
         frame_budgets[f"{year}-{self.child_class_2.id}"] = 28000
         
-        # Test coordinator view logic (new method)
+        # Test with frame_budgets context (unified method)
         serializer = FinancialSumSerializer()
-        coordinator_result = serializer.get_frameBudget_and_budgetChange_new(
+        result_with_context = serializer.get_frameBudget_and_budgetChange(
             instance=self.tse_2028,
             year=year,
             for_frame_view=False,
             frame_budgets=frame_budgets
         )
         
-        # Test planning view logic (old method)
-        planning_result = serializer.get_frameBudget_and_budgetChange(
-            instance=self.tse_2028,
-            year=year,
-            for_frame_view=False
-        )
-        
-        # Both should show NO overlap since 30000 + 28000 = 58000 (exactly equal)
+        # Should show NO overlap since 30000 + 28000 = 58000 (exactly equal)
         self.assertFalse(
-            coordinator_result["year0"]["isFrameBudgetOverlap"],
-            "Coordinator view should not show budget overlap when children sum equals parent budget"
-        )
-        
-        self.assertFalse(
-            planning_result["isFrameBudgetOverlap"],
-            "Planning view should not show budget overlap when children sum equals parent budget"
-        )
-        
-        # Both methods should return the same result
-        self.assertEqual(
-            coordinator_result["year0"]["isFrameBudgetOverlap"],
-            planning_result["isFrameBudgetOverlap"],
-            "Coordinator and planning views should show consistent budget overlap results"
+            result_with_context["year0"]["isFrameBudgetOverlap"],
+            "Should not show budget overlap when children sum equals parent budget (TSE-2028 scenario)"
         )
 

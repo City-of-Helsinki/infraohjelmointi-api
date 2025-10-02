@@ -29,55 +29,55 @@ from django.db.models.functions import Coalesce
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
 
-    def get_frameBudget_and_budgetChange_new(self, instance, year: int, for_frame_view: bool, frame_budgets: defaultdict) -> dict:
-        """
-        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
-        isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
-        """
-
+    def _get_coordinator_instance(self, instance, _type: str):
+        """Get the coordinator instance if needed."""
         for_coordinator = self.context.get("for_coordinator", False)
-        _type = instance._meta.model.__name__
-
-        if (
-            for_coordinator == False
-            or getattr(instance, "forCoordinatorOnly", False) == False
-        ):
-            # get coordinatorClass when planning classes/locations are being fetched
+        
+        if not for_coordinator or not getattr(instance, "forCoordinatorOnly", False):
             if _type == "ProjectClass":
-                instance = getattr(instance, "coordinatorClass", None)
-            if _type == "ProjectLocation":
-                instance = getattr(instance, "coordinatorLocation", None)
+                return getattr(instance, "coordinatorClass", None)
+            elif _type == "ProjectLocation":
+                return getattr(instance, "coordinatorLocation", None)
+        return instance
 
-        ret_val = {
+    def _create_empty_budget_result(self) -> dict:
+        """Create empty budget result structure for 11 years."""
+        return {
             f"year{y}": {
                 "frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False
             }
             for y in range(11)
         }
 
-        if _type not in ["ProjectClass", "ProjectLocation"] or instance == None:
-            return ret_val
-        
+    def _populate_financial_data(self, instance, _type: str, year: int, for_frame_view: bool, ret_val: dict):
+        """Populate frameBudget and budgetChange data for all years."""
         for y in range(11):
-            finance_instance = None
-            if instance.finances.filter(year=year+y, forFrameView=for_frame_view).exists():
-                if _type == "ProjectClass":
-                    finance_instance = ClassFinancialService.get(
-                        class_id=instance.id, year=year+y, for_frame_view=for_frame_view
-                    )
-                if _type == "ProjectLocation":
-                    finance_instance = LocationFinancialService.get(
-                        location_id=instance.id, year=year+y, for_frame_view=for_frame_view
-                    )
-            if finance_instance != None:
+            if not instance.finances.filter(year=year+y, forFrameView=for_frame_view).exists():
+                continue
+                
+            finance_instance = self._get_finance_instance(_type, instance.id, year+y, for_frame_view)
+            if finance_instance is not None:
                 ret_val[f"year{y}"]["frameBudget"] = finance_instance.frameBudget
                 ret_val[f"year{y}"]["budgetChange"] = finance_instance.budgetChange
-        
-        # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
-        if _type != "ProjectClass":
-            return ret_val
 
-        # get all childs with frameBudget for each level
+    def _get_finance_instance(self, _type: str, instance_id, year: int, for_frame_view: bool):
+        """Get finance instance based on type."""
+        try:
+            if _type == "ProjectClass":
+                return ClassFinancialService.get(
+                    class_id=instance_id, year=year, for_frame_view=for_frame_view
+                )
+            elif _type == "ProjectLocation":
+                return LocationFinancialService.get(
+                    location_id=instance_id, year=year, for_frame_view=for_frame_view
+                )
+        except Exception:
+            # If service call fails, return None (no financial data exists)
+            return None
+        return None
+
+    def _get_child_relations(self, instance):
+        """Get all child class and location relations."""
         child_classes = (
             ProjectClass.objects.filter(
                 path__startswith=instance.path,
@@ -87,7 +87,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             .annotate(parentRelation=F("parent"))
             .values("id", "parentRelation")
         )
-        # get all locations with parentClass as childs and get frameBudgets
+        
         child_locations = (
             ProjectLocation.objects.filter(
                 parentClass__in=[
@@ -100,144 +100,43 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             .values("id", "parentRelation")
         )
 
-        # Combine all child relations of the current instance into one single queryset
-        all_child_relations = child_locations.union(child_classes)
-        
-        if all_child_relations.exists():
-            for y in range(11):    
-                # Sum up the frame budgets of direct children of the current instance
-                children_budget_sum = 0
-                current_instance_budget = frame_budgets[f"{year+y}-{instance.id}"]
-                
-                for relation in all_child_relations:
-                    # Only consider direct children of the current instance
-                    if relation['parentRelation'] == instance.id:
-                        children_budget_sum += frame_budgets[f"{year+y}-{relation['id']}"]
-                
-                # Check if children's budget sum exceeds current instance's budget
-                if children_budget_sum > current_instance_budget:
-                    ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
-        return ret_val
+        return child_locations.union(child_classes)
 
-    def get_frameBudget_and_budgetChange(self, instance, year: int, for_frame_view: bool) -> dict:
-        """
-        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.\n
-        isFrameBudgetOverlap donates if child classes have a frameBudget sum that exceeds the current class frameBudget.
-        """
+    def _calculate_budget_overlaps(self, instance, year: int, frame_budgets: defaultdict, 
+                                   all_child_relations, ret_val: dict):
+        """Calculate budget overlaps for all years."""
+        for y in range(11):    
+            children_budget_sum = sum(
+                frame_budgets[f"{year+y}-{relation['id']}"]
+                for relation in all_child_relations
+                if relation['parentRelation'] == instance.id
+            )
+            
+            current_budget = frame_budgets[f"{year+y}-{instance.id}"]
+            if children_budget_sum > current_budget:
+                ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
 
-        for_coordinator = self.context.get("for_coordinator", False)
+    def get_frameBudget_and_budgetChange(self, instance, year: int, for_frame_view: bool, frame_budgets: defaultdict) -> dict:
+        """
+        Returns the frameBudget, budgetChange and isFrameBudgetOverlap for a given year and class/location instance.
+        isFrameBudgetOverlap indicates if child classes have a frameBudget sum that exceeds the current class frameBudget.
+        """
         _type = instance._meta.model.__name__
+        instance = self._get_coordinator_instance(instance, _type)
+        ret_val = self._create_empty_budget_result()
 
-        if (
-            for_coordinator == False
-            or getattr(instance, "forCoordinatorOnly", False) == False
-        ):
-            # get coordinatorClass when planning classes/locations are being fetched
-            if _type == "ProjectClass":
-                instance = getattr(instance, "coordinatorClass", None)
-            if _type == "ProjectLocation":
-                instance = getattr(instance, "coordinatorLocation", None)
-
-        if _type not in ["ProjectClass", "ProjectLocation"] or instance == None:
-            return {"frameBudget": 0, "budgetChange": 0, "isFrameBudgetOverlap": False}
-
-        finance_instance = None
-        if instance.finances.filter(year=year, forFrameView=for_frame_view).exists():
-            if _type == "ProjectClass":
-                finance_instance = ClassFinancialService.get(
-                    class_id=instance.id, year=year, for_frame_view=for_frame_view
-                )
-            if _type == "ProjectLocation":
-                finance_instance = LocationFinancialService.get(
-                    location_id=instance.id, year=year, for_frame_view=for_frame_view
-                )
-
-        is_frame_budget_overlap = False
-        # Get framebudget sums for children only for ProjectClass instances since coordinator locations have no more levels under it
+        if _type not in ["ProjectClass", "ProjectLocation"] or instance is None:
+            return ret_val
+        
+        self._populate_financial_data(instance, _type, year, for_frame_view, ret_val)
+        
+        # Only ProjectClass instances can have budget overlaps (coordinator locations have no children)
         if _type == "ProjectClass":
-            # get all childs with frameBudget for each level
-
-            child_classes = (
-                ProjectClass.objects.filter(
-                    path__startswith=instance.path,
-                    path__gt=instance.path,
-                    forCoordinatorOnly=True,
-                )
-                .annotate(
-                    frameBudget=Coalesce(
-                        Subquery(
-                            ClassFinancial.objects.filter(
-                                classRelation=OuterRef("id"), year=year
-                            ).values_list("frameBudget", flat=True)[:1],
-                            output_field=IntegerField(),
-                        ),
-                        Value(0),
-                    ),
-                    parentRelation=F("parent"),
-                    parentFrameBudget=Coalesce(
-                        Subquery(
-                            ClassFinancial.objects.filter(
-                                classRelation=OuterRef("parent"), year=year
-                            ).values_list("frameBudget", flat=True)[:1],
-                            output_field=IntegerField(),
-                        ),
-                        Value(0),
-                    ),
-                )
-                .values("id", "parentRelation", "frameBudget", "parentFrameBudget")
-            )
-            # get all locations with parentClass as childs and get frameBudgets
-            child_locations = (
-                ProjectLocation.objects.filter(
-                    parentClass__in=[
-                        *child_classes.values_list("id", flat=True),
-                        instance.id,
-                    ],
-                    forCoordinatorOnly=True,
-                )
-                .annotate(
-                    frameBudget=Coalesce(
-                        Subquery(
-                            LocationFinancial.objects.filter(
-                                locationRelation=OuterRef("id"), year=year
-                            ).values_list("frameBudget", flat=True)[:1],
-                            output_field=IntegerField(),
-                        ),
-                        Value(0),
-                    ),
-                    parentRelation=F("parentClass"),
-                    parentFrameBudget=Coalesce(
-                        Subquery(
-                            ClassFinancial.objects.filter(
-                                classRelation=OuterRef("parentClass"), year=year
-                            ).values_list("frameBudget", flat=True)[:1],
-                            output_field=IntegerField(),
-                        ),
-                        Value(0),
-                    ),
-                )
-                .values("id", "parentRelation", "frameBudget", "parentFrameBudget")
-            )
-            # Combine all child relations of the current instance into one single queryset
-            all_child_relations = child_locations.union(child_classes)
+            all_child_relations = self._get_child_relations(instance)
             if all_child_relations.exists():
-                grouped = defaultdict(lambda: {'frameBudget': 0})
-
-                for relation in all_child_relations:
-                    grouped[relation['parentRelation']]['frameBudget'] += relation['frameBudget']
-                    if grouped[relation['parentRelation']]['frameBudget'] > relation['parentFrameBudget']:
-                        is_frame_budget_overlap = True
-                        break
-
-        return {
-            "frameBudget": finance_instance.frameBudget
-            if finance_instance != None
-            else 0,
-            "budgetChange": finance_instance.budgetChange
-            if finance_instance != None
-            else 0,
-            "isFrameBudgetOverlap": is_frame_budget_overlap,
-        }
+                self._calculate_budget_overlaps(instance, year, frame_budgets, all_child_relations, ret_val)
+        
+        return ret_val
 
     def get_finance_sums(self, instance):
         """
@@ -271,29 +170,25 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         summed_finances["year"] = year
       
-        frame_budgets = self.context.get("frame_budgets", None)
-        if frame_budgets == None:
-            for i in range(11):
-                summed_finances[f"year{i}"] = {
-                    **self.get_frameBudget_and_budgetChange(
-                        instance=instance,
-                        year=year + i,
-                        for_frame_view=forced_to_frame
-                    ),
-                    "plannedBudget": int(summed_finances.pop(f"year{i}_plannedBudget")),
-                }
-        else:
-            summed_finances = {
-                **summed_finances,
-                **self.get_frameBudget_and_budgetChange_new(
-                    instance=instance,
-                    year=year,
-                    for_frame_view=forced_to_frame,
-                    frame_budgets=frame_budgets
-                ),
-            }
-            for i in range(11):
-                summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
+        # Use unified method with frame_budgets context
+        frame_budgets = self.context.get("frame_budgets")
+        if frame_budgets is None:
+            # Build frame_budgets if not provided (e.g., in signal handlers or tests)
+            # Use lazy import to avoid circular dependency
+            from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+            frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(year, for_frame_view=forced_to_frame)
+        
+        summed_finances = {
+            **summed_finances,
+            **self.get_frameBudget_and_budgetChange(
+                instance=instance,
+                year=year,
+                for_frame_view=forced_to_frame,
+                frame_budgets=frame_budgets
+            ),
+        }
+        for i in range(11):
+            summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
 
         return summed_finances
 
