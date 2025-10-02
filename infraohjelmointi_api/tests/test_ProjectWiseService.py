@@ -4,6 +4,7 @@ from django.test import TestCase
 from datetime import date
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory, Person
+from ..serializers import ProjectCreateSerializer
 from ..services import ProjectWiseService
 from ..views import BaseViewSet
 from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper, to_pw_map
@@ -1555,3 +1556,597 @@ class IO396FieldMappingTestCase(TestCase):
 
                 # Verify integer conversion
                 self.assertEqual(result['PROJECT_Louhi__hankkeen_aloitusvuosi'], 2025)
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectCreationPWIntegrationTestCase(TestCase):
+    """
+    This addresses the gap where creating a new project with PW ID doesn't trigger automatic sync.
+    """
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="Test Class Creation",
+            defaults={'path': "Test/Class/Creation"}
+        )
+
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_with_pw_id_triggers_automatic_sync(self, mock_post, mock_get_pw):
+        # Mock PW responses
+        mock_get_pw.return_value = {
+            "relationshipInstances": [{
+                "relatedInstance": {
+                    "instanceId": "test-instance-id",
+                    "properties": {}
+                }
+            }]
+        }
+        mock_post.return_value.json.return_value = {"success": True}
+
+        # Create project data with PW ID
+        project_data = {
+            "name": "New Project with PW ID",
+            "description": "Test project created with PW ID",
+            "hkrId": 54321,
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer (simulating the create flow)
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        # This is where the automatic PW sync should happen
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertEqual(created_project.hkrId, 54321)
+        self.assertEqual(created_project.name, "New Project with PW ID")
+
+        # Verify that PW sync was called automatically
+        mock_get_pw.assert_called_once_with(54321)
+        mock_post.assert_called_once()
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_without_pw_id_no_sync(self, mock_post, mock_get_pw):
+        # Create project data without PW ID
+        project_data = {
+            "name": "New Project without PW ID",
+            "description": "Test project created without PW ID",
+            "hkrId": None,  # No PW ID
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertIsNone(created_project.hkrId)
+        self.assertEqual(created_project.name, "New Project without PW ID")
+
+        # Verify that PW sync was NOT called
+        mock_get_pw.assert_not_called()
+        mock_post.assert_not_called()
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_with_empty_pw_id_no_sync(self, mock_post, mock_get_pw):
+        # Create project data with empty PW ID
+        project_data = {
+            "name": "New Project with empty PW ID",
+            "description": "Test project created with empty PW ID",
+            "hkrId": None,  # Empty PW ID
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertIsNone(created_project.hkrId)
+        self.assertEqual(created_project.name, "New Project with empty PW ID")
+
+        # Verify that PW sync was NOT called
+        mock_get_pw.assert_not_called()
+        mock_post.assert_not_called()
+
+    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
+    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
+    def test_create_project_with_pw_id_sync_error_handling(self, mock_post, mock_get_pw):
+        """Test that PW sync errors don't break project creation"""
+        # Mock PW service to raise an exception
+        mock_get_pw.side_effect = Exception("PW service unavailable")
+        
+        # Create project data with PW ID
+        project_data = {
+            "name": "New Project with PW ID Error",
+            "description": "Test project with PW sync error",
+            "hkrId": 99999,
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        # Project creation should succeed even if PW sync fails
+        created_project = serializer.save()
+
+        # Verify project was created successfully
+        self.assertIsNotNone(created_project)
+        self.assertEqual(created_project.hkrId, 99999)
+        self.assertEqual(created_project.name, "New Project with PW ID Error")
+
+        # Verify that PW sync was attempted
+        mock_get_pw.assert_called_once_with(99999)
+
+    def test_sync_new_project_to_projectwise_whitespace_pw_id_validation(self):
+        """Test that _sync_new_project_to_projectwise handles whitespace PW IDs correctly"""
+        # Create a mock project with whitespace PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project Whitespace PW"
+        mock_project.hkrId = "   "  # Whitespace only
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            # Call the method
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify debug log was called (whitespace-only PW ID should be treated as no PW ID)
+            mock_logger.debug.assert_called_once()
+            debug_call_args = mock_logger.debug.call_args[0][0]
+            self.assertIn("created without PW ID - skipping PW sync", debug_call_args)
+
+    def test_sync_new_project_to_projectwise_method_coverage(self):
+        """Test the _sync_new_project_to_projectwise method directly"""
+        # Create a mock project with PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project"
+        mock_project.hkrId = 12345
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        # Mock the ProjectWise service and create_comprehensive_project_data
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService') as mock_pw_service_class, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.create_comprehensive_project_data') as mock_create_data, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            
+            mock_pw_service = Mock()
+            mock_pw_service_class.return_value = mock_pw_service
+            mock_create_data.return_value = {'name': 'Test Project', 'description': 'Test'}
+            
+            # Call the method
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify the method was called correctly
+            mock_create_data.assert_called_once_with(mock_project)
+            mock_pw_service.sync_project_to_pw.assert_called_once_with(
+                data={'name': 'Test Project', 'description': 'Test'}, 
+                project=mock_project
+            )
+            mock_logger.info.assert_called()
+
+    def test_sync_new_project_to_projectwise_no_pw_id(self):
+        """Test _sync_new_project_to_projectwise with no PW ID"""
+        # Create a mock project without PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project No PW"
+        mock_project.hkrId = None
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            # Call the method
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify debug log was called
+            mock_logger.debug.assert_called_once()
+
+    def test_sync_new_project_to_projectwise_empty_pw_id(self):
+        """Test _sync_new_project_to_projectwise with empty PW ID"""
+        # Create a mock project with empty PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project Empty PW"
+        mock_project.hkrId = ""
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            # Call the method
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify debug log was called
+            mock_logger.debug.assert_called_once()
+
+    def test_sync_new_project_to_projectwise_whitespace_pw_id(self):
+        """Test _sync_new_project_to_projectwise with whitespace PW ID"""
+        # Create a mock project with whitespace PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project Whitespace PW"
+        mock_project.hkrId = "   "
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            # Call the method
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify debug log was called
+            mock_logger.debug.assert_called_once()
+
+    def test_sync_new_project_to_projectwise_exception_handling(self):
+        """Test _sync_new_project_to_projectwise exception handling"""
+        # Create a mock project with PW ID
+        mock_project = Mock()
+        mock_project.name = "Test Project Exception"
+        mock_project.hkrId = 12345
+        
+        # Create serializer instance
+        serializer = ProjectCreateSerializer()
+        
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService') as mock_pw_service_class, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.create_comprehensive_project_data') as mock_create_data, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            
+            mock_pw_service = Mock()
+            mock_pw_service_class.return_value = mock_pw_service
+            mock_create_data.return_value = {'name': 'Test Project', 'description': 'Test'}
+            
+            # Make sync_project_to_pw raise an exception
+            mock_pw_service.sync_project_to_pw.side_effect = Exception("PW sync failed")
+            
+            # Call the method - should not raise exception
+            serializer._sync_new_project_to_projectwise(mock_project)
+            
+            # Verify error was logged
+            mock_logger.error.assert_called_once()
+            error_call_args = mock_logger.error.call_args[0][0]
+            self.assertIn("Failed to sync new project 'Test Project Exception' to ProjectWise", error_call_args)
+            self.assertIn("PW sync failed", error_call_args)
+
+
+class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
+    """
+    Test cases for the create_comprehensive_project_data function to ensure full coverage.
+    """
+
+    def test_create_comprehensive_project_data_with_all_fields(self):
+        """Test create_comprehensive_project_data with all fields populated"""
+        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
+        from datetime import date
+        
+        # Create a mock project with all fields
+        mock_project = Mock()
+        mock_project.name = "Complete Test Project"
+        mock_project.description = "Complete description"
+        mock_project.address = "Complete Address 123"
+        mock_project.entityName = "Complete Entity"
+        mock_project.estPlanningStart = date(2024, 1, 1)
+        mock_project.estPlanningEnd = date(2024, 3, 1)
+        mock_project.estConstructionStart = date(2024, 6, 1)
+        mock_project.estConstructionEnd = date(2024, 12, 1)
+        mock_project.presenceStart = date(2024, 2, 1)
+        mock_project.presenceEnd = date(2024, 2, 28)
+        mock_project.visibilityStart = date(2024, 3, 1)
+        mock_project.visibilityEnd = date(2024, 3, 31)
+        mock_project.masterPlanAreaNumber = "MP001"
+        mock_project.trafficPlanNumber = "TP001"
+        mock_project.bridgeNumber = "BR001"
+        
+        # Call the function
+        result = create_comprehensive_project_data(mock_project)
+        
+        # Verify all fields are included
+        expected_fields = [
+            'name', 'description', 'address', 'entityName',
+            'estPlanningStart', 'estPlanningEnd', 'estConstructionStart', 'estConstructionEnd',
+            'presenceStart', 'presenceEnd', 'visibilityStart', 'visibilityEnd',
+            'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
+        ]
+        
+        for field in expected_fields:
+            self.assertIn(field, result, f"Field '{field}' should be included")
+        
+        # Verify values are correct
+        self.assertEqual(result['name'], "Complete Test Project")
+        self.assertEqual(result['description'], "Complete description")
+        self.assertEqual(result['address'], "Complete Address 123")
+        self.assertEqual(result['entityName'], "Complete Entity")
+        self.assertEqual(result['masterPlanAreaNumber'], "MP001")
+        self.assertEqual(result['trafficPlanNumber'], "TP001")
+        self.assertEqual(result['bridgeNumber'], "BR001")
+
+    def test_create_comprehensive_project_data_with_none_values(self):
+        """Test create_comprehensive_project_data with None values (should be excluded)"""
+        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
+        from datetime import date
+        
+        # Create a mock project with some None values
+        mock_project = Mock()
+        mock_project.name = "Partial Test Project"
+        mock_project.description = "Partial description"
+        mock_project.address = None  # None value
+        mock_project.entityName = None  # None value
+        mock_project.estPlanningStart = date(2024, 1, 1)
+        mock_project.estPlanningEnd = None  # None value
+        mock_project.estConstructionStart = date(2024, 6, 1)
+        mock_project.estConstructionEnd = date(2024, 12, 1)
+        mock_project.presenceStart = None  # None value
+        mock_project.presenceEnd = None  # None value
+        mock_project.visibilityStart = date(2024, 3, 1)
+        mock_project.visibilityEnd = date(2024, 3, 31)
+        mock_project.masterPlanAreaNumber = "MP001"
+        mock_project.trafficPlanNumber = None  # None value
+        mock_project.bridgeNumber = "BR001"
+        
+        # Call the function
+        result = create_comprehensive_project_data(mock_project)
+        
+        # Verify None fields are excluded
+        none_fields = ['address', 'entityName', 'estPlanningEnd', 'presenceStart', 'presenceEnd', 'trafficPlanNumber']
+        for field in none_fields:
+            self.assertNotIn(field, result, f"Field '{field}' should be excluded (None value)")
+        
+        # Verify non-None fields are included
+        included_fields = ['name', 'description', 'estPlanningStart', 'estConstructionStart', 
+                          'estConstructionEnd', 'visibilityStart', 'visibilityEnd', 
+                          'masterPlanAreaNumber', 'bridgeNumber']
+        for field in included_fields:
+            self.assertIn(field, result, f"Field '{field}' should be included")
+
+    def test_create_comprehensive_project_data_with_empty_strings(self):
+        """Test create_comprehensive_project_data with empty strings (should be included)"""
+        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
+        
+        # Create a mock project with empty strings
+        mock_project = Mock()
+        mock_project.name = ""  # Empty string
+        mock_project.description = ""  # Empty string
+        mock_project.address = ""  # Empty string
+        mock_project.entityName = ""  # Empty string
+        mock_project.estPlanningStart = None
+        mock_project.estPlanningEnd = None
+        mock_project.estConstructionStart = None
+        mock_project.estConstructionEnd = None
+        mock_project.presenceStart = None
+        mock_project.presenceEnd = None
+        mock_project.visibilityStart = None
+        mock_project.visibilityEnd = None
+        mock_project.masterPlanAreaNumber = ""  # Empty string
+        mock_project.trafficPlanNumber = ""  # Empty string
+        mock_project.bridgeNumber = ""  # Empty string
+        
+        # Call the function
+        result = create_comprehensive_project_data(mock_project)
+        
+        # Verify empty strings are included (not None)
+        empty_string_fields = ['name', 'description', 'address', 'entityName', 
+                              'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']
+        for field in empty_string_fields:
+            self.assertIn(field, result, f"Field '{field}' should be included (empty string is not None)")
+            self.assertEqual(result[field], "", f"Field '{field}' should be empty string")
+
+    def test_create_comprehensive_project_data_minimal_project(self):
+        """Test create_comprehensive_project_data with minimal project data"""
+        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
+        
+        # Create a mock project with only required fields
+        mock_project = Mock()
+        mock_project.name = "Minimal Project"
+        mock_project.description = "Minimal description"
+        mock_project.address = None
+        mock_project.entityName = None
+        mock_project.estPlanningStart = None
+        mock_project.estPlanningEnd = None
+        mock_project.estConstructionStart = None
+        mock_project.estConstructionEnd = None
+        mock_project.presenceStart = None
+        mock_project.presenceEnd = None
+        mock_project.visibilityStart = None
+        mock_project.visibilityEnd = None
+        mock_project.masterPlanAreaNumber = None
+        mock_project.trafficPlanNumber = None
+        mock_project.bridgeNumber = None
+        
+        # Call the function
+        result = create_comprehensive_project_data(mock_project)
+        
+        # Should only include non-None fields
+        self.assertEqual(len(result), 2)  # Only name and description
+        self.assertIn('name', result)
+        self.assertIn('description', result)
+        self.assertEqual(result['name'], "Minimal Project")
+        self.assertEqual(result['description'], "Minimal description")
+
+    def test_create_comprehensive_project_data_return_type(self):
+        """Test that create_comprehensive_project_data returns a dict"""
+        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
+        
+        # Create a minimal mock project
+        mock_project = Mock()
+        mock_project.name = "Type Test Project"
+        mock_project.description = "Type test description"
+        mock_project.address = None
+        mock_project.entityName = None
+        mock_project.estPlanningStart = None
+        mock_project.estPlanningEnd = None
+        mock_project.estConstructionStart = None
+        mock_project.estConstructionEnd = None
+        mock_project.presenceStart = None
+        mock_project.presenceEnd = None
+        mock_project.visibilityStart = None
+        mock_project.visibilityEnd = None
+        mock_project.masterPlanAreaNumber = None
+        mock_project.trafficPlanNumber = None
+        mock_project.bridgeNumber = None
+        
+        # Call the function
+        result = create_comprehensive_project_data(mock_project)
+        
+        # Verify return type
+        self.assertIsInstance(result, dict)
+        self.assertGreater(len(result), 0)
+
+
+class ProjectCreateSerializerCreateMethodTestCase(TestCase):
+    """
+    Test cases for the create method in ProjectCreateSerializer to ensure the new sync functionality is covered.
+    """
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="Test Class Create Method",
+            defaults={'path': "Test/Class/Create/Method"}
+        )
+
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectCreateSerializer._sync_new_project_to_projectwise')
+    def test_create_method_calls_sync_with_pw_id(self, mock_sync):
+        """Test that the create method calls _sync_new_project_to_projectwise when project has PW ID"""
+        # Create project data with PW ID
+        project_data = {
+            "name": "Test Create Method Project",
+            "description": "Test project for create method",
+            "hkrId": 12345,
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertEqual(created_project.hkrId, 12345)
+
+        # Verify that _sync_new_project_to_projectwise was called
+        mock_sync.assert_called_once_with(created_project)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectCreateSerializer._sync_new_project_to_projectwise')
+    def test_create_method_calls_sync_without_pw_id(self, mock_sync):
+        """Test that the create method calls _sync_new_project_to_projectwise even without PW ID"""
+        # Create project data without PW ID
+        project_data = {
+            "name": "Test Create Method Project No PW",
+            "description": "Test project for create method without PW",
+            "hkrId": None,
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+        }
+
+        # Create the project using the serializer
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        created_project = serializer.save()
+
+        # Verify project was created
+        self.assertIsNotNone(created_project)
+        self.assertIsNone(created_project.hkrId)
+
+        # Verify that _sync_new_project_to_projectwise was called (it will handle the no PW ID case)
+        mock_sync.assert_called_once_with(created_project)
+
+    def test_create_method_integration_with_sync(self):
+        """Test the create method integration with the actual sync functionality"""
+        # Mock the ProjectWise service to avoid actual API calls
+        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService') as mock_pw_service_class, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.create_comprehensive_project_data') as mock_create_data, \
+             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
+            
+            mock_pw_service = Mock()
+            mock_pw_service_class.return_value = mock_pw_service
+            mock_create_data.return_value = {'name': 'Test Project', 'description': 'Test'}
+            
+            # Create project data with PW ID
+            project_data = {
+                "name": "Test Integration Project",
+                "description": "Test project for integration",
+                "hkrId": 54321,
+                "programmed": True,
+                "projectClass": str(self.project_class.id),
+                "type": str(self.project_type.id),
+                "phase": str(self.project_phase.id),
+                "category": str(self.project_category.id),
+                "planningStartYear": 2024,
+                "constructionEndYear": 2025,
+            }
+
+            # Create the project using the serializer
+            serializer = ProjectCreateSerializer(data=project_data)
+            self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+            created_project = serializer.save()
+
+            # Verify project was created
+            self.assertIsNotNone(created_project)
+            self.assertEqual(created_project.hkrId, 54321)
+
+            # Verify that the sync process was called
+            mock_create_data.assert_called_once_with(created_project)
+            mock_pw_service.sync_project_to_pw.assert_called_once_with(
+                data={'name': 'Test Project', 'description': 'Test'}, 
+                project=created_project
+            )
+            mock_logger.info.assert_called()
