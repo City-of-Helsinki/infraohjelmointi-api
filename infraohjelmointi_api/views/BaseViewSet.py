@@ -16,6 +16,7 @@ class BaseViewSet(viewsets.ModelViewSet):
             IsCoordinator
             | IsPlanner
             | IsPlannerOfProjectAreas
+            | IsClassProgrammer
             | IsProjectManager
             | IsViewer
             | IsAdmin

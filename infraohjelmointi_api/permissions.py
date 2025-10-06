@@ -1,7 +1,9 @@
 from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectClass import ProjectClass
 from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
+from infraohjelmointi_api.models import ProjectProgrammer
 from rest_framework import permissions
+from django.conf import settings
 
 GET = "GET"
 POST = "POST"
@@ -445,3 +447,138 @@ class IsAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
         return True
+
+
+class IsClassProgrammer(permissions.BasePermission):
+    """
+    Permission class for restricted class programmers (IO-756).
+
+    Allows programmers to edit only projects in their specifically assigned classes.
+    Similar to IsPlannerOfProjectAreas but with individual class-level restrictions.
+
+    Users must be in the restricted programmer AD group and have a ProjectProgrammer
+    assignment to edit projects. They can only edit projects where the projectClass
+    matches their assignment.
+
+    Coordinators and admins bypass these restrictions.
+    """
+
+    def user_in_restricted_programmer_group(self, request):
+        """Check if user is in restricted programmer AD group"""
+        restricted_group_name = getattr(settings, 'RESTRICTED_PROGRAMMER_AD_GROUP', 'sg_kymp_sso_io_rajoitetut_ohjelmoijat')
+        return restricted_group_name in request.user.ad_groups.all().values_list(
+            "name", flat=True
+        )
+
+    def user_is_coordinator_or_admin(self, request):
+        """Check if user is coordinator or admin (bypass restrictions)"""
+        ad_groups = request.user.ad_groups.all().values_list("name", flat=True)
+        return (
+            "sg_kymp_sso_io_koordinaattorit" in ad_groups
+            or "sg_kymp_sso_io_admin" in ad_groups
+        )
+
+    def get_user_assigned_classes(self, request):
+        """Get project classes assigned to this user via email matching"""
+
+        # Extract name from email with robust parsing
+        user_email = request.user.email
+        if not user_email or '@' not in user_email:
+            return []
+
+        # Get username part before @
+        username = user_email.split('@')[0]
+
+        # Handle various email formats
+        if '.' not in username:
+            # No dots in username (e.g., "test@hel.fi")
+            return []
+
+        # Split by dots and clean up
+        parts = [part.strip() for part in username.split('.') if part.strip()]
+
+        if len(parts) < 2:
+            return []
+
+        # Take first two non-empty parts
+        first_name = parts[0].capitalize()
+        last_name = parts[1].capitalize()
+
+        # Validate names are not empty
+        if not first_name or not last_name:
+            return []
+
+        # Find ProjectProgrammer by name matching (case-insensitive)
+        programmer = ProjectProgrammer.objects.filter(
+            firstName__iexact=first_name,
+            lastName__iexact=last_name
+        ).first()
+
+        if programmer:
+            # Get classes where this programmer is the default
+            assigned_classes = ProjectClass.objects.filter(defaultProgrammer=programmer)
+            return list(assigned_classes.values_list('id', flat=True))
+
+        return []
+
+    def project_has_class(self, obj):
+        """Check if project has a projectClass assigned"""
+        return obj.projectClass is not None
+
+    def has_permission(self, request, view):
+        """Check if user has permission for the action"""
+        # Only apply to authenticated users
+        if not request.user.is_authenticated:
+            return False
+
+        # Coordinators and admins bypass restrictions (let other classes handle)
+        if self.user_is_coordinator_or_admin(request):
+            return False
+
+        # Only apply to restricted programmer group
+        if not self.user_in_restricted_programmer_group(request):
+            return False
+
+        # Allow read actions
+        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+            return True
+
+        # Allow edit actions (will be checked at object level)
+        if view.action in [
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *PROJECT_NOTE_ALL_ACTIONS,
+        ]:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        """Check if user has permission for this specific object"""
+        _type = obj._meta.model.__name__
+
+        # Only apply to Project objects
+        if _type != "Project":
+            return False
+
+        # Coordinators and admins bypass restrictions
+        if self.user_is_coordinator_or_admin(request):
+            return True
+
+        # Allow read actions for all projects
+        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+            return True
+
+        # For edit actions, check if project has a class
+        if not self.project_has_class(obj):
+            return False  # No class assigned, deny
+
+        # Check if user has assignment for this specific class
+        assigned_class_ids = self.get_user_assigned_classes(request)
+        if not assigned_class_ids:
+            return False  # No assignments, deny
+
+        # Check if project's class is in user's assignments
+        if obj.projectClass_id in assigned_class_ids:
+            return True
+
+        return False
