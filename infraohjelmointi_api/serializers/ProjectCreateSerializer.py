@@ -1,11 +1,16 @@
 from os import path
+import logging
 from infraohjelmointi_api.models import (
     Project,
 )
+
+logger = logging.getLogger("infraohjelmointi_api")
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
     PWProjectResponseError,
+    ProjectWiseService,
 )
+from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
@@ -273,6 +278,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         validated_data = self.run_pre_create_update_validation(data=validated_data)
         project = super(ProjectCreateSerializer, self).create(validated_data)
 
+        # Automatic ProjectWise sync when project is created with PW ID
+        self._sync_new_project_to_projectwise(project)
+
         return project
 
     @override
@@ -374,3 +382,33 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             else None
         )
         return rep
+
+    def _sync_new_project_to_projectwise(self, project: Project):
+        """
+        Handle automatic ProjectWise synchronization when a new project is created with PW ID.
+        
+        Args:
+            project: The newly created project instance
+        """
+        # Check if project was created with a PW ID
+        if project.hkrId is not None and str(project.hkrId).strip() != "":
+            logger.info(f"New project '{project.name}' created with PW ID {project.hkrId} - performing automatic PW sync")
+            
+            try:
+                # Create comprehensive data dict for automatic update
+                automatic_update_data = create_comprehensive_project_data(project)
+                
+                # Initialize ProjectWise service and sync
+                project_wise_service = ProjectWiseService()
+                project_wise_service.sync_project_to_pw(
+                    data=automatic_update_data, project=project
+                )
+                
+                logger.info(f"Successfully synced new project '{project.name}' to ProjectWise")
+                
+            except Exception as e:
+                logger.error(f"Failed to sync new project '{project.name}' to ProjectWise: {str(e)}")
+                # Don't raise the exception to avoid breaking project creation
+        else:
+            logger.debug(f"New project '{project.name}' created without PW ID - skipping PW sync")
+

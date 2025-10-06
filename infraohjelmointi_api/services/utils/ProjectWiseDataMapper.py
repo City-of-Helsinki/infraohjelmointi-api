@@ -382,6 +382,38 @@ class ProjectWiseDataMapper:
         }
 
 
+def create_comprehensive_project_data(project: Project) -> dict:
+    """
+    Create a comprehensive data dictionary for automatic PW updates.
+    
+    Args:
+        project: The project object to extract data from
+        
+    Returns:
+        Dictionary with all relevant project fields, excluding None values
+    """
+    comprehensive_data = {
+        'name': project.name,
+        'description': project.description,
+        'address': project.address,
+        'entityName': project.entityName,
+        'estPlanningStart': project.estPlanningStart,
+        'estPlanningEnd': project.estPlanningEnd,
+        'estConstructionStart': project.estConstructionStart,
+        'estConstructionEnd': project.estConstructionEnd,
+        'presenceStart': project.presenceStart,
+        'presenceEnd': project.presenceEnd,
+        'visibilityStart': project.visibilityStart,
+        'visibilityEnd': project.visibilityEnd,
+        'masterPlanAreaNumber': project.masterPlanAreaNumber,
+        'trafficPlanNumber': project.trafficPlanNumber,
+        'bridgeNumber': project.bridgeNumber,
+    }
+
+    # Remove None values to avoid unnecessary processing
+    return {k: v for k, v in comprehensive_data.items() if v is not None}
+
+
 class ProjectWiseDataFieldNotFound(RuntimeError):
     """Error for not supporting field"""
 

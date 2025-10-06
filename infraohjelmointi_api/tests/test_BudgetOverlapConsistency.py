@@ -94,7 +94,7 @@ class BudgetOverlapConsistencyTestCase(TestCase):
             child2_budget=self.TSE_2028_CHILD2_BUDGET
         )
 
-        # Test the NEW method with frame_budgets context (what both views should now use)
+        # Test with frame_budgets context (unified method)
         frame_budgets = self._build_frame_budgets()
         serializer = ProjectClassSerializer(
             [self.parent_coordinator_class],
@@ -112,8 +112,8 @@ class BudgetOverlapConsistencyTestCase(TestCase):
         # TSE-2028 case: children sum equals parent, should be no overlap
         self.assertFalse(overlap_status, "TSE-2028 scenario should show no overlap with frame_budgets context")
 
-    def test_both_methods_give_same_result(self):
-        """Test that old method (without frame_budgets) and new method (with frame_budgets) give same result"""
+    def test_overlap_detection_works(self):
+        """Test that overlap detection works correctly with frame_budgets context"""
         # Overlap scenario: children sum exceeds parent budget (overlap expected)
         self.create_budget_scenario(
             parent_budget=self.OVERLAP_PARENT_BUDGET,
@@ -121,21 +121,9 @@ class BudgetOverlapConsistencyTestCase(TestCase):
             child2_budget=self.OVERLAP_CHILD2_BUDGET
         )
 
-        # Test OLD method (without frame_budgets context)
-        old_method_serializer = ProjectClassSerializer(
-            [self.parent_coordinator_class],
-            many=True,
-            context={
-                "for_coordinator": True,
-                "finance_year": self.year,
-                # No frame_budgets context
-            }
-        )
-        old_method_result = old_method_serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
-
-        # Test NEW method (with frame_budgets context)
+        # Test with frame_budgets context (unified method)
         frame_budgets = self._build_frame_budgets()
-        new_method_serializer = ProjectClassSerializer(
+        serializer = ProjectClassSerializer(
             [self.parent_coordinator_class],
             many=True,
             context={
@@ -144,12 +132,10 @@ class BudgetOverlapConsistencyTestCase(TestCase):
                 "frame_budgets": frame_budgets
             }
         )
-        new_method_result = new_method_serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        result = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
 
-        # Both methods should detect the overlap
-        self.assertTrue(old_method_result, "Old method should detect overlap")
-        self.assertTrue(new_method_result, "New method should detect overlap")
-        self.assertEqual(old_method_result, new_method_result, "Both methods must give identical results")
+        # Should detect the overlap
+        self.assertTrue(result, "Should detect overlap when children sum exceeds parent budget")
 
     def _build_frame_budgets(self):
         """Build frame_budgets context like the views do"""
@@ -250,6 +236,15 @@ class ViewEndpointConsistencyTestCase(TestCase):
 
 class FrameBudgetsContextTestCase(TestCase):
     """Test the frame_budgets context building logic specifically"""
+    
+    # Test scenario constants for clarity and DRY
+    TSE_2028_PARENT_BUDGET = 58000  # TSE-2028 scenario from IO-743
+    TSE_2028_CHILD1_BUDGET = 30000
+    TSE_2028_CHILD2_BUDGET = 28000
+
+    OVERLAP_PARENT_BUDGET = 50000   # Overlap scenario for testing
+    OVERLAP_CHILD1_BUDGET = 30000
+    OVERLAP_CHILD2_BUDGET = 28000   # 30k + 28k = 58k > 50k
 
     def setUp(self):
         self.year = date.today().year
@@ -310,3 +305,539 @@ class FrameBudgetsContextTestCase(TestCase):
 
         # Verify defaultdict behavior for non-existent keys
         self.assertEqual(frame_budgets["nonexistent-key"], 0)
+
+    def test_actual_overlap_scenario(self):
+        """Test a scenario that SHOULD trigger overlap"""
+        # Create parent class with 50k budget
+        parent_class = ProjectClass.objects.create(
+            name="Test Parent Class Overlap",
+            path="Test Parent Class Overlap",
+            forCoordinatorOnly=True
+        )
+        
+        # Create child classes with total 58k budget (> 50k parent = overlap!)
+        child_class_1 = ProjectClass.objects.create(
+            name="Test Child Class 1 Overlap",
+            path="Test Parent Class Overlap/Test Child Class 1 Overlap",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        child_class_2 = ProjectClass.objects.create(
+            name="Test Child Class 2 Overlap", 
+            path="Test Parent Class Overlap/Test Child Class 2 Overlap",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        # Create financial records that SHOULD cause overlap
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=self.OVERLAP_PARENT_BUDGET  # 50,000
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_1,
+            year=self.year,
+            frameBudget=self.OVERLAP_CHILD1_BUDGET  # 30,000
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_2,
+            year=self.year,
+            frameBudget=self.OVERLAP_CHILD2_BUDGET  # 28,000
+        )
+        
+        # Test with frame_budgets context (unified method)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        # Should detect the overlap (30k + 28k = 58k > 50k)
+        overlap = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        self.assertTrue(overlap, "Should detect overlap (58k > 50k)")
+
+    def test_no_children_scenario(self):
+        """Test scenario with no children (should never show overlap)"""
+        # Create parent class with no children
+        parent_class = ProjectClass.objects.create(
+            name="Parent With No Children",
+            path="Parent With No Children",
+            forCoordinatorOnly=True
+        )
+        
+        # Create unrelated class (not a child)
+        unrelated_class = ProjectClass.objects.create(
+            name="Unrelated Class",
+            path="Unrelated Class",
+            forCoordinatorOnly=True
+        )
+        
+        # Give both classes budgets
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=50000
+        )
+        ClassFinancial.objects.create(
+            classRelation=unrelated_class,
+            year=self.year,
+            frameBudget=100000  # Even with huge budget, shouldn't affect parent
+        )
+        
+        # Test with frame_budgets context (unified method)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        # Should never show overlap when there are no children
+        overlap = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        self.assertFalse(overlap, "Should never show overlap when there are no children")
+
+    def test_tse_2028_scenario_balanced_budget(self):
+        """Test TSE-2028 scenario - balanced budget should not show overlap"""
+        # Create TSE-2028 scenario classes
+        parent_class = ProjectClass.objects.create(
+            name="TSE-2028 Parent",
+            path="TSE-2028 Parent",
+            forCoordinatorOnly=True
+        )
+        
+        child_class_1 = ProjectClass.objects.create(
+            name="TSE-2028 Child 1",
+            path="TSE-2028 Parent/TSE-2028 Child 1",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        child_class_2 = ProjectClass.objects.create(
+            name="TSE-2028 Child 2", 
+            path="TSE-2028 Parent/TSE-2028 Child 2",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        # Create balanced budget scenario
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=self.TSE_2028_PARENT_BUDGET  # 58,000
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_1,
+            year=self.year,
+            frameBudget=self.TSE_2028_CHILD1_BUDGET  # 30,000
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_2,
+            year=self.year,
+            frameBudget=self.TSE_2028_CHILD2_BUDGET  # 28,000
+        )
+        
+        # Test with frame_budgets context (unified method)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        # Should show no overlap for balanced budget (30k + 28k = 58k)
+        overlap = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        self.assertFalse(overlap, "TSE-2028: Should show no overlap for balanced budget (30k + 28k = 58k)")
+
+    def test_zero_parent_budget_scenario(self):
+        """Test edge case where parent has zero budget but children have budgets"""
+        # Create parent with zero budget
+        parent_class = ProjectClass.objects.create(
+            name="Zero Budget Parent",
+            path="Zero Budget Parent",
+            forCoordinatorOnly=True
+        )
+        
+        child_class_1 = ProjectClass.objects.create(
+            name="Child of Zero Parent 1",
+            path="Zero Budget Parent/Child of Zero Parent 1",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        child_class_2 = ProjectClass.objects.create(
+            name="Child of Zero Parent 2", 
+            path="Zero Budget Parent/Child of Zero Parent 2",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        # Parent has 0 budget, children have positive budgets
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=0  # Zero parent budget
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_1,
+            year=self.year,
+            frameBudget=10000
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_2,
+            year=self.year,
+            frameBudget=5000
+        )
+        
+        # Test with frame_budgets context (unified method)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        # Should show overlap when children exceed zero parent budget
+        overlap = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        self.assertTrue(overlap, "Should show overlap when children exceed zero parent budget (15k > 0)")
+
+    def test_forFrameView_duplicate_overlap_issue(self):
+        """
+        Test documenting the forFrameView duplicate issue found in production.
+        
+        IO-353 introduced forFrameView field and created duplicate financial records.
+        This causes false positive budget overlap warnings because build_frame_budgets_context
+        counts both forFrameView=False and forFrameView=True records.
+        
+        NOTE: This test documents the expected behavior for when the forFrameView field exists.
+        In production, the fix would filter by forFrameView to avoid counting duplicates.
+        """
+        # Create the exact scenario from production investigation:
+        # Parent "8 01 Kiinteä omaisuus" with 58,000 budget
+        # Children with 30,000 + 17,000 = 47,000 total (no overlap)
+        parent_class = ProjectClass.objects.create(
+            name="8 01 Kiinteä omaisuus",
+            path="8 01 Kiinteä omaisuus", 
+            forCoordinatorOnly=True
+        )
+        
+        child_class_1 = ProjectClass.objects.create(
+            name="8 01 01 Kiinteistöjen ostot",
+            path="8 01 Kiinteä omaisuus/8 01 01 Kiinteistöjen ostot",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        child_class_2 = ProjectClass.objects.create(
+            name="8 01 03 Esirakentaminen",
+            path="8 01 Kiinteä omaisuus/8 01 03 Esirakentaminen", 
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        # Create financial records that should NOT show overlap
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=58000,
+            budgetChange=0
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_1,
+            year=self.year,
+            frameBudget=30000,
+            budgetChange=0
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class_2,
+            year=self.year,
+            frameBudget=17000,
+            budgetChange=0
+        )
+        
+        # Test the scenario - should show no overlap (30,000 + 17,000 = 47,000 < 58,000)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        overlap_status = serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        
+        # This should be False in both test environment and after production fix
+        self.assertFalse(overlap_status, 
+                        "Should show no overlap for the production scenario (47,000 < 58,000)")
+        
+        # Document the exact budget values we expect
+        parent_budget = frame_budgets[f"{self.year}-{parent_class.id}"]
+        child1_budget = frame_budgets[f"{self.year}-{child_class_1.id}"]
+        child2_budget = frame_budgets[f"{self.year}-{child_class_2.id}"]
+        
+        self.assertEqual(parent_budget, 58000, "Parent budget should be 58,000")
+        self.assertEqual(child1_budget, 30000, "Child1 budget should be 30,000")
+        self.assertEqual(child2_budget, 17000, "Child2 budget should be 17,000")
+        
+        # Total children should be less than parent (no overlap)
+        children_total = child1_budget + child2_budget
+        self.assertEqual(children_total, 47000, "Children total should be 47,000")
+        self.assertLess(children_total, parent_budget, "Children total should be less than parent")
+        
+        # NOTE: In production with forFrameView duplicates, the fix would be:
+        # 1. Modify build_frame_budgets_context to filter by forFrameView=False
+        # 2. This ensures only original records are counted, not duplicates
+        # 3. Result: Same single values as above, no false overlap warnings
+
+    def test_forFrameView_consistency(self):
+        """Test that both forFrameView=True and False give same overlap results"""
+        # Create scenario with overlap
+        parent_class = ProjectClass.objects.create(
+            name="forFrameView Consistency Parent",
+            path="forFrameView Consistency Parent",
+            forCoordinatorOnly=True
+        )
+        
+        child_class = ProjectClass.objects.create(
+            name="forFrameView Consistency Child",
+            path="forFrameView Consistency Parent/Child",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        # Create financial records for BOTH forFrameView values
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=50000,
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=self.year,
+            frameBudget=50000,
+            forFrameView=True  # Duplicate for frame view
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class,
+            year=self.year,
+            frameBudget=60000,  # Exceeds parent
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class,
+            year=self.year,
+            frameBudget=60000,  # Duplicate for frame view
+            forFrameView=True
+        )
+        
+        # Test both views should give same result (both detect overlap)
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        frame_budgets_false = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        frame_budgets_true = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=True)
+        
+        # Test forFrameView=False
+        serializer_false = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets_false
+            }
+        )
+        
+        # Test forFrameView=True  
+        serializer_true = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets_true
+            }
+        )
+        
+        overlap_false = serializer_false.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        overlap_true = serializer_true.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        
+        # Both should detect overlap consistently
+        self.assertTrue(overlap_false, "forFrameView=False should detect overlap (60k > 50k)")
+        self.assertTrue(overlap_true, "forFrameView=True should detect overlap (60k > 50k)")
+        self.assertEqual(overlap_false, overlap_true, "Both forFrameView modes should give identical overlap results")
+
+    def test_deep_hierarchy_only_direct_children(self):
+        """Test that overlap only considers direct children, not grandchildren"""
+        # Create 3-level hierarchy: grandparent -> parent -> child
+        grandparent = ProjectClass.objects.create(
+            name="Grandparent",
+            path="Grandparent",
+            forCoordinatorOnly=True
+        )
+        
+        parent = ProjectClass.objects.create(
+            name="Parent",
+            path="Grandparent/Parent",
+            parent=grandparent,
+            forCoordinatorOnly=True
+        )
+        
+        child = ProjectClass.objects.create(
+            name="Child",
+            path="Grandparent/Parent/Child",
+            parent=parent,
+            forCoordinatorOnly=True
+        )
+        
+        # Grandparent: 100k, Parent: 50k, Child: 80k
+        # Child exceeds parent (80k > 50k) but grandparent should only see parent (50k < 100k)
+        ClassFinancial.objects.create(
+            classRelation=grandparent,
+            year=self.year,
+            frameBudget=100000,
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=parent,
+            year=self.year,
+            frameBudget=50000,
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=child,
+            year=self.year,
+            frameBudget=80000,
+            forFrameView=False
+        )
+        
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(self.year, for_frame_view=False)
+        
+        # Test grandparent should NOT show overlap (only sees direct child: parent=50k < grandparent=100k)
+        grandparent_serializer = ProjectClassSerializer(
+            [grandparent],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        # Test parent SHOULD show overlap (sees direct child: child=80k > parent=50k)
+        parent_serializer = ProjectClassSerializer(
+            [parent],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": self.year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        grandparent_overlap = grandparent_serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        parent_overlap = parent_serializer.data[0]['finances']['year0']['isFrameBudgetOverlap']
+        
+        self.assertFalse(grandparent_overlap, "Grandparent should NOT show overlap (only counts direct children)")
+        self.assertTrue(parent_overlap, "Parent should show overlap (direct child exceeds budget)")
+
+    def test_multiple_years_overlap_detection(self):
+        """Test overlap detection works across multiple years"""
+        parent_class = ProjectClass.objects.create(
+            name="Multi-Year Parent",
+            path="Multi-Year Parent",
+            forCoordinatorOnly=True
+        )
+        
+        child_class = ProjectClass.objects.create(
+            name="Multi-Year Child",
+            path="Multi-Year Parent/Child",
+            parent=parent_class,
+            forCoordinatorOnly=True
+        )
+        
+        base_year = self.year
+        
+        # Create scenario: overlap in year 2, no overlap in year 5
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=base_year + 2,
+            frameBudget=100000,
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class,
+            year=base_year + 2,
+            frameBudget=150000,  # Exceeds parent
+            forFrameView=False
+        )
+        
+        ClassFinancial.objects.create(
+            classRelation=parent_class,
+            year=base_year + 5,
+            frameBudget=200000,
+            forFrameView=False
+        )
+        ClassFinancial.objects.create(
+            classRelation=child_class,
+            year=base_year + 5,
+            frameBudget=180000,  # Within parent budget
+            forFrameView=False
+        )
+        
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(base_year, for_frame_view=False)
+        
+        serializer = ProjectClassSerializer(
+            [parent_class],
+            many=True,
+            context={
+                "for_coordinator": True,
+                "finance_year": base_year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
+        data = serializer.data[0]['finances']
+        
+        # Year 2 should show overlap
+        self.assertTrue(data['year2']['isFrameBudgetOverlap'], "Year 2 should show overlap (150k > 100k)")
+        
+        # Year 5 should NOT show overlap
+        self.assertFalse(data['year5']['isFrameBudgetOverlap'], "Year 5 should NOT show overlap (180k < 200k)")
+        
+        # Other years should not show overlap (no data)
+        self.assertFalse(data['year0']['isFrameBudgetOverlap'], "Year 0 should NOT show overlap (no data)")
+        self.assertFalse(data['year10']['isFrameBudgetOverlap'], "Year 10 should NOT show overlap (no data)")
