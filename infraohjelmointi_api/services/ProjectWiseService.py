@@ -494,15 +494,14 @@ class ProjectWiseService:
             'personConstruction': str(project.personConstruction.id) if project.personConstruction else None,
         }
 
-        # Remove None values before transformation
+        # Remove None values
+        # NOTE: Do NOT call convert_to_pw_data here! Return internal field names.
+        # The __sync_project_to_pw method will apply overwrite rules FIRST (which expects internal names),
+        # THEN convert to PW format. Calling convert_to_pw_data here causes double-conversion.
         cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
         
-        # Transform to PW format using ProjectWiseDataMapper
-        # This handles UUID->name conversion, boolean->text conversion, date formatting, etc.
-        project_data = self.project_wise_data_mapper.convert_to_pw_data(cleaned_data, project)
-        
-        logger.debug(f"Built and transformed project data for {project.name}: {project_data}")
-        return project_data
+        logger.debug(f"Built project data for {project.name} with {len(cleaned_data)} fields")
+        return cleaned_data
 
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
