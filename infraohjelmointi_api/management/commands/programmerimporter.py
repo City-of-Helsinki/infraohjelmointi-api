@@ -6,7 +6,7 @@ and assign them as default programmers to their designated project classes.
 import os
 import uuid
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 
 try:
@@ -64,9 +64,9 @@ class Command(BaseCommand):
                 '\033[0m'
             )
         )
-        
+
         self.stdout.write(f"Reading programmers from: {file_path}")
-        
+
         try:
             specific_assignments, fallback_assignments = self.read_excel_file(file_path)
         except Exception as e:
@@ -90,10 +90,10 @@ class Command(BaseCommand):
         """Read the Excel file and extract programmer assignments"""
         specific_assignments = []
         fallback_assignments = []
-        
+
         wb = openpyxl.load_workbook(file_path)
         ws = wb.active
-        
+
         self.stdout.write(f"Reading worksheet: {ws.title}")
         self.stdout.write(f"Total rows: {ws.max_row}, columns: {ws.max_column}")
 
@@ -128,17 +128,17 @@ class Command(BaseCommand):
             # Fallback format: District name in col1, empty col2, programmer in col3
             district_name = worksheet.cell(row=row_num, column=1).value
             programmer_name = worksheet.cell(row=row_num, column=3).value
-            
+
             if not district_name or not programmer_name:
                 return None
-                
+
             district_name = str(district_name).strip()
             programmer_name = str(programmer_name).strip()
-            
+
             # Skip entries marked as empty
             if programmer_name.lower() in ['jätetään tyhjiksi', 'ei valintaa', '']:
                 return None
-                
+
             return {
                 'type': 'fallback',
                 'district_name': district_name,
@@ -178,14 +178,14 @@ class Command(BaseCommand):
         else:
             first_name = programmer_name
             last_name = ''
-        
+
         return first_name, last_name
 
     def find_project_class(self, class_code, class_description):
         """Find project class by code and description"""
         # Try to find exact match first
         classes = ProjectClass.objects.filter(name__icontains=class_code)
-        
+
         if not classes.exists():
             return None, f"No project class found containing code '{class_code}'"
 
@@ -208,58 +208,82 @@ class Command(BaseCommand):
             name__icontains=district_name,
             defaultProgrammer__isnull=True
         )
-        
+
         return classes
 
     def find_or_create_programmer(self, programmer_name, dry_run=False):
         """Find or create a ProjectProgrammer"""
         first_name, last_name = self.parse_programmer_name(programmer_name)
-        
-        # Check if programmer already exists
+
+        # Check if programmer already exists (case-insensitive)
         existing = ProjectProgrammer.objects.filter(
-            firstName=first_name,
-            lastName=last_name
+            firstName__iexact=first_name,
+            lastName__iexact=last_name
         ).first()
-        
+
         if existing:
             return existing, f"Found existing programmer: {existing.firstName} {existing.lastName}"
 
         if dry_run:
             return None, f"Would create programmer: {first_name} {last_name}"
 
-        # Try to find matching Person
-        person = None
-        if first_name and last_name:
-            # Try exact match first
-            person = Person.objects.filter(
-                firstName=first_name,
-                lastName=last_name
-            ).first()
-            
-            # Try reverse order (lastName firstName)
-            if not person:
-                person = Person.objects.filter(
-                    firstName=last_name,
-                    lastName=first_name
+        # Use get_or_create with race condition protection
+        try:
+            with transaction.atomic():
+                # Double-check within transaction to prevent race conditions
+                existing = ProjectProgrammer.objects.filter(
+                    firstName__iexact=first_name,
+                    lastName__iexact=last_name
                 ).first()
 
-        # Create new ProjectProgrammer
-        programmer = ProjectProgrammer.objects.create(
-            id=uuid.uuid4(),
-            firstName=first_name,
-            lastName=last_name,
-            person=person,
-            createdDate=timezone.now(),
-            updatedDate=timezone.now()
-        )
+                if existing:
+                    return existing, f"Found existing programmer (race condition): {existing.firstName} {existing.lastName}"
 
-        person_msg = f" (linked to Person: {person.firstName} {person.lastName})" if person else " (no Person link found)"
-        return programmer, f"Created programmer: {programmer.firstName} {programmer.lastName}{person_msg}"
+                # Try to find matching Person
+                person = None
+                if first_name and last_name:
+                    # Try exact match first
+                    person = Person.objects.filter(
+                        firstName__iexact=first_name,
+                        lastName__iexact=last_name
+                    ).first()
+
+                    # Try reverse order (lastName firstName)
+                    if not person:
+                        person = Person.objects.filter(
+                            firstName__iexact=last_name,
+                            lastName__iexact=first_name
+                        ).first()
+
+                # Create new ProjectProgrammer
+                programmer = ProjectProgrammer.objects.create(
+                    id=uuid.uuid4(),
+                    firstName=first_name,
+                    lastName=last_name,
+                    person=person,
+                    createdDate=timezone.now(),
+                    updatedDate=timezone.now()
+                )
+
+                person_msg = f" (linked to Person: {person.firstName} {person.lastName})" if person else " (no Person link found)"
+                return programmer, f"Created programmer: {programmer.firstName} {programmer.lastName}{person_msg}"
+
+        except IntegrityError:
+            # Race condition occurred, try to find the programmer that was created
+            existing = ProjectProgrammer.objects.filter(
+                firstName__iexact=first_name,
+                lastName__iexact=last_name
+            ).first()
+
+            if existing:
+                return existing, f"Found existing programmer (integrity error): {existing.firstName} {existing.lastName}"
+            else:
+                raise
 
     def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing):
         """Show what would be imported in dry-run mode"""
         self.stdout.write(self.style.SUCCESS("\n=== DRY RUN MODE ==="))
-        
+
         if clear_existing:
             existing_count = ProjectClass.objects.exclude(defaultProgrammer=None).count()
             self.stdout.write(f"Would clear {existing_count} existing programmer assignments")
@@ -270,13 +294,13 @@ class Command(BaseCommand):
             for i, assignment in enumerate(specific_assignments, 1):
                 self.stdout.write(f"\n{i}. Class: {assignment['class_code']} - {assignment['class_description']}")
                 self.stdout.write(f"   Programmer: {assignment['programmer_name']}")
-                
+
                 # Check if class exists
                 project_class, class_msg = self.find_project_class(
-                    assignment['class_code'], 
+                    assignment['class_code'],
                     assignment['class_description']
                 )
-                
+
                 if project_class:
                     self.stdout.write(f"   Found class: {project_class.name[:60]}...")
                     if class_msg:
@@ -290,11 +314,11 @@ class Command(BaseCommand):
             for i, assignment in enumerate(fallback_assignments, 1):
                 self.stdout.write(f"\n{i}. District: {assignment['district_name']}")
                 self.stdout.write(f"   Programmer: {assignment['programmer_name']}")
-                
+
                 # Find classes that would use this fallback
                 classes = self.find_classes_for_district_fallback(assignment['district_name'])
                 self.stdout.write(f"   Classes without specific programmer: {classes.count()}")
-                
+
                 if classes.count() > 0 and classes.count() <= 5:
                     for cls in classes:
                         self.stdout.write(f"     - {cls.name[:60]}...")
@@ -318,19 +342,19 @@ class Command(BaseCommand):
         self.stdout.write(f"\n--- PROCESSING SPECIFIC ASSIGNMENTS ({len(specific_assignments)}) ---")
         for i, assignment in enumerate(specific_assignments, 1):
             self.stdout.write(f"\n{i}/{len(specific_assignments)}: Processing {assignment['programmer_name']} -> {assignment['class_code']}")
-            
+
             # Find project class
             project_class, class_msg = self.find_project_class(
-                assignment['class_code'], 
+                assignment['class_code'],
                 assignment['class_description']
             )
-            
+
             if not project_class:
                 error_msg = f"Row {assignment['row']}: {class_msg}"
                 errors.append(error_msg)
                 self.stdout.write(f"   ERROR: {error_msg}")
                 continue
-                
+
             self.stdout.write(f"   Found class: {project_class.name[:60]}...")
             if class_msg:
                 self.stdout.write(f"   WARNING: {class_msg}")
@@ -339,7 +363,7 @@ class Command(BaseCommand):
             try:
                 programmer, prog_msg = self.find_or_create_programmer(assignment['programmer_name'])
                 self.stdout.write(f"   {prog_msg}")
-                
+
                 if "Created" in prog_msg:
                     created_programmers += 1
                 else:
@@ -360,11 +384,11 @@ class Command(BaseCommand):
         self.stdout.write(f"\n--- PROCESSING FALLBACK ASSIGNMENTS ({len(fallback_assignments)}) ---")
         for i, assignment in enumerate(fallback_assignments, 1):
             self.stdout.write(f"\n{i}/{len(fallback_assignments)}: Processing fallback {assignment['programmer_name']} -> {assignment['district_name']}")
-            
+
             # Find classes that need this fallback
             classes = self.find_classes_for_district_fallback(assignment['district_name'])
             self.stdout.write(f"   Found {classes.count()} classes without specific programmer in {assignment['district_name']}")
-            
+
             if classes.count() == 0:
                 self.stdout.write(f"   WARNING: No classes found or all already have programmers assigned")
                 continue
@@ -373,7 +397,7 @@ class Command(BaseCommand):
             try:
                 programmer, prog_msg = self.find_or_create_programmer(assignment['programmer_name'])
                 self.stdout.write(f"   {prog_msg}")
-                
+
                 if "Created" in prog_msg:
                     created_programmers += 1
                 else:
@@ -386,7 +410,7 @@ class Command(BaseCommand):
                     project_class.save()
                     fallback_assigned += 1
                     assigned_classes += 1
-                
+
                 self.stdout.write(f"   Assigned fallback programmer to {fallback_assigned} classes")
 
             except Exception as e:
@@ -399,7 +423,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Created programmers: {created_programmers}")
         self.stdout.write(f"Found existing programmers: {found_programmers}")
         self.stdout.write(f"Total classes assigned: {assigned_classes}")
-        
+
         if errors:
             self.stdout.write(f"Errors: {len(errors)}")
             for error in errors:

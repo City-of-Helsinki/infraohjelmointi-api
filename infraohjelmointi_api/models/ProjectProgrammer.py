@@ -15,6 +15,10 @@ class ProjectProgrammer(models.Model):
         related_name="personProgramming"
     )
 
+    class Meta:
+        # Prevent duplicate programmers with same name
+        unique_together = [['firstName', 'lastName']]
+
     def is_empty_programmer(self):
         """Check if this is the special empty programmer entity"""
         return self.firstName == "Ei" and self.lastName == "Valintaa"
