@@ -140,14 +140,25 @@ class ProjectWiseService:
 
             # Apply overwrite rules to filter data
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
-
+            
+            # IO-396 DIAGNOSTIC: Log what was filtered out
+            filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
+            if filtered_out:
+                logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
+            
             if not filtered_data:
                 logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
+                logger.debug(f"Original data had {len(data)} fields: {list(data.keys())}")
+                logger.debug(f"Current PW data: {current_pw_properties}")
                 return
 
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
                 data=filtered_data, project=project
             )
+            
+            # IO-396 DIAGNOSTIC: Log the actual data being sent to PW
+            logger.info(f"Sending {len(pw_project_data)} fields to PW for '{project.name}': {list(pw_project_data.keys())}")
+            logger.debug(f"Full PW data payload: {pw_project_data}")
 
             if pw_project_data:
                 pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
@@ -170,13 +181,52 @@ class ProjectWiseService:
 
                 api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
 
-                logger.info(f"Updating project '{project.name}' (HKR ID: {project.hkrId}) to PW with fields: {list(filtered_data.keys())}")
-                logger.debug(f"PW update endpoint {api_url}")
-                logger.debug(f"Update request data: {pw_update_data}")
+                logger.info(f"=" * 80)
+                logger.info(f"UPDATING PROJECT: '{project.name}' (HKR ID: {project.hkrId})")
+                logger.info(f"PW Instance ID: {pw_instance_id}")
+                logger.info(f"Fields being sent: {list(pw_project_data.keys())}")
+                logger.debug(f"PW update endpoint: {api_url}")
+                logger.debug(f"Complete update request data: {pw_update_data}")
 
                 response = self.session.post(url=api_url, json=pw_update_data)
-                logger.debug("PW responded to Update request")
-                logger.debug(response.json())
+                
+                # CRITICAL: Validate response status code
+                if response.status_code != 200:
+                    # Extract detailed error information
+                    try:
+                        error_detail = response.json()
+                    except:
+                        error_detail = response.reason
+                    
+                    # Log comprehensive error information for debugging
+                    logger.error(f"=" * 80)
+                    logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
+                    logger.error(f"Status Code: {response.status_code}")
+                    logger.error(f"PW Error Response: {error_detail}")
+                    logger.error(f"Request URL: {api_url}")
+                    logger.error(f"Fields attempted: {list(pw_project_data.keys())}")
+                    logger.error(f"Full payload sent: {pw_project_data}")
+                    logger.error(f"=" * 80)
+                    
+                    error_msg = f"PW update failed for project '{project.name}' (HKR ID: {project.hkrId}) with status code '{response.status_code}': {error_detail}"
+                    raise PWProjectResponseError(error_msg)
+                
+                # Success - log response details
+                pw_response = response.json()
+                logger.info(f"PW UPDATE SUCCESSFUL: '{project.name}' (HKR ID: {project.hkrId})")
+                logger.debug(f"PW success response: {pw_response}")
+                
+                # Verify PW confirms the change
+                if 'changedInstance' in pw_response:
+                    change_info = pw_response['changedInstance']
+                    logger.info(f"PW confirmed change: {change_info.get('change', 'Unknown change type')}")
+                    if 'properties' in change_info:
+                        logger.debug(f"PW reported changed properties: {list(change_info['properties'].keys())}")
+                else:
+                    logger.warning(f"PW responded 200 but no 'changedInstance' in response - verify update actually persisted")
+                    logger.debug(f"Unexpected response structure: {pw_response}")
+                
+                logger.info(f"=" * 80)
             else:
                 logger.info(f"No PW data generated for project '{project.name}' (HKR ID: {project.hkrId})")
         except (
@@ -195,8 +245,9 @@ class ProjectWiseService:
         Apply overwrite rules to filter data before sending to PW.
 
         Rules:
-        - Only update if infrastructure tool field is empty BUT PW has data
-        - Never overwrite protected fields if they have data in PW
+        - Send infra tool data when it has a value (overwrites PW data)
+        - Skip fields when infra tool is empty BUT PW has data (preserves existing PW data)
+        - EXCEPTION: Never overwrite protected fields if they have data in PW (always preserve)
         """
         filtered_data = {}
 
@@ -237,6 +288,7 @@ class ProjectWiseService:
         pw_field_name = self._get_pw_field_mapping().get(field_name)
         if not pw_field_name:
             # No mapping found, include the field (might be handled by other logic)
+            logger.debug(f"Field '{field_name}' has no PW mapping - including anyway")
             return True
 
         # Get current values
@@ -247,25 +299,29 @@ class ProjectWiseService:
         project_empty = not project_value or (isinstance(project_value, str) and not project_value.strip())
         pw_has_data = pw_value and (not isinstance(pw_value, str) or pw_value.strip())
 
+        # IO-396 DIAGNOSTIC: Extra verbose logging for critical fields
+        if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
+            logger.info(f"CRITICAL FIELD '{field_name}': tool_value={project_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
+
         # Apply overwrite rules
         if field_name in protected_fields:
             # Protected field: never overwrite if PW has data
             if pw_has_data:
-                logger.debug(f"Skipping protected field '{field_name}' - PW has data: '{pw_value}'")
+                logger.debug(f"SKIP: Protected field '{field_name}' - PW has data: '{pw_value}'")
                 return False
             else:
-                logger.debug(f"Including protected field '{field_name}' - PW has no data")
+                logger.debug(f"INCLUDE: Protected field '{field_name}' - PW has no data")
                 return True
         else:
             # Regular field: only skip if infra tool is empty but PW has data
             if project_empty and pw_has_data:
-                logger.debug(f"Skipping field '{field_name}' - infra tool empty but PW has data: '{pw_value}'")
+                logger.debug(f"SKIP: Field '{field_name}' - infra tool empty but PW has data: '{pw_value}'")
                 return False
             else:
                 if not project_empty:
-                    logger.debug(f"Including field '{field_name}' - infra tool has data")
+                    logger.debug(f"INCLUDE: Field '{field_name}' - infra tool has data (value: {project_value})")
                 else:
-                    logger.debug(f"Including field '{field_name}' - both infra tool and PW are empty")
+                    logger.debug(f"INCLUDE: Field '{field_name}' - both infra tool and PW are empty")
                 return True
 
     def _get_pw_field_mapping(self) -> dict:
@@ -363,11 +419,14 @@ class ProjectWiseService:
         errors = 0
 
         for i, project in enumerate(projects, 1):
-            logger.info(f"Processing project {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
+            logger.info(f"\n{'='*100}")
+            logger.info(f"PROCESSING PROJECT {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
+            logger.info(f"{'='*100}")
 
             try:
                 # Create comprehensive project data for mass update
                 project_data = self._create_project_data_for_mass_update(project)
+                logger.debug(f"Created project data with {len(project_data)} fields: {list(project_data.keys())}")
 
                 if not project_data:
                     logger.info(f"No data to sync for project '{project.name}' - all fields are None")
@@ -499,6 +558,10 @@ class ProjectWiseService:
         # The __sync_project_to_pw method will apply overwrite rules FIRST (which expects internal names),
         # THEN convert to PW format. Calling convert_to_pw_data here causes double-conversion.
         cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
+        
+        # IO-396 DIAGNOSTIC: Log critical "Ohjelmoitu" field status
+        if 'programmed' in cleaned_data:
+            logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
         
         logger.debug(f"Built project data for {project.name} with {len(cleaned_data)} fields")
         return cleaned_data
