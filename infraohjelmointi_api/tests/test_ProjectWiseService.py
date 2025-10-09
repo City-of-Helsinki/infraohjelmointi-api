@@ -114,7 +114,8 @@ class ProjectWiseServiceTestCase(TestCase):
     def test_apply_overwrite_rules_protected_fields(self, mock_post, mock_get_pw):
         """Test that protected fields are never overwritten if PW has data"""
         mock_get_pw.return_value = self.mock_pw_response
-        mock_post.return_value.json.return_value = {"success": True}
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
 
         service = ProjectWiseService()
 
@@ -149,7 +150,8 @@ class ProjectWiseServiceTestCase(TestCase):
     def test_apply_overwrite_rules_regular_fields(self, mock_post, mock_get_pw):
         """Test regular field overwrite rules: skip if infra tool empty but PW has data"""
         mock_get_pw.return_value = self.mock_pw_response
-        mock_post.return_value.json.return_value = {"success": True}
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
 
         service = ProjectWiseService()
 
@@ -263,7 +265,8 @@ class ProjectWiseServiceTestCase(TestCase):
     def test_sync_project_to_pw_legacy_usage(self, mock_post, mock_get_pw):
         """Test the legacy usage of sync_project_to_pw with PW ID"""
         mock_get_pw.return_value = self.mock_pw_response
-        mock_post.return_value.json.return_value = {"success": True}
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
 
         with patch('infraohjelmointi_api.services.ProjectService.ProjectService.get_by_hkr_id') as mock_get_by_hkr:
             mock_get_by_hkr.return_value = self.programmed_project_with_hkr
@@ -284,7 +287,8 @@ class ProjectWiseServiceTestCase(TestCase):
     def test_sync_project_to_pw_new_usage(self, mock_post, mock_get_pw):
         """Test the new usage of sync_project_to_pw with data and project"""
         mock_get_pw.return_value = self.mock_pw_response
-        mock_post.return_value.json.return_value = {"success": True}
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
 
         service = ProjectWiseService()
 
@@ -1580,7 +1584,8 @@ class ProjectCreationPWIntegrationTestCase(TestCase):
                 }
             }]
         }
-        mock_post.return_value.json.return_value = {"success": True}
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
 
         # Create project data with PW ID
         project_data = {
