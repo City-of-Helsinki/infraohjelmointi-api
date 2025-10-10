@@ -281,8 +281,11 @@ class ProjectWiseService:
 
             except Exception as e:
                 logger.error(f"Error processing field '{field_name}': {str(e)}")
-                # On error, include the field to be safe
-                filtered_data[field_name] = field_value
+                logger.warning(f"SKIP: Field '{field_name}' - validation failed, not sending to PW")
+                # BUG FIX: SKIP fields that fail validation instead of including them
+                # Previously we included failed fields "to be safe", but this caused us to send
+                # locked/invalid fields to PW, which PW would silently reject
+                # Do NOT add to filtered_data - skip this field
 
         return filtered_data
 
@@ -311,16 +314,20 @@ class ProjectWiseService:
             return True
 
         # Get current values
-        project_value = getattr(project, field_name, None)
+        # BUG FIX: Use field_value from data dict (UUID strings) instead of getattr (objects)
+        # The field_value parameter contains properly formatted UUID strings for related objects,
+        # while getattr would return the actual ProjectPhase/ProjectType objects
         pw_value = current_pw_properties.get(pw_field_name, '')
 
         # Check if values are empty
-        project_empty = not project_value or (isinstance(project_value, str) and not project_value.strip())
+        project_empty = not field_value or (isinstance(field_value, str) and not field_value.strip())
         pw_has_data = pw_value and (not isinstance(pw_value, str) or pw_value.strip())
 
         # IO-396 DIAGNOSTIC: Extra verbose logging for critical fields
         if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
-            logger.info(f"CRITICAL FIELD '{field_name}': tool_value={project_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
+            # For diagnostics, also show the project object value to compare
+            project_obj_value = getattr(project, field_name, None)
+            logger.info(f"CRITICAL FIELD '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
 
         # PW FIELD VALIDATION: Classification hierarchy fields cannot be created via API
         # If PW has these fields empty, we cannot populate them - the folder structure must exist in PW first
@@ -335,16 +342,17 @@ class ProjectWiseService:
         # If PW has a value and our value is different, skip the field
         if field_name in ['type', 'phase', 'programmed'] and pw_has_data and not project_empty:
             # Compare actual values to determine if they differ
+            # field_value is already a UUID string or boolean from the data dict
             from .utils.ProjectWiseDataMapper import ProjectWiseDataMapper
             mapper = ProjectWiseDataMapper()
-            project_data_for_comparison = {field_name: project_value}
+            project_data_for_comparison = {field_name: field_value}
             converted_data = mapper.convert_to_pw_data(project_data_for_comparison, project)
             converted_value = converted_data.get(pw_field_name, '')
 
             # Log the conversion for debugging
             logger.debug(
                 f"Locked field comparison '{field_name}': "
-                f"raw_tool_value={project_value}, "
+                f"data_value={field_value}, "
                 f"converted_tool_value='{converted_value}', "
                 f"pw_value='{pw_value}'"
             )
@@ -374,7 +382,7 @@ class ProjectWiseService:
                 return False
             else:
                 if not project_empty:
-                    logger.debug(f"INCLUDE: Field '{field_name}' - infra tool has data (value: {project_value})")
+                    logger.debug(f"INCLUDE: Field '{field_name}' - infra tool has data (value: {field_value})")
                 else:
                     logger.debug(f"INCLUDE: Field '{field_name}' - both infra tool and PW are empty")
                 return True
