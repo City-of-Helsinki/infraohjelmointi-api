@@ -1841,11 +1841,16 @@ class ProjectCreationPWIntegrationTestCase(TestCase):
             # Call the method - should not raise exception
             serializer._sync_new_project_to_projectwise(mock_project)
             
-            # Verify error was logged
-            mock_logger.error.assert_called_once()
-            error_call_args = mock_logger.error.call_args[0][0]
-            self.assertIn("Failed to sync new project 'Test Project Exception' to ProjectWise", error_call_args)
-            self.assertIn("PW sync failed", error_call_args)
+            # Verify error was logged (enhanced logging uses multiple error calls)
+            self.assertTrue(mock_logger.error.called)
+            self.assertGreaterEqual(mock_logger.error.call_count, 1)
+            
+            # Check that key error messages are in the logged calls
+            error_messages = [str(call[0][0]) for call in mock_logger.error.call_args_list]
+            error_text = ' '.join(error_messages)
+            self.assertIn("AUTOMATIC PW SYNC FAILED", error_text)
+            self.assertIn("Test Project Exception", error_text)
+            self.assertIn("PW sync failed", error_text)
 
 
 class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
