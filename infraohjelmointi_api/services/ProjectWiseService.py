@@ -140,12 +140,24 @@ class ProjectWiseService:
 
             # Apply overwrite rules to filter data
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
-            
-            # IO-396 DIAGNOSTIC: Log what was filtered out
+
+            # IO-396 DIAGNOSTIC: Log what was filtered out and categorize reasons
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
             if filtered_out:
                 logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
-            
+                
+                # Check which categories of fields were filtered
+                field_categories = {
+                    'classification': [f for f in filtered_out.keys() if f in ['projectClass', 'projectDistrict']],
+                    'locked': [f for f in filtered_out.keys() if f in ['type', 'phase', 'programmed']],
+                    'protected': [f for f in filtered_out.keys() if f in ['description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']],
+                    'empty_tool': [f for f in filtered_out.keys() if f not in ['projectClass', 'projectDistrict', 'type', 'phase', 'programmed', 'description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']]
+                }
+                
+                for category, fields in field_categories.items():
+                    if fields:
+                        logger.info(f"  Filtered ({category}): {fields}")
+
             if not filtered_data:
                 logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
                 logger.debug(f"Original data had {len(data)} fields: {list(data.keys())}")
@@ -155,7 +167,7 @@ class ProjectWiseService:
             pw_project_data = self.project_wise_data_mapper.convert_to_pw_data(
                 data=filtered_data, project=project
             )
-            
+
             # IO-396 DIAGNOSTIC: Log the actual data being sent to PW
             logger.info(f"Sending {len(pw_project_data)} fields to PW for '{project.name}': {list(pw_project_data.keys())}")
             logger.debug(f"Full PW data payload: {pw_project_data}")
@@ -189,7 +201,7 @@ class ProjectWiseService:
                 logger.debug(f"Complete update request data: {pw_update_data}")
 
                 response = self.session.post(url=api_url, json=pw_update_data)
-                
+
                 # CRITICAL: Validate response status code
                 if response.status_code != 200:
                     # Extract detailed error information
@@ -197,7 +209,7 @@ class ProjectWiseService:
                         error_detail = response.json()
                     except:
                         error_detail = response.reason
-                    
+
                     # Log comprehensive error information for debugging
                     logger.error(f"=" * 80)
                     logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
@@ -206,16 +218,23 @@ class ProjectWiseService:
                     logger.error(f"Request URL: {api_url}")
                     logger.error(f"Fields attempted: {list(pw_project_data.keys())}")
                     logger.error(f"Full payload sent: {pw_project_data}")
-                    logger.error(f"=" * 80)
                     
+                    # Log PW's current state for comparison
+                    if current_pw_properties:
+                        critical_pw_fields = {k: v for k, v in current_pw_properties.items() 
+                                             if any(field in k for field in ['vaihe', 'Toimiala', 'luokka', 'piirin', 'Ohjelmoitu'])}
+                        logger.error(f"PW current critical fields: {critical_pw_fields}")
+                    
+                    logger.error(f"=" * 80)
+
                     error_msg = f"PW update failed for project '{project.name}' (HKR ID: {project.hkrId}) with status code '{response.status_code}': {error_detail}"
                     raise PWProjectResponseError(error_msg)
-                
+
                 # Success - log response details
                 pw_response = response.json()
                 logger.info(f"PW UPDATE SUCCESSFUL: '{project.name}' (HKR ID: {project.hkrId})")
                 logger.debug(f"PW success response: {pw_response}")
-                
+
                 # Verify PW confirms the change
                 if 'changedInstance' in pw_response:
                     change_info = pw_response['changedInstance']
@@ -225,7 +244,7 @@ class ProjectWiseService:
                 else:
                     logger.warning(f"PW responded 200 but no 'changedInstance' in response - verify update actually persisted")
                     logger.debug(f"Unexpected response structure: {pw_response}")
-                
+
                 logger.info(f"=" * 80)
             else:
                 logger.info(f"No PW data generated for project '{project.name}' (HKR ID: {project.hkrId})")
@@ -303,7 +322,43 @@ class ProjectWiseService:
         if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
             logger.info(f"CRITICAL FIELD '{field_name}': tool_value={project_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
 
-        # Apply overwrite rules
+        # PW FIELD VALIDATION: Classification hierarchy fields cannot be created via API
+        # If PW has these fields empty, we cannot populate them - the folder structure must exist in PW first
+        if field_name in ['projectClass', 'projectDistrict'] and not pw_has_data and not project_empty:
+            logger.warning(
+                f"SKIP: Classification field '{field_name}' - PW is empty, "
+                f"cannot create folder structure via API. Manual PW setup required."
+            )
+            return False
+
+        # PW FIELD VALIDATION: Locked fields (type, phase, programmed) cannot be changed once set
+        # If PW has a value and our value is different, skip the field
+        if field_name in ['type', 'phase', 'programmed'] and pw_has_data and not project_empty:
+            # Compare actual values to determine if they differ
+            from .utils.ProjectWiseDataMapper import ProjectWiseDataMapper
+            mapper = ProjectWiseDataMapper()
+            project_data_for_comparison = {field_name: project_value}
+            converted_data = mapper.convert_to_pw_data(project_data_for_comparison, project)
+            converted_value = converted_data.get(pw_field_name, '')
+
+            # Log the conversion for debugging
+            logger.debug(
+                f"Locked field comparison '{field_name}': "
+                f"raw_tool_value={project_value}, "
+                f"converted_tool_value='{converted_value}', "
+                f"pw_value='{pw_value}'"
+            )
+
+            if str(converted_value).strip() != str(pw_value).strip():
+                logger.warning(
+                    f"SKIP: Locked field '{field_name}' - PW has different value "
+                    f"(PW: '{pw_value}', Tool: '{converted_value}'). Cannot change locked fields in PW."
+                )
+                return False
+            else:
+                logger.debug(f"Locked field '{field_name}' values match - will include in update")
+
+        # Apply overwrite rules for regular fields
         if field_name in protected_fields:
             # Protected field: never overwrite if PW has data
             if pw_has_data:
@@ -329,11 +384,11 @@ class ProjectWiseService:
         Get the mapping from project fields to PW field names.
         Uses ProjectWiseDataMapper.to_pw_map for complete and accurate mappings.
         """
-        
+
         # Build simplified mapping for _should_include_field_in_update logic
         # Extract the actual PW field names from the complex mapping structure
         field_mapping = {}
-        
+
         for field_name, mapping in to_pw_map.items():
             if isinstance(mapping, str):
                 # Simple string mapping
@@ -345,7 +400,7 @@ class ProjectWiseService:
                 # Enum mapping - use first field name from values list
                 if isinstance(mapping['values'], list) and mapping['values']:
                     field_mapping[field_name] = mapping['values'][0]
-                    
+
         return field_mapping
 
     def _filter_projects_for_test_scope(self, projects):
@@ -355,7 +410,7 @@ class ProjectWiseService:
         """
         # Get test scope class ID from environment variable
         test_scope_subclass_id = env("PW_TEST_SCOPE_CLASS_ID", default=None)
-        
+
         if not test_scope_subclass_id:
             logger.warning("PW_TEST_SCOPE_CLASS_ID environment variable not set - returning empty queryset")
             return projects.none()
@@ -558,11 +613,11 @@ class ProjectWiseService:
         # The __sync_project_to_pw method will apply overwrite rules FIRST (which expects internal names),
         # THEN convert to PW format. Calling convert_to_pw_data here causes double-conversion.
         cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
-        
+
         # IO-396 DIAGNOSTIC: Log critical "Ohjelmoitu" field status
         if 'programmed' in cleaned_data:
             logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
-        
+
         logger.debug(f"Built project data for {project.name} with {len(cleaned_data)} fields")
         return cleaned_data
 
