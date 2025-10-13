@@ -138,14 +138,14 @@ class ProjectWiseService:
             current_pw_data = self.get_project_from_pw(project.hkrId)
             current_pw_properties = current_pw_data.get("relationshipInstances", [{}])[0].get("relatedInstance", {}).get("properties", {})
 
-            # Apply overwrite rules to filter data
-            # NOTE: We now attempt to send all fields and let PW decide what it accepts/rejects
+            # Apply overwrite rules to filter data before sending to PW
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
             
-            # Track which fields differ from PW for potential retry (only check fields that passed filtering)
+            # Track fields that differ from PW for potential retry
+            # These fields may be rejected by PW under certain conditions (locked fields, missing folder structure, etc.)
             fields_that_differ = []
-            for field_name in ['type', 'phase', 'programmed']:
-                if field_name in filtered_data:  # Check filtered_data, not original data
+            for field_name in ['type', 'phase', 'programmed', 'projectClass', 'projectDistrict']:
+                if field_name in filtered_data:
                     pw_field_name = self._get_pw_field_mapping().get(field_name)
                     if pw_field_name:
                         pw_value = current_pw_properties.get(pw_field_name, '')
@@ -154,20 +154,17 @@ class ProjectWiseService:
                         if str(tool_value).strip() != str(pw_value).strip():
                             fields_that_differ.append(field_name)
             
-            # Log if we're testing potentially locked fields
             if fields_that_differ:
                 logger.info(
                     f"Note: About to test if PW accepts updates for fields that differ: {fields_that_differ}. "
                     f"Will retry without them if PW rejects."
                 )
 
-            # IO-396 DIAGNOSTIC: Log what was filtered out and categorize reasons
+            # Log filtered fields by category for diagnostics
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
             if filtered_out:
                 logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
                 
-                # Check which categories of fields were filtered
-                # NOTE: type/phase/programmed not pre-filtered - we let PW decide via try-catch
                 field_categories = {
                     'classification': [f for f in filtered_out.keys() if f in ['projectClass', 'projectDistrict']],
                     'protected': [f for f in filtered_out.keys() if f in ['description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']],
@@ -188,7 +185,7 @@ class ProjectWiseService:
                 data=filtered_data, project=project
             )
 
-            # IO-396 DIAGNOSTIC: Log the actual data being sent to PW
+            # Log data being sent to PW
             logger.info(f"Sending {len(pw_project_data)} fields to PW for '{project.name}': {list(pw_project_data.keys())}")
             logger.debug(f"Full PW data payload: {pw_project_data}")
 
@@ -220,9 +217,9 @@ class ProjectWiseService:
                 logger.debug(f"PW update endpoint: {api_url}")
                 logger.debug(f"Complete update request data: {pw_update_data}")
 
-                # Try-catch: Attempt update with all fields, retry without differing fields if rejected
+                # Try-catch with graceful retry: send all fields first, retry without differing fields if PW rejects
                 retry_succeeded = False
-                response = None  # Initialize to None in case of unexpected errors
+                response = None
                 try:
                     response = self.session.post(url=api_url, json=pw_update_data)
                     
@@ -282,7 +279,7 @@ class ProjectWiseService:
                                     f"RETRY ALSO FAILED with status {response.status_code}. "
                                     f"Problem is not just the locked fields. Falling through to detailed error handling."
                                 )
-                                # Don't raise - let detailed error handling at line 298 process this
+                                # Don't raise - let detailed error handling below process this
                         else:
                             # No fields left after removing differing ones - can't retry
                             logger.error(
@@ -290,15 +287,14 @@ class ProjectWiseService:
                                 f"All data depends on locked fields. Falling through to error handling with original response."
                             )
                             # Don't overwrite response - keep original failed response for error handling
-                            # Don't raise - let detailed error handling at line 298 process this
+                            # Don't raise - let detailed error handling below process this
                     else:
                         # No differing fields to retry without
                         logger.debug("No differing fields identified for retry - will process original error through detailed error handling")
-                        # Don't raise - let detailed error handling at line 298 process this
+                        # Don't raise - let detailed error handling below process this
 
-                # CRITICAL: Validate response status code (skip if retry already succeeded)
+                # Validate response status code (skip if retry already succeeded)
                 if not retry_succeeded:
-                    # Safety check: ensure response exists
                     if response is None:
                         logger.error(f"=" * 80)
                         logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
@@ -397,18 +393,17 @@ class ProjectWiseService:
         """
         Determine if a specific field should be included in the PW update based on overwrite rules.
         """
-        # Protected fields (never overwrite if PW has data) - Based on IO-396 ticket requirements
+        # Protected fields: never overwrite if PW has data (IO-396 requirements)
         protected_fields = {
-            'description',           # "Write: when added/edited" but should be protected per ticket
-            'presenceStart',         # Esilläolo - never overwrite per ticket requirements
-            'presenceEnd',           # Esilläolo - never overwrite per ticket requirements
-            'visibilityStart',       # Nähtävilläolo - never overwrite per ticket requirements
-            'visibilityEnd',         # Nähtävilläolo - never overwrite per ticket requirements
-            'masterPlanAreaNumber',  # "Write: never" per ticket
-            'trafficPlanNumber',     # "Write: never" per ticket
-            'bridgeNumber'           # "Write: never" per ticket
+            'description',           # Protected per ticket requirements
+            'presenceStart',         # Esilläolo - never overwrite
+            'presenceEnd',           # Esilläolo - never overwrite
+            'visibilityStart',       # Nähtävilläolo - never overwrite
+            'visibilityEnd',         # Nähtävilläolo - never overwrite
+            'masterPlanAreaNumber',  # Write: never
+            'trafficPlanNumber',     # Write: never
+            'bridgeNumber'           # Write: never
         }
-        # REMOVED from protected: 'type', 'projectDistrict' - these should update per ticket!
 
         # Get PW field mapping
         pw_field_name = self._get_pw_field_mapping().get(field_name)
@@ -427,25 +422,17 @@ class ProjectWiseService:
         project_empty = not field_value or (isinstance(field_value, str) and not field_value.strip())
         pw_has_data = pw_value and (not isinstance(pw_value, str) or pw_value.strip())
 
-        # IO-396 DIAGNOSTIC: Extra verbose logging for critical fields
+        # Verbose logging for critical fields
         if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
-            # For diagnostics, also show the project object value to compare
             project_obj_value = getattr(project, field_name, None)
             logger.info(f"CRITICAL FIELD '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
 
-        # PW FIELD VALIDATION: Classification hierarchy fields cannot be created via API
-        # If PW has these fields empty, we cannot populate them - the folder structure must exist in PW first
-        if field_name in ['projectClass', 'projectDistrict'] and not pw_has_data and not project_empty:
-            logger.warning(
-                f"SKIP: Classification field '{field_name}' - PW is empty, "
-                f"cannot create folder structure via API. Manual PW setup required."
-            )
-            return False
+        # Classification hierarchy fields (projectClass, projectDistrict): attempt to send
+        # If PW rejects (e.g., folder structure doesn't exist), the try-catch mechanism will handle it
+        # Previously these were preemptively blocked, but we should let PW decide what it accepts
 
-        # NOTE: Removed "locked field" pre-filtering for type, phase, programmed
-        # Instead, we attempt to send these fields and use try-catch retry logic in __sync_project_to_pw
-        # This allows PW to decide what it accepts/rejects, with graceful fallback
-        # If PW rejects, we retry without those fields and log them as confirmed locked fields
+        # For type, phase, programmed: we attempt to send and use try-catch retry logic
+        # This allows PW to decide what it accepts/rejects with graceful fallback
 
         # Apply overwrite rules for regular fields
         if field_name in protected_fields:
@@ -659,7 +646,7 @@ class ProjectWiseService:
             'address': project.address,
             'entityName': project.entityName,
 
-            # Status and classification - IO-396 fixes: Use UUIDs for transformation
+            # Status and classification (use UUIDs for transformation)
             'phase': str(project.phase.id) if project.phase else None,
             'type': str(project.type.id) if project.type else None,
             'projectClass': str(project.projectClass.id) if project.projectClass else None,
@@ -667,7 +654,7 @@ class ProjectWiseService:
             'area': str(project.area.id) if project.area else None,
             'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
             'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
-            'programmed': True,  # Always True - only programmed projects are synced to PW
+            'programmed': True,  # Always True for PW sync
 
             # Dates
             'estPlanningStart': project.estPlanningStart,
@@ -698,12 +685,11 @@ class ProjectWiseService:
         }
 
         # Remove None values
-        # NOTE: Do NOT call convert_to_pw_data here! Return internal field names.
-        # The __sync_project_to_pw method will apply overwrite rules FIRST (which expects internal names),
-        # THEN convert to PW format. Calling convert_to_pw_data here causes double-conversion.
+        # IMPORTANT: Return internal field names, not PW format
+        # __sync_project_to_pw will apply overwrite rules first, then convert to PW format
         cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
 
-        # IO-396 DIAGNOSTIC: Log critical "Ohjelmoitu" field status
+        # Log programmed status for diagnostics
         if 'programmed' in cleaned_data:
             logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
 
@@ -828,7 +814,7 @@ class ProjectWiseService:
             if project_properties["PROJECT_Hankkeen_kuvaus"]
             else "Kuvaus puuttuu"
         )
-        if description != "Kuvaus puuttuu" or description != "":
+        if description != "Kuvaus puuttuu" and description != "":
             project.description = description
 
         if project_properties["PROJECT_Kadun_tai_puiston_nimi"]:
