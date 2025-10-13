@@ -17,7 +17,8 @@ except ImportError:
 from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectProgrammer,
-    Person
+    Person,
+    Project
 )
 
 
@@ -46,11 +47,18 @@ class Command(BaseCommand):
             action='store_true',
             help='Clear all existing defaultProgrammer assignments first'
         )
+        parser.add_argument(
+            '--skip-projects',
+            action='store_true',
+            help='Skip applying default programmers to existing projects (only set class defaults)'
+        )
 
     def handle(self, *args, **options):
         file_path = options['file']
         dry_run = options['dry_run']
         clear_existing = options['clear_existing']
+        skip_projects = options['skip_projects']
+        apply_to_projects = not skip_projects  # Apply by default unless skipped
 
         if not os.path.exists(file_path):
             raise CommandError(f"Excel file path is incorrect or missing: {file_path}")
@@ -82,9 +90,9 @@ class Command(BaseCommand):
         self.stdout.write(f"Total: {total_assignments} assignments")
 
         if dry_run:
-            self.show_dry_run(specific_assignments, fallback_assignments, clear_existing)
+            self.show_dry_run(specific_assignments, fallback_assignments, clear_existing, apply_to_projects)
         else:
-            self.process_assignments(specific_assignments, fallback_assignments, clear_existing)
+            self.process_assignments(specific_assignments, fallback_assignments, clear_existing, apply_to_projects)
 
     def read_excel_file(self, file_path):
         """Read the Excel file and extract programmer assignments"""
@@ -280,13 +288,41 @@ class Command(BaseCommand):
             else:
                 raise
 
-    def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing):
+    def _get_programmer_with_hierarchy(self, project_class):
+        """
+        Get programmer with hierarchical fallback logic.
+        This matches the logic in ProjectCreateSerializer._get_default_programmer_with_fallback()
+        and ProjectClassSerializer.get_computedDefaultProgrammer().
+
+        Traverses up the class hierarchy to find a default programmer.
+        """
+        if project_class.defaultProgrammer:
+            return project_class.defaultProgrammer
+
+        # Traverse up the parent hierarchy
+        current = project_class.parent
+        while current:
+            if current.defaultProgrammer:
+                return current.defaultProgrammer
+            current = current.parent
+
+        # No default programmer found in hierarchy
+        return None
+
+    def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Show what would be imported in dry-run mode"""
         self.stdout.write(self.style.SUCCESS("\n=== DRY RUN MODE ==="))
 
         if clear_existing:
             existing_count = ProjectClass.objects.exclude(defaultProgrammer=None).count()
             self.stdout.write(f"Would clear {existing_count} existing programmer assignments")
+
+        if apply_to_projects:
+            projects_to_update = Project.objects.filter(
+                projectClass__defaultProgrammer__isnull=False,
+                personProgramming__isnull=True
+            ).count()
+            self.stdout.write(f"Would apply default programmers to {projects_to_update} existing projects")
 
         # Show specific assignments
         if specific_assignments:
@@ -324,7 +360,7 @@ class Command(BaseCommand):
                         self.stdout.write(f"     - {cls.name[:60]}...")
 
     @transaction.atomic
-    def process_assignments(self, specific_assignments, fallback_assignments, clear_existing):
+    def process_assignments(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Process programmer assignments and assign them to project classes"""
         self.stdout.write(self.style.SUCCESS("\n=== IMPORTING PROGRAMMERS ==="))
 
@@ -404,12 +440,9 @@ class Command(BaseCommand):
                     found_programmers += 1
 
                 # Assign programmer to all classes in this district that don't have one
-                fallback_assigned = 0
-                for project_class in classes:
-                    project_class.defaultProgrammer = programmer
-                    project_class.save()
-                    fallback_assigned += 1
-                    assigned_classes += 1
+                # Use bulk update for better performance
+                fallback_assigned = classes.update(defaultProgrammer=programmer)
+                assigned_classes += fallback_assigned
 
                 self.stdout.write(f"   Assigned fallback programmer to {fallback_assigned} classes")
 
@@ -418,11 +451,40 @@ class Command(BaseCommand):
                 errors.append(error_msg)
                 self.stdout.write(f"   ERROR: {error_msg}")
 
+        # Apply default programmers to existing projects if requested
+        projects_updated = 0
+        if apply_to_projects:
+            self.stdout.write(f"\n--- APPLYING DEFAULT PROGRAMMERS TO EXISTING PROJECTS ---")
+
+            # Find all projects that:
+            # 1. Have a projectClass
+            # 2. Don't already have a personProgramming assigned
+            # Note: We use hierarchical fallback in Python to find programmers
+            projects_to_update = Project.objects.filter(
+                personProgramming__isnull=True,
+                projectClass__isnull=False
+            ).select_related('projectClass')
+
+            projects_count = projects_to_update.count()
+            self.stdout.write(f"Found {projects_count} projects without programmers")
+
+            # Use hierarchical fallback to find programmers
+            for project in projects_to_update:
+                programmer = self._get_programmer_with_hierarchy(project.projectClass)
+                if programmer:
+                    project.personProgramming = programmer
+                    project.save()
+                    projects_updated += 1
+
+            self.stdout.write(f"Updated {projects_updated} projects with default programmers (including hierarchical fallback)")
+
         # Summary
         self.stdout.write(self.style.SUCCESS(f"\n=== IMPORT SUMMARY ==="))
         self.stdout.write(f"Created programmers: {created_programmers}")
         self.stdout.write(f"Found existing programmers: {found_programmers}")
         self.stdout.write(f"Total classes assigned: {assigned_classes}")
+        if apply_to_projects:
+            self.stdout.write(f"Projects updated with programmers: {projects_updated}")
 
         if errors:
             self.stdout.write(f"Errors: {len(errors)}")
