@@ -139,7 +139,27 @@ class ProjectWiseService:
             current_pw_properties = current_pw_data.get("relationshipInstances", [{}])[0].get("relatedInstance", {}).get("properties", {})
 
             # Apply overwrite rules to filter data
+            # NOTE: We now attempt to send all fields and let PW decide what it accepts/rejects
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
+            
+            # Track which fields differ from PW for potential retry (only check fields that passed filtering)
+            fields_that_differ = []
+            for field_name in ['type', 'phase', 'programmed']:
+                if field_name in filtered_data:  # Check filtered_data, not original data
+                    pw_field_name = self._get_pw_field_mapping().get(field_name)
+                    if pw_field_name:
+                        pw_value = current_pw_properties.get(pw_field_name, '')
+                        converted_data = self.project_wise_data_mapper.convert_to_pw_data({field_name: filtered_data[field_name]}, project)
+                        tool_value = converted_data.get(pw_field_name, '')
+                        if str(tool_value).strip() != str(pw_value).strip():
+                            fields_that_differ.append(field_name)
+            
+            # Log if we're testing potentially locked fields
+            if fields_that_differ:
+                logger.info(
+                    f"Note: About to test if PW accepts updates for fields that differ: {fields_that_differ}. "
+                    f"Will retry without them if PW rejects."
+                )
 
             # IO-396 DIAGNOSTIC: Log what was filtered out and categorize reasons
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
@@ -147,11 +167,11 @@ class ProjectWiseService:
                 logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
                 
                 # Check which categories of fields were filtered
+                # NOTE: type/phase/programmed not pre-filtered - we let PW decide via try-catch
                 field_categories = {
                     'classification': [f for f in filtered_out.keys() if f in ['projectClass', 'projectDistrict']],
-                    'locked': [f for f in filtered_out.keys() if f in ['type', 'phase', 'programmed']],
                     'protected': [f for f in filtered_out.keys() if f in ['description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']],
-                    'empty_tool': [f for f in filtered_out.keys() if f not in ['projectClass', 'projectDistrict', 'type', 'phase', 'programmed', 'description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']]
+                    'empty_tool': [f for f in filtered_out.keys() if f not in ['projectClass', 'projectDistrict', 'description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']]
                 }
                 
                 for category, fields in field_categories.items():
@@ -200,35 +220,119 @@ class ProjectWiseService:
                 logger.debug(f"PW update endpoint: {api_url}")
                 logger.debug(f"Complete update request data: {pw_update_data}")
 
-                response = self.session.post(url=api_url, json=pw_update_data)
-
-                # CRITICAL: Validate response status code
-                if response.status_code != 200:
-                    # Extract detailed error information
-                    try:
-                        error_detail = response.json()
-                    except:
-                        error_detail = response.reason
-
-                    # Log comprehensive error information for debugging
-                    logger.error(f"=" * 80)
-                    logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
-                    logger.error(f"Status Code: {response.status_code}")
-                    logger.error(f"PW Error Response: {error_detail}")
-                    logger.error(f"Request URL: {api_url}")
-                    logger.error(f"Fields attempted: {list(pw_project_data.keys())}")
-                    logger.error(f"Full payload sent: {pw_project_data}")
+                # Try-catch: Attempt update with all fields, retry without differing fields if rejected
+                retry_succeeded = False
+                response = None  # Initialize to None in case of unexpected errors
+                try:
+                    response = self.session.post(url=api_url, json=pw_update_data)
                     
-                    # Log PW's current state for comparison
-                    if current_pw_properties:
-                        critical_pw_fields = {k: v for k, v in current_pw_properties.items() 
-                                             if any(field in k for field in ['vaihe', 'Toimiala', 'luokka', 'piirin', 'Ohjelmoitu'])}
-                        logger.error(f"PW current critical fields: {critical_pw_fields}")
+                    # Check response in try block to catch errors
+                    if response.status_code != 200:
+                        raise Exception(f"Status {response.status_code}")
                     
-                    logger.error(f"=" * 80)
+                    # First attempt succeeded
+                    if fields_that_differ:
+                        logger.info(
+                            f"SUCCESS: PW accepted updates for fields that differ: {fields_that_differ}. "
+                            f"These fields are NOT locked and CAN be updated."
+                        )
+                        
+                except Exception as first_attempt_error:
+                    # First attempt failed - check if we have fields that differ to retry without
+                    logger.debug(f"First attempt failed: {str(first_attempt_error)}")
+                    
+                    if fields_that_differ:
+                        logger.warning(
+                            f"First update attempt failed for '{project.name}'. "
+                            f"Retrying without potentially locked fields: {fields_that_differ}"
+                        )
+                        
+                        # Retry without the fields that differ
+                        filtered_data_retry = {k: v for k, v in filtered_data.items() if k not in fields_that_differ}
+                        pw_project_data_retry = self.project_wise_data_mapper.convert_to_pw_data(
+                            data=filtered_data_retry, project=project
+                        )
+                        
+                        if pw_project_data_retry:
+                            pw_update_data_retry = {
+                                "instance": {
+                                    "schemaName": schema_name,
+                                    "className": class_name,
+                                    "instanceId": pw_instance_id,
+                                    "changeState": "modified",
+                                    "properties": pw_project_data_retry,
+                                }
+                            }
+                            
+                            logger.info(f"RETRY: Sending {len(pw_project_data_retry)} fields (excluded {fields_that_differ})")
+                            logger.debug(f"Retry payload: {pw_project_data_retry}")
+                            
+                            response = self.session.post(url=api_url, json=pw_update_data_retry)
+                            
+                            # Check retry response
+                            if response.status_code == 200:
+                                logger.warning(
+                                    f"SUCCESS on retry - CONFIRMED: {fields_that_differ} are LOCKED fields in PW. "
+                                    f"These cannot be updated once set. Other fields were updated successfully."
+                                )
+                                retry_succeeded = True
+                            else:
+                                # Retry also failed - will fall through to detailed error handling below
+                                logger.error(
+                                    f"RETRY ALSO FAILED with status {response.status_code}. "
+                                    f"Problem is not just the locked fields. Falling through to detailed error handling."
+                                )
+                                # Don't raise - let detailed error handling at line 298 process this
+                        else:
+                            # No fields left after removing differing ones - can't retry
+                            logger.error(
+                                f"Cannot retry: No fields left after excluding {fields_that_differ}. "
+                                f"All data depends on locked fields. Falling through to error handling with original response."
+                            )
+                            # Don't overwrite response - keep original failed response for error handling
+                            # Don't raise - let detailed error handling at line 298 process this
+                    else:
+                        # No differing fields to retry without
+                        logger.debug("No differing fields identified for retry - will process original error through detailed error handling")
+                        # Don't raise - let detailed error handling at line 298 process this
 
-                    error_msg = f"PW update failed for project '{project.name}' (HKR ID: {project.hkrId}) with status code '{response.status_code}': {error_detail}"
-                    raise PWProjectResponseError(error_msg)
+                # CRITICAL: Validate response status code (skip if retry already succeeded)
+                if not retry_succeeded:
+                    # Safety check: ensure response exists
+                    if response is None:
+                        logger.error(f"=" * 80)
+                        logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
+                        logger.error("No response received from PW API - possible network error or exception during POST")
+                        logger.error(f"Request URL: {api_url}")
+                        logger.error(f"=" * 80)
+                        raise PWProjectResponseError(f"No response from PW API for project '{project.name}' (HKR ID: {project.hkrId})")
+                    
+                    if response.status_code != 200:
+                        # Extract detailed error information
+                        try:
+                            error_detail = response.json()
+                        except:
+                            error_detail = response.reason
+
+                        # Log comprehensive error information for debugging
+                        logger.error(f"=" * 80)
+                        logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
+                        logger.error(f"Status Code: {response.status_code}")
+                        logger.error(f"PW Error Response: {error_detail}")
+                        logger.error(f"Request URL: {api_url}")
+                        logger.error(f"Fields attempted: {list(pw_project_data.keys())}")
+                        logger.error(f"Full payload sent: {pw_project_data}")
+                        
+                        # Log PW's current state for comparison
+                        if current_pw_properties:
+                            critical_pw_fields = {k: v for k, v in current_pw_properties.items() 
+                                                 if any(field in k for field in ['vaihe', 'Toimiala', 'luokka', 'piirin', 'Ohjelmoitu'])}
+                            logger.error(f"PW current critical fields: {critical_pw_fields}")
+                        
+                        logger.error(f"=" * 80)
+
+                        error_msg = f"PW update failed for project '{project.name}' (HKR ID: {project.hkrId}) with status code '{response.status_code}': {error_detail}"
+                        raise PWProjectResponseError(error_msg)
 
                 # Success - log response details
                 pw_response = response.json()
@@ -338,33 +442,10 @@ class ProjectWiseService:
             )
             return False
 
-        # PW FIELD VALIDATION: Locked fields (type, phase, programmed) cannot be changed once set
-        # If PW has a value and our value is different, skip the field
-        if field_name in ['type', 'phase', 'programmed'] and pw_has_data and not project_empty:
-            # Compare actual values to determine if they differ
-            # field_value is already a UUID string or boolean from the data dict
-            from .utils.ProjectWiseDataMapper import ProjectWiseDataMapper
-            mapper = ProjectWiseDataMapper()
-            project_data_for_comparison = {field_name: field_value}
-            converted_data = mapper.convert_to_pw_data(project_data_for_comparison, project)
-            converted_value = converted_data.get(pw_field_name, '')
-
-            # Log the conversion for debugging
-            logger.debug(
-                f"Locked field comparison '{field_name}': "
-                f"data_value={field_value}, "
-                f"converted_tool_value='{converted_value}', "
-                f"pw_value='{pw_value}'"
-            )
-
-            if str(converted_value).strip() != str(pw_value).strip():
-                logger.warning(
-                    f"SKIP: Locked field '{field_name}' - PW has different value "
-                    f"(PW: '{pw_value}', Tool: '{converted_value}'). Cannot change locked fields in PW."
-                )
-                return False
-            else:
-                logger.debug(f"Locked field '{field_name}' values match - will include in update")
+        # NOTE: Removed "locked field" pre-filtering for type, phase, programmed
+        # Instead, we attempt to send these fields and use try-catch retry logic in __sync_project_to_pw
+        # This allows PW to decide what it accepts/rejects, with graceful fallback
+        # If PW rejects, we retry without those fields and log them as confirmed locked fields
 
         # Apply overwrite rules for regular fields
         if field_name in protected_fields:
