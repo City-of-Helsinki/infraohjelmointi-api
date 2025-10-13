@@ -586,7 +586,7 @@ class ProjectWiseService:
             'area': str(project.area.id) if project.area else None,
             'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
             'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
-            'programmed': project.programmed,
+            'programmed': True,  # Always True - only programmed projects are synced to PW
 
             # Dates
             'estPlanningStart': project.estPlanningStart,
