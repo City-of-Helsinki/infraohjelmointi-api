@@ -17,7 +17,8 @@ except ImportError:
 from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectProgrammer,
-    Person
+    Person,
+    Project
 )
 
 
@@ -46,11 +47,18 @@ class Command(BaseCommand):
             action='store_true',
             help='Clear all existing defaultProgrammer assignments first'
         )
+        parser.add_argument(
+            '--skip-projects',
+            action='store_true',
+            help='Skip applying default programmers to existing projects (only set class defaults)'
+        )
 
     def handle(self, *args, **options):
         file_path = options['file']
         dry_run = options['dry_run']
         clear_existing = options['clear_existing']
+        skip_projects = options['skip_projects']
+        apply_to_projects = not skip_projects  # Apply by default unless skipped
 
         if not os.path.exists(file_path):
             raise CommandError(f"Excel file path is incorrect or missing: {file_path}")
@@ -82,9 +90,9 @@ class Command(BaseCommand):
         self.stdout.write(f"Total: {total_assignments} assignments")
 
         if dry_run:
-            self.show_dry_run(specific_assignments, fallback_assignments, clear_existing)
+            self.show_dry_run(specific_assignments, fallback_assignments, clear_existing, apply_to_projects)
         else:
-            self.process_assignments(specific_assignments, fallback_assignments, clear_existing)
+            self.process_assignments(specific_assignments, fallback_assignments, clear_existing, apply_to_projects)
 
     def read_excel_file(self, file_path):
         """Read the Excel file and extract programmer assignments"""
@@ -280,13 +288,20 @@ class Command(BaseCommand):
             else:
                 raise
 
-    def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing):
+    def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Show what would be imported in dry-run mode"""
         self.stdout.write(self.style.SUCCESS("\n=== DRY RUN MODE ==="))
-
+        
         if clear_existing:
             existing_count = ProjectClass.objects.exclude(defaultProgrammer=None).count()
             self.stdout.write(f"Would clear {existing_count} existing programmer assignments")
+        
+        if apply_to_projects:
+            projects_to_update = Project.objects.filter(
+                projectClass__defaultProgrammer__isnull=False,
+                personProgramming__isnull=True
+            ).count()
+            self.stdout.write(f"Would apply default programmers to {projects_to_update} existing projects")
 
         # Show specific assignments
         if specific_assignments:
@@ -324,7 +339,7 @@ class Command(BaseCommand):
                         self.stdout.write(f"     - {cls.name[:60]}...")
 
     @transaction.atomic
-    def process_assignments(self, specific_assignments, fallback_assignments, clear_existing):
+    def process_assignments(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Process programmer assignments and assign them to project classes"""
         self.stdout.write(self.style.SUCCESS("\n=== IMPORTING PROGRAMMERS ==="))
 
@@ -418,12 +433,37 @@ class Command(BaseCommand):
                 errors.append(error_msg)
                 self.stdout.write(f"   ERROR: {error_msg}")
 
+        # Apply default programmers to existing projects if requested
+        projects_updated = 0
+        if apply_to_projects:
+            self.stdout.write(f"\n--- APPLYING DEFAULT PROGRAMMERS TO EXISTING PROJECTS ---")
+            
+            # Find all projects that:
+            # 1. Have a projectClass with a defaultProgrammer set
+            # 2. Don't already have a personProgramming assigned
+            projects_to_update = Project.objects.filter(
+                projectClass__defaultProgrammer__isnull=False,
+                personProgramming__isnull=True
+            ).select_related('projectClass', 'projectClass__defaultProgrammer')
+            
+            projects_count = projects_to_update.count()
+            self.stdout.write(f"Found {projects_count} projects without programmers that have default programmers available")
+            
+            for project in projects_to_update:
+                project.personProgramming = project.projectClass.defaultProgrammer
+                project.save()
+                projects_updated += 1
+            
+            self.stdout.write(f"Updated {projects_updated} projects with default programmers")
+
         # Summary
         self.stdout.write(self.style.SUCCESS(f"\n=== IMPORT SUMMARY ==="))
         self.stdout.write(f"Created programmers: {created_programmers}")
         self.stdout.write(f"Found existing programmers: {found_programmers}")
         self.stdout.write(f"Total classes assigned: {assigned_classes}")
-
+        if apply_to_projects:
+            self.stdout.write(f"Projects updated with programmers: {projects_updated}")
+        
         if errors:
             self.stdout.write(f"Errors: {len(errors)}")
             for error in errors:
