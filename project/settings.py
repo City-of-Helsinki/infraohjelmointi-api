@@ -41,6 +41,7 @@ env = environ.Env(
     HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED=(bool, False),
     SOCIAL_AUTH_TUNNISTAMO_SCOPE=(str, "ad_group"),
     TWISTED_MAX_LINE_LENGTH=(int, 32768),
+    RESTRICTED_PROGRAMMER_AD_GROUP=(str, "sg_kymp_sso_io_rajoitetut_ohjelmoijat"),
 )
 
 if path.exists(".env"):
