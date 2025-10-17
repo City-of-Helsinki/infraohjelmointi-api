@@ -14,15 +14,12 @@ from datetime import datetime
 
 logger = logging.getLogger("infraohjelmointi_api")
 
-"""
-Maps infra tool fields to ProjectWise API fields.
-Handles type conversions, value lookups, and format normalization.
-"""
 to_pw_map = {
     "name": "PROJECT_Kohde",
     "address": "PROJECT_Kadun_tai_puiston_nimi",
     "description": "PROJECT_Hankkeen_kuvaus",
     "entityName": "PROJECT_Aluekokonaisuuden_nimi",
+    "constructionPhaseDetail": "PROJECT_Rakentamisvaiheen_tarkenne",
     "programmed": {
         "field": "PROJECT_Ohjelmoitu",
         "type": "boolean",
@@ -212,148 +209,139 @@ construction_phase_details_map = {
 
 
 class ProjectWiseDataMapper:
-    """Maps infra tool data to PW API format with type conversions and lookups."""
-
-    def convert_to_pw_data(self, data: dict) -> dict:
-        """Convert infra tool data dict to PW API format."""
+    def convert_to_pw_data(self, data: dict, project: Project):
         result = {}
         for field in data.keys():
-            if field not in to_pw_map:
+            if not field in to_pw_map:
                 logger.debug(f"Field '{field}' not supported")
                 continue
-
             value = data[field]
             mapped_field = to_pw_map[field]
+            mapped_field_type = type(mapped_field).__name__
+            # String value handling
+            if mapped_field_type == "str":
+                result[mapped_field] = value
+            # Boolean to text handling
+            elif mapped_field["type"] == "integer":
+                logger.debug(f"mapped_field {mapped_field}, value {value}")
+                result[mapped_field["field"]] = int(value)
 
-            self._convert_field(field, value, mapped_field, result)
+            # Boolean to text handling
+            elif mapped_field["type"] == "boolean":
+                result[mapped_field["field"]] = mapped_field["values"][
+                    str(value).lower()
+                ]
+            # List value handling
+            elif mapped_field["type"] == "listvalue":
+                field_mapper = None
+                if field == "phase":
+                    field_mapper = phase_map_for_infratool
+                    value = (
+                        ProjectPhaseService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
+                elif field == "type":
+                    field_mapper = project_type_map
+                    value = (
+                        ProjectTypeService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
+                elif field == "area":
+                    field_mapper = project_area_map
+                    value = (
+                        ProjectAreaService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
+                elif field == "responsibleZone":
+                    field_mapper = responsible_zone_map
+                    value = (
+                        ResponsibleZoneService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
+                elif field == "constructionPhaseDetail":
+                    field_mapper = construction_phase_details_map
+                    value = (
+                        ConstructionPhaseDetailService.get_by_id(value).value
+                        if not value is None
+                        else ""
+                    )
+                else:
+                    raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
+
+                result[mapped_field["field"]] = field_mapper[value] if value else None
+            # Class/Location field handling
+            elif mapped_field["type"] == "enum":
+                if field == "projectClass":
+                    classes = (
+                        ProjectClassService.get_by_id(value).path.split("/")
+                        if not value is None
+                        else ["", "", ""]
+                    )
+                    result[mapped_field["values"][0]] = classes[0]
+                    if len(classes) > 1:
+                        result[mapped_field["values"][1]] = classes[1]
+                    if len(classes) > 2:
+                        result[mapped_field["values"][2]] = classes[2]
+                elif field == "projectDistrict":
+                    locations = (
+                        ProjectDistrictService.get_by_id(value).path.split("/")
+                        if not value is None
+                        else ["", "", ""]
+                    )
+                    result[mapped_field["values"][0]] = locations[0]
+                    if len(locations) > 1:
+                        result[mapped_field["values"][1]] = locations[1]
+                    if len(locations) > 2:
+                        result[mapped_field["values"][2]] = locations[2]
+                elif field == "personPlanning":
+                    planningPersonModel = PersonService.get_by_id(value) if value else None
+                    # fullname
+                    result[mapped_field["values"][0]] = "{} {}".format(
+                        planningPersonModel.lastName, planningPersonModel.firstName
+                    ) if planningPersonModel else ""
+                    # title
+                    result[mapped_field["values"][1]] = planningPersonModel.title if planningPersonModel else ""
+                    # phone
+                    result[mapped_field["values"][2]] = planningPersonModel.phone if planningPersonModel else ""
+                    # email
+                    result[mapped_field["values"][3]] = planningPersonModel.email if planningPersonModel else ""
+                elif field == "personConstruction":
+                    constructionPersonModel = PersonService.get_by_id(value) if value else None
+                    # fullname
+                    result[mapped_field["values"][0]] = "{} {}, {}, {}, {}".format(
+                        constructionPersonModel.lastName,
+                        constructionPersonModel.firstName,
+                        constructionPersonModel.title,
+                        constructionPersonModel.phone,
+                        constructionPersonModel.email,
+                    ) if constructionPersonModel else ""
+
+            # Date field handling
+            elif mapped_field["type"] == "date":
+                if value:
+                    if isinstance(value, str):
+                        result[mapped_field["field"]] = datetime.strptime(
+                            value,
+                            mapped_field["fromFormat"],
+                        ).strftime(mapped_field["toFormat"])
+                    elif isinstance(value, datetime):
+                        result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"])
+                    elif hasattr(value, 'year'):  # Handle datetime.date objects
+                        # Convert date to datetime with midnight time, then format
+                        dt = datetime.combine(value, datetime.min.time())
+                        result[mapped_field["field"]] = dt.strftime(mapped_field["toFormat"])
+                    else:
+                        result[mapped_field["field"]] = ""
+                else:
+                    result[mapped_field["field"]] = ""
+            else:
+                raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
 
         return result
-
-    def _convert_field(self, field: str, value, mapped_field, result: dict):
-        """Convert a single field based on its type."""
-        if isinstance(mapped_field, str):
-            result[mapped_field] = value
-            return
-
-        field_type = mapped_field.get("type")
-        if field_type == "integer":
-            self._convert_integer_field(mapped_field, value, result)
-        elif field_type == "boolean":
-            self._convert_boolean_field(mapped_field, value, result)
-        elif field_type == "listvalue":
-            self._convert_listvalue_field(field, mapped_field, value, result)
-        elif field_type == "enum":
-            self._convert_enum_field(field, mapped_field, value, result)
-        elif field_type == "date":
-            self._convert_date_field(mapped_field, value, result)
-        else:
-            raise ProjectWiseDataFieldNotFound(f"Field '{field}' type '{field_type}' not supported")
-
-    def _convert_integer_field(self, mapped_field: dict, value, result: dict):
-        """Convert integer field."""
-        logger.debug(f"mapped_field {mapped_field}, value {value}")
-        result[mapped_field["field"]] = int(value)
-
-    def _convert_boolean_field(self, mapped_field: dict, value, result: dict):
-        """Convert boolean to Finnish text (Kyllä/Ei)."""
-        result[mapped_field["field"]] = mapped_field["values"][str(value).lower()]
-
-    def _convert_listvalue_field(self, field: str, mapped_field: dict, value, result: dict):
-        """Convert list value fields with UUID lookup."""
-        lookup_map = {
-            "phase": (phase_map_for_infratool, ProjectPhaseService),
-            "type": (project_type_map, ProjectTypeService),
-            "area": (project_area_map, ProjectAreaService),
-            "responsibleZone": (responsible_zone_map, ResponsibleZoneService),
-            "constructionPhaseDetail": (construction_phase_details_map, ConstructionPhaseDetailService),
-        }
-
-        if field not in lookup_map:
-            raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
-
-        field_mapper, service = lookup_map[field]
-        value = service.get_by_id(value).value if value is not None else ""
-        result[mapped_field["field"]] = field_mapper[value] if value else None
-
-    def _convert_enum_field(self, field: str, mapped_field: dict, value, result: dict):
-        """Convert enum fields (projectClass, projectDistrict, person)."""
-        if field == "projectClass":
-            self._convert_project_class(mapped_field, value, result)
-        elif field == "projectDistrict":
-            self._convert_project_district(mapped_field, value, result)
-        elif field == "personPlanning":
-            self._convert_person_planning(mapped_field, value, result)
-        elif field == "personConstruction":
-            self._convert_person_construction(mapped_field, value, result)
-
-    def _convert_project_class(self, mapped_field: dict, value, result: dict):
-        """Convert project classification with format normalization."""
-        classes = (
-            ProjectClassService.get_by_id(value).path.split("/")
-            if value is not None
-            else ["", "", ""]
-        )
-
-        # Normalize "8 04 Description" → "804 Description"
-        pluokka = classes[0]
-        if pluokka and ' ' in pluokka:
-            parts = pluokka.split(' ', 2)
-            if (len(parts) >= 2 and
-                parts[0].isdigit() and len(parts[0]) == 1 and
-                len(parts[1]) >= 2 and parts[1][:2].isdigit()):
-                pluokka = parts[0] + parts[1] + (' ' + parts[2] if len(parts) > 2 else '')
-
-        result[mapped_field["values"][0]] = pluokka
-        if len(classes) > 1:
-            result[mapped_field["values"][1]] = classes[1]
-        if len(classes) > 2:
-            result[mapped_field["values"][2]] = classes[2]
-
-    def _convert_project_district(self, mapped_field: dict, value, result: dict):
-        """Convert project district/location."""
-        locations = (
-            ProjectDistrictService.get_by_id(value).path.split("/")
-            if value is not None
-            else ["", "", ""]
-        )
-        result[mapped_field["values"][0]] = locations[0]
-        if len(locations) > 1:
-            result[mapped_field["values"][1]] = locations[1]
-        if len(locations) > 2:
-            result[mapped_field["values"][2]] = locations[2]
-
-    def _convert_person_planning(self, mapped_field: dict, value, result: dict):
-        """Convert planning person fields."""
-        person = PersonService.get_by_id(value) if value else None
-        result[mapped_field["values"][0]] = f"{person.lastName} {person.firstName}" if person else ""
-        result[mapped_field["values"][1]] = person.title if person else ""
-        result[mapped_field["values"][2]] = person.phone if person else ""
-        result[mapped_field["values"][3]] = person.email if person else ""
-
-    def _convert_person_construction(self, mapped_field: dict, value, result: dict):
-        """Convert construction person fields."""
-        person = PersonService.get_by_id(value) if value else None
-        if person:
-            result[mapped_field["values"][0]] = f"{person.lastName}, {person.firstName}, {person.title}, {person.phone}, {person.email}"
-        else:
-            result[mapped_field["values"][0]] = ""
-
-    def _convert_date_field(self, mapped_field: dict, value, result: dict):
-        """Convert date fields to PW format."""
-        if not value:
-            result[mapped_field["field"]] = ""
-            return
-
-        if isinstance(value, str):
-            dt = datetime.strptime(value, mapped_field["fromFormat"])
-            result[mapped_field["field"]] = dt.strftime(mapped_field["toFormat"])
-        elif isinstance(value, datetime):
-            result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"])
-        elif hasattr(value, 'year'):
-            dt = datetime.combine(value, datetime.min.time())
-            result[mapped_field["field"]] = dt.strftime(mapped_field["toFormat"])
-        else:
-            result[mapped_field["field"]] = ""
 
     def load_and_transform_phases(self):
         """Helper method to load phases from DB and transform to match PW format"""
@@ -397,10 +385,10 @@ class ProjectWiseDataMapper:
 def create_comprehensive_project_data(project: Project) -> dict:
     """
     Create a comprehensive data dictionary for automatic PW updates.
-
+    
     Args:
         project: The project object to extract data from
-
+        
     Returns:
         Dictionary with all relevant project fields, excluding None values
     """
