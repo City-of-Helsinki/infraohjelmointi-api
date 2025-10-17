@@ -287,14 +287,23 @@ class ProjectWiseDataMapper:
             self._convert_person_construction(mapped_field, value, result)
 
     def _convert_project_class(self, mapped_field: dict, value, result: dict):
-        """Convert project classification."""
+        """Convert project classification with format normalization."""
         classes = (
             ProjectClassService.get_by_id(value).path.split("/")
             if value is not None
             else ["", "", ""]
         )
 
-        result[mapped_field["values"][0]] = classes[0]
+        # Normalize "8 04 Description" → "804 Description"
+        pluokka = classes[0]
+        if pluokka and ' ' in pluokka:
+            parts = pluokka.split(' ', 2)
+            if (len(parts) >= 2 and
+                parts[0].isdigit() and len(parts[0]) == 1 and
+                len(parts[1]) >= 2 and parts[1][:2].isdigit()):
+                pluokka = parts[0] + parts[1] + (' ' + parts[2] if len(parts) > 2 else '')
+
+        result[mapped_field["values"][0]] = pluokka
         if len(classes) > 1:
             result[mapped_field["values"][1]] = classes[1]
         if len(classes) > 2:
