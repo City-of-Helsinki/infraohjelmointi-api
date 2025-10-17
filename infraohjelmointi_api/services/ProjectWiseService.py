@@ -59,6 +59,21 @@ class ProjectWiseService:
             self.project_wise_data_mapper.load_and_transform_project_types()
         )
 
+    @staticmethod
+    def _normalize_classification_format(value):
+        """
+        Normalize classification format for comparison.
+        '8 04 Puistot' and '804 Puistot' are treated as equivalent.
+        Returns normalized format (without space: '804 Puistot').
+        """
+        if not isinstance(value, str):
+            return value
+        # Pattern: "X YY Rest" → "XYY Rest"
+        match = re.match(r'^(\d) (\d{2}) (.+)$', value)
+        if match:
+            return match.group(1) + match.group(2) + ' ' + match.group(3)
+        return value
+
     def sync_all_projects_from_pw(self) -> None:
         """Method to synchronise all projects in DB with PW project data.\n"""
 
@@ -111,6 +126,75 @@ class ProjectWiseService:
                 )
             )
 
+    def _update_hierarchical_fields_one_by_one(self, instance_id, hierarchical_fields, project_name, hkr_id):
+        """
+        Update classification/location fields one at a time.
+        PW governance rules require individual updates for these fields.
+
+        Args:
+            instance_id: PW instance ID
+            hierarchical_fields: Dict of field_name: value for hierarchical fields
+            project_name: Project name for logging
+            hkr_id: HKR ID for logging
+
+        Returns:
+            Tuple of (success_count, total_count)
+        """
+        HIERARCHICAL_FIELD_ORDER = [
+            'PROJECT_Pluokka',
+            'PROJECT_Luokka',
+            'PROJECT_Alaluokka',
+            'PROJECT_Suurpiirin_nimi',
+            'PROJECT_Kaupunginosan_nimi'
+        ]
+
+        success_count = 0
+        total_count = len(hierarchical_fields)
+
+        logger.info(f"Updating {total_count} hierarchical fields one-at-a-time for '{project_name}' (HKR {hkr_id})")
+
+        for field_name in HIERARCHICAL_FIELD_ORDER:
+            if field_name not in hierarchical_fields:
+                continue
+
+            field_value = hierarchical_fields[field_name]
+
+            schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
+
+            pw_update_data = {
+                "instance": {
+                    "schemaName": schema_name,
+                    "className": class_name,
+                    "instanceId": instance_id,
+                    "changeState": "modified",
+                    "properties": {field_name: field_value}
+                }
+            }
+
+            api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{instance_id}"
+
+            try:
+                response = self.session.post(url=api_url, json=pw_update_data)
+
+                if response.status_code == 200:
+                    logger.info(f"  [OK] {field_name}: '{field_value}' - SUCCESS")
+                    success_count += 1
+                else:
+                    logger.warning(f"  [FAIL] {field_name}: '{field_value}' - FAILED (status {response.status_code})")
+                    try:
+                        error_detail = response.json()
+                        logger.warning(f"    Error: {error_detail.get('errorMessage', 'Unknown')}")
+                    except:
+                        pass
+
+                # Small delay between updates
+                time.sleep(0.5)
+
+            except Exception as e:
+                logger.error(f"  [ERROR] {field_name}: Exception - {str(e)}")
+
+        return success_count, total_count
+
     def sync_project_to_pw(self, pw_id: str = None, data: dict = None, project: Project = None) -> None:
         """Method to synchronise project with given PW id to PW, or sync given project with data.\n"""
 
@@ -140,27 +224,8 @@ class ProjectWiseService:
 
             # Apply overwrite rules to filter data before sending to PW
             filtered_data = self._apply_overwrite_rules(data, project, current_pw_properties)
-            
-            # Track fields that differ from PW for potential retry
-            # These fields may be rejected by PW under certain conditions (locked fields, missing folder structure, etc.)
-            fields_that_differ = []
-            for field_name in ['type', 'phase', 'programmed', 'projectClass', 'projectDistrict']:
-                if field_name in filtered_data:
-                    pw_field_name = self._get_pw_field_mapping().get(field_name)
-                    if pw_field_name:
-                        pw_value = current_pw_properties.get(pw_field_name, '')
-                        converted_data = self.project_wise_data_mapper.convert_to_pw_data({field_name: filtered_data[field_name]}, project)
-                        tool_value = converted_data.get(pw_field_name, '')
-                        if str(tool_value).strip() != str(pw_value).strip():
-                            fields_that_differ.append(field_name)
-            
-            if fields_that_differ:
-                logger.info(
-                    f"Note: About to test if PW accepts updates for fields that differ: {fields_that_differ}. "
-                    f"Will retry without them if PW rejects."
-                )
 
-            # Log filtered fields by category for diagnostics
+            # Log filtered fields for diagnostics
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
             if filtered_out:
                 logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
@@ -192,160 +257,110 @@ class ProjectWiseService:
             if pw_project_data:
                 pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
 
-                (
-                    schema_name,
-                    class_name,
-                    *others,
-                ) = self.pw_api_project_update_endpoint.split("/")
-
-                pw_update_data = {
-                    "instance": {
-                        "schemaName": schema_name,
-                        "className": class_name,
-                        "instanceId": pw_instance_id,
-                        "changeState": "modified",
-                        "properties": pw_project_data,
-                    }
-                }
-
+                schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
                 api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
 
                 logger.info(f"=" * 80)
                 logger.info(f"UPDATING PROJECT: '{project.name}' (HKR ID: {project.hkrId})")
                 logger.info(f"PW Instance ID: {pw_instance_id}")
-                logger.info(f"Fields being sent: {list(pw_project_data.keys())}")
-                logger.debug(f"PW update endpoint: {api_url}")
-                logger.debug(f"Complete update request data: {pw_update_data}")
 
-                # Try-catch with graceful retry: send all fields first, retry without differing fields if PW rejects
-                retry_succeeded = False
-                response = None
-                try:
-                    response = self.session.post(url=api_url, json=pw_update_data)
-                    
-                    # Check response in try block to catch errors
-                    if response.status_code != 200:
-                        raise Exception(f"Status {response.status_code}")
-                    
-                    # First attempt succeeded
-                    if fields_that_differ:
-                        logger.info(
-                            f"SUCCESS: PW accepted updates for fields that differ: {fields_that_differ}. "
-                            f"These fields are NOT locked and CAN be updated."
-                        )
-                        
-                except Exception as first_attempt_error:
-                    # First attempt failed - check if we have fields that differ to retry without
-                    logger.debug(f"First attempt failed: {str(first_attempt_error)}")
-                    
-                    if fields_that_differ:
-                        logger.warning(
-                            f"First update attempt failed for '{project.name}'. "
-                            f"Retrying without potentially locked fields: {fields_that_differ}"
-                        )
-                        
-                        # Retry without the fields that differ
-                        filtered_data_retry = {k: v for k, v in filtered_data.items() if k not in fields_that_differ}
-                        pw_project_data_retry = self.project_wise_data_mapper.convert_to_pw_data(
-                            data=filtered_data_retry, project=project
-                        )
-                        
-                        if pw_project_data_retry:
-                            pw_update_data_retry = {
-                                "instance": {
-                                    "schemaName": schema_name,
-                                    "className": class_name,
-                                    "instanceId": pw_instance_id,
-                                    "changeState": "modified",
-                                    "properties": pw_project_data_retry,
-                                }
-                            }
-                            
-                            logger.info(f"RETRY: Sending {len(pw_project_data_retry)} fields (excluded {fields_that_differ})")
-                            logger.debug(f"Retry payload: {pw_project_data_retry}")
-                            
-                            response = self.session.post(url=api_url, json=pw_update_data_retry)
-                            
-                            # Check retry response
-                            if response.status_code == 200:
-                                logger.warning(
-                                    f"SUCCESS on retry - CONFIRMED: {fields_that_differ} are LOCKED fields in PW. "
-                                    f"These cannot be updated once set. Other fields were updated successfully."
-                                )
-                                retry_succeeded = True
-                            else:
-                                # Retry also failed - will fall through to detailed error handling below
-                                logger.error(
-                                    f"RETRY ALSO FAILED with status {response.status_code}. "
-                                    f"Problem is not just the locked fields. Falling through to detailed error handling."
-                                )
-                                # Don't raise - let detailed error handling below process this
+                # Split hierarchical fields from normal fields
+                # Hierarchical fields need one-at-a-time updates due to PW governance rules
+                HIERARCHICAL_FIELDS = {
+                    'PROJECT_Pluokka',
+                    'PROJECT_Luokka',
+                    'PROJECT_Alaluokka',
+                    'PROJECT_Suurpiirin_nimi',
+                    'PROJECT_Kaupunginosan_nimi'
+                }
+
+                hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in HIERARCHICAL_FIELDS}
+                normal_to_update = {k: v for k, v in pw_project_data.items() if k not in HIERARCHICAL_FIELDS}
+
+                normal_success = False
+                hierarchical_success_count = 0
+                hierarchical_total_count = len(hierarchical_to_update)
+
+                # Update normal fields in batch (existing behavior)
+                if normal_to_update:
+                    logger.info(f"Updating {len(normal_to_update)} normal fields in batch")
+                    logger.debug(f"Normal fields: {list(normal_to_update.keys())}")
+
+                    pw_update_data = {
+                        "instance": {
+                            "schemaName": schema_name,
+                            "className": class_name,
+                            "instanceId": pw_instance_id,
+                            "changeState": "modified",
+                            "properties": normal_to_update,
+                        }
+                    }
+
+                    try:
+                        response = self.session.post(url=api_url, json=pw_update_data)
+
+                        if response.status_code == 200:
+                            logger.info("[OK] Normal fields updated successfully")
+                            normal_success = True
                         else:
-                            # No fields left after removing differing ones - can't retry
-                            logger.error(
-                                f"Cannot retry: No fields left after excluding {fields_that_differ}. "
-                                f"All data depends on locked fields. Falling through to error handling with original response."
+                            logger.error(f"[FAIL] Normal fields update failed (status {response.status_code})")
+                            try:
+                                error_detail = response.json()
+                                logger.error(f"  Error: {error_detail}")
+                            except:
+                                logger.error(f"  Error: {response.reason}")
+
+                            # Raise exception if normal fields fail - this is unexpected
+                            raise PWProjectResponseError(
+                                f"Normal field update failed for '{project.name}' (HKR {project.hkrId}): "
+                                f"Status {response.status_code}"
                             )
-                            # Don't overwrite response - keep original failed response for error handling
-                            # Don't raise - let detailed error handling below process this
-                    else:
-                        # No differing fields to retry without
-                        logger.debug("No differing fields identified for retry - will process original error through detailed error handling")
-                        # Don't raise - let detailed error handling below process this
 
-                # Validate response status code (skip if retry already succeeded)
-                if not retry_succeeded:
-                    if response is None:
-                        logger.error(f"=" * 80)
-                        logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
-                        logger.error("No response received from PW API - possible network error or exception during POST")
-                        logger.error(f"Request URL: {api_url}")
-                        logger.error(f"=" * 80)
-                        raise PWProjectResponseError(f"No response from PW API for project '{project.name}' (HKR ID: {project.hkrId})")
-                    
-                    if response.status_code != 200:
-                        # Extract detailed error information
-                        try:
-                            error_detail = response.json()
-                        except:
-                            error_detail = response.reason
-
-                        # Log comprehensive error information for debugging
-                        logger.error(f"=" * 80)
-                        logger.error(f"PW UPDATE FAILED: '{project.name}' (HKR ID: {project.hkrId})")
-                        logger.error(f"Status Code: {response.status_code}")
-                        logger.error(f"PW Error Response: {error_detail}")
-                        logger.error(f"Request URL: {api_url}")
-                        logger.error(f"Fields attempted: {list(pw_project_data.keys())}")
-                        logger.error(f"Full payload sent: {pw_project_data}")
-                        
-                        # Log PW's current state for comparison
-                        if current_pw_properties:
-                            critical_pw_fields = {k: v for k, v in current_pw_properties.items() 
-                                                 if any(field in k for field in ['vaihe', 'Toimiala', 'luokka', 'piirin', 'Ohjelmoitu'])}
-                            logger.error(f"PW current critical fields: {critical_pw_fields}")
-                        
-                        logger.error(f"=" * 80)
-
-                        error_msg = f"PW update failed for project '{project.name}' (HKR ID: {project.hkrId}) with status code '{response.status_code}': {error_detail}"
-                        raise PWProjectResponseError(error_msg)
-
-                # Success - log response details
-                pw_response = response.json()
-                logger.info(f"PW UPDATE SUCCESSFUL: '{project.name}' (HKR ID: {project.hkrId})")
-                logger.debug(f"PW success response: {pw_response}")
-
-                # Verify PW confirms the change
-                if 'changedInstance' in pw_response:
-                    change_info = pw_response['changedInstance']
-                    logger.info(f"PW confirmed change: {change_info.get('change', 'Unknown change type')}")
-                    if 'properties' in change_info:
-                        logger.debug(f"PW reported changed properties: {list(change_info['properties'].keys())}")
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"[ERROR] Normal fields update - network error: {str(e)}")
+                        raise PWProjectResponseError(f"Network error updating '{project.name}': {str(e)}")
                 else:
-                    logger.warning(f"PW responded 200 but no 'changedInstance' in response - verify update actually persisted")
-                    logger.debug(f"Unexpected response structure: {pw_response}")
+                    logger.info("No normal fields to update")
+                    normal_success = True  # No normal fields means nothing to fail
+
+                # Update hierarchical fields one-at-a-time (new behavior)
+                if hierarchical_to_update:
+                    hierarchical_success_count, hierarchical_total_count = self._update_hierarchical_fields_one_by_one(
+                        pw_instance_id,
+                        hierarchical_to_update,
+                        project.name,
+                        project.hkrId
+                    )
+
+                    if hierarchical_success_count == hierarchical_total_count:
+                        logger.info(f"[OK] All {hierarchical_total_count} hierarchical fields updated successfully")
+                    elif hierarchical_success_count > 0:
+                        logger.warning(
+                            f"[PARTIAL] {hierarchical_success_count}/{hierarchical_total_count} "
+                            f"hierarchical fields updated"
+                        )
+                    else:
+                        logger.error(f"[FAIL] All {hierarchical_total_count} hierarchical field updates failed")
+                else:
+                    logger.info("No hierarchical fields to update")
+
+                # Overall result
+                total_attempted = len(normal_to_update) + hierarchical_total_count
+                total_succeeded = (len(normal_to_update) if normal_success else 0) + hierarchical_success_count
 
                 logger.info(f"=" * 80)
+                logger.info(
+                    f"UPDATE RESULT: {total_succeeded}/{total_attempted} fields updated for "
+                    f"'{project.name}' (HKR {project.hkrId})"
+                )
+                logger.info(f"=" * 80)
+
+                # Don't raise exception if at least some fields updated successfully
+                # This allows partial updates (e.g., normal fields succeed even if hierarchical fail)
+                if total_succeeded == 0 and total_attempted > 0:
+                    raise PWProjectResponseError(
+                        f"All field updates failed for '{project.name}' (HKR {project.hkrId})"
+                    )
             else:
                 logger.info(f"No PW data generated for project '{project.name}' (HKR ID: {project.hkrId})")
         except (
