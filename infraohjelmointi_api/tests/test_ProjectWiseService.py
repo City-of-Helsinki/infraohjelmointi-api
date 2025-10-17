@@ -2054,15 +2054,17 @@ class DataMapperRefactoredMethodsTestCase(TestCase):
         result = self.mapper.convert_to_pw_data({})
         self.assertEqual(result, {})
 
-    def test_convert_project_class_normalization(self):
-        """Test '8 04' → '804' normalization."""
+    def test_convert_project_class_three_parts(self):
+        """Test project class with three-part path."""
         result = {}
         mapped_field = {"type": "enum", "values": ["PROJECT_Pluokka", "PROJECT_Luokka", "PROJECT_Alaluokka"]}
         mock_class = Mock()
         mock_class.path = "8 04 Puistot/Peruskorjaus/Sub"
         with patch.object(ProjectClassService, 'get_by_id', return_value=mock_class):
             self.mapper._convert_project_class(mapped_field, "uuid", result)
-        self.assertEqual(result["PROJECT_Pluokka"], "804 Puistot")
+        self.assertEqual(result["PROJECT_Pluokka"], "8 04 Puistot")
+        self.assertEqual(result["PROJECT_Luokka"], "Peruskorjaus")
+        self.assertEqual(result["PROJECT_Alaluokka"], "Sub")
 
     def test_convert_project_class_none(self):
         """Test project class with None."""
@@ -2331,8 +2333,8 @@ class AdditionalCoverageTestCase(TestCase):
         mapper._convert_integer_field(mapped_field, 2025, result)
         self.assertEqual(result["TEST_INT"], 2025)
 
-    def test_convert_project_class_with_normalization(self):
-        """Test project class with '8 04' → '804' normalization."""
+    def test_convert_project_class_with_full_path(self):
+        """Test project class with full three-part path."""
         mapper = ProjectWiseDataMapper()
         result = {}
         mapped_field = {"type": "enum", "values": ["PROJECT_Pluokka", "PROJECT_Luokka", "PROJECT_Alaluokka"]}
@@ -2342,7 +2344,7 @@ class AdditionalCoverageTestCase(TestCase):
         with patch.object(ProjectClassService, 'get_by_id', return_value=mock_class):
             mapper._convert_project_class(mapped_field, "uuid", result)
 
-        self.assertEqual(result["PROJECT_Pluokka"], "804 Puistot")
+        self.assertEqual(result["PROJECT_Pluokka"], "8 04 Puistot")
         self.assertEqual(result["PROJECT_Luokka"], "Peruskorjaus")
         self.assertEqual(result["PROJECT_Alaluokka"], "Sub")
 
