@@ -145,7 +145,8 @@ class ProjectWiseService:
             'PROJECT_Luokka',
             'PROJECT_Alaluokka',
             'PROJECT_Suurpiirin_nimi',
-            'PROJECT_Kaupunginosan_nimi'
+            'PROJECT_Kaupunginosan_nimi',
+            'PROJECT_Osa_alue'
         ]
 
         success_count = 0
@@ -271,7 +272,8 @@ class ProjectWiseService:
                     'PROJECT_Luokka',
                     'PROJECT_Alaluokka',
                     'PROJECT_Suurpiirin_nimi',
-                    'PROJECT_Kaupunginosan_nimi'
+                    'PROJECT_Kaupunginosan_nimi',
+                    'PROJECT_Osa_alue'
                 }
 
                 hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in HIERARCHICAL_FIELDS}
