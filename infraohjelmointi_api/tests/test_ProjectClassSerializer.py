@@ -274,8 +274,14 @@ class ProjectClassSerializerTestCase(TestCase):
         """Test IO-758: Suffix removal for all variations"""
         test_cases = [
             ("8 01 01 Test, Kylkn käytettäväksi", "8 01 01 Test"),
-            ("8 01 02 Test, Kaupunkiympäristölautakunnan käytettäväksi", "8 01 02 Test"),
-            ("8 01 03 Test, KHN käytettäväksi", "8 01 03 Test"),
+            ("8 01 02 Test, kylkn käytettäväksi", "8 01 02 Test"),
+            ("8 01 03 Test, Kaupunkiympäristölautakunnan käytettäväksi", "8 01 03 Test"),
+            ("8 01 04 Test, kaupunkiympäristölautakunnan käytettäväksi", "8 01 04 Test"),
+            ("8 01 05 Test, KHN käytettäväksi", "8 01 05 Test"),
+            ("8 01 06 Test, Khn käytettäväksi", "8 01 06 Test"),
+            ("8 01 07 Test, khn käytettäväksi", "8 01 07 Test"),
+            ("8 01 08 Test, Kaupunginhallituksen käytettäväksi", "8 01 08 Test"),
+            ("8 01 09 Test, kaupunginhallituksen käytettäväksi", "8 01 09 Test"),
         ]
 
         for original_name, expected_name in test_cases:
@@ -318,6 +324,50 @@ class ProjectClassSerializerTestCase(TestCase):
         self.assertEqual(
             prog_class.name,
             "Kiinteistöjen ostot ja lunastukset"
+        )
+
+    def test_four_digit_numbering_addition(self):
+        """Test IO-455: 4-digit numbering addition (8 03 01 01, 8 03 01 02, etc.)"""
+        coord_class_1 = ProjectClass.objects.create(
+            name="8 03 01 01 Uudisrakentaminen, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01",
+            forCoordinatorOnly=True
+        )
+
+        prog_class_1 = ProjectClass.objects.create(
+            name="Uudisrakentaminen",
+            path="8/Uudisrakentaminen",
+            forCoordinatorOnly=False
+        )
+
+        coord_class_1.relatedTo = prog_class_1
+        coord_class_1.save()
+
+        serializer = ProjectClassSerializer(prog_class_1)
+        self.assertEqual(
+            serializer.data['name'],
+            "8 03 01 01 Uudisrakentaminen"
+        )
+
+        coord_class_2 = ProjectClass.objects.create(
+            name="8 03 01 02 Perusparantaminen ja liikennejärjestelyt, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 02",
+            forCoordinatorOnly=True
+        )
+
+        prog_class_2 = ProjectClass.objects.create(
+            name="Perusparantaminen ja liikennejärjestelyt",
+            path="8/Perusparantaminen ja liikennejärjestelyt",
+            forCoordinatorOnly=False
+        )
+
+        coord_class_2.relatedTo = prog_class_2
+        coord_class_2.save()
+
+        serializer = ProjectClassSerializer(prog_class_2)
+        self.assertEqual(
+            serializer.data['name'],
+            "8 03 01 02 Perusparantaminen ja liikennejärjestelyt"
         )
 
     def test_programming_class_with_existing_numbering(self):
@@ -381,5 +431,5 @@ class ProjectClassSerializerTestCase(TestCase):
         serializer = ProjectClassSerializer(multi_suffix_class)
         self.assertEqual(
             serializer.data['name'],
-            "8 01 99 Test, Kaupunkiympäristölautakunnan käytettäväksi"
+            "8 01 99 Test"
         )
