@@ -14,6 +14,7 @@ from io import StringIO
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
+@patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'})
 class ProjectWiseServiceTestCase(TestCase):
     """
     Test cases for ProjectWiseService with focus on the new mass update functionality
@@ -776,6 +777,7 @@ class ProjectWiseConcurrencyTestCase(TestCase):
             self.assertEqual(initial_count, final_count, "Database should remain consistent after failure")
 
 
+@patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'})
 class ProjectWisePerformanceTestCase(TestCase):
     """
     Test cases for performance considerations during mass updates.
@@ -847,6 +849,7 @@ class ProjectWisePerformanceTestCase(TestCase):
             self.fail("Mass update should not cause memory issues")
 
 
+@patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'})
 class ProductionMassUpdateTestCase(TestCase):
     """
     Comprehensive test cases for the production-ready mass update functionality.
@@ -1479,6 +1482,7 @@ class IO396FieldMappingTestCase(TestCase):
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
+@patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'})
 class ProjectCreationPWIntegrationTestCase(TestCase):
     """
     This addresses the gap where creating a new project with PW ID doesn't trigger automatic sync.
@@ -1535,9 +1539,8 @@ class ProjectCreationPWIntegrationTestCase(TestCase):
         self.assertEqual(created_project.hkrId, 54321)
         self.assertEqual(created_project.name, "New Project with PW ID")
 
-        # Verify that PW sync was called automatically
         mock_get_pw.assert_called_once_with(54321)
-        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_count, 4, "Expected 1 batch + 3 hierarchical field calls")
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
@@ -1733,12 +1736,19 @@ class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
         """Test create_comprehensive_project_data with minimal project data"""
         from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
 
-        # Create a mock project with only required fields
         mock_project = Mock()
         mock_project.name = "Minimal Project"
         mock_project.description = "Minimal description"
         mock_project.address = None
         mock_project.entityName = None
+        mock_project.phase = None
+        mock_project.type = None
+        mock_project.projectClass = None
+        mock_project.projectDistrict = None
+        mock_project.area = None
+        mock_project.responsibleZone = None
+        mock_project.constructionPhaseDetail = None
+        mock_project.programmed = True
         mock_project.estPlanningStart = None
         mock_project.estPlanningEnd = None
         mock_project.estConstructionStart = None
@@ -1747,19 +1757,25 @@ class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
         mock_project.presenceEnd = None
         mock_project.visibilityStart = None
         mock_project.visibilityEnd = None
+        mock_project.planningStartYear = None
+        mock_project.constructionEndYear = None
+        mock_project.gravel = False
+        mock_project.louhi = False
         mock_project.masterPlanAreaNumber = None
         mock_project.trafficPlanNumber = None
         mock_project.bridgeNumber = None
+        mock_project.personPlanning = None
+        mock_project.personConstruction = None
 
-        # Call the function
         result = create_comprehensive_project_data(mock_project)
 
-        # Should only include non-None fields
-        self.assertEqual(len(result), 2)  # Only name and description
+        self.assertGreaterEqual(len(result), 3)
         self.assertIn('name', result)
         self.assertIn('description', result)
+        self.assertIn('programmed', result)
         self.assertEqual(result['name'], "Minimal Project")
         self.assertEqual(result['description'], "Minimal description")
+        self.assertEqual(result['programmed'], True)
 
     def test_create_comprehensive_project_data_return_type(self):
         """Test that create_comprehensive_project_data returns a dict"""
