@@ -384,19 +384,27 @@ class ProjectWiseDataMapper:
 
 def create_comprehensive_project_data(project: Project) -> dict:
     """
-    Create a comprehensive data dictionary for automatic PW updates.
+    Create comprehensive project data for ProjectWise synchronization.
     
     Args:
         project: The project object to extract data from
         
     Returns:
-        Dictionary with all relevant project fields, excluding None values
+        Dictionary with project fields (internal field names), excluding None values
     """
     comprehensive_data = {
         'name': project.name,
         'description': project.description,
         'address': project.address,
         'entityName': project.entityName,
+        'phase': str(project.phase.id) if project.phase else None,
+        'type': str(project.type.id) if project.type else None,
+        'projectClass': str(project.projectClass.id) if project.projectClass else None,
+        'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,
+        'area': str(project.area.id) if project.area else None,
+        'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
+        'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
+        'programmed': project.programmed,
         'estPlanningStart': project.estPlanningStart,
         'estPlanningEnd': project.estPlanningEnd,
         'estConstructionStart': project.estConstructionStart,
@@ -405,12 +413,17 @@ def create_comprehensive_project_data(project: Project) -> dict:
         'presenceEnd': project.presenceEnd,
         'visibilityStart': project.visibilityStart,
         'visibilityEnd': project.visibilityEnd,
+        'planningStartYear': project.planningStartYear,
+        'constructionEndYear': project.constructionEndYear,
+        'gravel': project.gravel,
+        'louhi': project.louhi,
         'masterPlanAreaNumber': project.masterPlanAreaNumber,
         'trafficPlanNumber': project.trafficPlanNumber,
         'bridgeNumber': project.bridgeNumber,
+        'personPlanning': str(project.personPlanning.id) if project.personPlanning else None,
+        'personConstruction': str(project.personConstruction.id) if project.personConstruction else None,
     }
 
-    # Remove None values to avoid unnecessary processing
     return {k: v for k, v in comprehensive_data.items() if v is not None}
 
 

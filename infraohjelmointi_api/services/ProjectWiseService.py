@@ -18,7 +18,11 @@ from .PersonService import PersonService
 from .ProjectService import ProjectService
 from .ProjectLocationService import ProjectLocationService
 
-from .utils import ProjectWiseDataMapper, ProjectWiseDataFieldNotFound
+from .utils import (
+    ProjectWiseDataMapper,
+    ProjectWiseDataFieldNotFound,
+    create_comprehensive_project_data,
+)
 from .utils.ProjectWiseDataMapper import to_pw_map
 
 env = environ.Env()
@@ -32,16 +36,15 @@ requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 
 class ProjectWiseService:
     def __init__(self) -> None:
-        # connection setup
         self.session = requests.Session()
         self.session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
         self.pw_api_url = env("PW_API_URL")
-
         self.pw_api_location_endpoint = env("PW_API_LOCATION_ENDPOINT")
         self.pw_api_project_metadata_endpoint = env("PW_API_PROJECT_META_ENDPOINT")
-
         self.pw_api_project_update_endpoint = env("PW_PROJECT_UPDATE_ENDPOINT")
-
+        
+        self.pw_sync_enabled = env.bool("PW_SYNC_ENABLED", default=False)
+        
         self.project_wise_data_mapper = ProjectWiseDataMapper()
 
         # preload data from DB to optimize performance
@@ -198,14 +201,20 @@ class ProjectWiseService:
 
     def sync_project_to_pw(self, pw_id: str = None, data: dict = None, project: Project = None) -> None:
         """Method to synchronise project with given PW id to PW, or sync given project with data.\n"""
+        
+        if not self.pw_sync_enabled:
+            logger.warning(
+                "ProjectWise sync is DISABLED (PW_SYNC_ENABLED=False). "
+                "Skipping sync to prevent dev/local data from reaching production PW. "
+                "Set PW_SYNC_ENABLED=True in production environment only."
+            )
+            return
 
         if pw_id:
-            # Legacy usage: sync by PW ID
             logger.debug(f"Synchronizing given project with PW Id '{pw_id}' to PW")
             project_obj = ProjectService.get_by_hkr_id(hkr_id=pw_id)
             self.__sync_project_to_pw(data={}, project=project_obj)
         elif project and data is not None:
-            # New usage: sync with data and project object
             logger.debug(f"Synchronizing project '{project.name}' (ID: {project.id}) to PW")
             self.__sync_project_to_pw(data=data, project=project)
         else:
@@ -543,7 +552,16 @@ class ProjectWiseService:
         Returns:
             List of update logs with detailed results for each project
         """
-        # Get all programmed projects with HKR IDs
+        if not self.pw_sync_enabled:
+            logger.error(
+                "=" * 100 + "\n"
+                "MASS UPDATE BLOCKED: ProjectWise sync is DISABLED\n"
+                "PW_SYNC_ENABLED=False prevents dev/local environments from syncing to production PW.\n"
+                "This is a safety feature. Set PW_SYNC_ENABLED=True in production .env only.\n" +
+                "=" * 100
+            )
+            return []
+        
         all_projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
 
         # Apply test scope filter if requested
@@ -622,7 +640,8 @@ class ProjectWiseService:
     def _create_project_data_for_mass_update(self, project: Project) -> dict:
         """
         Create project data dictionary for mass updates.
-        Includes all relevant fields that should be synchronized to PW.
+        
+        Validates project before delegating to shared data builder.
 
         Args:
             project: The project object to extract data from
@@ -634,11 +653,9 @@ class ProjectWiseService:
             ValueError: If project is invalid or missing required attributes
             TypeError: If project is not a Project instance
         """
-        # Type validation
         if not isinstance(project, Project):
             raise TypeError("project must be a Project instance")
 
-        # Required attributes validation
         if not project.id:
             raise ValueError("project must have an ID")
         if not project.programmed:
@@ -648,70 +665,20 @@ class ProjectWiseService:
         if not project.name:
             raise ValueError("project must have a name")
 
-        # Data type validation for critical fields
         if project.hkrId:
-            project.hkrId = str(project.hkrId)  # Convert to string if needed
+            project.hkrId = str(project.hkrId)
         if project.name and not isinstance(project.name, str):
             raise TypeError("name must be a string")
         if project.description and not isinstance(project.description, str):
             raise TypeError("description must be a string")
-        # Build raw project data with UUIDs for transformation
-        raw_project_data = {
-            # Basic info
-            'name': project.name,
-            'description': project.description,
-            'address': project.address,
-            'entityName': project.entityName,
 
-            # Status and classification (use UUIDs for transformation)
-            'phase': str(project.phase.id) if project.phase else None,
-            'type': str(project.type.id) if project.type else None,
-            'projectClass': str(project.projectClass.id) if project.projectClass else None,
-            'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,
-            'area': str(project.area.id) if project.area else None,
-            'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
-            'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
-            'programmed': True,  # Always True for PW sync
+        data = create_comprehensive_project_data(project)
 
-            # Dates
-            'estPlanningStart': project.estPlanningStart,
-            'estPlanningEnd': project.estPlanningEnd,
-            'estConstructionStart': project.estConstructionStart,
-            'estConstructionEnd': project.estConstructionEnd,
-            'presenceStart': project.presenceStart,
-            'presenceEnd': project.presenceEnd,
-            'visibilityStart': project.visibilityStart,
-            'visibilityEnd': project.visibilityEnd,
-
-            # Years
-            'planningStartYear': project.planningStartYear,
-            'constructionEndYear': project.constructionEndYear,
-
-            # Boolean flags
-            'gravel': project.gravel,
-            'louhi': project.louhi,
-
-            # Protected fields (only update if empty in PW)
-            'masterPlanAreaNumber': project.masterPlanAreaNumber,
-            'trafficPlanNumber': project.trafficPlanNumber,
-            'bridgeNumber': project.bridgeNumber,
-
-            # Person fields (UUIDs for transformation)
-            'personPlanning': str(project.personPlanning.id) if project.personPlanning else None,
-            'personConstruction': str(project.personConstruction.id) if project.personConstruction else None,
-        }
-
-        # Remove None values
-        # IMPORTANT: Return internal field names, not PW format
-        # __sync_project_to_pw will apply overwrite rules first, then convert to PW format
-        cleaned_data = {k: v for k, v in raw_project_data.items() if v is not None}
-
-        # Log programmed status for diagnostics
-        if 'programmed' in cleaned_data:
+        if 'programmed' in data:
             logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
 
-        logger.debug(f"Built project data for {project.name} with {len(cleaned_data)} fields")
-        return cleaned_data
+        logger.debug(f"Built project data for {project.name} with {len(data)} fields")
+        return data
 
     def get_project_from_pw(self, id: str):
         """Method to fetch project from PW with given PW project id"""
