@@ -222,6 +222,9 @@ class ProjectWiseService:
             project_obj = ProjectService.get_by_hkr_id(hkr_id=pw_id)
             self.__sync_project_to_pw(data={}, project=project_obj)
         elif project and data is not None:
+            logger.info(f"\n{'='*100}")
+            logger.info(f"AUTOMATIC SYNC: {project.name} (HKR ID: {project.hkrId})")
+            logger.info(f"{'='*100}")
             logger.debug(f"Synchronizing project '{project.name}' (ID: {project.id}) to PW")
             self.__sync_project_to_pw(data=data, project=project)
         else:
@@ -267,15 +270,13 @@ class ProjectWiseService:
                 data=filtered_data, project=project
             )
 
-            # Log data being sent to PW
-            logger.info(f"Sending {len(pw_project_data)} fields to PW for '{project.name}': {list(pw_project_data.keys())}")
+            # Log data being sent to PW (enhanced logging)
+            logger.info(f"Data prepared for PW sync: {len(pw_project_data)} fields")
+            logger.debug(f"Fields to update: {list(pw_project_data.keys())}")
             logger.debug(f"Full PW data payload: {pw_project_data}")
 
             if pw_project_data:
-                pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
-
-                schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
-                api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
+                pw_instance_id, api_url = self._get_pw_instance_and_url(current_pw_data)
 
                 logger.info(f"=" * 80)
                 logger.info(f"UPDATING PROJECT: '{project.name}' (HKR ID: {project.hkrId})")
@@ -283,10 +284,7 @@ class ProjectWiseService:
 
                 # Split hierarchical fields from normal fields
                 # Hierarchical fields need one-at-a-time updates due to PW governance rules
-                # Use class constant instead of local definition
-
-                hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in self.HIERARCHICAL_FIELDS}
-                normal_to_update = {k: v for k, v in pw_project_data.items() if k not in self.HIERARCHICAL_FIELDS}
+                hierarchical_to_update, normal_to_update = self._split_fields_by_type(pw_project_data)
 
                 normal_success = False
                 hierarchical_success_count = 0
@@ -296,7 +294,11 @@ class ProjectWiseService:
                 if normal_to_update:
                     logger.info(f"Updating {len(normal_to_update)} normal fields in batch")
                     logger.debug(f"Normal fields: {list(normal_to_update.keys())}")
+                    logger.info(f"Normal fields update: {list(normal_to_update.keys())}")
 
+                    # Extract schema and class names from endpoint
+                    schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
+                    
                     pw_update_data = {
                         "instance": {
                             "schemaName": schema_name,
@@ -336,6 +338,9 @@ class ProjectWiseService:
 
                 # Update hierarchical fields one-at-a-time (new behavior)
                 if hierarchical_to_update:
+                    logger.info(f"Updating {len(hierarchical_to_update)} hierarchical fields individually")
+                    logger.debug(f"Hierarchical fields: {list(hierarchical_to_update.keys())}")
+                    
                     hierarchical_success_count, hierarchical_total_count = self._update_hierarchical_fields_one_by_one(
                         pw_instance_id,
                         hierarchical_to_update,
@@ -356,14 +361,15 @@ class ProjectWiseService:
                     logger.info("No hierarchical fields to update")
 
                 # Overall result
-                total_attempted = len(normal_to_update) + hierarchical_total_count
-                total_succeeded = (len(normal_to_update) if normal_success else 0) + hierarchical_success_count
+                total_attempted, total_succeeded = self._calculate_update_results(
+                    normal_to_update, normal_success, hierarchical_success_count, hierarchical_total_count
+                )
 
                 logger.info(f"=" * 80)
-                logger.info(
-                    f"UPDATE RESULT: {total_succeeded}/{total_attempted} fields updated for "
-                    f"'{project.name}' (HKR {project.hkrId})"
-                )
+                logger.info(f"AUTOMATIC SYNC RESULT: {total_succeeded}/{total_attempted} fields updated")
+                logger.info(f"Project: '{project.name}' (HKR ID: {project.hkrId})")
+                logger.info(f"Normal fields: {len(normal_to_update)} attempted")
+                logger.info(f"Hierarchical fields: {hierarchical_total_count} attempted")
                 logger.info(f"=" * 80)
 
                 # Don't raise exception if at least some fields updated successfully
@@ -384,6 +390,41 @@ class ProjectWiseService:
             )
             # Re-raise the exception so mass update can count it as an error
             raise
+
+    def _split_fields_by_type(self, pw_project_data: dict) -> tuple[dict, dict]:
+        """
+        Split PW project data into hierarchical and normal fields.
+        
+        Returns:
+            tuple: (hierarchical_fields, normal_fields)
+        """
+        hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in self.HIERARCHICAL_FIELDS}
+        normal_to_update = {k: v for k, v in pw_project_data.items() if k not in self.HIERARCHICAL_FIELDS}
+        return hierarchical_to_update, normal_to_update
+
+    def _calculate_update_results(self, normal_to_update: dict, normal_success: bool, 
+                                hierarchical_success_count: int, hierarchical_total_count: int) -> tuple[int, int]:
+        """
+        Calculate total attempted and succeeded field updates.
+        
+        Returns:
+            tuple: (total_attempted, total_succeeded)
+        """
+        total_attempted = len(normal_to_update) + hierarchical_total_count
+        total_succeeded = (len(normal_to_update) if normal_success else 0) + hierarchical_success_count
+        return total_attempted, total_succeeded
+
+    def _get_pw_instance_and_url(self, current_pw_data: dict) -> tuple[str, str]:
+        """
+        Extract PW instance ID and build API URL for project update.
+        
+        Returns:
+            tuple: (instance_id, api_url)
+        """
+        pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
+        schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
+        api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
+        return pw_instance_id, api_url
 
     def _apply_overwrite_rules(self, data: dict, project: Project, current_pw_properties: dict) -> dict:
         """
