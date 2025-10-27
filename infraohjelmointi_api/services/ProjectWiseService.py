@@ -24,6 +24,7 @@ from .utils import (
     create_comprehensive_project_data,
 )
 from .utils.PWConfig import PWConfig
+from .utils.PWLogger import PWLogger
 from .utils.ProjectWiseDataMapper import to_pw_map
 
 env = environ.Env()
@@ -162,7 +163,7 @@ class ProjectWiseService:
         success_count = 0
         total_count = len(hierarchical_fields)
 
-        logger.info(f"Updating {total_count} hierarchical fields one-at-a-time for '{project_name}' (HKR {hkr_id})")
+        PWLogger.log_hierarchical_field_update_start(project_name, hkr_id, total_count)
 
         for field_name in self.HIERARCHICAL_FIELD_ORDER:
             if field_name not in hierarchical_fields:
@@ -188,21 +189,22 @@ class ProjectWiseService:
                 response = self.session.post(url=api_url, json=pw_update_data)
 
                 if response.status_code == 200:
-                    logger.info(f"  [OK] {field_name}: '{field_value}' - SUCCESS")
+                    PWLogger.log_hierarchical_field_result(field_name, field_value, True)
                     success_count += 1
                 else:
-                    logger.warning(f"  [FAIL] {field_name}: '{field_value}' - FAILED (status {response.status_code})")
+                    error_message = None
                     try:
                         error_detail = response.json()
-                        logger.warning(f"    Error: {error_detail.get('errorMessage', 'Unknown')}")
+                        error_message = error_detail.get('errorMessage', 'Unknown')
                     except:
                         pass
+                    PWLogger.log_hierarchical_field_result(field_name, field_value, False, response.status_code, error_message)
 
                 # Small delay between updates
                 time.sleep(PWConfig.HIERARCHICAL_FIELD_DELAY)
 
             except Exception as e:
-                logger.error(f"  [ERROR] {field_name}: Exception - {str(e)}")
+                PWLogger.log_hierarchical_field_result(field_name, str(e), False)
 
         return success_count, total_count
 
@@ -210,11 +212,7 @@ class ProjectWiseService:
         """Method to synchronise project with given PW id to PW, or sync given project with data.\n"""
         
         if not self.pw_sync_enabled:
-            logger.warning(
-                "ProjectWise sync is DISABLED (PW_SYNC_ENABLED=False). "
-                "Skipping sync to prevent dev/local data from reaching production PW. "
-                "Set PW_SYNC_ENABLED=True in production environment only."
-            )
+            PWLogger.log_sync_disabled_warning()
             return
 
         if pw_id:
@@ -222,9 +220,7 @@ class ProjectWiseService:
             project_obj = ProjectService.get_by_hkr_id(hkr_id=pw_id)
             self.__sync_project_to_pw(data={}, project=project_obj)
         elif project and data is not None:
-            logger.info(f"\n{'='*100}")
-            logger.info(f"AUTOMATIC SYNC: {project.name} (HKR ID: {project.hkrId})")
-            logger.info(f"{'='*100}")
+            PWLogger.log_sync_start(project.name, project.hkrId, "AUTOMATIC SYNC")
             logger.debug(f"Synchronizing project '{project.name}' (ID: {project.id}) to PW")
             self.__sync_project_to_pw(data=data, project=project)
         else:
@@ -247,21 +243,10 @@ class ProjectWiseService:
 
             # Log filtered fields for diagnostics
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
-            if filtered_out:
-                logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
-                
-                field_categories = {
-                    'classification': [f for f in filtered_out.keys() if f in PWConfig.CLASSIFICATION_FIELDS],
-                    'protected': [f for f in filtered_out.keys() if f in PWConfig.PROTECTED_FIELDS],
-                    'empty_tool': [f for f in filtered_out.keys() if f not in PWConfig.CLASSIFICATION_FIELDS and f not in PWConfig.PROTECTED_FIELDS]
-                }
-                
-                for category, fields in field_categories.items():
-                    if fields:
-                        logger.info(f"  Filtered ({category}): {fields}")
+            PWLogger.log_overwrite_rules(project.name, filtered_out)
 
             if not filtered_data:
-                logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
+                PWLogger.log_no_data_to_sync(project.name, project.hkrId, "all fields filtered by overwrite rules")
                 logger.debug(f"Original data had {len(data)} fields: {list(data.keys())}")
                 logger.debug(f"Current PW data: {current_pw_properties}")
                 return
@@ -270,21 +255,21 @@ class ProjectWiseService:
                 data=filtered_data, project=project
             )
 
-            # Log data being sent to PW (enhanced logging)
-            logger.info(f"Data prepared for PW sync: {len(pw_project_data)} fields")
-            logger.debug(f"Fields to update: {list(pw_project_data.keys())}")
-            logger.debug(f"Full PW data payload: {pw_project_data}")
+            # Log comprehensive data analysis (matching mass update quality)
+            PWLogger.log_data_preparation(project.name, pw_project_data, data)
 
             if pw_project_data:
                 pw_instance_id, api_url = self._get_pw_instance_and_url(current_pw_data)
 
-                logger.info(f"=" * 80)
-                logger.info(f"UPDATING PROJECT: '{project.name}' (HKR ID: {project.hkrId})")
-                logger.info(f"PW Instance ID: {pw_instance_id}")
+                # Performance tracking (matching mass update)
+                sync_start_time = time.time()
 
                 # Split hierarchical fields from normal fields
                 # Hierarchical fields need one-at-a-time updates due to PW governance rules
                 hierarchical_to_update, normal_to_update = self._split_fields_by_type(pw_project_data)
+                
+                # Log update operation details
+                PWLogger.log_update_operation(project.name, project.hkrId, pw_instance_id, normal_to_update, hierarchical_to_update)
 
                 normal_success = False
                 hierarchical_success_count = 0
@@ -292,9 +277,6 @@ class ProjectWiseService:
 
                 # Update normal fields in batch (existing behavior)
                 if normal_to_update:
-                    logger.info(f"Updating {len(normal_to_update)} normal fields in batch")
-                    logger.debug(f"Normal fields: {list(normal_to_update.keys())}")
-                    logger.info(f"Normal fields update: {list(normal_to_update.keys())}")
 
                     # Extract schema and class names from endpoint
                     schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
@@ -313,10 +295,11 @@ class ProjectWiseService:
                         response = self.session.post(url=api_url, json=pw_update_data)
 
                         if response.status_code == 200:
-                            logger.info("[OK] Normal fields updated successfully")
+                            PWLogger.log_field_update_result(True, "Normal", len(normal_to_update))
                             normal_success = True
                         else:
-                            logger.error(f"[FAIL] Normal fields update failed (status {response.status_code})")
+                            PWLogger.log_field_update_result(False, "Normal", len(normal_to_update))
+                            logger.error(f"Normal fields update failed (status {response.status_code})")
                             try:
                                 error_detail = response.json()
                                 logger.error(f"  Error: {error_detail}")
@@ -338,9 +321,6 @@ class ProjectWiseService:
 
                 # Update hierarchical fields one-at-a-time (new behavior)
                 if hierarchical_to_update:
-                    logger.info(f"Updating {len(hierarchical_to_update)} hierarchical fields individually")
-                    logger.debug(f"Hierarchical fields: {list(hierarchical_to_update.keys())}")
-                    
                     hierarchical_success_count, hierarchical_total_count = self._update_hierarchical_fields_one_by_one(
                         pw_instance_id,
                         hierarchical_to_update,
@@ -365,12 +345,16 @@ class ProjectWiseService:
                     normal_to_update, normal_success, hierarchical_success_count, hierarchical_total_count
                 )
 
-                logger.info(f"=" * 80)
-                logger.info(f"AUTOMATIC SYNC RESULT: {total_succeeded}/{total_attempted} fields updated")
-                logger.info(f"Project: '{project.name}' (HKR ID: {project.hkrId})")
-                logger.info(f"Normal fields: {len(normal_to_update)} attempted")
-                logger.info(f"Hierarchical fields: {hierarchical_total_count} attempted")
-                logger.info(f"=" * 80)
+                # Log final sync result with performance metrics
+                PWLogger.log_sync_result(
+                    project.name, 
+                    project.hkrId, 
+                    total_attempted, 
+                    total_succeeded,
+                    len(normal_to_update),
+                    hierarchical_total_count,
+                    sync_start_time
+                )
 
                 # Don't raise exception if at least some fields updated successfully
                 # This allows partial updates (e.g., normal fields succeed even if hierarchical fail)
@@ -385,9 +369,8 @@ class ProjectWiseService:
             PWProjectResponseError,
             PWProjectNotFoundError,
         ) as e:
-            logger.error(
-                f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
-            )
+            # Enhanced error logging (matching mass update quality)
+            PWLogger.log_sync_error(project.name, project.hkrId, e, data)
             # Re-raise the exception so mass update can count it as an error
             raise
 
@@ -447,8 +430,7 @@ class ProjectWiseService:
                     filtered_data[field_name] = field_value
 
             except Exception as e:
-                logger.error(f"Error processing field '{field_name}': {str(e)}")
-                logger.warning(f"SKIP: Field '{field_name}' - validation failed, not sending to PW")
+                PWLogger.log_field_processing_error(field_name, e)
                 # BUG FIX: SKIP fields that fail validation instead of including them
                 # Previously we included failed fields "to be safe", but this caused us to send
                 # locked/invalid fields to PW, which PW would silently reject
@@ -496,21 +478,21 @@ class ProjectWiseService:
         if field_name in protected_fields:
             # Protected field: never overwrite if PW has data
             if pw_has_data:
-                logger.debug(f"SKIP: Protected field '{field_name}' - PW has data: '{pw_value}'")
+                PWLogger.log_field_decision(field_name, "SKIP", "Protected field", pw_value=pw_value)
                 return False
             else:
-                logger.debug(f"INCLUDE: Protected field '{field_name}' - PW has no data")
+                PWLogger.log_field_decision(field_name, "INCLUDE", "Protected field")
                 return True
         else:
             # Regular field: only skip if infra tool is empty but PW has data
             if project_empty and pw_has_data:
-                logger.debug(f"SKIP: Field '{field_name}' - infra tool empty but PW has data: '{pw_value}'")
+                PWLogger.log_field_decision(field_name, "SKIP", "Field", pw_value=pw_value)
                 return False
             else:
                 if not project_empty:
-                    logger.debug(f"INCLUDE: Field '{field_name}' - infra tool has data (value: {field_value})")
+                    PWLogger.log_field_decision(field_name, "INCLUDE", "Field", data_value=str(field_value))
                 else:
-                    logger.debug(f"INCLUDE: Field '{field_name}' - both infra tool and PW are empty")
+                    PWLogger.log_field_decision(field_name, "INCLUDE", "Field")
                 return True
 
     def _get_pw_field_mapping(self) -> dict:
@@ -556,20 +538,20 @@ class ProjectWiseService:
         """
         if not self.pw_sync_enabled:
             logger.error(
-                "=" * 100 + "\n"
+                "=" * PWConfig.LOG_SEPARATOR_LENGTH + "\n"
                 "MASS UPDATE BLOCKED: ProjectWise sync is DISABLED\n"
                 "PW_SYNC_ENABLED=False prevents dev/local environments from syncing to production PW.\n"
                 "This is a safety feature. Set PW_SYNC_ENABLED=True in production .env only.\n" +
-                "=" * 100
+                "=" * PWConfig.LOG_SEPARATOR_LENGTH
             )
             return []
         
         projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
         total_projects = projects.count()
-        logger.info(f"Starting mass update of {total_projects} all programmed projects to PW")
+        PWLogger.log_mass_update_start(total_projects)
 
         if total_projects == 0:
-            logger.warning(f"No projects found for mass update (all programmed projects)")
+            PWLogger.log_mass_update_no_projects()
             return []
 
         update_log = []
@@ -578,9 +560,7 @@ class ProjectWiseService:
         errors = 0
 
         for i, project in enumerate(projects, 1):
-            logger.info(f"\n{'='*100}")
-            logger.info(f"PROCESSING PROJECT {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
-            logger.info(f"{'='*100}")
+            PWLogger.log_mass_update_progress(project.name, project.hkrId, i, total_projects)
 
             try:
                 # Create comprehensive project data for mass update
@@ -588,7 +568,7 @@ class ProjectWiseService:
                 logger.debug(f"Created project data with {len(project_data)} fields: {list(project_data.keys())}")
 
                 if not project_data:
-                    logger.info(f"No data to sync for project '{project.name}' - all fields are None")
+                    PWLogger.log_no_data_to_sync(project.name, project.hkrId, "all fields are None")
                     update_log.append({
                         'project_id': str(project.id),
                         'project_name': project.name,
@@ -612,7 +592,7 @@ class ProjectWiseService:
                 successful_updates += 1
 
             except Exception as e:
-                logger.error(f"Failed to update project {project.name}: {str(e)}")
+                PWLogger.log_project_processing_error(project.name, e)
                 update_log.append({
                     'project_id': str(project.id),
                     'project_name': project.name,
@@ -623,10 +603,7 @@ class ProjectWiseService:
                 errors += 1
 
         # Log comprehensive summary
-        logger.info(f"Mass update completed (all programmed projects): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
-
-        if errors > 0:
-            logger.warning(f"{errors} projects failed to update - check logs for details")
+        PWLogger.log_mass_update_summary(successful_updates, skipped_updates, errors)
 
         return update_log
 
@@ -668,9 +645,9 @@ class ProjectWiseService:
         data = create_comprehensive_project_data(project)
 
         if 'programmed' in data:
-            logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
+            PWLogger.log_data_processing(project.name, "Project programmed status", 1, f"{project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
 
-        logger.debug(f"Built project data for {project.name} with {len(data)} fields")
+        PWLogger.log_data_processing(project.name, "Built project data", len(data))
         return data
 
     def get_project_from_pw(self, id: str):
@@ -678,11 +655,11 @@ class ProjectWiseService:
         start_time = time.perf_counter()
         api_url = f"{self.pw_api_url}{self.pw_api_project_metadata_endpoint}{id}"
 
-        logger.debug("Requesting API {}".format(api_url))
+        PWLogger.log_api_request(api_url, "PW Project")
         response = self.session.get(api_url)
         response_time = time.perf_counter() - start_time
 
-        logger.debug(f"PW responded in {response_time}s")
+        PWLogger.log_api_response(response_time, operation="PW Project")
 
         # Check if PW responded with error
         if response.status_code != 200:
@@ -706,7 +683,7 @@ class ProjectWiseService:
         """
         api_url = f"{self.pw_api_url}{self.pw_api_location_endpoint}"
 
-        logger.debug("Requesting API {}".format(api_url))
+        PWLogger.log_api_request(api_url, "PW Location")
 
         response = self.session.get(api_url)
 
@@ -716,7 +693,7 @@ class ProjectWiseService:
                 f"PW responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
             )
         locations = response.json()["instances"]
-        logger.info(f"PW responded with {len(locations)} locations")
+        PWLogger.log_api_response(0, len(locations), "PW Location")
 
         # Iterate the result received from PW
         for model_data in locations:
