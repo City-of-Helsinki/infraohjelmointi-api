@@ -1,3 +1,7 @@
+import logging
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+
 from infraohjelmointi_api.services import ProjectDistrictService
 from ...models import Project
 from ..ProjectAreaService import ProjectAreaService
@@ -8,426 +12,310 @@ from ..ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from ..ProjectClassService import ProjectClassService
 from ..PersonService import PersonService
 
-import logging
-
-from datetime import datetime
+from infraohjelmointi_api.services.utils.FieldMappingConfig import FieldMappingConfig
+from infraohjelmointi_api.services.utils.FieldMappingDictionaries import FIELD_MAPPER_LOOKUP
 
 logger = logging.getLogger("infraohjelmointi_api")
 
-to_pw_map = {
-    "name": "PROJECT_Kohde",
-    "address": "PROJECT_Kadun_tai_puiston_nimi",
-    "description": "PROJECT_Hankkeen_kuvaus",
-    "entityName": "PROJECT_Aluekokonaisuuden_nimi",
-    "constructionPhaseDetail": "PROJECT_Rakentamisvaiheen_tarkenne",
-    "programmed": {
-        "field": "PROJECT_Ohjelmoitu",
-        "type": "boolean",
-        "values": {"true": "Kyllä", "false": "Ei"},
-    },
-    "gravel": {
-        "field": "PROJECT_Sorakatu",
-        "type": "boolean",
-        "values": {"true": "Kyllä", "false": "Ei"},
-    },
-    "louhi": {
-        "field": "PROJECT_Louheen",
-        "type": "boolean",
-        "values": {"true": "Kyllä", "false": "Ei"},
-    },
-    "planningStartYear": {
-        "field": "PROJECT_Louhi__hankkeen_aloitusvuosi",
-        "type": "integer",
-    },
-    "constructionEndYear": {
-        "field": "PROJECT_Louhi__hankkeen_valmistumisvuosi",
-        "type": "integer",
-    },
-    "estPlanningStart": {
-        "field": "PROJECT_Hankkeen_suunnittelu_alkaa",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "estPlanningEnd": {
-        "field": "PROJECT_Hankkeen_suunnittelu_pttyy",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "presenceStart": {
-        "field": "PROJECT_Esillaolo_alku",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "presenceEnd": {
-        "field": "PROJECT_Esillaolo_loppu",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "visibilityStart": {
-        "field": "PROJECT_Nhtvillolo_alku",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "visibilityEnd": {
-        "field": "PROJECT_Nhtvillolo_loppu",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "estConstructionStart": {
-        "field": "PROJECT_Hankkeen_rakentaminen_alkaa",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "estConstructionEnd": {
-        "field": "PROJECT_Hankkeen_rakentaminen_pttyy",
-        "type": "date",
-        "fromFormat": "%d.%m.%Y",
-        "toFormat": "%Y-%m-%dT%H:%M:%S",
-    },
-    "phase": {"field": "PROJECT_Hankkeen_vaihe", "type": "listvalue"},
-    "type": {"field": "PROJECT_Toimiala", "type": "listvalue"},
-    "area": {"field": "PROJECT_Projektialue", "type": "listvalue"},
-    "responsibleZone": {
-        "field": "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan",
-        "type": "listvalue",
-    },
-    "constructionPhaseDetail": {
-        "field": "PROJECT_Rakentamisvaiheen_tarkenne",
-        "type": "listvalue",
-    },
-    "projectDistrict": {
-        "type": "enum",
-        "values": [
-            "PROJECT_Suurpiirin_nimi",
-            "PROJECT_Kaupunginosan_nimi",
-            "PROJECT_Osa_alue",
-        ],
-    },
-    "projectClass": {
-        "type": "enum",
-        "values": [
-            "PROJECT_Pluokka",
-            "PROJECT_Luokka",
-            "PROJECT_Alaluokka",
-        ],
-    },
-    "personPlanning": {
-        "type": "enum",
-        "values": [
-            "PROJECT_Vastuuhenkil",
-            "PROJECT_Vastuuhenkiln_titteli",
-            "PROJECT_Vastuuhenkiln_puhelinnumero",
-            "PROJECT_Vastuuhenkiln_shkpostiosoite",
-        ],
-    },
-    "personConstruction": {
-        "type": "enum",
-        "values": ["PROJECT_Vastuuhenkil_rakennuttaminen"],
-    },
-}
-
-phase_map_for_pw = {
-    "proposal": "1. Hanke-ehdotus",
-    "design": "1.5 Yleissuunnittelu",
-    "programming": "2. Ohjelmointi",
-    "draftInitiation": [
-        "3. Suunnittelun aloitus / Suunnitelmaluonnos",
-        "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
-    ],
-    "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
-    "constructionPlan": "5. Rakennussuunnitelma",
-    "constructionWait": "6. Odottaa rakentamista",
-    "construction": "7. Rakentaminen",
-    "warrantyPeriod": "8. Takuuaika",
-    "completed": "9. Valmis / ylläpidossa",
-}
-
-phase_map_for_infratool = {
-    "proposal": "1. Hanke-ehdotus",
-    "design": "1.5 Yleissuunnittelu",
-    "programming": "2. Ohjelmointi",
-    "draftInitiation": "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
-    "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
-    "constructionPlan": "5. Rakennussuunnitelma",
-    "constructionWait": "6. Odottaa rakentamista",
-    "construction": "7. Rakentaminen",
-    "warrantyPeriod": "8. Takuuaika",
-    "completed": "9. Valmis / ylläpidossa",
-}
-
-project_area_map = {
-    "honkasuo": "Honkasuo",
-    "kalasatama": "Kalasatama",
-    "kruunuvuorenranta": "Kruunuvuorenranta",
-    "kuninkaantammi": "Kuninkaantammi",
-    "lansisatama": "Länsisatama",
-    "malminLentokenttaalue": "Malmin lentokenttäalue",
-    "pasila": "Pasila",
-    "ostersundom": "Östersundom",
-    "kamppiToolonlahti": "Kamppi-Töölönlahti",
-    "kuninkaankolmio": "Kuninkaankolmio",
-    "uudetProjektialueetJaMuuTaydennysrakentaminen": "Uudet projektialueet ja muu täydennysrakentaminen",
-    "lantinenBulevardikaupunki": "Läntinen bulevardikaupunki",
-    "makasiiniranta": "Makasiiniranta",
-    "koivusaari": "Koivusaari",
-}
-
-responsible_zone_map = {
-    "east": "Itä",
-    "west": "Länsi",
-    "north": "Pohjoinen",
-    "variousAreas": "Eri alueita",
-}
-
-project_type_map = {
-    "projectComplex": "hankekokonaisuus",
-    "street": "katu",
-    "cityRenewal": "kaupunkiuudistus",
-    "traffic": "liikenne",
-    "sports": "liikunta",
-    "omaStadi": "OmaStadi-hanke",
-    "projectArea": "projektialue",
-    "park": "puisto",
-    "bigTrafficProjects": "suuret liikennehankealueet",
-    "spesialtyStructures": "taitorakenne",
-    "preConstruction": "esirakentaminen",
-}
-
-construction_phase_details_map = {
-    "preConstruction": "1. Esirakentaminen",
-    "firstPhase": "2. Ensimmäinen vaihe",
-    "firstPhaseComplete": "3. Ensimmäinen vaihe valmis",
-    "secondPhase": "4. Toinen vaihe / viimeistely",
-}
-
 
 class ProjectWiseDataMapper:
-    def convert_to_pw_data(self, data: dict, project: Project):
-        result = {}
-        for field in data.keys():
-            if not field in to_pw_map:
-                logger.debug(f"Field '{field}' not supported")
+    """ProjectWise data mapper."""
+
+    def __init__(self):
+        self.field_config = FieldMappingConfig()
+
+    def convert_to_pw_data(self, data: dict, project: Project) -> dict:
+        """
+        Convert project data to ProjectWise format with proper error handling.
+
+        Args:
+            data: Dictionary of project data (internal field names)
+            project: Project object for additional context
+
+        Returns:
+            Dictionary with ProjectWise field names and values
+        """
+        pw_data = {}
+
+        for field_name, value in data.items():
+            try:
+                mapped_data = self._map_field(field_name, value, project)
+                if mapped_data:
+                    pw_data.update(mapped_data)
+            except Exception as e:
+                logger.warning(f"Failed to map field '{field_name}': {e}")
                 continue
-            value = data[field]
-            mapped_field = to_pw_map[field]
-            mapped_field_type = type(mapped_field).__name__
-            # String value handling
-            if mapped_field_type == "str":
-                result[mapped_field] = value
-            # Boolean to text handling
-            elif mapped_field["type"] == "integer":
-                logger.debug(f"mapped_field {mapped_field}, value {value}")
-                result[mapped_field["field"]] = int(value)
 
-            # Boolean to text handling
-            elif mapped_field["type"] == "boolean":
-                result[mapped_field["field"]] = mapped_field["values"][
-                    str(value).lower()
-                ]
-            # List value handling
-            elif mapped_field["type"] == "listvalue":
-                field_mapper = None
-                if field == "phase":
-                    field_mapper = phase_map_for_infratool
-                    value = (
-                        ProjectPhaseService.get_by_id(value).value
-                        if not value is None
-                        else ""
-                    )
-                elif field == "type":
-                    field_mapper = project_type_map
-                    value = (
-                        ProjectTypeService.get_by_id(value).value
-                        if not value is None
-                        else ""
-                    )
-                elif field == "area":
-                    field_mapper = project_area_map
-                    value = (
-                        ProjectAreaService.get_by_id(value).value
-                        if not value is None
-                        else ""
-                    )
-                elif field == "responsibleZone":
-                    field_mapper = responsible_zone_map
-                    value = (
-                        ResponsibleZoneService.get_by_id(value).value
-                        if not value is None
-                        else ""
-                    )
-                elif field == "constructionPhaseDetail":
-                    field_mapper = construction_phase_details_map
-                    value = (
-                        ConstructionPhaseDetailService.get_by_id(value).value
-                        if not value is None
-                        else ""
-                    )
-                else:
-                    raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
+        return pw_data
 
-                result[mapped_field["field"]] = field_mapper[value] if value else None
-            # Class/Location field handling
-            elif mapped_field["type"] == "enum":
-                if field == "projectClass":
-                    classes = (
-                        ProjectClassService.get_by_id(value).path.split("/")
-                        if not value is None
-                        else ["", "", ""]
-                    )
-                    result[mapped_field["values"][0]] = classes[0]
-                    if len(classes) > 1:
-                        result[mapped_field["values"][1]] = classes[1]
-                    if len(classes) > 2:
-                        result[mapped_field["values"][2]] = classes[2]
-                elif field == "projectDistrict":
-                    locations = (
-                        ProjectDistrictService.get_by_id(value).path.split("/")
-                        if not value is None
-                        else ["", "", ""]
-                    )
-                    result[mapped_field["values"][0]] = locations[0]
-                    if len(locations) > 1:
-                        result[mapped_field["values"][1]] = locations[1]
-                    if len(locations) > 2:
-                        result[mapped_field["values"][2]] = locations[2]
-                elif field == "personPlanning":
-                    planningPersonModel = PersonService.get_by_id(value) if value else None
-                    # fullname
-                    result[mapped_field["values"][0]] = "{} {}".format(
-                        planningPersonModel.lastName, planningPersonModel.firstName
-                    ) if planningPersonModel else ""
-                    # title
-                    result[mapped_field["values"][1]] = planningPersonModel.title if planningPersonModel else ""
-                    # phone
-                    result[mapped_field["values"][2]] = planningPersonModel.phone if planningPersonModel else ""
-                    # email
-                    result[mapped_field["values"][3]] = planningPersonModel.email if planningPersonModel else ""
-                elif field == "personConstruction":
-                    constructionPersonModel = PersonService.get_by_id(value) if value else None
-                    # fullname
-                    result[mapped_field["values"][0]] = "{} {}, {}, {}, {}".format(
-                        constructionPersonModel.lastName,
-                        constructionPersonModel.firstName,
-                        constructionPersonModel.title,
-                        constructionPersonModel.phone,
-                        constructionPersonModel.email,
-                    ) if constructionPersonModel else ""
+    def _map_field(self, field_name: str, value: Any, project: Project) -> Dict[str, Any]:
+        """
+        Map a single field with proper type handling.
 
-            # Date field handling
-            elif mapped_field["type"] == "date":
-                if value:
-                    if isinstance(value, str):
-                        result[mapped_field["field"]] = datetime.strptime(
-                            value,
-                            mapped_field["fromFormat"],
-                        ).strftime(mapped_field["toFormat"])
-                    elif isinstance(value, datetime):
-                        result[mapped_field["field"]] = value.strftime(mapped_field["toFormat"])
-                    elif hasattr(value, 'year'):  # Handle datetime.date objects
-                        # Convert date to datetime with midnight time, then format
-                        dt = datetime.combine(value, datetime.min.time())
-                        result[mapped_field["field"]] = dt.strftime(mapped_field["toFormat"])
-                    else:
-                        result[mapped_field["field"]] = ""
-                else:
-                    result[mapped_field["field"]] = ""
+        Args:
+            field_name: Name of the field to map
+            value: Value to map
+            project: Project object for context
+
+        Returns:
+            Dictionary with PW field name(s) and value(s)
+        """
+        if not self.field_config.is_supported_field(field_name):
+            logger.debug(f"Field '{field_name}' not supported")
+            return {}
+
+        field_type = self.field_config.get_field_type(field_name)
+
+        if field_type == "basic":
+            return self._map_basic_field(field_name, value)
+        elif field_type == "boolean":
+            return self._map_boolean_field(field_name, value)
+        elif field_type == "integer":
+            return self._map_integer_field(field_name, value)
+        elif field_type == "date":
+            return self._map_date_field(field_name, value)
+        elif field_type == "listvalue":
+            return self._map_listvalue_field(field_name, value, project)
+        elif field_type == "enum":
+            return self._map_enum_field(field_name, value, project)
+        else:
+            logger.warning(f"Unsupported field type '{field_type}' for field '{field_name}'")
+            return {}
+
+    def _map_basic_field(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """Map basic string fields."""
+        pw_field = self.field_config.get_pw_field_name(field_name)
+        return {pw_field: value} if value is not None else {}
+
+    def _map_boolean_field(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """Map boolean fields to PW text values."""
+        config = self.field_config.BOOLEAN_FIELDS[field_name]
+        pw_value = config.true_value if str(value).lower() == "true" else config.false_value
+        return {config.field: pw_value}
+
+    def _map_integer_field(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """Map integer fields."""
+        pw_field = self.field_config.get_pw_field_name(field_name)
+        return {pw_field: int(value)} if value is not None else {}
+
+    def _map_date_field(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """Map date fields with proper formatting."""
+        config = self.field_config.DATE_FIELDS[field_name]
+
+        if not value:
+            return {config.field: ""}
+
+        try:
+            if isinstance(value, str):
+                formatted_date = datetime.strptime(value, config.from_format).strftime(config.to_format)
+            elif isinstance(value, datetime):
+                formatted_date = value.strftime(config.to_format)
+            elif hasattr(value, 'year'):  # Handle datetime.date objects
+                dt = datetime.combine(value, datetime.min.time())
+                formatted_date = dt.strftime(config.to_format)
             else:
-                raise ProjectWiseDataFieldNotFound(f"Field '{field}' not supported")
+                formatted_date = ""
 
-        return result
+            return {config.field: formatted_date}
+        except Exception as e:
+            logger.warning(f"Failed to format date field '{field_name}': {e}")
+            return {config.field: ""}
 
-    def load_and_transform_phases(self):
-        """Helper method to load phases from DB and transform to match PW format"""
-        phases = {}
-        for pph in ProjectPhaseService.list_all():
-            mapped_value = phase_map_for_pw[pph.value]
-            if isinstance(mapped_value, list):
-                for key in mapped_value:
-                    phases[key] = pph
+    def _map_listvalue_field(self, field_name: str, value: Any, project: Project) -> Dict[str, Any]:
+        """Map list value fields using service lookups."""
+        config = self.field_config.LIST_VALUE_FIELDS[field_name]
+
+        if not value:
+            return {config.field: None}
+
+        # Get the field mapper
+        field_mapper = FIELD_MAPPER_LOOKUP[config.mapper]
+
+        # Get the actual value from the service
+        service_value = self._get_service_value(field_name, value)
+        if not service_value:
+            return {config.field: None}
+
+        # Map to PW value
+        pw_value = field_mapper.get(service_value)
+        return {config.field: pw_value} if pw_value else {config.field: None}
+
+    def _map_enum_field(self, field_name: str, value: Any, project: Project) -> Dict[str, Any]:
+        """Map enum fields that map to multiple PW fields."""
+        config = self.field_config.ENUM_FIELDS[field_name]
+
+        if not value:
+            return {field: "" for field in config.values}
+
+        if field_name == "projectClass":
+            return self._map_project_class_field(value, config.values)
+        elif field_name == "projectDistrict":
+            return self._map_project_district_field(value, config.values)
+        elif field_name == "personPlanning":
+            return self._map_person_planning_field(value, config.values)
+        elif field_name == "personConstruction":
+            return self._map_person_construction_field(value, config.values)
+        else:
+            logger.warning(f"Unsupported enum field '{field_name}'")
+            return {}
+
+    def _get_service_value(self, field_name: str, value: Any) -> Optional[str]:
+        """Get the actual value from the appropriate service."""
+        try:
+            if field_name == "phase":
+                return ProjectPhaseService.get_by_id(value).value if value else None
+            elif field_name == "type":
+                return ProjectTypeService.get_by_id(value).value if value else None
+            elif field_name == "area":
+                return ProjectAreaService.get_by_id(value).value if value else None
+            elif field_name == "responsibleZone":
+                return ResponsibleZoneService.get_by_id(value).value if value else None
+            elif field_name == "constructionPhaseDetail":
+                return ConstructionPhaseDetailService.get_by_id(value).value if value else None
             else:
-                phases[mapped_value] = pph
-        return phases
+                return None
+        except Exception as e:
+            logger.warning(f"Failed to get service value for '{field_name}': {e}")
+            return None
 
-    def load_and_transform_project_areas(self):
-        """Helper method to load project areas from DB and transform to match PW format"""
+    def _map_project_class_field(self, value: Any, pw_fields: List[str]) -> Dict[str, str]:
+        """Map project class to hierarchical PW fields."""
+        try:
+            classes = ProjectClassService.get_by_id(value).path.split("/") if value else ["", "", ""]
+            result = {}
+            for i, pw_field in enumerate(pw_fields):
+                result[pw_field] = classes[i] if i < len(classes) else ""
+            return result
+        except Exception as e:
+            logger.warning(f"Failed to map project class: {e}")
+            return {field: "" for field in pw_fields}
 
-        return {project_area_map[pa.value]: pa for pa in ProjectAreaService.list_all()}
+    def _map_project_district_field(self, value: Any, pw_fields: List[str]) -> Dict[str, str]:
+        """Map project district to hierarchical PW fields."""
+        try:
+            locations = ProjectDistrictService.get_by_id(value).path.split("/") if value else ["", "", ""]
+            result = {}
+            for i, pw_field in enumerate(pw_fields):
+                result[pw_field] = locations[i] if i < len(locations) else ""
+            return result
+        except Exception as e:
+            logger.warning(f"Failed to map project district: {e}")
+            return {field: "" for field in pw_fields}
 
-    def load_and_transform_responsible_zones(self):
-        """Helper method to load responsible zones from DB and transform to match PW format"""
+    def _map_person_planning_field(self, value: Any, pw_fields: List[str]) -> Dict[str, str]:
+        """Map planning person to multiple PW fields."""
+        try:
+            person = PersonService.get_by_id(value) if value else None
+            if not person:
+                return {field: "" for field in pw_fields}
 
-        return {
-            responsible_zone_map[rz.value]: rz
-            for rz in ResponsibleZoneService.list_all()
-        }
+            return {
+                pw_fields[0]: f"{person.lastName} {person.firstName}",
+                pw_fields[1]: person.title or "",
+                pw_fields[2]: person.phone or "",
+                pw_fields[3]: person.email or "",
+            }
+        except Exception as e:
+            logger.warning(f"Failed to map planning person: {e}")
+            return {field: "" for field in pw_fields}
 
-    def load_and_transform_project_types(self):
-        """Helper method to load project types from DB and transform to match PW format"""
+    def _map_person_construction_field(self, value: Any, pw_fields: List[str]) -> Dict[str, str]:
+        """Map construction person to PW field."""
+        try:
+            person = PersonService.get_by_id(value) if value else None
+            if not person:
+                return {pw_fields[0]: ""}
 
-        return {project_type_map[pt.value]: pt for pt in ProjectTypeService.list_all()}
+            full_info = f"{person.lastName}, {person.firstName}, {person.title}, {person.phone}, {person.email}"
+            return {pw_fields[0]: full_info}
+        except Exception as e:
+            logger.warning(f"Failed to map construction person: {e}")
+            return {pw_fields[0]: ""}
 
-    def load_and_transform_construction_phase_details(self):
-        """Helper method to load construction phase details from DB and transform to match PW format"""
-
-        return {
-            construction_phase_details_map[pd.value]: pd
-            for pd in ConstructionPhaseDetailService.list_all()
-        }
 
 
 def create_comprehensive_project_data(project: Project) -> dict:
     """
-    Create comprehensive project data for ProjectWise synchronization.
-    
+    Create comprehensive project data for ProjectWise sync.
+
     Args:
-        project: The project object to extract data from
-        
+        project: Project object to extract data from
+
     Returns:
-        Dictionary with project fields (internal field names), excluding None values
+        Dictionary with project data for PW sync
     """
-    comprehensive_data = {
-        'name': project.name,
-        'description': project.description,
-        'address': project.address,
-        'entityName': project.entityName,
-        'phase': str(project.phase.id) if project.phase else None,
-        'type': str(project.type.id) if project.type else None,
-        'projectClass': str(project.projectClass.id) if project.projectClass else None,
-        'projectDistrict': str(project.projectDistrict.id) if project.projectDistrict else None,
-        'area': str(project.area.id) if project.area else None,
-        'responsibleZone': str(project.responsibleZone.id) if project.responsibleZone else None,
-        'constructionPhaseDetail': str(project.constructionPhaseDetail.id) if project.constructionPhaseDetail else None,
-        'programmed': project.programmed,
-        'estPlanningStart': project.estPlanningStart,
-        'estPlanningEnd': project.estPlanningEnd,
-        'estConstructionStart': project.estConstructionStart,
-        'estConstructionEnd': project.estConstructionEnd,
-        'presenceStart': project.presenceStart,
-        'presenceEnd': project.presenceEnd,
-        'visibilityStart': project.visibilityStart,
-        'visibilityEnd': project.visibilityEnd,
-        'planningStartYear': project.planningStartYear,
-        'constructionEndYear': project.constructionEndYear,
-        'gravel': project.gravel,
-        'louhi': project.louhi,
-        'masterPlanAreaNumber': project.masterPlanAreaNumber,
-        'trafficPlanNumber': project.trafficPlanNumber,
-        'bridgeNumber': project.bridgeNumber,
-        'personPlanning': str(project.personPlanning.id) if project.personPlanning else None,
-        'personConstruction': str(project.personConstruction.id) if project.personConstruction else None,
-    }
+    data = {}
 
-    return {k: v for k, v in comprehensive_data.items() if v is not None}
+    # Basic fields
+    if project.name is not None:
+        data['name'] = project.name
+    if project.address is not None:
+        data['address'] = project.address
+    if project.description is not None:
+        data['description'] = project.description
+    if project.entityName is not None:
+        data['entityName'] = project.entityName
 
+    # Boolean fields
+    if project.programmed is not None:
+        data['programmed'] = project.programmed
+    if project.gravel is not None:
+        data['gravel'] = project.gravel
+    if project.louhi is not None:
+        data['louhi'] = project.louhi
 
-class ProjectWiseDataFieldNotFound(RuntimeError):
-    """Error for not supporting field"""
+    # Integer fields
+    if project.planningStartYear is not None:
+        data['planningStartYear'] = project.planningStartYear
+    if project.constructionEndYear is not None:
+        data['constructionEndYear'] = project.constructionEndYear
 
-    pass
+    # Date fields
+    if project.estPlanningStart is not None:
+        data['estPlanningStart'] = project.estPlanningStart
+    if project.estPlanningEnd is not None:
+        data['estPlanningEnd'] = project.estPlanningEnd
+    if project.presenceStart is not None:
+        data['presenceStart'] = project.presenceStart
+    if project.presenceEnd is not None:
+        data['presenceEnd'] = project.presenceEnd
+    if project.visibilityStart is not None:
+        data['visibilityStart'] = project.visibilityStart
+    if project.visibilityEnd is not None:
+        data['visibilityEnd'] = project.visibilityEnd
+    if project.estConstructionStart is not None:
+        data['estConstructionStart'] = project.estConstructionStart
+    if project.estConstructionEnd is not None:
+        data['estConstructionEnd'] = project.estConstructionEnd
+
+    # List value fields
+    if project.phase is not None:
+        data['phase'] = str(project.phase.id) if hasattr(project.phase, 'id') else str(project.phase)
+    if project.type is not None:
+        data['type'] = str(project.type.id) if hasattr(project.type, 'id') else str(project.type)
+    if project.area is not None:
+        data['area'] = str(project.area.id) if hasattr(project.area, 'id') else str(project.area)
+    if project.responsibleZone is not None:
+        data['responsibleZone'] = str(project.responsibleZone.id) if hasattr(project.responsibleZone, 'id') else str(project.responsibleZone)
+    if project.constructionPhaseDetail is not None:
+        data['constructionPhaseDetail'] = str(project.constructionPhaseDetail.id) if hasattr(project.constructionPhaseDetail, 'id') else str(project.constructionPhaseDetail)
+
+    # Enum fields
+    if project.projectDistrict is not None:
+        data['projectDistrict'] = str(project.projectDistrict.id) if hasattr(project.projectDistrict, 'id') else str(project.projectDistrict)
+    if project.projectClass is not None:
+        data['projectClass'] = str(project.projectClass.id) if hasattr(project.projectClass, 'id') else str(project.projectClass)
+    if project.personPlanning is not None:
+        data['personPlanning'] = str(project.personPlanning.id) if hasattr(project.personPlanning, 'id') else str(project.personPlanning)
+    if project.personConstruction is not None:
+        data['personConstruction'] = str(project.personConstruction.id) if hasattr(project.personConstruction, 'id') else str(project.personConstruction)
+
+    # Additional fields
+    if project.masterPlanAreaNumber is not None:
+        data['masterPlanAreaNumber'] = project.masterPlanAreaNumber
+    if project.trafficPlanNumber is not None:
+        data['trafficPlanNumber'] = project.trafficPlanNumber
+    if project.bridgeNumber is not None:
+        data['bridgeNumber'] = project.bridgeNumber
+
+    return data

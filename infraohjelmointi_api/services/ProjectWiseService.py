@@ -17,15 +17,18 @@ from ..models import (
 from .PersonService import PersonService
 from .ProjectService import ProjectService
 from .ProjectLocationService import ProjectLocationService
+from .ProjectPhaseService import ProjectPhaseService
+from .ProjectAreaService import ProjectAreaService
+from .ProjectTypeService import ProjectTypeService
+from .ResponsibleZoneService import ResponsibleZoneService
+from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 
 from .utils import (
     ProjectWiseDataMapper,
-    ProjectWiseDataFieldNotFound,
     create_comprehensive_project_data,
 )
 from .utils.PWConfig import PWConfig
 from .utils.PWLogger import PWLogger
-from .utils.ProjectWiseDataMapper import to_pw_map
 
 env = environ.Env()
 env.escape_proxy = True
@@ -61,21 +64,6 @@ class ProjectWiseService:
         self.pw_sync_enabled = env.bool("PW_SYNC_ENABLED", default=False)
         
         self.project_wise_data_mapper = ProjectWiseDataMapper()
-
-        # preload data from DB to optimize performance
-        self.project_phases = self.project_wise_data_mapper.load_and_transform_phases()
-        self.project_areas = (
-            self.project_wise_data_mapper.load_and_transform_project_areas()
-        )
-        self.responsible_zones = (
-            self.project_wise_data_mapper.load_and_transform_responsible_zones()
-        )
-        self.construction_phase_details = (
-            self.project_wise_data_mapper.load_and_transform_construction_phase_details()
-        )
-        self.project_types = (
-            self.project_wise_data_mapper.load_and_transform_project_types()
-        )
 
     @staticmethod
     def _normalize_classification_format(value):
@@ -498,24 +486,30 @@ class ProjectWiseService:
     def _get_pw_field_mapping(self) -> dict:
         """
         Get the mapping from project fields to PW field names.
-        Uses ProjectWiseDataMapper.to_pw_map for complete and accurate mappings.
+        Uses ProjectWiseDataMapper field config for complete and accurate mappings.
         """
-
-        # Build simplified mapping for _should_include_field_in_update logic
-        # Extract the actual PW field names from the complex mapping structure
+        mapper = ProjectWiseDataMapper()
         field_mapping = {}
 
-        for field_name, mapping in to_pw_map.items():
-            if isinstance(mapping, str):
-                # Simple string mapping
-                field_mapping[field_name] = mapping
-            elif isinstance(mapping, dict) and 'field' in mapping:
-                # Complex mapping with 'field' key
-                field_mapping[field_name] = mapping['field']
-            elif isinstance(mapping, dict) and 'values' in mapping:
-                # Enum mapping - use first field name from values list
-                if isinstance(mapping['values'], list) and mapping['values']:
-                    field_mapping[field_name] = mapping['values'][0]
+        # Get all supported fields and their PW field names
+        for field_name in mapper.field_config.BASIC_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+        
+        for field_name in mapper.field_config.BOOLEAN_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.INTEGER_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.DATE_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.LIST_VALUE_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        # For enum fields, use the first value as representative
+        for field_name in mapper.field_config.ENUM_FIELDS:
+            field_mapping[field_name] = mapper.field_config.ENUM_FIELDS[field_name].values[0]
 
         return field_mapping
 
@@ -775,11 +769,17 @@ class ProjectWiseService:
             project.address = project_properties["PROJECT_Kadun_tai_puiston_nimi"]
 
         if project_properties["PROJECT_Hankkeen_vaihe"]:
-            project.phase = (
-                self.project_phases[project_properties["PROJECT_Hankkeen_vaihe"]]
-                if project_properties["PROJECT_Hankkeen_vaihe"] in self.project_phases
-                else self.project_phases["2. Ohjelmointi"]
-            )
+            try:
+                # Find phase by PW value using reverse mapping
+                phase_value = project_properties["PROJECT_Hankkeen_vaihe"]
+                phase = ProjectPhaseService.find_by_value(phase_value)
+                if not phase:
+                    # Fallback to default phase
+                    phase = ProjectPhaseService.find_by_value("2. Ohjelmointi")
+                project.phase = phase
+            except Exception as e:
+                logger.warning(f"Failed to find phase for value '{phase_value}': {e}")
+                project.phase = ProjectPhaseService.find_by_value("2. Ohjelmointi")
 
         if project_properties["PROJECT_Louheen"]:
             project.louhi = project_properties["PROJECT_Louheen"] != "Ei"
@@ -788,9 +788,11 @@ class ProjectWiseService:
             project.gravel = project_properties["PROJECT_Sorakatu"] != "Ei"
 
         if project_properties["PROJECT_Projektialue"]:
-            project.area = self.project_areas[
-                project_properties["PROJECT_Projektialue"]
-            ]
+            try:
+                area_value = project_properties["PROJECT_Projektialue"]
+                project.area = ProjectAreaService.find_by_value(area_value)
+            except Exception as e:
+                logger.warning(f"Failed to find area for value '{area_value}': {e}")
 
         if project_properties["PROJECT_Aluekokonaisuuden_nimi"]:
             project.entityName = project_properties["PROJECT_Aluekokonaisuuden_nimi"]
@@ -799,17 +801,25 @@ class ProjectWiseService:
             project.programmed = project_properties["PROJECT_Ohjelmoitu"] != "Ei"
 
         if project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]:
-            project.constructionPhaseDetail = self.construction_phase_details[
-                project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]
-            ]
+            try:
+                detail_value = project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]
+                project.constructionPhaseDetail = ConstructionPhaseDetailService.find_by_value(detail_value)
+            except Exception as e:
+                logger.warning(f"Failed to find construction phase detail for value '{detail_value}': {e}")
 
         if project_properties["PROJECT_Toimiala"]:
-            project.type = self.project_types[project_properties["PROJECT_Toimiala"]]
+            try:
+                type_value = project_properties["PROJECT_Toimiala"]
+                project.type = ProjectTypeService.find_by_value(type_value)
+            except Exception as e:
+                logger.warning(f"Failed to find project type for value '{type_value}': {e}")
 
         if project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]:
-            project.responsibleZone = self.responsible_zones[
-                project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
-            ]
+            try:
+                zone_value = project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
+                project.responsibleZone = ResponsibleZoneService.find_by_value(zone_value)
+            except Exception as e:
+                logger.warning(f"Failed to find responsible zone for value '{zone_value}': {e}")
 
         if project_properties["PROJECT_Louhi__hankkeen_aloitusvuosi"]:
             project.planningStartYear = project_properties[
