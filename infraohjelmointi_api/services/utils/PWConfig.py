@@ -10,6 +10,9 @@ class PWConfig:
     HIERARCHICAL_FIELD_DELAY = 0.5  # PW needs time between hierarchical updates
     API_TIMEOUT = 30  # Max time to wait for API response
 
+    # === LOGGING ===
+    LOG_SEPARATOR_LENGTH = 100  # Standard separator length for consistent logging
+
     # === FIELD CLASSIFICATION ===
     # Protected fields: never overwrite if PW has data
     PROTECTED_FIELDS = frozenset([
