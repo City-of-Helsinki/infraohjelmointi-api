@@ -1,4 +1,5 @@
 import uuid
+import os
 from unittest.mock import Mock, patch
 from django.test import TestCase
 from datetime import date
@@ -23,23 +24,23 @@ class ProjectWiseServiceTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
-        # Create test project class for the test scope
-        self.test_scope_class, _ = ProjectClass.objects.get_or_create(
-            id="6182f067-b442-4788-b663-69a63c7380f9",  # The hardcoded test scope UUID
-            defaults={
-                'name': "Puistojen peruskorjaus",
-                'path': "8/04/Puistot ja liikunta-alueet/Puistojen peruskorjaus/Keskinen suurpiiri"
-            }
-        )
-
-        # Patch environment variable to use test scope class ID
-        self.env_patcher = patch.dict('os.environ', {'PW_TEST_SCOPE_CLASS_ID': str(self.test_scope_class.id)})
+        # Patch environment variables
+        self.env_patcher = patch.dict('os.environ', {
+            'PW_SYNC_ENABLED': 'True'
+        })
         self.env_patcher.start()
 
         # Create other required objects
         self.project_type, _ = ProjectType.objects.get_or_create(value="park")
         self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
         self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            id=uuid.uuid4(),
+            defaults={
+                'name': "Test Project Class",
+                'path': "Test/Path"
+            }
+        )
         self.person, _ = Person.objects.get_or_create(
             firstName="Test",
             lastName="Person",
@@ -54,7 +55,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="Test Address 1",
             hkrId=12345,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -75,7 +76,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="Test Address 2",
             hkrId=None,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -87,7 +88,7 @@ class ProjectWiseServiceTestCase(TestCase):
             description="Test description 3",
             hkrId=67890,
             programmed=False,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -164,7 +165,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="",  # Empty in infra tool
             hkrId=11111,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -197,69 +198,7 @@ class ProjectWiseServiceTestCase(TestCase):
         """Clean up test data"""
         self.env_patcher.stop()
 
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    def test_filter_projects_for_test_scope(self, mock_get_pw):
-        """Test that project filtering works for the test scope"""
-        service = ProjectWiseService()
 
-        # Get all projects
-        all_projects = Project.objects.all()
-
-        # Filter for test scope
-        filtered_projects = service._filter_projects_for_test_scope(all_projects)
-
-        # Should only include projects with the test scope class
-        self.assertEqual(filtered_projects.count(), 3)  # All our test projects have the test scope class
-
-        # Test with projects not in scope
-        other_class = ProjectClass.objects.create(
-            id=uuid.uuid4(),
-            name="Other Class",
-            path="Other/Path"
-        )
-
-        out_of_scope_project = Project.objects.create(
-            id=uuid.uuid4(),
-            name="Out of Scope Project",
-            description="Test",
-            hkrId=99999,
-            programmed=True,
-            projectClass=other_class,
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-        all_projects = Project.objects.all()
-        filtered_projects = service._filter_projects_for_test_scope(all_projects)
-
-        # Should still only include projects with the test scope class
-        self.assertEqual(filtered_projects.count(), 3)
-        self.assertNotIn(out_of_scope_project, filtered_projects)
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
-    def test_sync_all_projects_to_pw_with_test_scope(self, mock_sync, mock_get_pw):
-        """Test mass update with test scope filtering"""
-        mock_get_pw.return_value = self.mock_pw_response
-        mock_sync.return_value = None
-
-        service = ProjectWiseService()
-
-        # Run mass update
-        update_log = service.sync_all_projects_to_pw_with_test_scope()
-
-        # Should only process programmed projects with HKR IDs in test scope
-        self.assertEqual(len(update_log), 1)  # Only one project has both programmed=True and hkrId
-        self.assertEqual(update_log[0]['project_name'], "Test Programmed Project")
-        self.assertEqual(update_log[0]['status'], 'success')
-
-        # Verify that sync was called with correct data (internal field names)
-        mock_sync.assert_called_once()
-        call_args = mock_sync.call_args
-        self.assertIn('name', call_args[1]['data'])  # Internal field name
-        self.assertIn('description', call_args[1]['data'])  # Internal field name
-        self.assertEqual(call_args[1]['project'], self.programmed_project_with_hkr)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
@@ -331,6 +270,27 @@ class ProjectWiseServiceTestCase(TestCase):
 
             # Should log error
             mock_logger.error.assert_called_once_with("sync_project_to_pw called without proper parameters")
+
+    def test_hierarchical_fields_consistency(self):
+        """Verify HIERARCHICAL_FIELDS matches HIERARCHICAL_FIELD_ORDER."""
+        service = ProjectWiseService()
+        
+        # Check that HIERARCHICAL_FIELDS is a set of HIERARCHICAL_FIELD_ORDER
+        self.assertEqual(service.HIERARCHICAL_FIELDS, set(service.HIERARCHICAL_FIELD_ORDER))
+        
+        # Check exact count
+        self.assertEqual(len(service.HIERARCHICAL_FIELD_ORDER), 6)
+        
+        # Check that all expected fields are present
+        expected_fields = {
+            'PROJECT_Pluokka',
+            'PROJECT_Luokka', 
+            'PROJECT_Alaluokka',
+            'PROJECT_Suurpiirin_nimi',
+            'PROJECT_Kaupunginosan_nimi',
+            'PROJECT_Osa_alue'
+        }
+        self.assertEqual(service.HIERARCHICAL_FIELDS, expected_fields)
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -566,33 +526,6 @@ class ProjectWiseServiceEdgeCaseTestCase(TestCase):
         except Exception as e:
             self.fail(f"Should not raise exception with malformed PW data: {e}")
 
-    def test_test_scope_filtering_edge_cases(self):
-        """Test edge cases for test scope filtering"""
-        service = ProjectWiseService()
-
-        # Test with empty queryset
-        empty_projects = Project.objects.none()
-        filtered = service._filter_projects_for_test_scope(empty_projects)
-        self.assertEqual(filtered.count(), 0)
-
-        # Test with projects that don't have projectClass
-        project_without_class = Project.objects.create(
-            id=uuid.uuid4(),
-            name="No Class Project",
-            description="Test",
-            hkrId=88888,
-            programmed=True,
-            projectClass=None,  # No class
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-        all_projects = Project.objects.all()
-        filtered = service._filter_projects_for_test_scope(all_projects)
-
-        # Should not include project without class
-        self.assertNotIn(project_without_class, filtered)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     def test_pw_api_errors_handling(self, mock_get_pw):
@@ -668,41 +601,7 @@ class ProjectWiseServiceEdgeCaseTestCase(TestCase):
         except Exception as e:
             self.fail(f"Should handle special characters: {e}")
 
-    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
-    def test_filter_projects_for_test_scope_missing_env_var(self, mock_env):
-        """Test that missing PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
-        # Mock environment to return None for PW_TEST_SCOPE_CLASS_ID
-        def env_side_effect(key, default=None):
-            if key == 'PW_TEST_SCOPE_CLASS_ID':
-                return default
-            return 'mock-value'  # For other required env vars
 
-        mock_env.side_effect = env_side_effect
-
-        service = ProjectWiseService()
-        projects = Project.objects.filter(programmed=True)
-
-        result = service._filter_projects_for_test_scope(projects)
-
-        self.assertEqual(result.count(), 0)
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
-    def test_filter_projects_for_test_scope_invalid_uuid(self, mock_env):
-        """Test that invalid UUID in PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
-        # Mock environment to return invalid UUID
-        def env_side_effect(key, default=None):
-            if key == 'PW_TEST_SCOPE_CLASS_ID':
-                return 'invalid-uuid'
-            return 'mock-value'  # For other required env vars
-
-        mock_env.side_effect = env_side_effect
-
-        service = ProjectWiseService()
-        projects = Project.objects.filter(programmed=True)
-
-        result = service._filter_projects_for_test_scope(projects)
-
-        self.assertEqual(result.count(), 0)
 
 
 class ProjectWiseConcurrencyTestCase(TestCase):
@@ -857,20 +756,20 @@ class ProductionMassUpdateTestCase(TestCase):
 
     def setUp(self):
         """Set up comprehensive test data for production mass update testing"""
-        # Create test scope class
-        self.test_scope_class, _ = ProjectClass.objects.get_or_create(
-            id="6182f067-b442-4788-b663-69a63c7380f9",
-            defaults={
-                'name': "Puistojen peruskorjaus",
-                'path': "8/04/Puistot ja liikunta-alueet/Puistojen peruskorjaus/Keskinen suurpiiri"
-            }
-        )
-
-        # Patch environment variable to use test scope class ID
-        self.env_patcher = patch.dict('os.environ', {'PW_TEST_SCOPE_CLASS_ID': str(self.test_scope_class.id)})
+        # Patch environment variables
+        self.env_patcher = patch.dict('os.environ', {
+            'PW_SYNC_ENABLED': 'True'
+        })
         self.env_patcher.start()
 
-        # Create other class for out-of-scope projects
+        # Create project classes
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            id=uuid.uuid4(),
+            defaults={
+                'name': "Test Project Class",
+                'path': "Test/Path"
+            }
+        )
         self.other_class, _ = ProjectClass.objects.get_or_create(
             name="Other Class Production",
             defaults={'path': "Other/Production/Class"}
@@ -888,7 +787,7 @@ class ProductionMassUpdateTestCase(TestCase):
 
         # Create various test projects for comprehensive testing
 
-        # 1. Perfect programmed project with HKR ID in test scope
+        # 1. Perfect programmed project with HKR ID
         self.perfect_project = Project.objects.create(
             id=uuid.uuid4(),
             name="Perfect Test Project",
@@ -897,7 +796,7 @@ class ProductionMassUpdateTestCase(TestCase):
             entityName="Perfect Entity",
             hkrId=10001,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -924,7 +823,7 @@ class ProductionMassUpdateTestCase(TestCase):
             entityName="Partial Entity",
             hkrId=10002,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -933,7 +832,7 @@ class ProductionMassUpdateTestCase(TestCase):
             masterPlanAreaNumber="MP002"
         )
 
-        # 3. Programmed project outside test scope
+        # 3. Programmed project with different class
         self.out_of_scope_project = Project.objects.create(
             id=uuid.uuid4(),
             name="Out of Scope Project",
@@ -953,7 +852,7 @@ class ProductionMassUpdateTestCase(TestCase):
             description="Non-programmed",
             hkrId=10004,
             programmed=False,  # Not programmed
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -966,7 +865,7 @@ class ProductionMassUpdateTestCase(TestCase):
             description="No HKR ID",
             hkrId=None,  # No HKR ID
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -1003,31 +902,6 @@ class ProductionMassUpdateTestCase(TestCase):
         # Verify sync was called for each project
         self.assertEqual(mock_sync.call_count, expected_projects)
 
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
-    def test_test_scope_mass_update_filters_correctly(self, mock_sync, mock_get_pw):
-        """Test test scope mass update only processes test scope projects"""
-        mock_get_pw.return_value = {
-            "relationshipInstances": [{"relatedInstance": {"instanceId": "test-id", "properties": {}}}]
-        }
-        mock_sync.return_value = None
-
-        service = ProjectWiseService()
-
-        # Run test scope mass update
-        update_log = service.sync_all_projects_to_pw_with_test_scope()
-
-        # Should only process test scope projects
-        expected_projects = 2  # perfect_project, partial_project (both in test scope)
-        self.assertEqual(len(update_log), expected_projects)
-
-        # Verify correct projects were processed
-        processed_names = [log['project_name'] for log in update_log]
-        self.assertIn("Perfect Test Project", processed_names)
-        self.assertIn("Partial Data Project", processed_names)
-
-        # Verify out-of-scope project was excluded
-        self.assertNotIn("Out of Scope Project", processed_names)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
@@ -1270,41 +1144,6 @@ class ProjectImporterCommandTestCase(TestCase):
     Test cases for the management command functionality.
     """
 
-    @patch('infraohjelmointi_api.management.commands.projectimporter.ProjectWiseService')
-    def test_sync_projects_to_pw_test_scope_command(self, mock_service_class):
-        """Test the new management command option"""
-
-        # Mock the service and its method
-        mock_service = Mock()
-        mock_service.sync_all_projects_to_pw_with_test_scope.return_value = [
-            {
-                'project_name': 'Test Project 1',
-                'hkr_id': 12345,
-                'status': 'success'
-            },
-            {
-                'project_name': 'Test Project 2',
-                'hkr_id': 67890,
-                'status': 'error',
-                'error': 'Connection failed'
-            }
-        ]
-        mock_service_class.return_value = mock_service
-
-        # Capture stdout
-        out = StringIO()
-
-        # Call the command
-        call_command('projectimporter', '--sync-projects-to-pw-test-scope', stdout=out)
-
-        # Verify service was called
-        mock_service.sync_all_projects_to_pw_with_test_scope.assert_called_once()
-
-        # Verify output contains summary
-        output = out.getvalue()
-        self.assertIn('1 processed successfully', output)
-        self.assertIn('1 errors', output)
-        self.assertIn('Error updating Test Project 2', output)
 
 
 class ProjectWisePhaseAssignmentTestCase(TestCase):

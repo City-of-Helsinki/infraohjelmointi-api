@@ -23,6 +23,7 @@ from .utils import (
     ProjectWiseDataFieldNotFound,
     create_comprehensive_project_data,
 )
+from .utils.PWConfig import PWConfig
 from .utils.ProjectWiseDataMapper import to_pw_map
 
 env = environ.Env()
@@ -198,7 +199,7 @@ class ProjectWiseService:
                         pass
 
                 # Small delay between updates
-                time.sleep(0.5)
+                time.sleep(PWConfig.HIERARCHICAL_FIELD_DELAY)
 
             except Exception as e:
                 logger.error(f"  [ERROR] {field_name}: Exception - {str(e)}")
@@ -247,9 +248,9 @@ class ProjectWiseService:
                 logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
                 
                 field_categories = {
-                    'classification': [f for f in filtered_out.keys() if f in ['projectClass', 'projectDistrict']],
-                    'protected': [f for f in filtered_out.keys() if f in ['description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']],
-                    'empty_tool': [f for f in filtered_out.keys() if f not in ['projectClass', 'projectDistrict', 'description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']]
+                    'classification': [f for f in filtered_out.keys() if f in PWConfig.CLASSIFICATION_FIELDS],
+                    'protected': [f for f in filtered_out.keys() if f in PWConfig.PROTECTED_FIELDS],
+                    'empty_tool': [f for f in filtered_out.keys() if f not in PWConfig.CLASSIFICATION_FIELDS and f not in PWConfig.PROTECTED_FIELDS]
                 }
                 
                 for category, fields in field_categories.items():
@@ -419,16 +420,7 @@ class ProjectWiseService:
         Determine if a specific field should be included in the PW update based on overwrite rules.
         """
         # Protected fields: never overwrite if PW has data (IO-396 requirements)
-        protected_fields = {
-            'description',           # Protected per ticket requirements
-            'presenceStart',         # Esilläolo - never overwrite
-            'presenceEnd',           # Esilläolo - never overwrite
-            'visibilityStart',       # Nähtävilläolo - never overwrite
-            'visibilityEnd',         # Nähtävilläolo - never overwrite
-            'masterPlanAreaNumber',  # Write: never
-            'trafficPlanNumber',     # Write: never
-            'bridgeNumber'           # Write: never
-        }
+        protected_fields = PWConfig.PROTECTED_FIELDS
 
         # Get PW field mapping
         pw_field_name = self._get_pw_field_mapping().get(field_name)
@@ -504,27 +496,6 @@ class ProjectWiseService:
 
         return field_mapping
 
-    def _filter_projects_for_test_scope(self, projects):
-        """
-        Filter projects for the test scope: 8 04 Puistot ja liikunta-alueet Puistojen peruskorjaus Keskinen suurpiiri
-        Uses environment variable PW_TEST_SCOPE_CLASS_ID for flexibility between environments.
-        """
-        # Get test scope class ID from environment variable
-        test_scope_subclass_id = env("PW_TEST_SCOPE_CLASS_ID", default=None)
-
-        if not test_scope_subclass_id:
-            logger.warning("PW_TEST_SCOPE_CLASS_ID environment variable not set - returning empty queryset")
-            return projects.none()
-
-        try:
-            filtered_projects = projects.filter(projectClass__id=test_scope_subclass_id)
-            logger.info(f"Filtered projects for test scope: {filtered_projects.count()} projects found under subClass {test_scope_subclass_id}")
-            return filtered_projects
-        except Exception as e:
-            logger.error(f"Error filtering projects for test scope: {str(e)}")
-            logger.error(f"Make sure PW_TEST_SCOPE_CLASS_ID environment variable is set to a valid ProjectClass UUID")
-            logger.warning("Returning empty queryset due to filtering error")
-            return projects.none()
 
     def sync_all_projects_to_pw(self):
         """
@@ -532,21 +503,12 @@ class ProjectWiseService:
         Implements overwrite rules and comprehensive logging.
         Only processes programmed projects with HKR IDs.
         """
-        return self._mass_update_projects_to_pw(use_test_scope=False)
+        return self._mass_update_projects_to_pw()
 
-    def sync_all_projects_to_pw_with_test_scope(self):
-        """
-        TEST-SCOPE mass update of programmed projects to PW.
-        Only processes projects under the specific test scope class hierarchy.
-        """
-        return self._mass_update_projects_to_pw(use_test_scope=True)
-
-    def _mass_update_projects_to_pw(self, use_test_scope: bool = False):
+    def _mass_update_projects_to_pw(self):
         """
         Core mass update implementation with overwrite rules and comprehensive logging.
-
-        Args:
-            use_test_scope: If True, only process test scope projects. If False, process all programmed projects.
+        Processes all programmed projects with HKR IDs.
 
         Returns:
             List of update logs with detailed results for each project
@@ -561,21 +523,12 @@ class ProjectWiseService:
             )
             return []
         
-        all_projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
-
-        # Apply test scope filter if requested
-        if use_test_scope:
-            projects = self._filter_projects_for_test_scope(all_projects)
-            scope_description = "test scope"
-        else:
-            projects = all_projects
-            scope_description = "all programmed projects"
-
+        projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
         total_projects = projects.count()
-        logger.info(f"Starting mass update of {total_projects} {scope_description} to PW")
+        logger.info(f"Starting mass update of {total_projects} all programmed projects to PW")
 
         if total_projects == 0:
-            logger.warning(f"No projects found for mass update ({scope_description})")
+            logger.warning(f"No projects found for mass update (all programmed projects)")
             return []
 
         update_log = []
@@ -629,7 +582,7 @@ class ProjectWiseService:
                 errors += 1
 
         # Log comprehensive summary
-        logger.info(f"Mass update completed ({scope_description}): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
+        logger.info(f"Mass update completed (all programmed projects): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
 
         if errors > 0:
             logger.warning(f"{errors} projects failed to update - check logs for details")

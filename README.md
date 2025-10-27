@@ -298,12 +298,6 @@ ProjectWise integration provides document management and project folder synchron
      ```bash
      python manage.py projectimporter --sync-project-to-pw pw_id
      ```
-***FOR TESTING***
-   - Only sync specified project class (8 04 Puistot ja liikunta-alueet - Puistojen peruskorjaus - Keskinen suurpiiri):
-     ```bash
-     python manage.py projectimporter --sync-projects-to-pw-test-scope
-     ``` 
-
    - Projects are automatically synced to ProjectWise when:
        - A PATCH request is made to the projects endpoint
        - Project data is updated through the API
