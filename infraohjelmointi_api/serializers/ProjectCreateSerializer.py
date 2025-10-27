@@ -52,7 +52,6 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
 )
 from infraohjelmointi_api.serializers.UpdateListSerializer import UpdateListSerializer
 from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
-from infraohjelmointi_api.services import ProjectWiseService
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,
     EstConstructionEndValidator,
@@ -392,11 +391,15 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         """
         # Check if project was created with a PW ID
         if project.hkrId is not None and str(project.hkrId).strip() != "":
-            logger.info(f"New project '{project.name}' created with PW ID {project.hkrId} - performing automatic PW sync")
+            logger.info(f"=" * 80)
+            logger.info(f"NEW PROJECT CREATED with PW ID: '{project.name}' (HKR ID: {project.hkrId})")
+            logger.info(f"Performing automatic comprehensive PW sync...")
+            logger.info(f"=" * 80)
             
             try:
                 # Create comprehensive data dict for automatic update
                 automatic_update_data = create_comprehensive_project_data(project)
+                logger.debug(f"Automatic update data includes {len(automatic_update_data)} fields: {list(automatic_update_data.keys())}")
                 
                 # Initialize ProjectWise service and sync
                 project_wise_service = ProjectWiseService()
@@ -407,8 +410,14 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 logger.info(f"Successfully synced new project '{project.name}' to ProjectWise")
                 
             except Exception as e:
-                logger.error(f"Failed to sync new project '{project.name}' to ProjectWise: {str(e)}")
-                # Don't raise the exception to avoid breaking project creation
+                # Log detailed error
+                logger.error(f"=" * 80)
+                logger.error(f"AUTOMATIC PW SYNC FAILED for new project '{project.name}' (HKR ID: {project.hkrId})")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+                logger.error(f"Project created successfully but PW sync failed - data may be out of sync")
+                logger.error(f"=" * 80)
+                # Don't raise - allow project creation to succeed, user can retry sync with button
         else:
             logger.debug(f"New project '{project.name}' created without PW ID - skipping PW sync")
 

@@ -1681,12 +1681,32 @@ class ProjectViewSet(BaseViewSet):
 
         if hkr_id_added_first_time:
             # This is the first time PW ID is added - perform automatic update with all project data
-            logger.info(f"HKR ID added for first time to project '{updated_project.name}' - performing automatic PW update")
+            logger.info(f"=" * 80)
+            logger.info(f"HKR ID ADDED for first time to project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
+            logger.info(f"Performing automatic comprehensive PW sync...")
+            logger.info(f"=" * 80)
 
-            # Create comprehensive data dict for automatic update
-            automatic_update_data = create_comprehensive_project_data(updated_project)
+            try:
+                # Create comprehensive data dict for automatic update
+                automatic_update_data = create_comprehensive_project_data(updated_project)
+                logger.debug(f"Automatic update data includes {len(automatic_update_data)} fields: {list(automatic_update_data.keys())}")
 
-            self.projectWiseService.sync_project_to_pw(
-                data=automatic_update_data, project=updated_project
-            )
+                self.projectWiseService.sync_project_to_pw(
+                    data=automatic_update_data, project=updated_project
+                )
+                
+                logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
+                
+            except Exception as e:
+                # Log detailed error but don't break the update
+                logger.error(f"=" * 80)
+                logger.error(f"AUTOMATIC PW SYNC FAILED for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+                logger.error(f"Project update succeeded but PW sync failed - data may be out of sync")
+                logger.error(f"=" * 80)
+                # Re-raise to make the failure visible in the UI
+                raise ValidationError({
+                    "hkrId": f"Project updated successfully but failed to sync to ProjectWise: {str(e)}. Please use 'Update to PW' button to retry."
+                })
 
