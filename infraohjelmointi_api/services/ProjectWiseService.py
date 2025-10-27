@@ -35,6 +35,19 @@ requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 
 
 class ProjectWiseService:
+    """Service for ProjectWise integration."""
+
+    # Class constants - defined once, used everywhere
+    HIERARCHICAL_FIELD_ORDER = [
+        'PROJECT_Pluokka',           # Main classification
+        'PROJECT_Luokka',            # Sub-classification
+        'PROJECT_Alaluokka',         # Sub-sub-classification
+        'PROJECT_Suurpiirin_nimi',   # District
+        'PROJECT_Kaupunginosan_nimi',# Sub-district
+        'PROJECT_Osa_alue'           # Sub-area
+    ]
+    HIERARCHICAL_FIELDS = set(HIERARCHICAL_FIELD_ORDER)  # O(1) lookup
+
     def __init__(self) -> None:
         self.session = requests.Session()
         self.session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
@@ -143,21 +156,14 @@ class ProjectWiseService:
         Returns:
             Tuple of (success_count, total_count)
         """
-        HIERARCHICAL_FIELD_ORDER = [
-            'PROJECT_Pluokka',
-            'PROJECT_Luokka',
-            'PROJECT_Alaluokka',
-            'PROJECT_Suurpiirin_nimi',
-            'PROJECT_Kaupunginosan_nimi',
-            'PROJECT_Osa_alue'
-        ]
+        # Use class constant instead of local definition
 
         success_count = 0
         total_count = len(hierarchical_fields)
 
         logger.info(f"Updating {total_count} hierarchical fields one-at-a-time for '{project_name}' (HKR {hkr_id})")
 
-        for field_name in HIERARCHICAL_FIELD_ORDER:
+        for field_name in self.HIERARCHICAL_FIELD_ORDER:
             if field_name not in hierarchical_fields:
                 continue
 
@@ -276,17 +282,10 @@ class ProjectWiseService:
 
                 # Split hierarchical fields from normal fields
                 # Hierarchical fields need one-at-a-time updates due to PW governance rules
-                HIERARCHICAL_FIELDS = {
-                    'PROJECT_Pluokka',
-                    'PROJECT_Luokka',
-                    'PROJECT_Alaluokka',
-                    'PROJECT_Suurpiirin_nimi',
-                    'PROJECT_Kaupunginosan_nimi',
-                    'PROJECT_Osa_alue'
-                }
+                # Use class constant instead of local definition
 
-                hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in HIERARCHICAL_FIELDS}
-                normal_to_update = {k: v for k, v in pw_project_data.items() if k not in HIERARCHICAL_FIELDS}
+                hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in self.HIERARCHICAL_FIELDS}
+                normal_to_update = {k: v for k, v in pw_project_data.items() if k not in self.HIERARCHICAL_FIELDS}
 
                 normal_success = False
                 hierarchical_success_count = 0
