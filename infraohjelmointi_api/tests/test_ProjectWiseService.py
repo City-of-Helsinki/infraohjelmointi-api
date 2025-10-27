@@ -1,5 +1,4 @@
 import uuid
-import os
 from unittest.mock import Mock, patch
 from django.test import TestCase
 from datetime import date
@@ -8,9 +7,7 @@ from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCa
 from ..serializers import ProjectCreateSerializer
 from ..services import ProjectWiseService
 from ..views import BaseViewSet
-from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper, to_pw_map
-from django.core.management import call_command
-from io import StringIO
+from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -274,17 +271,17 @@ class ProjectWiseServiceTestCase(TestCase):
     def test_hierarchical_fields_consistency(self):
         """Verify HIERARCHICAL_FIELDS matches HIERARCHICAL_FIELD_ORDER."""
         service = ProjectWiseService()
-        
+
         # Check that HIERARCHICAL_FIELDS is a set of HIERARCHICAL_FIELD_ORDER
         self.assertEqual(service.HIERARCHICAL_FIELDS, set(service.HIERARCHICAL_FIELD_ORDER))
-        
+
         # Check exact count
         self.assertEqual(len(service.HIERARCHICAL_FIELD_ORDER), 6)
-        
+
         # Check that all expected fields are present
         expected_fields = {
             'PROJECT_Pluokka',
-            'PROJECT_Luokka', 
+            'PROJECT_Luokka',
             'PROJECT_Alaluokka',
             'PROJECT_Suurpiirin_nimi',
             'PROJECT_Kaupunginosan_nimi',
@@ -1065,8 +1062,9 @@ class ProjectWiseDataMapperTestCase(TestCase):
 
         for field, expected_mapping in basic_field_mappings.items():
             with self.subTest(category="basic", field=field):
-                self.assertIn(field, to_pw_map, f"Basic field '{field}' should be mapped")
-                self.assertEqual(to_pw_map[field], expected_mapping)
+                mapper = ProjectWiseDataMapper()
+                self.assertTrue(mapper.field_config.is_supported_field(field), f"Basic field '{field}' should be supported")
+                self.assertEqual(mapper.field_config.get_pw_field_name(field), expected_mapping)
 
         # Test protected field mappings (IO-396 requirements)
         protected_field_mappings = {
@@ -1079,19 +1077,11 @@ class ProjectWiseDataMapperTestCase(TestCase):
 
         for field, expected_mapping in protected_field_mappings.items():
             with self.subTest(category="protected", field=field):
-                self.assertIn(field, to_pw_map, f"Protected field '{field}' should be mapped")
-                # Handle both string mappings and dict mappings
-                if isinstance(to_pw_map[field], str):
-                    self.assertEqual(to_pw_map[field], expected_mapping)
-                else:
-                    self.assertEqual(to_pw_map[field]['field'], expected_mapping)
+                mapper = ProjectWiseDataMapper()
+                self.assertTrue(mapper.field_config.is_supported_field(field), f"Protected field '{field}' should be supported")
+                self.assertEqual(mapper.field_config.get_pw_field_name(field), expected_mapping)
 
         # Test critical field mappings using ProjectWiseService._get_pw_field_mapping()
-        with patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseDataMapper') as mock_mapper_class:
-            mock_mapper = Mock()
-            mock_mapper.load_and_transform_project_areas.return_value = {}
-            mock_mapper_class.return_value = mock_mapper
-
             service = ProjectWiseService()
             field_mapping = service._get_pw_field_mapping()
 
@@ -1169,9 +1159,17 @@ class ProjectWisePhaseAssignmentTestCase(TestCase):
         with the correct 'in' operator for dictionary key lookup.
         """
 
-        # Create the mapper to get the phase mappings
-        mapper = ProjectWiseDataMapper()
-        phases = mapper.load_and_transform_phases()
+        # Get the phase mappings from FieldMappingDictionaries and create reverse mapping
+        from infraohjelmointi_api.services.utils.FieldMappingDictionaries import PHASE_MAP_FOR_PW
+
+        # Create reverse mapping (PW value -> internal value) for testing
+        phases = {}
+        for internal_key, pw_value in PHASE_MAP_FOR_PW.items():
+            if isinstance(pw_value, list):
+                for pw_val in pw_value:
+                    phases[pw_val] = internal_key
+            else:
+                phases[pw_value] = internal_key
 
         # Test the fixed logic with real ProjectWise phase values
         test_cases = [
@@ -1187,12 +1185,12 @@ class ProjectWisePhaseAssignmentTestCase(TestCase):
                 # Test the FIXED logic (using 'in' operator)
                 if pw_phase in phases:
                     result_phase = phases[pw_phase]
-                    self.assertEqual(result_phase.value, expected_internal_phase,
+                    self.assertEqual(result_phase, expected_internal_phase,
                                    f"Phase '{pw_phase}' should map to '{expected_internal_phase}'")
                 else:
                     # Should default to programming for unknown phases
                     result_phase = phases['2. Ohjelmointi']
-                    self.assertEqual(result_phase.value, 'programming',
+                    self.assertEqual(result_phase, 'programming',
                                    f"Unknown phase '{pw_phase}' should default to 'programming'")
 
     def test_phase_assignment_buggy_vs_fixed_logic(self):
@@ -1203,8 +1201,16 @@ class ProjectWisePhaseAssignmentTestCase(TestCase):
         while the new 'in' logic works correctly.
         """
 
-        mapper = ProjectWiseDataMapper()
-        phases = mapper.load_and_transform_phases()
+        from infraohjelmointi_api.services.utils.FieldMappingDictionaries import PHASE_MAP_FOR_PW
+
+        # Create reverse mapping (PW value -> internal value) for testing
+        phases = {}
+        for internal_key, pw_value in PHASE_MAP_FOR_PW.items():
+            if isinstance(pw_value, list):
+                for pw_val in pw_value:
+                    phases[pw_val] = internal_key
+            else:
+                phases[pw_value] = internal_key
 
         # Test with a valid ProjectWise phase
         pw_phase = '7. Rakentaminen'
@@ -1222,7 +1228,7 @@ class ProjectWisePhaseAssignmentTestCase(TestCase):
         # Verify the phase mapping works with the fixed logic
         if fixed_result:
             result_phase = phases[pw_phase]
-            self.assertEqual(result_phase.value, 'construction',
+            self.assertEqual(result_phase, 'construction',
                            "Phase '7. Rakentaminen' should map to 'construction'")
 
 

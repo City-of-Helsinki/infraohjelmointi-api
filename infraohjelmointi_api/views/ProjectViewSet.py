@@ -34,7 +34,6 @@ from infraohjelmointi_api.services import (
     ProjectFinancialService,
     ProjectClassService,
 )
-from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 import json
 
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
@@ -1794,9 +1793,9 @@ class ProjectViewSet(BaseViewSet):
                 self.projectWiseService.sync_project_to_pw(
                     data=automatic_update_data, project=updated_project
                 )
-                
+
                 logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
-                
+
             except Exception as e:
                 # Log detailed error but don't break the update
                 logger.error(f"=" * 80)
