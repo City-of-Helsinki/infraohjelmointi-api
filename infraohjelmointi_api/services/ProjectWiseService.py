@@ -453,7 +453,7 @@ class ProjectWiseService:
         # Verbose logging for critical fields
         if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
             project_obj_value = getattr(project, field_name, None)
-            logger.info(f"CRITICAL FIELD '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
+            logger.debug(f"Field '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
 
         # Classification hierarchy fields (projectClass, projectDistrict): attempt to send
         # If PW rejects (e.g., folder structure doesn't exist), the try-catch mechanism will handle it
