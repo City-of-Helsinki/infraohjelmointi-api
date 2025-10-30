@@ -23,7 +23,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             .select_related("coordinatorClass")
             .prefetch_related("coordinatorClass__finances")
         )
-        
+
         # Apply user role-based filtering
         user = self.request.user
         if hasattr(user, 'groups'):
@@ -34,7 +34,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
                 ) | queryset.filter(
                     name__startswith='8 08'
                 )
-        
+
         return queryset
 
     @action(
@@ -61,10 +61,10 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         try:
             # Get the parent class
             parent_class = self.get_queryset().get(id=parent_id)
-            
+
             # Get all classes for the hierarchy
             all_classes = self.get_queryset()
-            
+
             # Determine what type of parent this is and return appropriate children
             if parent_class.parent is None:  # Master class
                 classes = all_classes.filter(parent=parent_id)
@@ -75,7 +75,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             else:  # Subclass
                 subclasses = all_classes.filter(id=parent_id)
                 classes = all_classes.filter(id=parent_class.parent)
-            
+
             # Serialize the results
             serializer = self.get_serializer_class()
             return Response({

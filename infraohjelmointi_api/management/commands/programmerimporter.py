@@ -14,6 +14,7 @@ try:
 except ImportError:
     raise CommandError("openpyxl is required to read Excel files. Please install it.")
 
+from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
 from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectProgrammer,
@@ -291,23 +292,9 @@ class Command(BaseCommand):
     def _get_programmer_with_hierarchy(self, project_class):
         """
         Get programmer with hierarchical fallback logic.
-        This matches the logic in ProjectCreateSerializer._get_default_programmer_with_fallback()
-        and ProjectClassSerializer.get_computedDefaultProgrammer().
-
-        Traverses up the class hierarchy to find a default programmer.
+        Uses shared utility with cycle detection for safety.
         """
-        if project_class.defaultProgrammer:
-            return project_class.defaultProgrammer
-
-        # Traverse up the parent hierarchy
-        current = project_class.parent
-        while current:
-            if current.defaultProgrammer:
-                return current.defaultProgrammer
-            current = current.parent
-
-        # No default programmer found in hierarchy
-        return None
+        return get_programmer_from_hierarchy(project_class)
 
     def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Show what would be imported in dry-run mode"""

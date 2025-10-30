@@ -6,8 +6,12 @@ from infraohjelmointi_api.serializers.FinancialSumSerializer import (
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import (
     ProjectProgrammerSerializer,
 )
+from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
 from rest_framework import serializers
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectClassSerializer(FinancialSumSerializer):
@@ -78,14 +82,14 @@ class ProjectClassSerializer(FinancialSumSerializer):
             return ProjectProgrammerSerializer(obj.defaultProgrammer).data
 
         # 2. Traverse up the parent hierarchy
-        current = obj.parent
-        while current:
-            if current.defaultProgrammer_id:
-                return ProjectProgrammerSerializer(current.defaultProgrammer).data
-            current = current.parent
-
-        # 3. No default programmer found in hierarchy
-        return None
+        try:
+            programmer = get_programmer_from_hierarchy(obj)
+            if programmer:
+                return ProjectProgrammerSerializer(programmer).data
+            return None
+        except ValueError as e:
+            logger.error(f"Hierarchy error: {e}")
+            return None
 
     def get_autoSelectSubClass(self, obj):
         """
