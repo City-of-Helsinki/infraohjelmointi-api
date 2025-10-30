@@ -240,15 +240,48 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
 
+    def _get_default_programmer_with_fallback(self, project_class):
+        """
+        Get default programmer with hierarchical fallback logic.
+        Traverses up the class hierarchy to find a default programmer.
+        This matches the computedDefaultProgrammer field in ProjectClassSerializer.
+        """
+        # Check if current class has default programmer
+        if project_class.defaultProgrammer:
+            return project_class.defaultProgrammer
+        
+        # Traverse up the parent hierarchy
+        current = project_class.parent
+        while current:
+            if current.defaultProgrammer:
+                return current.defaultProgrammer
+            current = current.parent
+        
+        # No default programmer found in hierarchy
+        return None
+
     def run_pre_create_update_validation(self, data: dict, instance=None):
         # remove projectId as it does not exist on the Project model
         data.pop("projectId", None)
 
         # Set default programmer from project class if one is selected and no programmer is set
+        # Uses hierarchical fallback: check parent classes if current class has no default
         project_class = data.get("projectClass", None)
-        if project_class and not data.get("personProgramming", None):
-            if project_class.defaultProgrammer:
-                data["personProgramming"] = project_class.defaultProgrammer
+        
+        # Only set default programmer if:
+        # 1. We have a project class
+        # 2. No programmer is being explicitly set in this request
+        # 3. For updates: the existing project doesn't already have a programmer
+        should_set_default = (
+            project_class and 
+            not data.get("personProgramming", None) and
+            (instance is None or instance.personProgramming is None)
+        )
+        
+        if should_set_default:
+            programmer = self._get_default_programmer_with_fallback(project_class)
+            if programmer:
+                data["personProgramming"] = programmer
 
         phase = data.get("phase", None)
         if phase is not None and phase.value == "programming":

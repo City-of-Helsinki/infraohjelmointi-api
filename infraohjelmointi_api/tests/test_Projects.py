@@ -3959,3 +3959,226 @@ class ProjectTestCase(TestCase):
             responseForcedToFrame.json()["finances"],
             patchData["finances"]
         )
+
+
+class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
+    """Test hierarchical programmer fallback in project creation/update (IO-411)"""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create test programmers
+        cls.programmer_parent = ProjectProgrammer.objects.create(
+            firstName="Parent",
+            lastName="Programmer"
+        )
+        
+        cls.programmer_child = ProjectProgrammer.objects.create(
+            firstName="Child",
+            lastName="Programmer"
+        )
+        
+        # Create hierarchical class structure
+        cls.parent_class = ProjectClass.objects.create(
+            name="8 03 Kadut ja liikenneväylät",
+            path="8 03 Kadut ja liikenneväylät",
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_parent
+        )
+        
+        cls.child_class_with_programmer = ProjectClass.objects.create(
+            name="8 03 01 Uudisrakentaminen",
+            path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen",
+            parent=cls.parent_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_child
+        )
+        
+        cls.child_class_no_programmer = ProjectClass.objects.create(
+            name="8 03 02 Perusparantaminen",
+            path="8 03 Kadut ja liikenneväylät/8 03 02 Perusparantaminen",
+            parent=cls.parent_class,
+            forCoordinatorOnly=False
+        )
+        
+        cls.grandchild_class = ProjectClass.objects.create(
+            name="8 03 02 01 Liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/8 03 02 Perusparantaminen/8 03 02 01 Liikennejärjestelyt",
+            parent=cls.child_class_no_programmer,
+            forCoordinatorOnly=False
+        )
+        
+        cls.orphan_class = ProjectClass.objects.create(
+            name="Orphan Class",
+            path="Orphan Class",
+            forCoordinatorOnly=False
+        )
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_direct_programmer(self, mock_pw_service):
+        """Test that project creation uses direct programmer if class has one"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Direct',
+            'description': 'Test description',
+            'projectClass': self.child_class_with_programmer.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_child)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_parent_fallback(self, mock_pw_service):
+        """Test that project creation inherits programmer from parent class"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Parent Fallback',
+            'description': 'Test description',
+            'projectClass': self.child_class_no_programmer.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_grandparent_fallback(self, mock_pw_service):
+        """Test that project creation inherits programmer from grandparent class"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Grandparent Fallback',
+            'description': 'Test description',
+            'projectClass': self.grandchild_class.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_no_programmer(self, mock_pw_service):
+        """Test that project creation with no programmer in hierarchy sets None"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project No Programmer',
+            'description': 'Test description',
+            'projectClass': self.orphan_class.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertIsNone(project.personProgramming)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_explicit_programmer(self, mock_pw_service):
+        """Test that explicit programmer is not overridden by default"""
+        explicit_programmer = ProjectProgrammer.objects.create(
+            firstName="Explicit",
+            lastName="Programmer"
+        )
+        
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Explicit',
+            'description': 'Test description',
+            'projectClass': self.child_class_with_programmer.id,
+            'personProgramming': explicit_programmer.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, explicit_programmer)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_update_project_adds_programmer_from_hierarchy(self, mock_pw_service):
+        """Test that updating project class adds programmer from hierarchy"""
+        project = Project.objects.create(
+            name="Test Project Update",
+            description="Test description",
+            projectClass=self.orphan_class
+        )
+        
+        self.assertIsNone(project.personProgramming)
+        
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'name': project.name,
+                'projectClass': self.child_class_no_programmer.id,
+            },
+            partial=True
+        )
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+        self.assertEqual(updated_project.personProgramming, self.programmer_parent)
+    
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_update_project_preserves_existing_programmer(self, mock_pw_service):
+        """Test that updating project preserves existing programmer"""
+        existing_programmer = ProjectProgrammer.objects.create(
+            firstName="Existing",
+            lastName="Programmer"
+        )
+        
+        project = Project.objects.create(
+            name="Test Project Preserve",
+            description="Test description",
+            projectClass=self.orphan_class,
+            personProgramming=existing_programmer
+        )
+        
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'name': project.name,
+                'projectClass': self.child_class_with_programmer.id,
+            },
+            partial=True
+        )
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+        self.assertEqual(updated_project.personProgramming, existing_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_saija_case_simulation(self, mock_pw_service):
+        """Test the specific Saija case from Jira: creating project under traffic arrangements"""
+        itainen_suurpiiri = ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            path="8 03 Kadut ja liikenneväylät/Itäinen suurpiiri",
+            parent=self.parent_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=self.programmer_parent
+        )
+        
+        traffic_class = ProjectClass.objects.create(
+            name="E Liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/Itäinen suurpiiri/E Liikennejärjestelyt",
+            parent=itainen_suurpiiri,
+            forCoordinatorOnly=False
+        )
+        
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Turunlinnantien hidastejärjestelyt',
+            'description': 'Test traffic arrangements',
+            'projectClass': traffic_class.id,
+        })
+        
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+
+    def test_fallback_method_direct_programmer(self):
+        """Test fallback method returns direct programmer"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.child_class_with_programmer)
+        self.assertEqual(programmer, self.programmer_child)
+
+    def test_fallback_method_parent_programmer(self):
+        """Test fallback method returns parent programmer"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.grandchild_class)
+        self.assertEqual(programmer, self.programmer_parent)
+
+    def test_fallback_method_no_programmer(self):
+        """Test fallback method returns None when no programmer in hierarchy"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.orphan_class)
+        self.assertIsNone(programmer)
+
