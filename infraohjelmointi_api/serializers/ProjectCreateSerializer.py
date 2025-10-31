@@ -11,6 +11,7 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     ProjectWiseService,
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
+from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
@@ -239,16 +240,35 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
+    def _get_default_programmer_with_fallback(self, project_class):
+        """
+        Get default programmer with hierarchical fallback logic.
+        Uses shared utility with cycle detection.
+        """
+        return get_programmer_from_hierarchy(project_class)
 
     def run_pre_create_update_validation(self, data: dict, instance=None):
         # remove projectId as it does not exist on the Project model
         data.pop("projectId", None)
 
         # Set default programmer from project class if one is selected and no programmer is set
+        # Uses hierarchical fallback: check parent classes if current class has no default
         project_class = data.get("projectClass", None)
-        if project_class and not data.get("personProgramming", None):
-            if project_class.defaultProgrammer:
-                data["personProgramming"] = project_class.defaultProgrammer
+
+        # Only set default programmer if:
+        # 1. We have a project class
+        # 2. No programmer is being explicitly set in this request
+        # 3. For updates: the existing project doesn't already have a programmer
+        should_set_default = (
+            project_class and
+            not data.get("personProgramming", None) and
+            (instance is None or instance.personProgramming is None)
+        )
+
+        if should_set_default:
+            programmer = self._get_default_programmer_with_fallback(project_class)
+            if programmer:
+                data["personProgramming"] = programmer
 
         phase = data.get("phase", None)
         if phase is not None and phase.value == "programming":
@@ -385,7 +405,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     def _sync_new_project_to_projectwise(self, project: Project):
         """
         Handle automatic ProjectWise synchronization when a new project is created with PW ID.
-        
+
         Args:
             project: The newly created project instance
         """
@@ -395,20 +415,20 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             logger.info(f"NEW PROJECT CREATED with PW ID: '{project.name}' (HKR ID: {project.hkrId})")
             logger.info(f"Performing automatic comprehensive PW sync...")
             logger.info(f"=" * 80)
-            
+
             try:
                 # Create comprehensive data dict for automatic update
                 automatic_update_data = create_comprehensive_project_data(project)
                 logger.debug(f"Automatic update data includes {len(automatic_update_data)} fields: {list(automatic_update_data.keys())}")
-                
+
                 # Initialize ProjectWise service and sync
                 project_wise_service = ProjectWiseService()
                 project_wise_service.sync_project_to_pw(
                     data=automatic_update_data, project=project
                 )
-                
+
                 logger.info(f"Successfully synced new project '{project.name}' to ProjectWise")
-                
+
             except Exception as e:
                 # Log detailed error
                 logger.error(f"=" * 80)
