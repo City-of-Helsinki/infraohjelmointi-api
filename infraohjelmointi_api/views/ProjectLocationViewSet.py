@@ -1,4 +1,5 @@
 from datetime import date
+from django.db.models import Prefetch
 from infraohjelmointi_api.serializers.ProjectLocationSerializer import (
     ProjectLocationSerializer,
 )
@@ -7,6 +8,7 @@ from infraohjelmointi_api.services import (
     LocationFinancialService,
 )
 from infraohjelmointi_api.models.LocationFinancial import LocationFinancial
+from infraohjelmointi_api.models import Project
 from overrides import override
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -22,8 +24,24 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
 
     @override
     def get_queryset(self):
-        """Default is programmer view"""
-        return ProjectLocationService.list_all()
+        """Default is programmer view with optimized prefetching"""
+        return (
+            ProjectLocationService.list_all()
+            .select_related('coordinatorLocation', 'parent', 'parentClass')
+            .prefetch_related(
+                'coordinatorLocation__finances',
+                Prefetch(
+                    'finances',
+                    queryset=LocationFinancial.objects.filter(forFrameView=False).order_by('year'),
+                ),
+                Prefetch(
+                    'project_set',
+                    queryset=Project.objects.filter(programmed=True)
+                    .select_related('projectLocation')
+                    .prefetch_related('finances'),
+                ),
+            )
+        )
 
     @action(
         methods=["get"],

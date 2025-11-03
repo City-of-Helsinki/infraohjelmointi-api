@@ -36,3 +36,11 @@ class ProjectClass(models.Model):
         blank=True,
         related_name="classes"
     )
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['parent'], name='idx_projectclass_parent'),
+            models.Index(fields=['defaultProgrammer'], name='idx_projectclass_programmer'),
+            models.Index(fields=['path'], name='idx_projectclass_path'),
+            models.Index(fields=['forCoordinatorOnly'], name='idx_projectclass_coordinator'),
+        ]

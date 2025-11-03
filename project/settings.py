@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import dj_database_url
 import environ
+import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -241,15 +242,69 @@ LOGGING = {
 }
 
 
-# Caching framework defaults
+# Caching framework - Redis for production, LocMemCache as fallback
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
-        "OPTIONS": {"MAX_ENTRIES": 300},
+# Get logger for cache configuration messages
+logger = logging.getLogger(__name__)
+
+REDIS_URL = env('REDIS_URL', default=None)
+
+if REDIS_URL:
+    # Redis cache configuration (for local testing + Azure Redis)
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "IGNORE_EXCEPTIONS": True,  # Critical: App works even if Redis down
+                "SOCKET_CONNECT_TIMEOUT": 5,
+                "SOCKET_TIMEOUT": 5,
+                "CONNECTION_POOL_KWARGS": {
+                    "max_connections": 10,
+                    "retry_on_timeout": True,
+                },
+            },
+            "KEY_PREFIX": "infraohjelmointi",
+            "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
+        }
     }
-}
+    
+    # Configure django-eventstream to use Redis for SSE event storage (fixes IO-725)
+    # This is separate from Django's cache configuration
+    from urllib.parse import urlparse
+    
+    parsed = urlparse(REDIS_URL)
+    EVENTSTREAM_REDIS = {
+        'host': parsed.hostname or 'localhost',
+        'port': parsed.port or 6379,
+        'db': int(parsed.path.lstrip('/') or 0) if parsed.path else 0,
+    }
+    
+    # If Redis URL has password (Azure Redis uses this)
+    if parsed.password:
+        EVENTSTREAM_REDIS['password'] = parsed.password
+    
+    logger.info("✅ Redis cache configured: %s", REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL)
+    logger.info("✅ EventStream configured to use Redis for SSE events (IO-725 fix)")
+else:
+    # Fallback to LocMemCache (current behavior)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
+            "OPTIONS": {"MAX_ENTRIES": 300},
+        }
+    }
+    logger.info("ℹ️  Using LocMemCache (Redis not configured)")
+
+# GRIP proxy configuration (optional - not needed for your scale)
+GRIP_URL = env('GRIP_URL', default=None)
+if GRIP_URL:
+    GRIP_PROXIES = [GRIP_URL]
+    logger.info("✅ GRIP proxy configured: %s", GRIP_URL)
+else:
+    logger.info("ℹ️  Using direct SSE (no GRIP proxy)")
 
 
 # Swagger settings

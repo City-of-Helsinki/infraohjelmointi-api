@@ -1,6 +1,6 @@
 from datetime import date
 import logging
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import post_save, m2m_changed, post_delete
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial
@@ -11,6 +11,7 @@ from infraohjelmointi_api.serializers import (
     ProjectLocationSerializer,
 )
 from .services import ClassFinancialService, ProjectService, LocationFinancialService
+from .services.CacheService import CacheService
 from .models import ProjectFinancial
 from django.dispatch import receiver
 from django_eventstream import send_event
@@ -217,8 +218,8 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
     """
     _type = instance._meta.model.__name__
     if created:
-        logger.debug("Signal Triggered: {} Object was created".format(_type))
-    logger.debug("Signal Triggered: {} Object was updated".format(_type))
+        pass  # Reduced logging noise: was logger.debug("Signal Triggered...")
+    # Also removed: logger.debug("Signal Triggered: {} Object was updated".format(_type))
     year = getattr(instance, "finance_year", date.today().year)
     send_event(
         "finance",
@@ -233,7 +234,7 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
 @on_transaction_commit
 def get_notified_project(sender, instance, created, update_fields, **kwargs):
     if created:
-        logger.debug("Signal Triggered: Project was created")
+        pass  # logger.debug("Signal Triggered: Project was created")
     else:
         # This comes from partial_update action which is overriden in project view set
         # It gets added to the project instance before .save() is called
@@ -254,4 +255,151 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
                 ).data,
             },
         )
-        logger.debug("Signal Triggered: Project was updated")
+        pass  # logger.debug("Signal Triggered: Project was updated")
+
+
+# Cache invalidation signal handlers for performance optimization
+@receiver(post_save, sender=ProjectFinancial)
+@receiver(post_delete, sender=ProjectFinancial)
+def invalidate_project_financial_cache(sender, instance, **kwargs):
+    """
+    Invalidate cache when ProjectFinancial is saved or deleted
+    
+    This ensures that financial calculations are refreshed when data changes.
+    """
+    try:
+        project = instance.project
+        
+        # Invalidate caches for all related entities
+        if project.projectClass:
+            CacheService.invalidate_financial_sum(
+                instance_id=project.projectClass.id,
+                instance_type='ProjectClass'
+            )
+            # Also invalidate parent classes
+            parent = project.projectClass.parent
+            while parent:
+                CacheService.invalidate_financial_sum(
+                    instance_id=parent.id,
+                    instance_type='ProjectClass'
+                )
+                parent = parent.parent
+        
+        if project.projectLocation:
+            CacheService.invalidate_financial_sum(
+                instance_id=project.projectLocation.id,
+                instance_type='ProjectLocation'
+            )
+            # Also invalidate parent locations
+            parent = project.projectLocation.parent
+            while parent:
+                CacheService.invalidate_financial_sum(
+                    instance_id=parent.id,
+                    instance_type='ProjectLocation'
+                )
+                parent = parent.parent
+        
+        if project.projectGroup:
+            CacheService.invalidate_financial_sum(
+                instance_id=project.projectGroup.id,
+                instance_type='ProjectGroup'
+            )
+        
+        # Reduced logging for performance: Cache invalidated for ProjectFinancial
+    except Exception as e:
+        logger.error(f"Error invalidating cache for ProjectFinancial: {e}")
+
+
+@receiver(post_save, sender=ClassFinancial)
+@receiver(post_delete, sender=ClassFinancial)
+def invalidate_class_financial_cache(sender, instance, **kwargs):
+    """
+    Invalidate cache when ClassFinancial is saved or deleted
+    """
+    try:
+        class_relation = instance.classRelation
+        
+        # Invalidate cache for this class
+        CacheService.invalidate_financial_sum(
+            instance_id=class_relation.id,
+            instance_type='ProjectClass'
+        )
+        
+        # Invalidate parent classes
+        parent = class_relation.parent
+        while parent:
+            CacheService.invalidate_financial_sum(
+                instance_id=parent.id,
+                instance_type='ProjectClass'
+            )
+            parent = parent.parent
+        
+        # Invalidate frame budgets cache (since ClassFinancial affects budget calculations)
+        CacheService.invalidate_frame_budgets(year=instance.year)
+        
+        # Reduced logging for performance: Cache invalidated for ClassFinancial
+    except Exception as e:
+        logger.error(f"Error invalidating cache for ClassFinancial: {e}")
+
+
+@receiver(post_save, sender=LocationFinancial)
+@receiver(post_delete, sender=LocationFinancial)
+def invalidate_location_financial_cache(sender, instance, **kwargs):
+    """
+    Invalidate cache when LocationFinancial is saved or deleted
+    """
+    try:
+        location_relation = instance.locationRelation
+        
+        # Invalidate cache for this location
+        CacheService.invalidate_financial_sum(
+            instance_id=location_relation.id,
+            instance_type='ProjectLocation'
+        )
+        
+        # Invalidate parent locations
+        parent = location_relation.parent
+        while parent:
+            CacheService.invalidate_financial_sum(
+                instance_id=parent.id,
+                instance_type='ProjectLocation'
+            )
+            parent = parent.parent
+        
+        # Invalidate frame budgets cache
+        CacheService.invalidate_frame_budgets(year=instance.year)
+        
+        # Reduced logging for performance: Cache invalidated for LocationFinancial
+    except Exception as e:
+        logger.error(f"Error invalidating cache for LocationFinancial: {e}")
+
+
+@receiver(post_save, sender=Project)
+def invalidate_project_cache(sender, instance, created, **kwargs):
+    """
+    Invalidate cache when Project is saved (programmed status or relationships change)
+    """
+    try:
+        # Only invalidate if relevant fields changed
+        if created or instance.programmed:
+            if instance.projectClass:
+                CacheService.invalidate_financial_sum(
+                    instance_id=instance.projectClass.id,
+                    instance_type='ProjectClass'
+                )
+            
+            if instance.projectLocation:
+                CacheService.invalidate_financial_sum(
+                    instance_id=instance.projectLocation.id,
+                    instance_type='ProjectLocation'
+                )
+            
+            if instance.projectGroup:
+                CacheService.invalidate_financial_sum(
+                    instance_id=instance.projectGroup.id,
+                    instance_type='ProjectGroup'
+                )
+            
+            pass  # Reduced logging: Cache invalidated for Project change
+    except Exception as e:
+        logger.error(f"Error invalidating cache for Project: {e}")

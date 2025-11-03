@@ -288,4 +288,8 @@ class Project(models.Model):
                 name="Unique together Constraint Project",
             )
         ]
+        indexes = [
+            models.Index(fields=['programmed'], name='idx_project_programmed'),
+            models.Index(fields=['projectClass'], name='idx_project_class'),
+        ]
         ordering = ["-id"]

@@ -37,3 +37,7 @@ class ProjectFinancial(models.Model):
                 name="Unique together Constraint Project Financial",
             )
         ]
+        indexes = [
+            models.Index(fields=['year'], name='idx_projectfinancial_year'),
+            models.Index(fields=['forFrameView'], name='idx_projectfinancial_frameview'),
+        ]

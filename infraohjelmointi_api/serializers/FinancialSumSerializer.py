@@ -12,6 +12,7 @@ from infraohjelmointi_api.services import (
     ClassFinancialService,
     LocationFinancialService,
 )
+from infraohjelmointi_api.services.CacheService import CacheService
 from rest_framework import serializers
 from django.db.models import (
     IntegerField,
@@ -50,12 +51,21 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         }
 
     def _populate_financial_data(self, instance, _type: str, year: int, for_frame_view: bool, ret_val: dict):
-        """Populate frameBudget and budgetChange data for all years."""
+        """Populate frameBudget and budgetChange data for all years using prefetched data."""
+        # Use prefetched finances data to avoid N+1 queries
+        # The finances are already prefetched in the ViewSet queryset
+        finances_list = list(instance.finances.all()) if hasattr(instance, 'finances') else []
+        
+        # Create a lookup dict for O(1) access
+        finances_by_year = {
+            f.year: f for f in finances_list 
+            if f.forFrameView == for_frame_view
+        }
+        
         for y in range(11):
-            if not instance.finances.filter(year=year+y, forFrameView=for_frame_view).exists():
-                continue
-                
-            finance_instance = self._get_finance_instance(_type, instance.id, year+y, for_frame_view)
+            target_year = year + y
+            finance_instance = finances_by_year.get(target_year)
+            
             if finance_instance is not None:
                 ret_val[f"year{y}"]["frameBudget"] = finance_instance.frameBudget
                 ret_val[f"year{y}"]["budgetChange"] = finance_instance.budgetChange
@@ -141,12 +151,33 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def get_finance_sums(self, instance):
         """
         Calculates financial sums for 10 years given a group | location | class instance.
+        Uses caching for performance optimization.
         """
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         forced_to_frame = self.context.get("forcedToFrame", False)
+        for_coordinator = self.context.get("for_coordinator", False)
+        
+        # Try to get from cache first
+        cached_result = CacheService.get_financial_sum(
+            instance_id=instance.id,
+            instance_type=_type,
+            year=year,
+            for_frame_view=forced_to_frame,
+            for_coordinator=for_coordinator
+        )
+        
+        if cached_result is not None:
+            return cached_result
 
-        related_projects = self.get_related_projects(instance=instance, _type=_type)
+        # Try to use prefetched project_set if available (from ViewSet)
+        # This avoids N+1 queries for ProjectClass, ProjectLocation, and ProjectGroup
+        if hasattr(instance, '_prefetched_objects_cache') and 'project_set' in instance._prefetched_objects_cache:
+            # Use prefetched data - much faster!
+            related_projects = instance.project_set.all()
+        else:
+            # Fall back to querying (when not prefetched)
+            related_projects = self.get_related_projects(instance=instance, _type=_type)
                 
         args = {
             f"year{i}_plannedBudget": Sum(
@@ -189,6 +220,16 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         }
         for i in range(11):
             summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
+
+        # Cache the result
+        CacheService.set_financial_sum(
+            instance_id=instance.id,
+            instance_type=_type,
+            year=year,
+            for_frame_view=forced_to_frame,
+            data=summed_finances,
+            for_coordinator=for_coordinator
+        )
 
         return summed_finances
 

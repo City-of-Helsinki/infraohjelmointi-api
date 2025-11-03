@@ -28,3 +28,5 @@ zipp>=3.19.1                                   # not directly required, pinned b
 python-dateutil
 urllib3>=2.5.0                                 # not directly required, pinned by Snyk to avoid a vulnerability
 h11>=0.16.0                                    # not directly required, pinned by Snyk to avoid a vulnerability
+django-redis==6.0.0                            # Redis cache backend for Django
+redis>=5.0.0                                   # Redis client (for django-eventstream)
