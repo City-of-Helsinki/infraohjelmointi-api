@@ -393,6 +393,120 @@ class ProjectClassSerializerTestCase(TestCase):
             "8 01 01 Test Class With Existing Numbering"
         )
 
+    def test_numbering_from_parent_hierarchy(self):
+        """Test IO-455: Numbering from parent when coordinator class has no numbering in name"""
+        # Create the hierarchy: coordinator parent with numbering
+        coord_parent = ProjectClass.objects.create(
+            name="8 04 01 01 Uudet puistot ja puistojen peruskorjaus",
+            path="8/8 04/8 04 01/8 04 01 01",
+            forCoordinatorOnly=True
+        )
+        
+        # Coordinator class without numbering in name
+        coord_class = ProjectClass.objects.create(
+            name="Uudet puistot",
+            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot",
+            parent=coord_parent,
+            forCoordinatorOnly=True
+        )
+        
+        # Programming class
+        prog_class = ProjectClass.objects.create(
+            name="Uudet puistot",
+            path="8/Uudet puistot",
+            forCoordinatorOnly=False
+        )
+        
+        coord_class.relatedTo = prog_class
+        coord_class.save()
+        
+        serializer = ProjectClassSerializer(prog_class)
+        # Should get numbering from coordinator's parent
+        self.assertEqual(
+            serializer.data['name'],
+            "8 04 01 01 Uudet puistot"
+        )
+
+    def test_numbering_from_grandparent_hierarchy(self):
+        """Test IO-455: Numbering from grandparent when neither coordinator nor parent have numbering"""
+        # Create the hierarchy with numbering only at grandparent level
+        coord_grandparent = ProjectClass.objects.create(
+            name="8 09 04 03 Puistot ja liikunta-alueet",
+            path="8/8 09/8 09 04/8 09 04 03",
+            forCoordinatorOnly=True
+        )
+        
+        coord_parent = ProjectClass.objects.create(
+            name="Puistot",
+            path="8/8 09/8 09 04/8 09 04 03/Puistot",
+            parent=coord_grandparent,
+            forCoordinatorOnly=True
+        )
+        
+        coord_class = ProjectClass.objects.create(
+            name="Uudisrakentaminen",
+            path="8/8 09/8 09 04/8 09 04 03/Puistot/Uudisrakentaminen",
+            parent=coord_parent,
+            forCoordinatorOnly=True
+        )
+        
+        prog_class = ProjectClass.objects.create(
+            name="Puistot uudisrakentaminen",
+            path="8/Puistot uudisrakentaminen",
+            forCoordinatorOnly=False
+        )
+        
+        coord_class.relatedTo = prog_class
+        coord_class.save()
+        
+        serializer = ProjectClassSerializer(prog_class)
+        # Should get numbering from coordinator's grandparent
+        self.assertEqual(
+            serializer.data['name'],
+            "8 09 04 03 Puistot uudisrakentaminen"
+        )
+
+    def test_real_world_pattern_matching_names(self):
+        """Test IO-455: Real-world pattern like 'Luonnonsuojelualueet' with matching names in hierarchy"""
+        # Pattern from production: programming and coordinator have same name,
+        # numbering comes from grandparent
+        coord_grandparent = ProjectClass.objects.create(
+            name="8 04 01 01 Uudet puistot ja puistojen peruskorjaus",
+            path="8/8 04/8 04 01/8 04 01 01",
+            forCoordinatorOnly=True
+        )
+        
+        coord_parent = ProjectClass.objects.create(
+            name="Uudet puistot",
+            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot",
+            parent=coord_grandparent,
+            forCoordinatorOnly=True
+        )
+        
+        # Coordinator and programming class have the same name
+        coord_class = ProjectClass.objects.create(
+            name="Luonnonsuojelualueet",
+            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot/Luonnonsuojelualueet",
+            parent=coord_parent,
+            forCoordinatorOnly=True
+        )
+        
+        prog_class = ProjectClass.objects.create(
+            name="Luonnonsuojelualueet",
+            path="8/Luonnonsuojelualueet",
+            forCoordinatorOnly=False
+        )
+        
+        coord_class.relatedTo = prog_class
+        coord_class.save()
+        
+        serializer = ProjectClassSerializer(prog_class)
+        # Should get numbering from coordinator's grandparent
+        self.assertEqual(
+            serializer.data['name'],
+            "8 04 01 01 Luonnonsuojelualueet"
+        )
+
     def test_edge_cases(self):
         """Test edge cases: no relationship, no numbering, multiple suffixes"""
         orphan_prog_class = ProjectClass.objects.create(

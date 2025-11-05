@@ -23,6 +23,32 @@ class ProjectClassSerializer(FinancialSumSerializer):
     class Meta(BaseMeta):
         model = ProjectClass
 
+    def _extract_numbering_from_coordinator_hierarchy(self, coordinator_class):
+        """
+        Extract numbering from coordinator class or its parent hierarchy.
+        
+        Some coordinator classes have numbering directly in their name (e.g., "8 03 01 02 Name"),
+        while others have it in their parent's name. This method traverses up the hierarchy
+        to find the numbering.
+        
+        Returns the numbering string (e.g., "8 04 01 01") or None if not found.
+        """
+        current = coordinator_class
+        max_depth = 10  # Prevent infinite loops
+        depth = 0
+        
+        while current and depth < max_depth:
+            # Try to extract numbering from current class name
+            match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})', current.name)
+            if match:
+                return match.group(1)
+            
+            # Move to parent
+            current = current.parent
+            depth += 1
+        
+        return None
+
     def get_name(self, obj):
         """
         Handle both IO-758 (suffix removal) and IO-455 (numbering addition) at the serializer level.
@@ -47,13 +73,10 @@ class ProjectClassSerializer(FinancialSumSerializer):
 
         # IO-455: Add numbering to programming view classes
         if not obj.forCoordinatorOnly and hasattr(obj, 'coordinatorClass') and obj.coordinatorClass:
-            coordinator_name = obj.coordinatorClass.name
-
-            # Extract full numbering from coordinator class name (up to 4 digits)
-            match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})', coordinator_name)
-            if match:
-                numbering = match.group(1)
-
+            # Extract numbering from coordinator class or its parent hierarchy
+            numbering = self._extract_numbering_from_coordinator_hierarchy(obj.coordinatorClass)
+            
+            if numbering:
                 # Check if programming class name already starts with numbering
                 programming_match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})\s+(.+)', name)
                 if programming_match:
