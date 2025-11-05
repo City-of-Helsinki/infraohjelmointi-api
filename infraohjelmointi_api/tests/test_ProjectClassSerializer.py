@@ -433,3 +433,251 @@ class ProjectClassSerializerTestCase(TestCase):
             serializer.data['name'],
             "8 01 99 Test"
         )
+
+
+class ComputedDefaultProgrammerTestCase(TestCase):
+    """Test computedDefaultProgrammer field with hierarchical fallback logic"""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create test programmers
+        cls.programmer_1 = ProjectProgrammer.objects.create(
+            firstName="Alice",
+            lastName="Smith"
+        )
+
+        cls.programmer_2 = ProjectProgrammer.objects.create(
+            firstName="Bob",
+            lastName="Johnson"
+        )
+
+        cls.programmer_3 = ProjectProgrammer.objects.create(
+            firstName="Charlie",
+            lastName="Brown"
+        )
+
+        # Create hierarchical class structure
+        # Root level
+        cls.root_class = ProjectClass.objects.create(
+            name="8 03 Kadut ja liikenneväylät",
+            path="8 03 Kadut ja liikenneväylät",
+            forCoordinatorOnly=False
+        )
+
+        # Level 1 - has default programmer
+        cls.level1_class = ProjectClass.objects.create(
+            name="8 03 01 Uudisrakentaminen ja perusparantaminen",
+            path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen ja perusparantaminen",
+            parent=cls.root_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_1
+        )
+
+        # Level 2 - no default programmer
+        cls.level2_class = ProjectClass.objects.create(
+            name="8 03 01 02 Perusparantaminen ja liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen ja perusparantaminen/8 03 01 02 Perusparantaminen ja liikennejärjestelyt",
+            parent=cls.level1_class,
+            forCoordinatorOnly=False
+        )
+
+        # Level 3 - no default programmer (Saija's case)
+        cls.level3_class = ProjectClass.objects.create(
+            name="E Liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen ja perusparantaminen/8 03 01 02 Perusparantaminen ja liikennejärjestelyt/E Liikennejärjestelyt",
+            parent=cls.level2_class,
+            forCoordinatorOnly=False
+        )
+
+        # Another branch with different programmer
+        cls.other_level1_class = ProjectClass.objects.create(
+            name="8 03 02 Projektialueiden kadut",
+            path="8 03 Kadut ja liikenneväylät/8 03 02 Projektialueiden kadut",
+            parent=cls.root_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_2
+        )
+
+        # Class with no parent hierarchy and no default programmer
+        cls.orphan_class = ProjectClass.objects.create(
+            name="Orphan Class",
+            path="Orphan Class",
+            forCoordinatorOnly=False
+        )
+
+        # Class with direct default programmer
+        cls.direct_class = ProjectClass.objects.create(
+            name="Direct Class",
+            path="Direct Class",
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_3
+        )
+
+    def test_computed_default_programmer_direct_assignment(self):
+        """Test that class with direct default programmer returns it"""
+        serializer = ProjectClassSerializer(self.direct_class)
+        data = serializer.data
+
+        self.assertIn('computedDefaultProgrammer', data)
+        self.assertIsNotNone(data['computedDefaultProgrammer'])
+        self.assertEqual(data['computedDefaultProgrammer']['firstName'], 'Charlie')
+        self.assertEqual(data['computedDefaultProgrammer']['lastName'], 'Brown')
+
+    def test_computed_default_programmer_hierarchical_fallback(self):
+        """Test that class without default programmer inherits from parent"""
+        serializer = ProjectClassSerializer(self.level3_class)
+        data = serializer.data
+
+        self.assertIn('computedDefaultProgrammer', data)
+        self.assertIsNotNone(data['computedDefaultProgrammer'])
+        # Should inherit from level1_class (Alice Smith)
+        self.assertEqual(data['computedDefaultProgrammer']['firstName'], 'Alice')
+        self.assertEqual(data['computedDefaultProgrammer']['lastName'], 'Smith')
+
+    def test_computed_default_programmer_multi_level_fallback(self):
+        """Test that class inherits from grandparent when parent has no default"""
+        serializer = ProjectClassSerializer(self.level2_class)
+        data = serializer.data
+
+        self.assertIn('computedDefaultProgrammer', data)
+        self.assertIsNotNone(data['computedDefaultProgrammer'])
+        # Should inherit from level1_class (Alice Smith)
+        self.assertEqual(data['computedDefaultProgrammer']['firstName'], 'Alice')
+        self.assertEqual(data['computedDefaultProgrammer']['lastName'], 'Smith')
+
+    def test_computed_default_programmer_no_fallback(self):
+        """Test that class with no hierarchy and no default returns None"""
+        serializer = ProjectClassSerializer(self.orphan_class)
+        data = serializer.data
+
+        self.assertIn('computedDefaultProgrammer', data)
+        self.assertIsNone(data['computedDefaultProgrammer'])
+
+    def test_computed_default_programmer_different_branches(self):
+        """Test that different branches return their respective programmers"""
+        # Test level3_class (should get Alice from level1)
+        serializer1 = ProjectClassSerializer(self.level3_class)
+        data1 = serializer1.data
+        self.assertEqual(data1['computedDefaultProgrammer']['firstName'], 'Alice')
+
+        # Test other_level1_class (should get Bob directly)
+        serializer2 = ProjectClassSerializer(self.other_level1_class)
+        data2 = serializer2.data
+        self.assertEqual(data2['computedDefaultProgrammer']['firstName'], 'Bob')
+
+    def test_computed_vs_default_programmer_consistency(self):
+        """Test that computedDefaultProgrammer matches defaultProgrammer when both exist"""
+        serializer = ProjectClassSerializer(self.level1_class)
+        data = serializer.data
+
+        # Both should return the same programmer
+        self.assertEqual(
+            data['defaultProgrammer']['id'],
+            data['computedDefaultProgrammer']['id']
+        )
+        self.assertEqual(
+            data['defaultProgrammer']['firstName'],
+            data['computedDefaultProgrammer']['firstName']
+        )
+
+    def test_computed_default_programmer_serialization_structure(self):
+        """Test that computedDefaultProgrammer has proper serialization structure"""
+        serializer = ProjectClassSerializer(self.level3_class)
+        data = serializer.data
+
+        computed = data['computedDefaultProgrammer']
+        self.assertIsInstance(computed, dict)
+        self.assertIn('id', computed)
+        self.assertIn('firstName', computed)
+        self.assertIn('lastName', computed)
+        self.assertIn('person', computed)
+
+    def test_saija_case_simulation(self):
+        """Test the specific case mentioned in Jira: Saija's traffic arrangements"""
+        # This simulates the exact scenario from the Jira ticket
+        # "Katujen perusparantamiseen liikennejärjestelyjen alle itäiseen suurpiiriin"
+
+        # Create the specific hierarchy mentioned
+        itainen_suurpiiri = ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            path="8 03 Kadut ja liikenneväylät/Uudisrakentaminen/Itäinen suurpiiri",
+            parent=self.root_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=self.programmer_1  # Saija Vihervaara
+        )
+
+        # Test that the traffic class inherits from suurpiiri
+        serializer = ProjectClassSerializer(self.level3_class)
+        data = serializer.data
+
+        # Should get the programmer from the hierarchy (Alice Smith in our test)
+        self.assertIsNotNone(data['computedDefaultProgrammer'])
+        self.assertEqual(data['computedDefaultProgrammer']['firstName'], 'Alice')
+
+    def test_deep_hierarchy_fallback(self):
+        """Test fallback through multiple levels of hierarchy"""
+        # Create a deeper hierarchy
+        level4_class = ProjectClass.objects.create(
+            name="Level 4 Class",
+            path="8 03/Level 1/Level 2/Level 3/Level 4",
+            parent=self.level3_class,
+            forCoordinatorOnly=False
+        )
+
+        serializer = ProjectClassSerializer(level4_class)
+        data = serializer.data
+
+        # Should inherit from level1_class (Alice Smith) through the hierarchy
+        self.assertIsNotNone(data['computedDefaultProgrammer'])
+        self.assertEqual(data['computedDefaultProgrammer']['firstName'], 'Alice')
+
+    def test_computed_default_programmer_with_none_parents(self):
+        """Test behavior when some parents in hierarchy are None"""
+        # Create a class with None parent
+        class_with_none_parent = ProjectClass.objects.create(
+            name="Class with None Parent",
+            path="Class with None Parent",
+            parent=None,
+            forCoordinatorOnly=False
+        )
+
+        serializer = ProjectClassSerializer(class_with_none_parent)
+        data = serializer.data
+
+        # Should return None since no hierarchy and no default
+        self.assertIsNone(data['computedDefaultProgrammer'])
+
+    def test_computed_default_programmer_json_serialization(self):
+        """Test that computedDefaultProgrammer can be JSON serialized"""
+        serializer = ProjectClassSerializer(self.level3_class)
+        data = serializer.data
+
+        # This should not raise any exceptions
+        json_output = JSONRenderer().render(data)
+
+        # Verify JSON contains the computed programmer data
+        self.assertIn(b'"computedDefaultProgrammer"', json_output)
+        self.assertIn(b'"Alice"', json_output)
+        self.assertIn(b'"Smith"', json_output)
+
+    def test_computed_default_programmer_multiple_classes(self):
+        """Test computedDefaultProgrammer with multiple classes (list serialization)"""
+        classes = [self.level3_class, self.direct_class, self.orphan_class]
+        serializer = ProjectClassSerializer(classes, many=True)
+        data = serializer.data
+
+        self.assertEqual(len(data), 3)
+
+        # Find each class in the results
+        level3_data = next(item for item in data if item['name'] == 'E Liikennejärjestelyt')
+        direct_data = next(item for item in data if item['name'] == 'Direct Class')
+        orphan_data = next(item for item in data if item['name'] == 'Orphan Class')
+
+        # Verify computedDefaultProgrammer for each
+        self.assertIsNotNone(level3_data['computedDefaultProgrammer'])
+        self.assertEqual(level3_data['computedDefaultProgrammer']['firstName'], 'Alice')
+
+        self.assertIsNotNone(direct_data['computedDefaultProgrammer'])
+        self.assertEqual(direct_data['computedDefaultProgrammer']['firstName'], 'Charlie')
+
+        self.assertIsNone(orphan_data['computedDefaultProgrammer'])

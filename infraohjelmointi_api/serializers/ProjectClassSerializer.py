@@ -6,12 +6,18 @@ from infraohjelmointi_api.serializers.FinancialSumSerializer import (
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import (
     ProjectProgrammerSerializer,
 )
+from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
 from rest_framework import serializers
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectClassSerializer(FinancialSumSerializer):
     defaultProgrammer = ProjectProgrammerSerializer(read_only=True)
+    computedDefaultProgrammer = serializers.SerializerMethodField()
+    autoSelectSubClass = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
 
     class Meta(BaseMeta):
@@ -58,3 +64,44 @@ class ProjectClassSerializer(FinancialSumSerializer):
                     name = f"{numbering} {name}"
 
         return name
+
+    def get_computedDefaultProgrammer(self, obj):
+        """
+        Compute default programmer with hierarchical fallback logic.
+
+        This method traverses up the class hierarchy to find a default programmer:
+        1. Check if current class has default programmer
+        2. If not, check parent class
+        3. Continue up the hierarchy until found or root reached
+
+        This solves the issue where users select specific sub-classes that don't
+        have default programmers, but their parent classes do.
+        """
+        # 1. Check if current class has default programmer
+        if obj.defaultProgrammer_id:
+            return ProjectProgrammerSerializer(obj.defaultProgrammer).data
+
+        # 2. Traverse up the parent hierarchy
+        try:
+            programmer = get_programmer_from_hierarchy(obj)
+            if programmer:
+                return ProjectProgrammerSerializer(programmer).data
+            return None
+        except ValueError as e:
+            logger.error(f"Hierarchy error: {e}")
+            return None
+
+    def get_autoSelectSubClass(self, obj):
+        """
+        Determine if this class should auto-select a sub-class based on location.
+
+        This replaces the hardcoded frontend logic for "suurpiiri", "östersundom" matching.
+        """
+        # Check if this class name contains location keywords that should trigger auto-selection
+        location_keywords = ['suurpiiri', 'östersundom']
+
+        for keyword in location_keywords:
+            if keyword in obj.name.lower():
+                return True
+
+        return False
