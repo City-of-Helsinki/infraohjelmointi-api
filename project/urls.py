@@ -153,6 +153,12 @@ router.register(
     basename="projectProgrammers"
 )
 
+router.register(
+    r"audit-logs",
+    views.AuditLogViewSet,
+    basename="auditLogs"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",

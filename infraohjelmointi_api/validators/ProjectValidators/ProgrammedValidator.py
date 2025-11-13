@@ -51,12 +51,13 @@ class ProgrammedValidator(BaseValidator):
                 },
                 code="programmed_true_missing_category",
             )
+        # IO-755: Allow programmed=False for completed phase (when no budget)
         if programmed == False and (
-            phase != None and (phase.value not in ["proposal", "design"])
+            phase is not None and (phase.value not in ["proposal", "design", "completed"])
         ):
             raise ValidationError(
                 detail={
-                    "programmed": "phase must be set to `proposal` or `design` if programmed is `False`"
+                    "programmed": "phase must be set to `proposal`, `design`, or `completed` if programmed is `False`"
                 },
                 code="programmed_false_missing_phase",
             )

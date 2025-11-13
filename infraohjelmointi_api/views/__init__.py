@@ -41,3 +41,4 @@ from .AppStateValueViewSet import *
 from .SapCurrentYearViewSet import *
 from .BudgetOverrunReasonViewSet import *
 from .ProjectProgrammerViewSet import *
+from .AuditLogViewSet import *

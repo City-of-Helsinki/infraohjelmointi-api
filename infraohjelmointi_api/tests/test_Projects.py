@@ -50,10 +50,10 @@ def mock_projectwise_get_service(func):
         # Mock both service instances to avoid external dependency
         mock_create_instance = mock_create_service.return_value
         mock_create_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
-        
-        mock_get_instance = mock_get_service.return_value  
+
+        mock_get_instance = mock_get_service.return_value
         mock_get_instance.get_project_from_pw.return_value = {"instanceId": "mock-instance-id"}
-        
+
         return func(self, *args, **kwargs)
     return wrapper
 
@@ -618,7 +618,7 @@ class ProjectTestCase(TestCase):
 
     @mock_projectwise_get_service
     def test_GET_one_project(self):
-        
+
         response = self.client.get(
             "/projects/{}/".format(self.project_1_Id),
         )
@@ -3390,7 +3390,7 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "phase must be set to `proposal` or `design` if programmed is `False`",
+            "phase must be set to `proposal`, `design`, or `completed` if programmed is `False`",
             response.json()["programmed"][0],
         )
         # Getting proposal phase from the data that is populated when tests run the migrations
@@ -3959,3 +3959,635 @@ class ProjectTestCase(TestCase):
             responseForcedToFrame.json()["finances"],
             patchData["finances"]
         )
+
+
+class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
+    """Test hierarchical programmer fallback in project creation/update (IO-411)"""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create test programmers
+        cls.programmer_parent = ProjectProgrammer.objects.create(
+            firstName="Parent",
+            lastName="Programmer"
+        )
+
+        cls.programmer_child = ProjectProgrammer.objects.create(
+            firstName="Child",
+            lastName="Programmer"
+        )
+
+        # Create phases for IO-755 tests
+        cls.phase_programming, _ = ProjectPhase.objects.get_or_create(
+            value="programming",
+            defaults={'name': 'Programming', 'index': 2}
+        )
+        cls.phase_completed, _ = ProjectPhase.objects.get_or_create(
+            value="completed",
+            defaults={'name': 'Completed', 'index': 9}
+        )
+
+        # Create category for IO-755 tests (required when programmed=True)
+        cls.test_category, _ = ProjectCategory.objects.get_or_create(
+            value="test"
+        )
+
+        # Create hierarchical class structure
+        cls.parent_class = ProjectClass.objects.create(
+            name="8 03 Kadut ja liikenneväylät",
+            path="8 03 Kadut ja liikenneväylät",
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_parent
+        )
+
+        cls.child_class_with_programmer = ProjectClass.objects.create(
+            name="8 03 01 Uudisrakentaminen",
+            path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen",
+            parent=cls.parent_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=cls.programmer_child
+        )
+
+        cls.child_class_no_programmer = ProjectClass.objects.create(
+            name="8 03 02 Perusparantaminen",
+            path="8 03 Kadut ja liikenneväylät/8 03 02 Perusparantaminen",
+            parent=cls.parent_class,
+            forCoordinatorOnly=False
+        )
+
+        cls.grandchild_class = ProjectClass.objects.create(
+            name="8 03 02 01 Liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/8 03 02 Perusparantaminen/8 03 02 01 Liikennejärjestelyt",
+            parent=cls.child_class_no_programmer,
+            forCoordinatorOnly=False
+        )
+
+        cls.orphan_class = ProjectClass.objects.create(
+            name="Orphan Class",
+            path="Orphan Class",
+            forCoordinatorOnly=False
+        )
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_direct_programmer(self, mock_pw_service):
+        """Test that project creation uses direct programmer if class has one"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Direct',
+            'description': 'Test description',
+            'projectClass': self.child_class_with_programmer.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_child)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_parent_fallback(self, mock_pw_service):
+        """Test that project creation inherits programmer from parent class"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Parent Fallback',
+            'description': 'Test description',
+            'projectClass': self.child_class_no_programmer.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_grandparent_fallback(self, mock_pw_service):
+        """Test that project creation inherits programmer from grandparent class"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Grandparent Fallback',
+            'description': 'Test description',
+            'projectClass': self.grandchild_class.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_no_programmer(self, mock_pw_service):
+        """Test that project creation with no programmer in hierarchy sets None"""
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project No Programmer',
+            'description': 'Test description',
+            'projectClass': self.orphan_class.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertIsNone(project.personProgramming)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_explicit_programmer(self, mock_pw_service):
+        """Test that explicit programmer is not overridden by default"""
+        explicit_programmer = ProjectProgrammer.objects.create(
+            firstName="Explicit",
+            lastName="Programmer"
+        )
+
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test Project Explicit',
+            'description': 'Test description',
+            'projectClass': self.child_class_with_programmer.id,
+            'personProgramming': explicit_programmer.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, explicit_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_update_project_adds_programmer_from_hierarchy(self, mock_pw_service):
+        """Test that updating project class adds programmer from hierarchy"""
+        project = Project.objects.create(
+            name="Test Project Update",
+            description="Test description",
+            projectClass=self.orphan_class
+        )
+
+        self.assertIsNone(project.personProgramming)
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'name': project.name,
+                'projectClass': self.child_class_no_programmer.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+        self.assertEqual(updated_project.personProgramming, self.programmer_parent)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_update_project_preserves_existing_programmer(self, mock_pw_service):
+        """Test that updating project preserves existing programmer"""
+        existing_programmer = ProjectProgrammer.objects.create(
+            firstName="Existing",
+            lastName="Programmer"
+        )
+
+        project = Project.objects.create(
+            name="Test Project Preserve",
+            description="Test description",
+            projectClass=self.orphan_class,
+            personProgramming=existing_programmer
+        )
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'name': project.name,
+                'projectClass': self.child_class_with_programmer.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+        self.assertEqual(updated_project.personProgramming, existing_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_saija_case_simulation(self, mock_pw_service):
+        """Test the specific Saija case from Jira: creating project under traffic arrangements"""
+        itainen_suurpiiri = ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            path="8 03 Kadut ja liikenneväylät/Itäinen suurpiiri",
+            parent=self.parent_class,
+            forCoordinatorOnly=False,
+            defaultProgrammer=self.programmer_parent
+        )
+
+        traffic_class = ProjectClass.objects.create(
+            name="E Liikennejärjestelyt",
+            path="8 03 Kadut ja liikenneväylät/Itäinen suurpiiri/E Liikennejärjestelyt",
+            parent=itainen_suurpiiri,
+            forCoordinatorOnly=False
+        )
+
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Turunlinnantien hidastejärjestelyt',
+            'description': 'Test traffic arrangements',
+            'projectClass': traffic_class.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_parent)
+
+    def test_fallback_method_direct_programmer(self):
+        """Test fallback method returns direct programmer"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.child_class_with_programmer)
+        self.assertEqual(programmer, self.programmer_child)
+
+    def test_fallback_method_parent_programmer(self):
+        """Test fallback method returns parent programmer"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.grandchild_class)
+        self.assertEqual(programmer, self.programmer_parent)
+
+    def test_fallback_method_no_programmer(self):
+        """Test fallback method returns None when no programmer in hierarchy"""
+        serializer = ProjectCreateSerializer()
+        programmer = serializer._get_default_programmer_with_fallback(self.orphan_class)
+        self.assertIsNone(programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_with_current_year_budget_sets_programmed_true(self, mock_pw_service):
+        """Test IO-755: Completed project with current year budget automatically gets programmed=True"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project with some initial phase
+        project = Project.objects.create(
+            name="Test Completed Project",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Add budget for current year
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=50000.00,
+            forFrameView=False
+        )
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should automatically set programmed=True because there's budget for current year
+        self.assertTrue(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_without_current_year_budget_sets_programmed_false(self, mock_pw_service):
+        """Test IO-755: Completed project without current year budget automatically gets programmed=False"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project
+        project = Project.objects.create(
+            name="Test Completed No Budget",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # No budget for current year (or budget is zero)
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=0.00,  # Zero budget
+            forFrameView=False
+        )
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should automatically set programmed=False because no budget for current year
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_with_future_year_budget_only(self, mock_pw_service):
+        """Test IO-755: Budget in future year (not current) results in programmed=False"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project
+        project = Project.objects.create(
+            name="Test Future Budget",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Budget only for future years, not current year
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year + 1,
+            value=100000.00,
+            forFrameView=False
+        )
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should be False - budget must be for CURRENT year
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_with_null_value_budget(self, mock_pw_service):
+        """Test IO-755: Budget with null value is treated as no budget"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project
+        project = Project.objects.create(
+            name="Test Null Budget",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Budget with null value
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=None,
+            forFrameView=False
+        )
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should be False - null value means no budget
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_with_small_nonzero_budget(self, mock_pw_service):
+        """Test IO-755: Even small non-zero budget counts as having budget"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project
+        project = Project.objects.create(
+            name="Test Small Budget",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Small but non-zero budget
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=0.01,  # Even 1 cent counts
+            forFrameView=False
+        )
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should be True - any non-zero value counts
+        self.assertTrue(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_validator_allows_programmed_false_with_completed_phase(self, mock_pw_service):
+        """Test IO-755: Validator now allows programmed=False with completed phase"""
+        # Create a project
+        project = Project.objects.create(
+            name="Test Validator",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Try to manually set programmed=False with completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+                'programmed': False,
+            },
+            partial=True
+        )
+
+        # Should be valid - validator updated to allow this combination
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        self.assertEqual(updated_project.phase, self.phase_completed)
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_user_can_override_programmed_to_true(self, mock_pw_service):
+        """Test IO-755: User can manually override automatic behavior by explicitly setting programmed"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project with NO budget for current year
+        project = Project.objects.create(
+            name="Test Override to True",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # No budget (would normally result in programmed=False)
+        # But user explicitly sets it to True
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+                'programmed': True,  # Explicit override
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should respect user's explicit choice
+        self.assertTrue(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_user_can_override_programmed_to_false(self, mock_pw_service):
+        """Test IO-755: User can manually override automatic behavior even when budget exists"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project WITH budget for current year
+        project = Project.objects.create(
+            name="Test Override to False",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Add budget for current year (would normally result in programmed=True)
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=75000.00,
+            forFrameView=False
+        )
+
+        # But user explicitly sets it to False
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+                'programmed': False,  # Explicit override
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should respect user's explicit choice
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_only_checks_non_frameview_budget(self, mock_pw_service):
+        """Test IO-755: Only non-frameView budget is checked, not frameView budget"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create a project
+        project = Project.objects.create(
+            name="Test Frame View",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Add budget ONLY for frameView=True, not for actual budget
+        ProjectFinancial.objects.create(
+            project=project,
+            year=current_year,
+            value=50000.00,
+            forFrameView=True  # This is frame view, not actual budget
+        )
+
+        # No actual budget (forFrameView=False)
+
+        # Update to completed phase
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'phase': self.phase_completed.id,
+            },
+            partial=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+
+        # Should be False - only actual budget counts, not frame view
+        self.assertFalse(updated_project.programmed)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_completed_phase_in_bulk_update(self, mock_pw_service):
+        """Test IO-755: Bulk update also respects automatic programmed logic"""
+        from datetime import date
+        current_year = date.today().year
+
+        # Create two projects
+        project1 = Project.objects.create(
+            name="Test Bulk 1",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        project2 = Project.objects.create(
+            name="Test Bulk 2",
+            description="Test description",
+            projectClass=self.child_class_with_programmer,
+            phase=self.phase_programming,
+            programmed=True,
+            category=self.test_category
+        )
+
+        # Project 1 has budget for current year
+        ProjectFinancial.objects.create(
+            project=project1,
+            year=current_year,
+            value=10000.00,
+            forFrameView=False
+        )
+
+        # Project 2 has no budget
+
+        # Bulk update both to completed phase
+        serializer = ProjectCreateSerializer(
+            [project1, project2],
+            data=[
+                {'phase': self.phase_completed.id, 'projectId': project1.id},
+                {'phase': self.phase_completed.id, 'projectId': project2.id}
+            ],
+            partial=True,
+            many=True
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_projects = serializer.save()
+
+        # Project 1 should have programmed=True (has budget)
+        self.assertTrue(updated_projects[0].programmed)
+
+        # Project 2 should have programmed=False (no budget)
+        self.assertFalse(updated_projects[1].programmed)
+

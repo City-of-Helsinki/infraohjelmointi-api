@@ -1,15 +1,16 @@
-from overrides import override
-from unittest.mock import patch, MagicMock
-from decimal import Decimal
-from datetime import datetime
 import uuid
+from datetime import datetime
+from decimal import Decimal
+from unittest.mock import MagicMock, patch
+
+from django.test import TestCase
+from overrides import override
+
 from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.services.SapApiService import SapApiService
 from infraohjelmointi_api.views import BaseViewSet, SapCurrentYearViewSet
-import logging
-from django.test import TestCase
 
-logger = logging.getLogger("infraohjelmointi_api")
+
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
 class TestSAPService(TestCase):
@@ -78,8 +79,6 @@ class TestSAPService(TestCase):
 
         # Call the function with a known SAP ID
         project_id = '123'
-        result = {}
-
         all_sap_data = self.sap_service.get_all_project_costs_and_commitments_from_sap(project_id)
         current_year_data = self.sap_service.get_costs_and_commitments_by_year(project_id, datetime.now().year)
         result = {
@@ -140,8 +139,6 @@ class TestSAPService(TestCase):
 
         # Call the function and assert an empty dict is returned due to the error
         project_id = '123'
-        result = {}
-
         all_sap_data = self.sap_service.get_all_project_costs_and_commitments_from_sap(project_id)
         current_year_data = self.sap_service.get_costs_and_commitments_by_year(project_id, datetime.now().year)
         result = {
@@ -176,6 +173,7 @@ class TestSAPService(TestCase):
 
     def test_sync_all_projects_from_sap(self):
         # Mock the SAP API response for current year costs
+        # Using .01 suffix = planning task (should go to project_task, not production_task)
         mock_response_current_year_costs = MagicMock()
         mock_response_current_year_costs.status_code = 200
         mock_response_current_year_costs.json.return_value = {
@@ -200,5 +198,88 @@ class TestSAPService(TestCase):
         # get the data from database
         response = self.client.get("/sap-current-year-costs/{}/".format(datetime.now().year))
         data_in_database = response.data[0]
-        self.assertEqual(data_in_database['production_task_costs'], '111.000')
-        self.assertEqual(data_in_database['production_task_commitments'], '333.000')
+        # Planning tasks (ending in .01) should be in project_task, not production_task
+        self.assertEqual(data_in_database['project_task_costs'], '111.000')
+        self.assertEqual(data_in_database['project_task_commitments'], '333.000')
+        # Production tasks should be 0
+        self.assertEqual(data_in_database['production_task_costs'], '0.000')
+        self.assertEqual(data_in_database['production_task_commitments'], '0.000')
+
+    def test_calculate_values_with_dotted_format(self):
+        """Test that old dotted format (e.g., 2814I03976.01) is correctly categorized"""
+        sap_id = "2814I03976"
+        costs = [
+            {"Posid": "2814I03976.01", "Wkgbtr": "1000.000"},  # Planning task
+            {"Posid": "2814I03976.02", "Wkgbtr": "2000.000"},  # Construction task
+            {"Posid": "2814I03976.06", "Wkgbtr": "3000.000"},  # Construction task
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+        
+        self.assertEqual(result['project_task'], Decimal('1000.000'))
+        self.assertEqual(result['production_task'], Decimal('5000.000'))
+
+    def test_calculate_values_with_concatenated_format(self):
+        """Test that new concatenated format (e.g., 2814I0397600101) is correctly categorized"""
+        sap_id = "2814I03976"
+        costs = [
+            {"Posid": "2814I0397600101", "Wkgbtr": "1500.000"},  # Planning task
+            {"Posid": "2814I0397600106", "Wkgbtr": "2500.000"},  # Construction task
+            {"Posid": "2814I0397600199", "Wkgbtr": "3500.000"},  # Construction task
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+        
+        self.assertEqual(result['project_task'], Decimal('1500.000'))
+        self.assertEqual(result['production_task'], Decimal('6000.000'))
+
+    def test_calculate_values_with_mixed_formats(self):
+        """Test that both old and new formats work together"""
+        sap_id = "2814I03976"
+        costs = [
+            {"Posid": "2814I03976.01", "Wkgbtr": "1000.000"},     # Old format - planning
+            {"Posid": "2814I0397600101", "Wkgbtr": "1500.000"},   # New format - planning
+            {"Posid": "2814I03976.06", "Wkgbtr": "2000.000"},     # Old format - construction
+            {"Posid": "2814I0397600106", "Wkgbtr": "2500.000"},   # New format - construction
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+        
+        self.assertEqual(result['project_task'], Decimal('2500.000'))
+        self.assertEqual(result['production_task'], Decimal('4500.000'))
+
+    def test_calculate_values_edge_case_sap_id_ending_in_01(self):
+        """
+        Test edge case: SAP ID itself ends in '01' (e.g., 2814I03901)
+        Bare SAP ID should be categorized as construction, not planning
+        """
+        sap_id = "2814I03901"
+        costs = [
+            {"Posid": "2814I03901", "Wkgbtr": "1000.000"},         # Bare SAP ID - construction
+            {"Posid": "2814I03901.01", "Wkgbtr": "1500.000"},      # Planning task (old format)
+            {"Posid": "2814I0390100101", "Wkgbtr": "2000.000"},    # Planning task (new format)
+            {"Posid": "2814I03901.02", "Wkgbtr": "2500.000"},      # Construction task (old format)
+            {"Posid": "2814I0390100106", "Wkgbtr": "3000.000"},    # Construction task (new format)
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+        
+        # Planning tasks: 1500 + 2000 = 3500
+        self.assertEqual(result['project_task'], Decimal('3500.000'))
+        # Construction tasks: 1000 (bare) + 2500 + 3000 = 6500
+        self.assertEqual(result['production_task'], Decimal('6500.000'))
+
+    def test_calculate_values_io740_actual_data(self):
+        """
+        Test with actual production data structure from IO-740
+        This was the original bug: planning costs showed as 0
+        """
+        sap_id = "2814I03976"
+        costs = [
+            {"Posid": "2814I03976", "Wkgbtr": "37.490"},           # Bare SAP ID
+            {"Posid": "2814I0397600101", "Wkgbtr": "6000.000"},    # Planning task
+            {"Posid": "2814I0397600106", "Wkgbtr": "180000.000"},  # Construction task
+            {"Posid": "2814I0397600199", "Wkgbtr": "30000.000"},   # Construction task
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+        
+        # Planning: 6000
+        self.assertEqual(result['project_task'], Decimal('6000.000'))
+        # Construction: 37.490 + 180000 + 30000 = 210037.490
+        self.assertEqual(result['production_task'], Decimal('210037.490'))
