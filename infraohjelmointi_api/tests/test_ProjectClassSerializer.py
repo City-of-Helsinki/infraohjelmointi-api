@@ -393,120 +393,6 @@ class ProjectClassSerializerTestCase(TestCase):
             "8 01 01 Test Class With Existing Numbering"
         )
 
-    def test_numbering_from_parent_hierarchy(self):
-        """Test IO-455: Numbering from parent when coordinator class has no numbering in name"""
-        # Create the hierarchy: coordinator parent with numbering
-        coord_parent = ProjectClass.objects.create(
-            name="8 04 01 01 Uudet puistot ja puistojen peruskorjaus",
-            path="8/8 04/8 04 01/8 04 01 01",
-            forCoordinatorOnly=True
-        )
-        
-        # Coordinator class without numbering in name
-        coord_class = ProjectClass.objects.create(
-            name="Uudet puistot",
-            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot",
-            parent=coord_parent,
-            forCoordinatorOnly=True
-        )
-        
-        # Programming class
-        prog_class = ProjectClass.objects.create(
-            name="Uudet puistot",
-            path="8/Uudet puistot",
-            forCoordinatorOnly=False
-        )
-        
-        coord_class.relatedTo = prog_class
-        coord_class.save()
-        
-        serializer = ProjectClassSerializer(prog_class)
-        # Should get numbering from coordinator's parent
-        self.assertEqual(
-            serializer.data['name'],
-            "8 04 01 01 Uudet puistot"
-        )
-
-    def test_numbering_from_grandparent_hierarchy(self):
-        """Test IO-455: Numbering from grandparent when neither coordinator nor parent have numbering"""
-        # Create the hierarchy with numbering only at grandparent level
-        coord_grandparent = ProjectClass.objects.create(
-            name="8 09 04 03 Puistot ja liikunta-alueet",
-            path="8/8 09/8 09 04/8 09 04 03",
-            forCoordinatorOnly=True
-        )
-        
-        coord_parent = ProjectClass.objects.create(
-            name="Puistot",
-            path="8/8 09/8 09 04/8 09 04 03/Puistot",
-            parent=coord_grandparent,
-            forCoordinatorOnly=True
-        )
-        
-        coord_class = ProjectClass.objects.create(
-            name="Uudisrakentaminen",
-            path="8/8 09/8 09 04/8 09 04 03/Puistot/Uudisrakentaminen",
-            parent=coord_parent,
-            forCoordinatorOnly=True
-        )
-        
-        prog_class = ProjectClass.objects.create(
-            name="Puistot uudisrakentaminen",
-            path="8/Puistot uudisrakentaminen",
-            forCoordinatorOnly=False
-        )
-        
-        coord_class.relatedTo = prog_class
-        coord_class.save()
-        
-        serializer = ProjectClassSerializer(prog_class)
-        # Should get numbering from coordinator's grandparent
-        self.assertEqual(
-            serializer.data['name'],
-            "8 09 04 03 Puistot uudisrakentaminen"
-        )
-
-    def test_real_world_pattern_matching_names(self):
-        """Test IO-455: Real-world pattern like 'Luonnonsuojelualueet' with matching names in hierarchy"""
-        # Pattern from production: programming and coordinator have same name,
-        # numbering comes from grandparent
-        coord_grandparent = ProjectClass.objects.create(
-            name="8 04 01 01 Uudet puistot ja puistojen peruskorjaus",
-            path="8/8 04/8 04 01/8 04 01 01",
-            forCoordinatorOnly=True
-        )
-        
-        coord_parent = ProjectClass.objects.create(
-            name="Uudet puistot",
-            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot",
-            parent=coord_grandparent,
-            forCoordinatorOnly=True
-        )
-        
-        # Coordinator and programming class have the same name
-        coord_class = ProjectClass.objects.create(
-            name="Luonnonsuojelualueet",
-            path="8/8 04/8 04 01/8 04 01 01/Uudet puistot/Luonnonsuojelualueet",
-            parent=coord_parent,
-            forCoordinatorOnly=True
-        )
-        
-        prog_class = ProjectClass.objects.create(
-            name="Luonnonsuojelualueet",
-            path="8/Luonnonsuojelualueet",
-            forCoordinatorOnly=False
-        )
-        
-        coord_class.relatedTo = prog_class
-        coord_class.save()
-        
-        serializer = ProjectClassSerializer(prog_class)
-        # Should get numbering from coordinator's grandparent
-        self.assertEqual(
-            serializer.data['name'],
-            "8 04 01 01 Luonnonsuojelualueet"
-        )
-
     def test_edge_cases(self):
         """Test edge cases: no relationship, no numbering, multiple suffixes"""
         orphan_prog_class = ProjectClass.objects.create(
@@ -546,6 +432,359 @@ class ProjectClassSerializerTestCase(TestCase):
         self.assertEqual(
             serializer.data['name'],
             "8 01 99 Test"
+        )
+
+    def test_suurpiiri_classes_no_numbering(self):
+        """Test IO-455: Suurpiiri classes should not get numbering"""
+        coord_class = ProjectClass.objects.create(
+            name="8 03 01 01 Uudisrakentaminen, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01",
+            forCoordinatorOnly=True
+        )
+
+        suurpiiri_class = ProjectClass.objects.create(
+            name="Eteläinen suurpiiri",
+            path="8/Eteläinen suurpiiri",
+            forCoordinatorOnly=False
+        )
+
+        coord_class.relatedTo = suurpiiri_class
+        coord_class.save()
+
+        serializer = ProjectClassSerializer(suurpiiri_class)
+        # Suurpiiri classes should not get numbering even if they have a coordinator
+        self.assertEqual(serializer.data['name'], "Eteläinen suurpiiri")
+
+    def test_sub_items_no_numbering(self):
+        """Test IO-455: Sub-items under numbered parents should not get numbering"""
+        # Create parent coordinator class
+        parent_coord = ProjectClass.objects.create(
+            name="8 03 01 03 Muut investoinnit, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 03",
+            forCoordinatorOnly=True
+        )
+
+        # Create parent programming class
+        parent_prog = ProjectClass.objects.create(
+            name="Muut investoinnit",
+            path="8/Muut investoinnit",
+            forCoordinatorOnly=False
+        )
+
+        parent_coord.relatedTo = parent_prog
+        parent_coord.save()
+
+        # Create child coordinator class
+        child_coord = ProjectClass.objects.create(
+            name="8 03 01 03 Täytemaan vastaanottopaikat, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 03/Täytemaan vastaanottopaikat",
+            forCoordinatorOnly=True
+        )
+
+        # Create child programming class (sub-item)
+        child_prog = ProjectClass.objects.create(
+            name="Täytemaan vastaanottopaikat",
+            path="8/Muut investoinnit/Täytemaan vastaanottopaikat",
+            parent=parent_prog,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        # Parent should have numbering
+        parent_serializer = ProjectClassSerializer(parent_prog)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 03 01 03 Muut investoinnit"
+        )
+
+        # Child should NOT have numbering (it's a sub-item under a numbered parent)
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "Täytemaan vastaanottopaikat"
+        )
+
+    def test_sub_items_no_numbering_with_coordinator_parent(self):
+        """Test IO-455: Sub-items under coordinator parents with numbering should not get numbering"""
+        # Create coordinator parent with numbering
+        coord_parent = ProjectClass.objects.create(
+            name="8 03 01 02 Perusparantaminen ja liikennejärjestelyt, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 02",
+            forCoordinatorOnly=True
+        )
+
+        # Create programming parent
+        prog_parent = ProjectClass.objects.create(
+            name="Perusparantaminen ja liikennejärjestelyt",
+            path="8/Perusparantaminen ja liikennejärjestelyt",
+            forCoordinatorOnly=False
+        )
+
+        coord_parent.relatedTo = prog_parent
+        coord_parent.save()
+
+        # Create child coordinator
+        child_coord = ProjectClass.objects.create(
+            name="8 03 01 02 Katujen peruskorjaukset, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 02/Katujen peruskorjaukset",
+            forCoordinatorOnly=True
+        )
+
+        # Create child programming class (sub-item)
+        child_prog = ProjectClass.objects.create(
+            name="Katujen peruskorjaukset",
+            path="8/Perusparantaminen ja liikennejärjestelyt/Katujen peruskorjaukset",
+            parent=prog_parent,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        # Parent should have numbering
+        parent_serializer = ProjectClassSerializer(prog_parent)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 03 01 02 Perusparantaminen ja liikennejärjestelyt"
+        )
+
+        # Child should NOT have numbering
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "Katujen peruskorjaukset"
+        )
+
+    def test_child_with_own_coordinator_but_parent_has_numbering(self):
+        """Test IO-455: Child with own coordinatorClass should NOT get numbering if parent has numbering
+        
+        This is the real production scenario:
+        - Parent: "Perusparantaminen ja liikennejärjestelyt" has coordinatorClass "8 03 01 02..."
+        - Child: "Katujen peruskorjaukset" has own coordinatorClass "A Katujen peruskorjaukset" (no numbering)
+        - Child should NOT get numbering because parent has it
+        """
+        # Create parent coordinator class with numbering
+        parent_coord = ProjectClass.objects.create(
+            name="8 03 01 02 Perusparantaminen ja liikennejärjestelyt, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 02",
+            forCoordinatorOnly=True
+        )
+
+        # Create parent programming class
+        parent_prog = ProjectClass.objects.create(
+            name="Perusparantaminen ja liikennejärjestelyt",
+            path="8/Perusparantaminen ja liikennejärjestelyt",
+            forCoordinatorOnly=False
+        )
+
+        parent_coord.relatedTo = parent_prog
+        parent_coord.save()
+
+        # Create child coordinator class WITHOUT numbering
+        child_coord = ProjectClass.objects.create(
+            name="A Katujen peruskorjaukset, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 02/A Katujen peruskorjaukset",
+            forCoordinatorOnly=True
+        )
+
+        # Create child programming class with its own coordinatorClass
+        child_prog = ProjectClass.objects.create(
+            name="Katujen peruskorjaukset",
+            path="8/Perusparantaminen ja liikennejärjestelyt/Katujen peruskorjaukset",
+            parent=parent_prog,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        # Parent should have numbering
+        parent_serializer = ProjectClassSerializer(parent_prog)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 03 01 02 Perusparantaminen ja liikennejärjestelyt"
+        )
+
+        # Child should NOT have numbering (even though it has its own coordinatorClass)
+        # because parent has numbering
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "Katujen peruskorjaukset"
+        )
+
+    def test_child_with_own_coordinator_with_numbering_but_parent_has_numbering(self):
+        """Test IO-455: Child with own coordinatorClass WITH numbering should NOT get numbering if parent has numbering
+        
+        Edge case: What if child's coordinatorClass has numbering but parent also has numbering?
+        Child should still NOT get numbering.
+        """
+        # Create parent coordinator class with numbering
+        parent_coord = ProjectClass.objects.create(
+            name="8 03 01 01 Uudisrakentaminen, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01",
+            forCoordinatorOnly=True
+        )
+
+        # Create parent programming class
+        parent_prog = ProjectClass.objects.create(
+            name="Uudisrakentaminen",
+            path="8/Uudisrakentaminen",
+            forCoordinatorOnly=False
+        )
+
+        parent_coord.relatedTo = parent_prog
+        parent_coord.save()
+
+        # Create child coordinator class WITH numbering (different from parent)
+        child_coord = ProjectClass.objects.create(
+            name="8 03 01 01 J Meluesteet, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01/J Meluesteet",
+            forCoordinatorOnly=True
+        )
+
+        # Create child programming class
+        child_prog = ProjectClass.objects.create(
+            name="Meluesteet",
+            path="8/Uudisrakentaminen/Meluesteet",
+            parent=parent_prog,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        # Parent should have numbering
+        parent_serializer = ProjectClassSerializer(parent_prog)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 03 01 01 Uudisrakentaminen"
+        )
+
+        # Child should NOT have numbering (even though its coordinatorClass has numbering)
+        # because parent has numbering
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "Meluesteet"
+        )
+
+    def test_child_with_parent_that_has_numbering_in_raw_name(self):
+        """
+        Test IO-455: Child gets numbering when parent has static numbering in raw name.
+        
+        Parent with numbering in database name but no coordinator should not block children
+        from getting numbering, as parent's name doesn't change after serialization.
+        """
+        parent_prog = ProjectClass.objects.create(
+            name="8 03 Kadut ja liikenneväylät",
+            path="8/8 03 Kadut ja liikenneväylät",
+            forCoordinatorOnly=False
+        )
+
+        child_coord = ProjectClass.objects.create(
+            name="8 03 01 01 Uudisrakentaminen, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01",
+            forCoordinatorOnly=True
+        )
+
+        child_prog = ProjectClass.objects.create(
+            name="Uudisrakentaminen",
+            path="8/8 03 Kadut ja liikenneväylät/Uudisrakentaminen",
+            parent=parent_prog,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        parent_serializer = ProjectClassSerializer(parent_prog)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 03 Kadut ja liikenneväylät"
+        )
+
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "8 03 01 01 Uudisrakentaminen"
+        )
+
+    def test_coordinator_hierarchy_numbering_extraction(self):
+        """
+        Test IO-455: Extract numbering from coordinator parent when coordinator itself lacks it.
+        
+        Programming class should traverse coordinator parent hierarchy to find numbering.
+        """
+        parent_coord = ProjectClass.objects.create(
+            name="8 04 01 01 Parent category, Kylkn käytettäväksi",
+            path="8/8 04/8 04 01/8 04 01 01",
+            forCoordinatorOnly=True
+        )
+
+        child_coord = ProjectClass.objects.create(
+            name="Child category, Kylkn käytettäväksi",
+            path="8/8 04/8 04 01/8 04 01 01/Child category",
+            parent=parent_coord,
+            forCoordinatorOnly=True
+        )
+
+        prog_class = ProjectClass.objects.create(
+            name="Child category",
+            path="8/Child category",
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = prog_class
+        child_coord.save()
+
+        serializer = ProjectClassSerializer(prog_class)
+        self.assertEqual(
+            serializer.data['name'],
+            "8 04 01 01 Child category"
+        )
+
+    def test_coordinator_grandparent_hierarchy_numbering_extraction(self):
+        """
+        Test IO-455: Extract numbering from coordinator grandparent hierarchy.
+        
+        Should traverse multiple levels up coordinator hierarchy to find numbering.
+        """
+        grandparent_coord = ProjectClass.objects.create(
+            name="8 03 01 01 Grandparent category, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01",
+            forCoordinatorOnly=True
+        )
+
+        parent_coord = ProjectClass.objects.create(
+            name="Parent category, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01/Parent category",
+            parent=grandparent_coord,
+            forCoordinatorOnly=True
+        )
+
+        child_coord = ProjectClass.objects.create(
+            name="Child category, Kylkn käytettäväksi",
+            path="8/8 03/8 03 01/8 03 01 01/Parent category/Child category",
+            parent=parent_coord,
+            forCoordinatorOnly=True
+        )
+
+        prog_class = ProjectClass.objects.create(
+            name="Child category",
+            path="8/Child category",
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = prog_class
+        child_coord.save()
+
+        serializer = ProjectClassSerializer(prog_class)
+        self.assertEqual(
+            serializer.data['name'],
+            "8 03 01 01 Child category"
         )
 
 

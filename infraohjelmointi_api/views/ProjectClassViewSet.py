@@ -20,7 +20,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         """Default is programmer view with user role filtering"""
         queryset = (
             ProjectClassService.list_all()
-            .select_related("coordinatorClass", "coordinatorClass__parent", "coordinatorClass__parent__parent")
+            .select_related("coordinatorClass", "coordinatorClass__parent", "coordinatorClass__parent__parent", "parent")
             .prefetch_related("coordinatorClass__finances")
         )
 

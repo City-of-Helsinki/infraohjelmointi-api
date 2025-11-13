@@ -23,41 +23,79 @@ class ProjectClassSerializer(FinancialSumSerializer):
     class Meta(BaseMeta):
         model = ProjectClass
 
-    def _extract_numbering_from_coordinator_hierarchy(self, coordinator_class):
+    def _extract_numbering(self, name, suffix_pattern):
+        """Extract numbering prefix from a name (e.g., '8 03 01 01' from '8 03 01 01 Name')."""
+        name_clean = re.sub(suffix_pattern, '', name).strip()
+        match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})', name_clean)
+        return match.group(1) if match else None
+
+    def _get_coordinator_numbering(self, programming_class, suffix_pattern):
         """
-        Extract numbering from coordinator class or its parent hierarchy.
+        Get numbering from programming class's coordinator hierarchy.
         
-        Some coordinator classes have numbering directly in their name (e.g., "8 03 01 02 Name"),
-        while others have it in their parent's name. This method traverses up the hierarchy
-        to find the numbering.
-        
-        Returns the numbering string (e.g., "8 04 01 01") or None if not found.
+        Traverses up coordinator parent chain until numbering is found.
+        Returns None if no coordinator or no numbering found.
         """
-        current = coordinator_class
-        max_depth = 10  # Prevent infinite loops
-        depth = 0
+        try:
+            coordinator = programming_class.coordinatorClass
+        except (AttributeError, ProjectClass.DoesNotExist):
+            return None
         
-        while current and depth < max_depth:
-            # Try to extract numbering from current class name
-            match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})', current.name)
-            if match:
-                return match.group(1)
-            
-            # Move to parent
+        if not coordinator:
+            return None
+        
+        current = coordinator
+        max_depth = 10
+        
+        while current and max_depth > 0:
+            numbering = self._extract_numbering(current.name, suffix_pattern)
+            if numbering:
+                return numbering
             current = current.parent
-            depth += 1
+            max_depth -= 1
         
         return None
 
+    def _would_get_numbering_from_coordinator(self, programming_class, suffix_pattern):
+        """
+        Check if programming class would GET numbering from coordinator.
+        
+        Returns True only if the class's numbering would change after serialization.
+        This distinguishes between:
+        - Classes with static numbering that won't change (e.g., "8 03 Kadut...")
+        - Classes that will get/update numbering from coordinator
+        """
+        if programming_class.forCoordinatorOnly:
+            return False
+        
+        raw_numbering = self._extract_numbering(programming_class.name, suffix_pattern)
+        coordinator_numbering = self._get_coordinator_numbering(programming_class, suffix_pattern)
+        
+        if not coordinator_numbering:
+            return False
+        
+        return raw_numbering != coordinator_numbering
+
+    def _any_ancestor_would_get_numbering(self, programming_class, suffix_pattern):
+        """Check if any ancestor would get numbering from coordinator."""
+        current = programming_class.parent
+        max_depth = 10
+        
+        while current and max_depth > 0:
+            if self._would_get_numbering_from_coordinator(current, suffix_pattern):
+                return True
+            current = current.parent
+            max_depth -= 1
+        
+        return False
+
     def get_name(self, obj):
         """
-        Handle both IO-758 (suffix removal) and IO-455 (numbering addition) at the serializer level.
-        This approach is easily reversible and doesn't modify the database.
+        Apply name transformations: suffix removal (IO-758) and numbering addition (IO-455).
+        Modifications are applied at serialization only; database remains unchanged.
         """
         name = obj.name
 
-        # IO-758: Remove TA-kohtien suffixes
-        # Use regex pattern to catch all variations more comprehensively
         suffix_pattern = (r',\s*('
                           r'Kylkn|'
                           r'kylkn|'
@@ -71,21 +109,20 @@ class ProjectClassSerializer(FinancialSumSerializer):
                           r')\s+käytettäväksi')
         name = re.sub(suffix_pattern, '', name).strip()
 
-        # IO-455: Add numbering to programming view classes
-        if not obj.forCoordinatorOnly and hasattr(obj, 'coordinatorClass') and obj.coordinatorClass:
-            # Extract numbering from coordinator class or its parent hierarchy
-            numbering = self._extract_numbering_from_coordinator_hierarchy(obj.coordinatorClass)
-            
-            if numbering:
-                # Check if programming class name already starts with numbering
-                programming_match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})\s+(.+)', name)
-                if programming_match:
-                    # Use the coordinator numbering and the rest of the programming name
-                    name = f"{numbering} {programming_match.group(2)}"
-                else:
-                    # Programming name doesn't start with numbering, just add it
-                    name = f"{numbering} {name}"
-
+        if obj.forCoordinatorOnly:
+            return name
+        
+        if 'suurpiiri' in obj.name.lower():
+            return name
+        
+        if self._any_ancestor_would_get_numbering(obj, suffix_pattern):
+            return name
+        
+        numbering = self._get_coordinator_numbering(obj, suffix_pattern)
+        if numbering:
+            name_without_numbering = re.sub(r'^(\d+\s+\d+(?:\s+\d+){0,2})\s+', '', name)
+            name = f"{numbering} {name_without_numbering}"
+        
         return name
 
     def get_computedDefaultProgrammer(self, obj):
