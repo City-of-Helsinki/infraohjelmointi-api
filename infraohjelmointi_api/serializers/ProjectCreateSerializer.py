@@ -274,11 +274,29 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         if phase is not None and phase.value == "programming":
             data["programmed"] = True
 
-        if phase is not None and (
-            phase.value == "completed"
-            or phase.value == "proposal"
-        ):
+        if phase is not None and phase.value == "proposal":
             data["programmed"] = False
+        
+        # IO-755: When marking project as completed, set programmed based on budget
+        # Only auto-set if user hasn't explicitly provided a value
+        if phase is not None and phase.value == "completed" and "programmed" not in data:
+            # Check if project has budget reservations for current year
+            from datetime import date
+            current_year = date.today().year
+            
+            # If this is an update (instance exists), check its finances
+            if instance:
+                # Check finances for current year (both frameView types)
+                has_current_year_budget = instance.finances.filter(
+                    year=current_year,
+                    forFrameView=False  # Only check actual budget, not frame view
+                ).exclude(value=0).exclude(value__isnull=True).exists()
+                
+                # Set programmed based on budget existence
+                data["programmed"] = has_current_year_budget
+            else:
+                # For new projects being created as completed (unlikely), default to False
+                data["programmed"] = False
 
         for estDate, frameEstDate in self.estFieldsRelations:
             if data.get(estDate, None) != None and (
