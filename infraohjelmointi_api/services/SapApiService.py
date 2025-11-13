@@ -1,22 +1,19 @@
-import requests
-from os import path
-import environ
 import logging
 import time
+from datetime import datetime
 from decimal import Decimal
+from os import path
+
+import environ
+import requests
 from django.core.exceptions import MultipleObjectsReturned
 
-from datetime import datetime
-
-logger = logging.getLogger("infraohjelmointi_api")
-
-from ..models import (
-    Project,
-)
-
+from ..models import Project
 from .ProjectService import ProjectService
 from .SapCostService import SapCostService
 from .SapCurrentYearService import SapCurrentYearService
+
+logger = logging.getLogger("infraohjelmointi_api")
 
 
 env = environ.Env()
@@ -340,25 +337,43 @@ class SapApiService:
         result will include two keys separating groups: 01 and others.\n
         """
         # costs must be groupped by task
-        # 01 = Project task
-        # 02, 03, 04 = Production task, will be grouped as one
+        # 01 = Project task (planning)
+        # 02, 03, 04, 06, 99 = Production task (construction), will be grouped as one
         #
         # Task group id is formatted as sap_id.task_id (2814I06808.01,2814I06808.02,2814I06808.03, or 2814I06808.04)
         # Task id can also contain sub task i.e. 2814I06808.01.01, or sub sub task i.e. 2814I06808.01.01.02
+        # 
+        # NOTE: SAP returns task IDs in TWO formats:
+        #   1. OLD FORMAT (with dots): "2814I03976.01" - backward compatible
+        #   2. NEW FORMAT (concatenated): SAPID(variable length) + SUBPROJECT(3 digits) + TASK(2 digits)
+        #      Example: "2814I03976" + "001" + "01" = "2814I0397600101"
+        #      Planning tasks end with "01" (last 2 chars)
+        #      Construction tasks end with "02", "03", "04", "06", "99", etc.
+        #
+        # EDGE CASE: Some SAP IDs themselves end in "01" (e.g., "2814I03901")
+        #   - These bare IDs should NOT be classified as planning tasks
+        #   - Only extended IDs (longer than base SAP ID) ending in "01" are planning tasks
         grouped_by_task = {
             "project_task": Decimal(0.000),
             "production_task": Decimal(0.000),
         }
-        project_task_id = f"{sap_id}.01"
         for cost in values:
-            task_id = cost["Posid"]
-            group_id = (
-                "project_task" if project_task_id in task_id else "production_task"
-            )
-
-            grouped_by_task[group_id] = grouped_by_task[group_id] + Decimal(
-                cost["Wkgbtr"]
-            )
+            posid = cost["Posid"]
+            
+            # Determine if this is a planning task using robust logic:
+            # 1. Check for old format with dots (e.g., "2814I03976.01")
+            if ".01" in posid:
+                is_planning = True
+            # 2. Check for new format: Must be longer than base SAP ID, end with "01", and start with SAP ID
+            #    This prevents false positives for bare SAP IDs that happen to end in "01"
+            elif len(posid) > len(sap_id) and posid.endswith("01") and posid.startswith(sap_id):
+                is_planning = True
+            else:
+                is_planning = False
+            
+            group_id = "project_task" if is_planning else "production_task"
+            grouped_by_task[group_id] += Decimal(cost["Wkgbtr"])
+        
         return grouped_by_task
 
     def __log_response_error(self, response: requests.Response, id: str) -> None:
