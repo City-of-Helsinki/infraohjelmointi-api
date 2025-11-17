@@ -43,3 +43,8 @@ from .SapCurrentYearViewSet import *
 from .BudgetOverrunReasonViewSet import *
 from .ProjectProgrammerViewSet import *
 from .AuditLogViewSet import *
+from .TalpaProjectOpeningViewSet import *
+from .TalpaProjectTypeViewSet import *
+from .TalpaServiceClassViewSet import *
+from .TalpaAssetClassViewSet import *
+from .TalpaProjectNumberRangeViewSet import *

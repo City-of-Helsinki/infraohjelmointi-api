@@ -3,6 +3,8 @@ from django.db import models
 from .Project import Project
 from .Person import Person
 from .TalpaProjectType import TalpaProjectType
+from .TalpaServiceClass import TalpaServiceClass
+from .TalpaAssetClass import TalpaAssetClass
 
 
 class TalpaProjectOpening(models.Model):
@@ -29,7 +31,9 @@ class TalpaProjectOpening(models.Model):
     )
 
     # Contact Information (Yhteydenoton tiedot)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, blank=False, null=False)
+    status = models.CharField(
+        max_length=50, choices=STATUS_CHOICES, blank=False, null=False, default="excel_generated"
+    )
     servicePackage = models.CharField(
         max_length=100, default="Taloushallinnon palvelut", blank=False, null=False
     )  # Financial Administration Services
@@ -57,6 +61,26 @@ class TalpaProjectOpening(models.Model):
     responsiblePersonEmail = models.EmailField(blank=True, null=True)  # "Vastuuhenkilön sähköposti"
     responsiblePersonPhone = models.CharField(max_length=50, blank=True, null=True)  # "Vastuuhenkilön puhelin"
     excelFile = models.FileField(upload_to="talpa_excel/", blank=True, null=True)  # Optional, for storing generated Excel
+
+    # Additional fields from Excel form
+    serviceClass = models.ForeignKey(
+        TalpaServiceClass, on_delete=models.DO_NOTHING, blank=True, null=True
+    )  # "Palveluluokka"
+    assetClass = models.ForeignKey(
+        TalpaAssetClass, on_delete=models.DO_NOTHING, blank=True, null=True
+    )  # "Käyttöomaisuusluokka"
+    unit = models.CharField(
+        max_length=50, blank=True, null=True
+    )  # "Yksikkö" - Required for 2814E projects: "Tontit", "Mao", "Geo"
+    investmentProfile = models.CharField(
+        max_length=50, blank=True, null=True
+    )  # "Invest. profiili", e.g., "Z12550"
+    profileName = models.CharField(
+        max_length=200, blank=True, null=True
+    )  # "Profiilin nimi", e.g., "Kiinteät rakenteet ja laitteet"
+    templateProject = models.CharField(
+        max_length=50, blank=True, null=True
+    )  # "Malliprojekti", e.g., "2814I00000"
 
     # Metadata
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)

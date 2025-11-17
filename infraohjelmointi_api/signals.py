@@ -2,7 +2,7 @@ from datetime import date
 import logging
 from django.db.models.signals import post_save
 from django.db import transaction
-from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation
+from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation, TalpaProjectOpening
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -419,3 +419,47 @@ def invalidate_project_cache(sender, instance, created, **kwargs):
         logger.error(f"Error invalidating cache for Project: {e}")
 
 
+
+
+@receiver(post_save, sender=Project)
+@on_transaction_commit
+def update_talpa_status_on_sap_project(sender, instance, created, update_fields, **kwargs):
+    """
+    Automatically update TalpaProjectOpening status to "project_number_opened"
+    when sapProject is set on a Project.
+
+    Only updates if:
+    1. sapProject actually changed (was None/empty, now has value)
+    2. TalpaProjectOpening exists for this project
+    3. Current status is "sent_to_talpa" (locked)
+    """
+    # Only process if sapProject was updated
+    if update_fields and "sapProject" not in update_fields:
+        return
+
+    # Only process if sapProject is set (not None/empty)
+    if not instance.sapProject:
+        return
+
+    try:
+        talpa_opening = TalpaProjectOpening.objects.get(project=instance)
+    except TalpaProjectOpening.DoesNotExist:
+        # No Talpa opening for this project, nothing to do
+        return
+
+    # Only update if status is "sent_to_talpa" (locked)
+    if talpa_opening.status != "sent_to_talpa":
+        return
+
+    # Check if sapProject actually changed (was None/empty before)
+    # We can't easily check the old value here, so we'll update if status allows it
+    # The status check above ensures we only update locked forms
+
+    # Update status to "project_number_opened"
+    # Use update_fields to avoid triggering validation that might block the update
+    talpa_opening.status = "project_number_opened"
+    talpa_opening.save(update_fields=["status"])
+    logger.info(
+        f"TalpaProjectOpening status updated to 'project_number_opened' for project {instance.id} "
+        f"(sapProject: {instance.sapProject})"
+    )

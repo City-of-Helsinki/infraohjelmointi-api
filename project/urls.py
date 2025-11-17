@@ -159,6 +159,36 @@ router.register(
     basename="auditLogs"
 )
 
+router.register(
+    r"talpa-project-opening",
+    views.TalpaProjectOpeningViewSet,
+    basename="talpaProjectOpening"
+)
+
+router.register(
+    r"talpa-project-types",
+    views.TalpaProjectTypeViewSet,
+    basename="talpaProjectTypes"
+)
+
+router.register(
+    r"talpa-service-classes",
+    views.TalpaServiceClassViewSet,
+    basename="talpaServiceClasses"
+)
+
+router.register(
+    r"talpa-asset-classes",
+    views.TalpaAssetClassViewSet,
+    basename="talpaAssetClasses"
+)
+
+router.register(
+    r"talpa-project-ranges",
+    views.TalpaProjectNumberRangeViewSet,
+    basename="talpaProjectRanges"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
