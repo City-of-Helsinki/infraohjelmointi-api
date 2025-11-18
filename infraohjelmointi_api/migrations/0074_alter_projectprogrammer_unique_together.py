@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0073_add_performance_indexes'),
+        ('infraohjelmointi_api', '0073_fix_completed_projects_programmed'),
     ]
 
     operations = [

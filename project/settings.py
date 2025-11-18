@@ -248,8 +248,44 @@ LOGGING = {
 logger = logging.getLogger(__name__)
 
 REDIS_URL = env('REDIS_URL', default=None)
+REDIS_AVAILABLE = False
 
 if REDIS_URL:
+    # Test Redis connectivity and command response before using it
+    import socket
+    from urllib.parse import urlparse
+    
+    try:
+        parsed = urlparse(REDIS_URL)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 6379
+        
+        # Quick connectivity test with short timeout
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        test_socket.settimeout(0.3)
+        result = test_socket.connect_ex((host, port))
+        
+        if result == 0:
+            # Test if Redis actually responds to commands
+            try:
+                test_socket.settimeout(0.2)
+                test_socket.sendall(b'PING\r\n')
+                response = test_socket.recv(1024)
+                if b'PONG' in response or b'+PONG' in response:
+                    REDIS_AVAILABLE = True
+                else:
+                    logger.warning(f"Redis at {host}:{port} did not respond to PING, falling back to LocMemCache")
+            except Exception:
+                logger.warning(f"Redis at {host}:{port} did not respond to commands, falling back to LocMemCache")
+        else:
+            logger.warning(f"Redis not available at {host}:{port}, falling back to LocMemCache")
+        
+        if 'test_socket' in locals():
+            test_socket.close()
+    except Exception as e:
+        logger.warning(f"Redis connectivity test failed: {e}, falling back to LocMemCache")
+
+if REDIS_URL and REDIS_AVAILABLE:
     # Redis cache configuration (for local testing + Azure Redis)
     CACHES = {
         "default": {
@@ -257,12 +293,14 @@ if REDIS_URL:
             "LOCATION": REDIS_URL,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "IGNORE_EXCEPTIONS": True,  # Critical: App works even if Redis down
-                "SOCKET_CONNECT_TIMEOUT": 5,
-                "SOCKET_TIMEOUT": 5,
+                "IGNORE_EXCEPTIONS": True,
+                "SOCKET_CONNECT_TIMEOUT": 1,
+                "SOCKET_TIMEOUT": 1,
                 "CONNECTION_POOL_KWARGS": {
                     "max_connections": 10,
-                    "retry_on_timeout": True,
+                    "retry_on_timeout": False,
+                    "socket_connect_timeout": 1,
+                    "socket_timeout": 1,
                 },
             },
             "KEY_PREFIX": "infraohjelmointi",
@@ -271,9 +309,6 @@ if REDIS_URL:
     }
     
     # Configure django-eventstream to use Redis for SSE event storage (fixes IO-725)
-    # This is separate from Django's cache configuration
-    from urllib.parse import urlparse
-    
     parsed = urlparse(REDIS_URL)
     EVENTSTREAM_REDIS = {
         'host': parsed.hostname or 'localhost',
@@ -285,18 +320,24 @@ if REDIS_URL:
     if parsed.password:
         EVENTSTREAM_REDIS['password'] = parsed.password
     
-    logger.info("✅ Redis cache configured: %s", REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL)
-    logger.info("✅ EventStream configured to use Redis for SSE events (IO-725 fix)")
+    logger.info("Redis cache configured: %s", REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL)
+    logger.info("EventStream configured to use Redis for SSE events (IO-725 fix)")
 else:
-    # Fallback to LocMemCache (current behavior)
+    # Disable cache entirely when Redis is unavailable
+    # Using dummy cache backend that does nothing (no storage, no shared state issues)
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
-            "OPTIONS": {"MAX_ENTRIES": 300},
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         }
     }
-    logger.info("ℹ️  Using LocMemCache (Redis not configured)")
+    if REDIS_URL:
+        logger.warning("Redis URL configured but not available - cache disabled. "
+                      "Application will work but without caching performance benefits.")
+    else:
+        logger.info("Redis not configured - cache disabled (development/local)")
+    
+    # Cache will be permanently disabled via AppConfig.ready() after Django apps are loaded
+    # This avoids import issues during collectstatic/build time
 
 # GRIP proxy configuration (optional - not needed for your scale)
 GRIP_URL = env('GRIP_URL', default=None)

@@ -177,12 +177,13 @@ class ProjectClassSerializerTestCase(TestCase):
 
     def test_empty_programmer_serialization(self):
         """Test serialization when defaultProgrammer is the 'Ei Valintaa' empty programmer"""
-        # Create empty programmer
-        empty_programmer = ProjectProgrammer.objects.create(
+        # Get or create empty programmer (migration 0069 may have already created it)
+        empty_programmer, created = ProjectProgrammer.objects.get_or_create(
             firstName="Ei",
             lastName="Valintaa",
-            person=None
+            defaults={"person": None}
         )
+        # Use the programmer from get_or_create, don't try to create again
 
         # Create class with empty programmer
         class_with_empty = ProjectClass.objects.create(

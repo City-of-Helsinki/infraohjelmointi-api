@@ -32,6 +32,9 @@ class CacheServiceBasicTest(TestCase):
     def setUp(self):
         cache.clear()
         self.current_year = date.today().year
+        # Check if cache is disabled (DummyCache backend)
+        from django.conf import settings
+        self.cache_disabled = 'dummy' in settings.CACHES['default']['BACKEND'].lower()
     
     def test_cache_key_generation_is_deterministic(self):
         """Cache keys should be consistent for same inputs"""
@@ -67,6 +70,9 @@ class CacheServiceBasicTest(TestCase):
     
     def test_financial_sum_cache_set_and_get(self):
         """Test setting and getting financial sum from cache"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        
         test_data = {
             'year0': {'frameBudget': 100000, 'budgetChange': 0},
             'year1': {'frameBudget': 110000, 'budgetChange': 10000},
@@ -97,6 +103,9 @@ class CacheServiceBasicTest(TestCase):
     
     def test_frame_budgets_cache_set_and_get(self):
         """Test setting and getting frame budgets from cache"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        
         test_data = {
             'budgets': [
                 {'class': 'TestClass', 'budget': 500000}
@@ -132,6 +141,9 @@ class CacheServiceBasicTest(TestCase):
     
     def test_invalidate_financial_sum(self):
         """Test that invalidate_financial_sum clears cached data"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        
         instance_id = str(uuid.uuid4())
         test_data = {'year0': {'frameBudget': 100000}}
         
@@ -173,6 +185,9 @@ class CacheServiceBasicTest(TestCase):
     
     def test_invalidate_frame_budgets(self):
         """Test that invalidate_frame_budgets clears cached data"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        
         test_data = {'budgets': []}
         
         # Set cache for both forFrameView values
@@ -210,6 +225,9 @@ class CacheServiceIntegrationTest(TransactionTestCase):
     def setUp(self):
         cache.clear()
         self.current_year = date.today().year
+        # Check if cache is disabled (DummyCache backend)
+        from django.conf import settings
+        self.cache_disabled = 'dummy' in settings.CACHES['default']['BACKEND'].lower()
         
         # Create test programmer
         self.programmer = ProjectProgrammer.objects.create(
@@ -237,6 +255,9 @@ class CacheServiceIntegrationTest(TransactionTestCase):
     
     def test_financial_sum_serializer_uses_cache(self):
         """Test that FinancialSumSerializer uses the cache"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        
         from infraohjelmointi_api.serializers import ProjectClassSerializer
         
         # First call - cache miss, should calculate
@@ -278,6 +299,8 @@ class CacheServiceIntegrationTest(TransactionTestCase):
     
     def test_cache_invalidation_on_financial_save(self):
         """Test that cache is invalidated when financial data changes"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
         # Create programming class
         prog_class = ProjectClass.objects.create(
             name="Test Programming Class",
@@ -340,6 +363,8 @@ class CacheServiceIntegrationTest(TransactionTestCase):
     
     def test_cache_invalidation_on_class_financial_save(self):
         """Test that cache is invalidated when ClassFinancial changes"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
         # Cache data for the coordinator class
         test_cache_data = {'year0': {'frameBudget': 999999}}
         CacheService.set_financial_sum(
@@ -379,6 +404,128 @@ class CacheServiceIntegrationTest(TransactionTestCase):
             for_coordinator=True
         )
         self.assertIsNone(cached_after, "Cache should be invalidated after ClassFinancial update")
+    
+    def test_cache_invalidation_for_related_planning_class(self):
+        """Test that cache is invalidated for planning class when coordinator class finances change"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        # Create planning class linked to coordinator class
+        planning_class = ProjectClass.objects.create(
+            name="Test Planning Class",
+            path="TestProg",
+            forCoordinatorOnly=False,
+            relatedTo=self.coord_class  # Link to coordinator
+        )
+        
+        # Cache data for the planning class (which shows coordinator's finances)
+        test_cache_data = {'year0': {'frameBudget': 999999}}
+        CacheService.set_financial_sum(
+            instance_id=planning_class.id,
+            instance_type='ProjectClass',
+            year=self.current_year,
+            for_frame_view=False,
+            data=test_cache_data,
+            for_coordinator=False  # Planning class view
+        )
+        
+        # Verify cached
+        cached_before = CacheService.get_financial_sum(
+            instance_id=planning_class.id,
+            instance_type='ProjectClass',
+            year=self.current_year,
+            for_frame_view=False,
+            for_coordinator=False
+        )
+        self.assertEqual(cached_before, test_cache_data)
+        
+        # Update coordinator's ClassFinancial - should invalidate planning class cache too
+        cf = ClassFinancial.objects.get(
+            classRelation=self.coord_class,
+            year=self.current_year,
+            forFrameView=False
+        )
+        cf.frameBudget = 200000
+        cf.save()
+        
+        # Planning class cache should be cleared (because it displays coordinator's finances)
+        cached_after = CacheService.get_financial_sum(
+            instance_id=planning_class.id,
+            instance_type='ProjectClass',
+            year=self.current_year,
+            for_frame_view=False,
+            for_coordinator=False
+        )
+        self.assertIsNone(cached_after, "Planning class cache should be invalidated when coordinator finances change")
+    
+    def test_cache_invalidation_for_related_planning_location(self):
+        """Test that cache is invalidated for planning location when coordinator location finances change"""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        from infraohjelmointi_api.models import ProjectLocation, LocationFinancial
+        
+        # Create coordinator location
+        coord_location = ProjectLocation.objects.create(
+            name="Test Coordinator Location",
+            path="CoordLoc",
+            forCoordinatorOnly=True
+        )
+        
+        # Create planning location linked to coordinator location
+        planning_location = ProjectLocation.objects.create(
+            name="Test Planning Location",
+            path="PlanLoc",
+            forCoordinatorOnly=False,
+            relatedTo=coord_location  # Link to coordinator
+        )
+        
+        # Add financial data to coordinator location
+        LocationFinancial.objects.create(
+            locationRelation=coord_location,
+            year=self.current_year,
+            frameBudget=50000,
+            budgetChange=0,
+            forFrameView=False
+        )
+        
+        # Cache data for the planning location (which shows coordinator's finances)
+        test_cache_data = {'year0': {'frameBudget': 999999}}
+        CacheService.set_financial_sum(
+            instance_id=planning_location.id,
+            instance_type='ProjectLocation',
+            year=self.current_year,
+            for_frame_view=False,
+            data=test_cache_data,
+            for_coordinator=False  # Planning location view
+        )
+        
+        # Verify cached
+        cached_before = CacheService.get_financial_sum(
+            instance_id=planning_location.id,
+            instance_type='ProjectLocation',
+            year=self.current_year,
+            for_frame_view=False,
+            for_coordinator=False
+        )
+        self.assertEqual(cached_before, test_cache_data)
+        
+        # Update coordinator's LocationFinancial - should invalidate planning location cache too
+        lf = LocationFinancial.objects.get(
+            locationRelation=coord_location,
+            year=self.current_year,
+            forFrameView=False
+        )
+        lf.frameBudget = 200000
+        lf.save()
+        
+        # Planning location cache should be cleared
+        cached_after = CacheService.get_financial_sum(
+            instance_id=planning_location.id,
+            instance_type='ProjectLocation',
+            year=self.current_year,
+            for_frame_view=False,
+            for_coordinator=False
+        )
+        self.assertIsNone(cached_after, "Planning location cache should be invalidated when coordinator finances change")
 
 
 class CacheResilienceTest(TestCase):
@@ -451,10 +598,10 @@ class CacheBackendTest(TestCase):
         self.assertIn('default', settings.CACHES)
         backend = settings.CACHES['default']['BACKEND']
         
-        # Should be either Redis or LocMemCache
+        # Should be Redis, LocMemCache, or DummyCache (when Redis unavailable)
         self.assertTrue(
-            'redis' in backend.lower() or 'locmem' in backend.lower(),
-            f"Expected Redis or LocMemCache backend, got: {backend}"
+            'redis' in backend.lower() or 'locmem' in backend.lower() or 'dummy' in backend.lower(),
+            f"Expected Redis, LocMemCache, or DummyCache backend, got: {backend}"
         )
     
     def test_cache_timeout_configured(self):

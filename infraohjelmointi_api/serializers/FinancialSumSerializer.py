@@ -15,16 +15,10 @@ from infraohjelmointi_api.services import (
 from infraohjelmointi_api.services.CacheService import CacheService
 from rest_framework import serializers
 from django.db.models import (
-    IntegerField,
     Sum,
-    F,
-    Value,
     Q,
-    OuterRef,
-    Subquery,
 )
 from django.db.models.manager import BaseManager
-from django.db.models.functions import Coalesce
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -33,12 +27,40 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def _get_coordinator_instance(self, instance, _type: str):
         """Get the coordinator instance if needed."""
         for_coordinator = self.context.get("for_coordinator", False)
-        
+
         if not for_coordinator or not getattr(instance, "forCoordinatorOnly", False):
             if _type == "ProjectClass":
-                return getattr(instance, "coordinatorClass", None)
+                coordinator_id = getattr(instance, "coordinatorClass_id", None)
+                if coordinator_id:
+                    # Get fresh instance from database to ensure all relationships are available
+                    # This is critical for overlap detection - we need a fresh query
+                    coordinator = ProjectClass.objects.get(id=coordinator_id)
+                    # Clear prefetch cache to force fresh query for finances after updates
+                    if hasattr(coordinator, '_prefetched_objects_cache'):
+                        coordinator._prefetched_objects_cache.pop('finances', None)
+                    return coordinator
+                # Fallback to relationship access if ID not available
+                coordinator = getattr(instance, "coordinatorClass", None)
+                if coordinator:
+                    coordinator.refresh_from_db()
+                    if hasattr(coordinator, '_prefetched_objects_cache'):
+                        coordinator._prefetched_objects_cache.pop('finances', None)
+                return coordinator
             elif _type == "ProjectLocation":
-                return getattr(instance, "coordinatorLocation", None)
+                coordinator_id = getattr(instance, "coordinatorLocation_id", None)
+                if coordinator_id:
+                    # Get fresh instance from database
+                    coordinator = ProjectLocation.objects.get(id=coordinator_id)
+                    if hasattr(coordinator, '_prefetched_objects_cache'):
+                        coordinator._prefetched_objects_cache.pop('finances', None)
+                    return coordinator
+                # Fallback to relationship access
+                coordinator = getattr(instance, "coordinatorLocation", None)
+                if coordinator:
+                    coordinator.refresh_from_db()
+                    if hasattr(coordinator, '_prefetched_objects_cache'):
+                        coordinator._prefetched_objects_cache.pop('finances', None)
+                return coordinator
         return instance
 
     def _create_empty_budget_result(self) -> dict:
@@ -52,20 +74,41 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def _populate_financial_data(self, instance, _type: str, year: int, for_frame_view: bool, ret_val: dict):
         """Populate frameBudget and budgetChange data for all years using prefetched data."""
-        # Use prefetched finances data to avoid N+1 queries
-        # The finances are already prefetched in the ViewSet queryset
-        finances_list = list(instance.finances.all()) if hasattr(instance, 'finances') else []
-        
+        # Clear prefetch cache to ensure we get fresh data (important after PATCH operations)
+        if hasattr(instance, '_prefetched_objects_cache') and 'finances' in instance._prefetched_objects_cache:
+            del instance._prefetched_objects_cache['finances']
+
+        # Force a fresh query to get the latest finances (avoids stale prefetched data)
+        # This is critical after PATCH operations that update finances
+        if _type == "ProjectClass":
+            finances_list = list(
+                ClassFinancial.objects.filter(
+                    classRelation=instance,
+                    year__in=range(year, year + 11),
+                    forFrameView=for_frame_view
+                )
+            )
+        elif _type == "ProjectLocation":
+            finances_list = list(
+                LocationFinancial.objects.filter(
+                    locationRelation=instance,
+                    year__in=range(year, year + 11),
+                    forFrameView=for_frame_view
+                )
+            )
+        else:
+            # Fallback to prefetched data for other types
+            finances_list = list(instance.finances.all()) if hasattr(instance, 'finances') else []
+
         # Create a lookup dict for O(1) access
         finances_by_year = {
-            f.year: f for f in finances_list 
-            if f.forFrameView == for_frame_view
+            f.year: f for f in finances_list
         }
-        
+
         for y in range(11):
             target_year = year + y
             finance_instance = finances_by_year.get(target_year)
-            
+
             if finance_instance is not None:
                 ret_val[f"year{y}"]["frameBudget"] = finance_instance.frameBudget
                 ret_val[f"year{y}"]["budgetChange"] = finance_instance.budgetChange
@@ -88,41 +131,70 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
     def _get_child_relations(self, instance):
         """Get all child class and location relations."""
+        # Get direct children only (where parent == instance)
         child_classes = (
             ProjectClass.objects.filter(
-                path__startswith=instance.path,
-                path__gt=instance.path,
+                parent=instance,
                 forCoordinatorOnly=True,
             )
-            .annotate(parentRelation=F("parent"))
-            .values("id", "parentRelation")
+            .values("id")
         )
-        
+
+        # Also get child locations that belong to this class or its child classes
+        child_class_ids = list(child_classes.values_list("id", flat=True))
         child_locations = (
             ProjectLocation.objects.filter(
-                parentClass__in=[
-                    *child_classes.values_list("id", flat=True),
-                    instance.id,
-                ],
+                parentClass__in=[instance.id, *child_class_ids],
                 forCoordinatorOnly=True,
             )
-            .annotate(parentRelation=F("parentClass"))
-            .values("id", "parentRelation")
+            .values("id", "parentClass")
         )
 
-        return child_locations.union(child_classes)
+        # Build result list with proper parentRelation annotation
+        result = []
+        for child_class in child_classes:
+            result.append({
+                'id': child_class['id'],
+                'parentRelation': instance.id
+            })
+        for child_location in child_locations:
+            result.append({
+                'id': child_location['id'],
+                'parentRelation': child_location['parentClass']
+            })
 
-    def _calculate_budget_overlaps(self, instance, year: int, frame_budgets: defaultdict, 
+        return result
+
+    def _calculate_budget_overlaps(self, instance, year: int, frame_budgets: defaultdict,
                                    all_child_relations, ret_val: dict):
         """Calculate budget overlaps for all years."""
-        for y in range(11):    
-            children_budget_sum = sum(
-                frame_budgets[f"{year+y}-{relation['id']}"]
-                for relation in all_child_relations
-                if relation['parentRelation'] == instance.id
-            )
-            
-            current_budget = frame_budgets[f"{year+y}-{instance.id}"]
+        # Convert instance.id to string for consistent key matching
+        instance_id_str = str(instance.id)
+
+        for y in range(11):
+            target_year = year + y
+            children_budget_sum = 0
+
+            # Iterate through child relations and sum budgets of direct children
+            for relation in all_child_relations:
+                parent_relation = relation.get('parentRelation')
+                # Compare UUIDs - convert both to strings for consistent comparison
+                # Handle both UUID objects and None values
+                if parent_relation is not None:
+                    parent_relation_str = str(parent_relation)
+                    if parent_relation_str == instance_id_str:
+                        child_id_str = str(relation['id'])
+                        key = f"{target_year}-{child_id_str}"
+                        child_budget = frame_budgets[key]
+                        children_budget_sum += child_budget
+
+            # Get current budget for this instance
+            current_budget_key = f"{target_year}-{instance_id_str}"
+            current_budget = frame_budgets[current_budget_key]
+
+            # Set overlap flag if children exceed parent budget
+            # Note: We check children_budget_sum > 0 to ensure we have children, and
+            # children_budget_sum > current_budget to detect overlap
             if children_budget_sum > current_budget:
                 ret_val[f"year{y}"]["isFrameBudgetOverlap"] = True
 
@@ -137,15 +209,16 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         if _type not in ["ProjectClass", "ProjectLocation"] or instance is None:
             return ret_val
-        
+
         self._populate_financial_data(instance, _type, year, for_frame_view, ret_val)
-        
+
         # Only ProjectClass instances can have budget overlaps (coordinator locations have no children)
         if _type == "ProjectClass":
             all_child_relations = self._get_child_relations(instance)
-            if all_child_relations.exists():
+            # _get_child_relations now returns a list, so no need to convert
+            if all_child_relations:
                 self._calculate_budget_overlaps(instance, year, frame_budgets, all_child_relations, ret_val)
-        
+
         return ret_val
 
     def get_finance_sums(self, instance):
@@ -157,28 +230,36 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = int(self.context.get("finance_year", date.today().year))
         forced_to_frame = self.context.get("forcedToFrame", False)
         for_coordinator = self.context.get("for_coordinator", False)
-        
-        # Try to get from cache first
-        cached_result = CacheService.get_financial_sum(
-            instance_id=instance.id,
-            instance_type=_type,
-            year=year,
-            for_frame_view=forced_to_frame,
-            for_coordinator=for_coordinator
-        )
-        
+
+        frame_budgets = self.context.get("frame_budgets")
+        if frame_budgets is None:
+            from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+            frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(year, for_frame_view=forced_to_frame)
+
+        use_cache = True
+        if not for_coordinator:
+            if _type == "ProjectClass":
+                if getattr(instance, "coordinatorClass", None):
+                    use_cache = False
+            elif _type == "ProjectLocation":
+                if getattr(instance, "coordinatorLocation", None):
+                    use_cache = False
+
+        cached_result = None
+        if use_cache:
+            cached_result = CacheService.get_financial_sum(
+                instance_id=instance.id,
+                instance_type=_type,
+                year=year,
+                for_frame_view=forced_to_frame,
+                for_coordinator=for_coordinator
+            )
+
         if cached_result is not None:
             return cached_result
 
-        # Try to use prefetched project_set if available (from ViewSet)
-        # This avoids N+1 queries for ProjectClass, ProjectLocation, and ProjectGroup
-        if hasattr(instance, '_prefetched_objects_cache') and 'project_set' in instance._prefetched_objects_cache:
-            # Use prefetched data - much faster!
-            related_projects = instance.project_set.all()
-        else:
-            # Fall back to querying (when not prefetched)
-            related_projects = self.get_related_projects(instance=instance, _type=_type)
-                
+        related_projects = self.get_related_projects(instance=instance, _type=_type)
+
         args = {
             f"year{i}_plannedBudget": Sum(
                 "finances__value",
@@ -200,15 +281,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             )["projectBudgets"]
 
         summed_finances["year"] = year
-      
-        # Use unified method with frame_budgets context
-        frame_budgets = self.context.get("frame_budgets")
-        if frame_budgets is None:
-            # Build frame_budgets if not provided (e.g., in signal handlers or tests)
-            # Use lazy import to avoid circular dependency
-            from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
-            frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(year, for_frame_view=forced_to_frame)
-        
         summed_finances = {
             **summed_finances,
             **self.get_frameBudget_and_budgetChange(
@@ -221,7 +293,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         for i in range(11):
             summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
 
-        # Cache the result
         CacheService.set_financial_sum(
             instance_id=instance.id,
             instance_type=_type,
@@ -248,14 +319,14 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         | Q(projectLocation__parent__coordinatorLocation=instance)
                         | Q(projectLocation__parent__parent__coordinatorLocation=instance)
                     )
-                    
+
                     # Group filter for coordinator: either no group OR group belongs to this location hierarchy
                     coordinator_group_filter = Q(projectGroup__isnull=True) | Q(
                         Q(projectGroup__locationRelation__coordinatorLocation=instance)
                         | Q(projectGroup__locationRelation__parent__coordinatorLocation=instance)
                         | Q(projectGroup__locationRelation__parent__parent__coordinatorLocation=instance)
                     )
-                    
+
                     return (
                         Project.objects.select_related(
                             "projectLocation",
@@ -277,7 +348,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     # Base filter: projects that belong to this location or its children
                     base_filter = Q(
                         Q(projectLocation=instance)
-                        | Q(projectLocation__parent=instance)  
+                        | Q(projectLocation__parent=instance)
                         | Q(projectLocation__parent__parent=instance)
                     )
 
@@ -287,7 +358,7 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                         | Q(projectGroup__locationRelation__parent=instance)
                         | Q(projectGroup__locationRelation__parent__parent=instance)
                     )
-                    
+
                     return (
                         Project.objects.select_related(
                             "projectLocation",
