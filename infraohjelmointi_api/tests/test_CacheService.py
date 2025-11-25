@@ -1,5 +1,6 @@
 """Tests for CacheService."""
 
+import time
 import uuid
 from datetime import date
 from unittest.mock import patch, MagicMock
@@ -682,4 +683,389 @@ class CachedLookupViewSetTest(TestCase):
         response2 = self.client.get('/project-types/')
         self.assertEqual(response2.status_code, 200)
         self.assertEqual(len(response2.json()), cached_count)
+    
+    def test_create_invalidates_cache(self):
+        """Test that creating an item invalidates the cache."""
+        response = self.client.get('/project-types/')
+        self.assertEqual(response.status_code, 200)
+        initial_count = len(response.json())
+        
+        self.assertIsNotNone(CacheService.get_lookup('ProjectType'))
+        
+        response = self.client.post('/project-types/', {'value': 'new_type'}, content_type='application/json')
+        self.assertEqual(response.status_code, 201)
+        
+        self.assertIsNone(CacheService.get_lookup('ProjectType'))
+        
+        response = self.client.get('/project-types/')
+        self.assertEqual(len(response.json()), initial_count + 1)
+    
+    def test_update_invalidates_cache(self):
+        """Test that updating an item invalidates the cache."""
+        obj = ProjectType.objects.create(value='update_test')
+        
+        self.client.get('/project-types/')
+        self.assertIsNotNone(CacheService.get_lookup('ProjectType'))
+        
+        response = self.client.put(f'/project-types/{obj.id}/', {'value': 'updated'}, content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        self.assertIsNone(CacheService.get_lookup('ProjectType'))
+    
+    def test_partial_update_invalidates_cache(self):
+        """Test that partial update invalidates the cache."""
+        obj = ProjectType.objects.create(value='patch_test')
+        
+        self.client.get('/project-types/')
+        self.assertIsNotNone(CacheService.get_lookup('ProjectType'))
+        
+        response = self.client.patch(f'/project-types/{obj.id}/', {'value': 'patched'}, content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        self.assertIsNone(CacheService.get_lookup('ProjectType'))
+    
+    def test_delete_invalidates_cache(self):
+        """Test that deleting an item invalidates the cache."""
+        obj = ProjectType.objects.create(value='delete_test')
+        
+        self.client.get('/project-types/')
+        self.assertIsNotNone(CacheService.get_lookup('ProjectType'))
+        
+        response = self.client.delete(f'/project-types/{obj.id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        self.assertIsNone(CacheService.get_lookup('ProjectType'))
 
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class AllLookupViewSetsTest(TestCase):
+    """Tests to cover all lookup ViewSets."""
+    
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(username='testuser2', password='testpass')
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'}
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+    
+    def test_construction_phase_viewset(self):
+        """Test ConstructionPhaseViewSet is cached."""
+        response = self.client.get('/construction-phases/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ConstructionPhase'))
+    
+    def test_construction_phase_detail_viewset(self):
+        """Test ConstructionPhaseDetailViewSet is cached."""
+        response = self.client.get('/construction-phase-details/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ConstructionPhaseDetail'))
+    
+    def test_planning_phase_viewset(self):
+        """Test PlanningPhaseViewSet is cached."""
+        response = self.client.get('/planning-phases/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('PlanningPhase'))
+    
+    def test_project_area_viewset(self):
+        """Test ProjectAreaViewSet is cached."""
+        response = self.client.get('/project-areas/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ProjectArea'))
+    
+    def test_project_category_viewset(self):
+        """Test ProjectCategoryViewSet is cached."""
+        response = self.client.get('/project-categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ProjectCategory'))
+    
+    def test_project_priority_viewset(self):
+        """Test ProjectPriorityViewSet is cached."""
+        response = self.client.get('/project-priority/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ProjectPriority'))
+    
+    def test_project_quality_level_viewset(self):
+        """Test ProjectQualityLevelViewSet is cached."""
+        response = self.client.get('/project-quality-levels/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ProjectQualityLevel'))
+    
+    def test_project_responsible_zone_viewset(self):
+        """Test ProjectResponsibleZoneViewSet is cached."""
+        response1 = self.client.get('/responsible-zones/')
+        self.assertEqual(response1.status_code, 200)
+        
+        response2 = self.client.get('/responsible-zones/')
+        self.assertEqual(response2.status_code, 200)
+        
+        cached = CacheService.get_lookup('ResponsibleZone')
+        self.assertIsNotNone(cached)
+    
+    def test_project_risk_viewset(self):
+        """Test ProjectRiskViewSet is cached."""
+        response = self.client.get('/project-risks/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('ProjectRisk'))
+    
+    def test_task_status_viewset(self):
+        """Test TaskStatusViewSet is cached."""
+        response = self.client.get('/task-status/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(CacheService.get_lookup('TaskStatus'))
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class RedisAvailabilityCheckerTest(TestCase):
+    """Tests for RedisAvailabilityChecker."""
+    
+    def setUp(self):
+        RedisAvailabilityChecker.reset()
+    
+    def test_is_available_caches_result(self):
+        """Test that availability check is cached."""
+        with patch.object(RedisAvailabilityChecker, '_check_redis_connection', return_value=True):
+            result1 = RedisAvailabilityChecker.is_available()
+            result2 = RedisAvailabilityChecker.is_available()
+            self.assertTrue(result1)
+            self.assertTrue(result2)
+    
+    def test_check_with_timeout_handles_timeout(self):
+        """Test that timeout check works correctly."""
+        result = RedisAvailabilityChecker._check_with_timeout('nonexistent-host-12345', 6379)
+        self.assertFalse(result)
+    
+    def test_check_redis_connection_returns_false_without_redis_url(self):
+        """Test that check returns False when REDIS_URL is not set."""
+        with patch.object(settings, 'REDIS_URL', None):
+            result = RedisAvailabilityChecker._check_redis_connection()
+            self.assertFalse(result)
+    
+    def test_check_redis_connection_returns_false_with_dummy_cache(self):
+        """Test that check returns False with dummy cache backend."""
+        with patch.object(settings, 'REDIS_URL', 'redis://localhost:6379/0'):
+            with patch.object(settings, 'CACHES', {'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}}):
+                result = RedisAvailabilityChecker._check_redis_connection()
+                self.assertFalse(result)
+    
+    def test_reset_clears_cached_state(self):
+        """Test that reset clears cached availability state."""
+        with patch.object(RedisAvailabilityChecker, '_check_redis_connection', return_value=True):
+            RedisAvailabilityChecker.is_available()
+            self.assertIsNotNone(RedisAvailabilityChecker._is_available)
+            
+            RedisAvailabilityChecker.reset()
+            self.assertIsNone(RedisAvailabilityChecker._is_available)
+            self.assertEqual(RedisAvailabilityChecker._last_check, 0)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CacheServiceEdgeCasesTest(TestCase):
+    """Tests for edge cases and error handling in CacheService."""
+    
+    def setUp(self):
+        cache.clear()
+    
+    def test_get_cache_key_name_uses_model_name(self):
+        """Test that get_cache_key_name returns model name from serializer."""
+        from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+        from infraohjelmointi_api.views.ProjectTypeViewSet import ProjectTypeViewSet
+        
+        viewset = ProjectTypeViewSet()
+        viewset.action = 'list'
+        key_name = viewset.get_cache_key_name()
+        self.assertEqual(key_name, 'ProjectType')
+    
+    def test_cached_lookup_viewset_handles_non_200_response(self):
+        """Test that non-200 responses don't cache."""
+        from infraohjelmointi_api.views.ProjectTypeViewSet import ProjectTypeViewSet
+        
+        viewset = ProjectTypeViewSet()
+        viewset.action = 'list'
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.data = []
+        
+        with patch.object(viewset, 'list', return_value=mock_response):
+            result = viewset.list(None)
+            self.assertEqual(result.status_code, 400)
+            self.assertIsNone(CacheService.get_lookup('ProjectType'))
+    
+    def test_invalidate_financial_sum_handles_exceptions(self):
+        """Test that invalidate_financial_sum handles exceptions gracefully."""
+        with patch.object(CacheService, '_safe_cache_delete', side_effect=Exception("Test error")):
+            CacheService.invalidate_financial_sum('123', 'ProjectClass')
+    
+    def test_invalidate_frame_budgets_with_year(self):
+        """Test invalidate_frame_budgets with specific year."""
+        test_data = {'budgets': []}
+        CacheService.set_frame_budgets(2024, True, test_data)
+        CacheService.set_frame_budgets(2025, True, test_data)
+        
+        CacheService.invalidate_frame_budgets(2024)
+        
+        self.assertIsNone(CacheService.get_frame_budgets(2024, True))
+        self.assertIsNotNone(CacheService.get_frame_budgets(2025, True))
+    
+    def test_circuit_breaker_disables_cache_after_failures(self):
+        """Test that circuit breaker disables cache after multiple failures."""
+        with patch.object(cache, 'set', side_effect=Exception("Redis error")):
+            for _ in range(3):
+                CacheService.set_financial_sum('123', 'ProjectClass', 2024, False, {'test': 'data'})
+            
+            result = CacheService.get_financial_sum('123', 'ProjectClass', 2024, False)
+            self.assertIsNone(result)
+    
+    def test_cache_re_enables_after_timeout(self):
+        """Test that cache re-enables after circuit breaker timeout."""
+        CacheService._cache_failures = 3
+        CacheService._cache_disabled_until = time.time() - 10
+        
+        with patch.object(CacheService, '_check_redis_availability', return_value=True):
+            result = CacheService._is_cache_disabled()
+            self.assertFalse(result)
+            self.assertEqual(CacheService._cache_failures, 0)
+
+
+class ViewSetImportTest(TestCase):
+    """Tests that verify ViewSet classes are properly defined."""
+    
+    def test_cached_lookup_viewsets_have_serializer_class(self):
+        """Verify all CachedLookupViewSet subclasses have serializer_class."""
+        from infraohjelmointi_api.views import (
+            ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
+            ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
+            ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            PlanningPhaseViewSet,
+        )
+        
+        viewsets = [
+            ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
+            ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
+            ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            PlanningPhaseViewSet,
+        ]
+        
+        for viewset_class in viewsets:
+            self.assertTrue(
+                hasattr(viewset_class, 'serializer_class'),
+                f"{viewset_class.__name__} missing serializer_class"
+            )
+            self.assertIsNotNone(viewset_class.serializer_class)
+    
+    def test_cached_lookup_viewsets_inherit_correctly(self):
+        """Verify ViewSets inherit from CachedLookupViewSet."""
+        from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+        from infraohjelmointi_api.views import (
+            ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
+        )
+        
+        for viewset_class in [ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet]:
+            self.assertTrue(
+                issubclass(viewset_class, CachedLookupViewSet),
+                f"{viewset_class.__name__} should inherit from CachedLookupViewSet"
+            )
+
+
+class BaseClassLocationViewSetTest(TestCase):
+    """Tests for BaseClassLocationViewSet methods."""
+    
+    def test_parse_forced_to_frame_false_string(self):
+        """Test parsing 'false' string."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        self.assertFalse(BaseClassLocationViewSet.parse_forced_to_frame_param("false"))
+        self.assertFalse(BaseClassLocationViewSet.parse_forced_to_frame_param("False"))
+    
+    def test_parse_forced_to_frame_true_string(self):
+        """Test parsing 'true' string."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        self.assertTrue(BaseClassLocationViewSet.parse_forced_to_frame_param("true"))
+        self.assertTrue(BaseClassLocationViewSet.parse_forced_to_frame_param("True"))
+    
+    def test_parse_forced_to_frame_bool(self):
+        """Test parsing boolean values."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        self.assertTrue(BaseClassLocationViewSet.parse_forced_to_frame_param(True))
+        self.assertFalse(BaseClassLocationViewSet.parse_forced_to_frame_param(False))
+    
+    def test_parse_forced_to_frame_invalid(self):
+        """Test parsing invalid value raises error."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        from rest_framework.exceptions import ParseError
+        
+        with self.assertRaises(ParseError):
+            BaseClassLocationViewSet.parse_forced_to_frame_param("invalid")
+    
+    def test_is_patch_data_valid_missing_finances(self):
+        """Test validation fails without finances key."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        viewset = BaseClassLocationViewSet()
+        self.assertFalse(viewset.is_patch_data_valid({}))
+        self.assertFalse(viewset.is_patch_data_valid({'other': 'data'}))
+    
+    def test_is_patch_data_valid_missing_year(self):
+        """Test validation fails without year in finances."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        viewset = BaseClassLocationViewSet()
+        self.assertFalse(viewset.is_patch_data_valid({'finances': {'frameBudget': 100}}))
+    
+    def test_is_patch_data_valid_invalid_values(self):
+        """Test validation fails with invalid finance values."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        viewset = BaseClassLocationViewSet()
+        self.assertFalse(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': 'not a dict'}
+        }))
+        self.assertFalse(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': {}}
+        }))
+        self.assertFalse(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': {'invalid': 100}}
+        }))
+    
+    def test_is_patch_data_valid_success(self):
+        """Test validation succeeds with valid data."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        viewset = BaseClassLocationViewSet()
+        self.assertTrue(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': {'frameBudget': 100000}}
+        }))
+        self.assertTrue(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': {'budgetChange': 5000}}
+        }))
+        self.assertTrue(viewset.is_patch_data_valid({
+            'finances': {'year': 2024, 'year0': {'frameBudget': 100000, 'budgetChange': 5000}}
+        }))
+    
+    def test_build_frame_budgets_context_returns_defaultdict(self):
+        """Test that build_frame_budgets_context returns a defaultdict."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        from collections import defaultdict
+        
+        result = BaseClassLocationViewSet.build_frame_budgets_context(2024, False)
+        self.assertEqual(result['nonexistent-key'], 0)
+    
+    def test_coordinator_docstring_generators(self):
+        """Test docstring generator methods."""
+        from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+        
+        list_doc = BaseClassLocationViewSet._get_coordinator_list_docstring('class', '/project-classes')
+        self.assertIn('coordinator', list_doc.lower())
+        self.assertIn('year', list_doc.lower())
+        
+        patch_doc = BaseClassLocationViewSet._get_coordinator_patch_docstring('class', '/project-classes', 'class_id')
+        self.assertIn('coordinator', patch_doc.lower())
+        self.assertIn('class_id', patch_doc)
