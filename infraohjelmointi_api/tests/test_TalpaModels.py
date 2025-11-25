@@ -1,4 +1,7 @@
+from datetime import date
+
 from django.test import TestCase
+
 from infraohjelmointi_api.models import (
     Project,
     TalpaProjectOpening,
@@ -310,4 +313,69 @@ class TalpaModelsTestCase(TestCase):
         str_repr = str(talpa_opening)
         self.assertIn("Test Project", str_repr)
         self.assertIn("excel_generated", str_repr)
+
+    def test_talpa_project_opening_new_address_fields(self):
+        """Test new address fields (streetAddress, postalCode)"""
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            streetAddress="Testikatu 1",
+            postalCode="00100"
+        )
+
+        self.assertEqual(talpa_opening.streetAddress, "Testikatu 1")
+        self.assertEqual(talpa_opening.postalCode, "00100")
+
+    def test_talpa_project_opening_new_schedule_fields(self):
+        """Test new schedule fields (projectStartDate, projectEndDate)"""
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectStartDate=date(2025, 1, 1),
+            projectEndDate=date(2030, 12, 31)
+        )
+
+        self.assertEqual(talpa_opening.projectStartDate, date(2025, 1, 1))
+        self.assertEqual(talpa_opening.projectEndDate, date(2030, 12, 31))
+
+    def test_talpa_project_opening_readiness_field(self):
+        """Test readiness field with valid choices"""
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            readiness="Kesken"
+        )
+
+        self.assertEqual(talpa_opening.readiness, "Kesken")
+
+    def test_talpa_project_opening_unit_choices(self):
+        """Test unit field with valid choices for 2814E projects"""
+        for unit_value in ["Tontit", "Mao", "Geo"]:
+            talpa_opening = TalpaProjectOpening.objects.create(
+                project=Project.objects.create(
+                    name=f"Test Project {unit_value}",
+                    description="Test",
+                    type=self.project_type,
+                    phase=self.project_phase,
+                    category=self.project_category,
+                    projectClass=self.project_class,
+                ),
+                priority="Normaali",
+                subject="Uusi",
+                unit=unit_value
+            )
+            self.assertEqual(talpa_opening.unit, unit_value)
+
+    def test_talpa_project_opening_project_name_max_length(self):
+        """Test projectName max length is 24 characters"""
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectName="123456789012345678901234"
+        )
+        self.assertEqual(len(talpa_opening.projectName), 24)
 

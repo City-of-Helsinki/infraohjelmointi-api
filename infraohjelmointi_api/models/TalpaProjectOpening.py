@@ -8,6 +8,20 @@ from .TalpaAssetClass import TalpaAssetClass
 
 
 class TalpaProjectOpening(models.Model):
+    """
+    Model for Talpa project opening data.
+    
+    This stores all fields needed for the Talpa Excel export form
+    ("Projektin avauslomake Infra").
+    
+    Field Reference (from Excel form):
+    - Section 1: Budget item selection (2814I/2814E) - derived from projectType
+    - Section 2: Project identifiers (budgetAccount, projectNumber, templateProject, etc.)
+    - Section 3: Schedule (projectStartDate, projectEndDate)
+    - Section 4: Address & contacts (streetAddress, postalCode, responsiblePerson)
+    - Section 5: Classes (serviceClass, assetClass, profileName, investmentProfile, readiness)
+    """
+    
     STATUS_CHOICES = [
         ("excel_generated", "Avauspyyntö-Excel muodostettu"),
         ("sent_to_talpa", "Avauspyyntö lähetetty Talpaan"),
@@ -25,64 +39,111 @@ class TalpaProjectOpening(models.Model):
         ("Lukitus", "Lukitus - Lock"),
     ]
 
+    UNIT_CHOICES = [
+        ("Tontit", "Tontit - Plots"),
+        ("Mao", "Mao - Land Use"),
+        ("Geo", "Geo - Geotechnical"),
+    ]
+
+    READINESS_CHOICES = [
+        ("Kesken", "Kesken - In Progress"),
+        ("Valmis", "Valmis - Ready"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.OneToOneField(
         Project, on_delete=models.CASCADE, related_name="talpaProjectOpening"
     )
 
-    # Contact Information (Yhteydenoton tiedot)
+    # =========================================================================
+    # Contact Information for Talpa Portal (Yhteydenoton tiedot)
+    # These are used when submitting to the Talpa service portal
+    # =========================================================================
     status = models.CharField(
         max_length=50, choices=STATUS_CHOICES, blank=False, null=False, default="excel_generated"
     )
     servicePackage = models.CharField(
         max_length=100, default="Taloushallinnon palvelut", blank=False, null=False
-    )  # Financial Administration Services
+    )  # Financial Administration Services - Talpa portal default
     service = models.CharField(
         max_length=100, default="SAP-projektinumeron avauspyyntö", blank=False, null=False
-    )  # SAP project number opening request
+    )  # SAP project number opening request - Talpa portal default
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, blank=False, null=False)
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, blank=False, null=False)
     organization = models.CharField(max_length=50, default="2800 Kymp", blank=False, null=False)
-    additionalInformation = models.TextField(blank=True, null=True)  # Free-form text area for contact details
+    additionalInformation = models.TextField(blank=True, null=True)  # "Lisätietoja" - Talpa portal notes
 
-    # Project Basic Information (Projektin perustiedot)
-    projectName = models.CharField(max_length=200, blank=True, null=True)  # "Projektin nimi"
+    # =========================================================================
+    # Project Basic Information (Projektin perustiedot) - Excel Form Fields
+    # These map directly to columns in "Projektin avauslomake Infra" Excel
+    # =========================================================================
+    projectName = models.CharField(max_length=24, blank=True, null=True)  # "SAP nimi" - max 24 chars including spaces
     projectType = models.ForeignKey(
         TalpaProjectType, on_delete=models.DO_NOTHING, blank=True, null=True
-    )  # "Projektin tyyppi"
+    )  # "Laji" - Project type selection
     budgetAccount = models.CharField(
         max_length=50, blank=True, null=True
-    )  # "TA-kohta", can be alphanumeric like "8030101A"
-    majorDistrict = models.CharField(max_length=50, blank=True, null=True)  # "Suurpiiri", e.g., "01 Eteläinen"
-    area = models.CharField(max_length=100, blank=True, null=True)  # "Alue", e.g., "011 Keskusta"
+    )  # "Talousarviokohdan numero" - e.g., "8030101A"
+    majorDistrict = models.CharField(max_length=50, blank=True, null=True)  # "Suurpiiri" - used for validation
+    area = models.CharField(max_length=100, blank=True, null=True)  # "Alue" - used for validation
     projectNumber = models.CharField(max_length=20, blank=True, null=True)  # "Projektinumero" - validated against ranges
-    projectDescription = models.TextField(blank=True, null=True)  # "Projektin kuvaus"
-    responsiblePerson = models.CharField(max_length=200, blank=True, null=True)  # "Vastuuhenkilö"
-    responsiblePersonEmail = models.EmailField(blank=True, null=True)  # "Vastuuhenkilön sähköposti"
-    responsiblePersonPhone = models.CharField(max_length=50, blank=True, null=True)  # "Vastuuhenkilön puhelin"
-    excelFile = models.FileField(upload_to="talpa_excel/", blank=True, null=True)  # Optional, for storing generated Excel
 
-    # Additional fields from Excel form
+    # Address fields - Excel column "Osoite+postinumero=Työmaa-avain"
+    streetAddress = models.CharField(
+        max_length=200, blank=True, null=True
+    )  # "Osoite" - Street address
+    postalCode = models.CharField(
+        max_length=10, blank=True, null=True
+    )  # "Postinumero" - Postal code
+
+    # Schedule fields - Excel column "Projekti alkaa - päättyy, huom.takuuaika"
+    projectStartDate = models.DateField(
+        blank=True, null=True
+    )  # "Projekti alkaa" - Project start date
+    projectEndDate = models.DateField(
+        blank=True, null=True
+    )  # "Projekti päättyy" - Project end date (note: include warranty period +6 years)
+
+    responsiblePerson = models.CharField(max_length=200, blank=True, null=True)  # "Vastuuhenkilö"
+    responsiblePersonEmail = models.EmailField(blank=True, null=True)  # Email for internal use (not sent to Talpa Excel)
+    excelFile = models.FileField(upload_to="talpa_excel/", blank=True, null=True)  # Generated Excel file
+
+    # =========================================================================
+    # DEPRECATED FIELDS - Kept for backward compatibility
+    # These fields are NOT in the Talpa Excel form but may be sent by older UI versions.
+    # They are accepted but not used in Excel export.
+    # =========================================================================
+    projectDescription = models.TextField(blank=True, null=True)  # DEPRECATED: Not in Excel form
+    responsiblePersonPhone = models.CharField(max_length=50, blank=True, null=True)  # DEPRECATED: Not in Excel form
+
+    # =========================================================================
+    # Classification Fields (Hankkeen luokat) - Excel Form Fields
+    # =========================================================================
     serviceClass = models.ForeignKey(
         TalpaServiceClass, on_delete=models.DO_NOTHING, blank=True, null=True
-    )  # "Palveluluokka"
+    )  # "Palveluluokka" - e.g., 4601, 4701, 3551, 5361
     assetClass = models.ForeignKey(
         TalpaAssetClass, on_delete=models.DO_NOTHING, blank=True, null=True
-    )  # "Käyttöomaisuusluokka"
+    )  # "Käyttöomaisuusluokat" - Asset class with holding period
     unit = models.CharField(
-        max_length=50, blank=True, null=True
-    )  # "Yksikkö" - Required for 2814E projects: "Tontit", "Mao", "Geo"
+        max_length=50, choices=UNIT_CHOICES, blank=True, null=True
+    )  # "Yksikkö" - REQUIRED for 2814E projects: Tontit, Mao, Geo
     investmentProfile = models.CharField(
         max_length=50, blank=True, null=True
-    )  # "Invest. profiili", e.g., "Z12550"
+    )  # "Invest. profiili" - e.g., "Z12550" (2814I) or "Z12525" (2814E)
     profileName = models.CharField(
         max_length=200, blank=True, null=True
-    )  # "Profiilin nimi", e.g., "Kiinteät rakenteet ja laitteet"
+    )  # "Profiilin nimi" - e.g., "Kiinteät rakenteet ja laitteet"
     templateProject = models.CharField(
         max_length=50, blank=True, null=True
-    )  # "Malliprojekti", e.g., "2814I00000"
+    )  # "Malliprojekti" - e.g., "2814I00000" or "2814E00013"
+    readiness = models.CharField(
+        max_length=50, choices=READINESS_CHOICES, blank=True, null=True
+    )  # "Valmius" - e.g., "Kesken"
 
+    # =========================================================================
     # Metadata
+    # =========================================================================
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
     createdBy = models.ForeignKey(

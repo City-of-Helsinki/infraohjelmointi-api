@@ -1,7 +1,11 @@
+from datetime import date
+from unittest.mock import patch
+import uuid
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from unittest.mock import patch
+
 from infraohjelmointi_api.models import (
     Project,
     TalpaProjectOpening,
@@ -15,7 +19,6 @@ from infraohjelmointi_api.models import (
     ProjectClass,
 )
 from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
-import uuid
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -316,4 +319,110 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         self.assertEqual(response.data["serviceClass"]["code"], "4601")
         self.assertIsNotNone(response.data["assetClass"])
         self.assertEqual(response.data["assetClass"]["componentClass"], "8103000")
+
+    def test_create_with_new_address_fields(self):
+        """Test creating TalpaProjectOpening with new address fields"""
+        url = "/talpa-project-opening/"
+        data = {
+            "project": str(self.project.id),
+            "priority": "Normaali",
+            "subject": "Uusi",
+            "streetAddress": "Testikatu 1",
+            "postalCode": "00100",
+        }
+        
+        response = self.client.post(url, data, format="json")
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
+        self.assertEqual(talpa_opening.streetAddress, "Testikatu 1")
+        self.assertEqual(talpa_opening.postalCode, "00100")
+
+    def test_create_with_schedule_field_aliases(self):
+        """Test creating with UI field aliases (projectStart/projectEnd)"""
+        url = "/talpa-project-opening/"
+        data = {
+            "project": str(self.project.id),
+            "priority": "Normaali",
+            "subject": "Uusi",
+            "projectStart": "2025-01-01",
+            "projectEnd": "2030-12-31",
+        }
+        
+        response = self.client.post(url, data, format="json")
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
+        self.assertEqual(str(talpa_opening.projectStartDate), "2025-01-01")
+        self.assertEqual(str(talpa_opening.projectEndDate), "2030-12-31")
+
+    def test_response_includes_schedule_aliases(self):
+        """Test that response includes both model field names and aliases"""
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectStartDate=date(2025, 1, 1),
+            projectEndDate=date(2030, 12, 31),
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/"
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("projectStartDate", response.data)
+        self.assertIn("projectEndDate", response.data)
+        self.assertIn("projectStart", response.data)
+        self.assertIn("projectEnd", response.data)
+        self.assertEqual(response.data["projectStart"], response.data["projectStartDate"])
+
+    def test_create_with_readiness_field(self):
+        """Test creating with readiness field"""
+        url = "/talpa-project-opening/"
+        data = {
+            "project": str(self.project.id),
+            "priority": "Normaali",
+            "subject": "Uusi",
+            "readiness": "Kesken",
+        }
+        
+        response = self.client.post(url, data, format="json")
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
+        self.assertEqual(talpa_opening.readiness, "Kesken")
+
+    def test_holding_time_computed_field(self):
+        """Test that holdingTime is computed from assetClass"""
+        self.talpa_asset_class.holdingPeriodYears = 20
+        self.talpa_asset_class.save()
+        
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            assetClass=self.talpa_asset_class
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/"
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["holdingTime"], 20)
+
+    def test_asset_classes_id_alias(self):
+        """Test that assetClassesId alias works (UI uses plural)"""
+        url = "/talpa-project-opening/"
+        data = {
+            "project": str(self.project.id),
+            "priority": "Normaali",
+            "subject": "Uusi",
+            "assetClassesId": str(self.talpa_asset_class.id),
+        }
+        
+        response = self.client.post(url, data, format="json")
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
+        self.assertEqual(talpa_opening.assetClass, self.talpa_asset_class)
 
