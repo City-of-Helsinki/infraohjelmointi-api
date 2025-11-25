@@ -1,10 +1,9 @@
 from infraohjelmointi_api.serializers.ProjectDistrictSerializer import ProjectDistrictSerializer
-from .BaseViewSet import BaseViewSet
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ProjectDistrictViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project Districts to be viewed or edited
-    """
+class ProjectDistrictViewSet(CachedLookupViewSet):
+    """API endpoint for project districts (cached)."""
 
     serializer_class = ProjectDistrictSerializer

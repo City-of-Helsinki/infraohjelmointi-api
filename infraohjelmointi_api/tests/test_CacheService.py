@@ -5,9 +5,12 @@ from datetime import date
 from unittest.mock import patch, MagicMock
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
+
+from helusers.models import ADGroup
 
 from infraohjelmointi_api.models import (
     ProjectClass,
@@ -17,19 +20,23 @@ from infraohjelmointi_api.models import (
     ProjectLocation,
     LocationFinancial,
     ProjectGroup,
+    ProjectPhase,
     ProjectProgrammer,
+    ProjectType,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
 from infraohjelmointi_api.services.CacheService import CacheService
 from infraohjelmointi_api.services.RedisAvailabilityChecker import RedisAvailabilityChecker
 
-
-@override_settings(CACHES={
+LOCMEM_CACHE = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     }
-})
+}
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
 class CacheServiceBasicTest(TestCase):
     """Basic unit tests for CacheService methods."""
     
@@ -221,11 +228,7 @@ class CacheServiceBasicTest(TestCase):
         self.assertIsNone(cached_false)
 
 
-@override_settings(CACHES={
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-    }
-})
+@override_settings(CACHES=LOCMEM_CACHE)
 class CacheServiceIntegrationTest(TransactionTestCase):
     """Integration tests for CacheService with Django models"""
     
@@ -588,10 +591,95 @@ class CacheBackendTest(TestCase):
         )
     
     def test_cache_timeout_configured(self):
-        """Verify cache timeout is reasonable"""
+        """Verify cache timeout is reasonable."""
         timeout = CacheService.DEFAULT_TIMEOUT
         
-        # Should be at least 60 seconds (1 minute) but not more than 1 day
         self.assertGreaterEqual(timeout, 60, "Cache timeout too short")
         self.assertLessEqual(timeout, 86400, "Cache timeout too long")
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class LookupCacheTest(TestCase):
+    """Tests for lookup table caching."""
+    
+    def setUp(self):
+        cache.clear()
+    
+    def test_lookup_cache_set_and_get(self):
+        """Test setting and getting lookup cache."""
+        test_data = [{'id': 1, 'name': 'Test'}]
+        CacheService.set_lookup('TestModel', test_data)
+        
+        result = CacheService.get_lookup('TestModel')
+        self.assertEqual(result, test_data)
+    
+    def test_lookup_cache_invalidate(self):
+        """Test invalidating lookup cache."""
+        test_data = [{'id': 1, 'name': 'Test'}]
+        CacheService.set_lookup('TestModel', test_data)
+        
+        CacheService.invalidate_lookup('TestModel')
+        
+        result = CacheService.get_lookup('TestModel')
+        self.assertIsNone(result)
+    
+    def test_lookup_cache_miss_returns_none(self):
+        """Test that cache miss returns None."""
+        result = CacheService.get_lookup('NonExistentModel')
+        self.assertIsNone(result)
+    
+    def test_lookup_timeout_is_one_hour(self):
+        """Verify lookup cache timeout is 1 hour."""
+        self.assertEqual(CacheService.LOOKUP_TIMEOUT, 3600)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupViewSetTest(TestCase):
+    """Tests for CachedLookupViewSet functionality."""
+    
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        coord_group = ADGroup.objects.create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            display_name='Coordinators'
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+    
+    def test_project_types_list_is_cached(self):
+        """Test that project types list response is cached."""
+        ProjectType.objects.create(value='test_type')
+        
+        response = self.client.get('/project-types/')
+        self.assertEqual(response.status_code, 200)
+        
+        cached = CacheService.get_lookup('ProjectType')
+        self.assertIsNotNone(cached)
+    
+    def test_project_phases_list_is_cached(self):
+        """Test that project phases list response is cached."""
+        ProjectPhase.objects.create(value='test_phase')
+        
+        response = self.client.get('/project-phases/')
+        self.assertEqual(response.status_code, 200)
+        
+        cached = CacheService.get_lookup('ProjectPhase')
+        self.assertIsNotNone(cached)
+    
+    def test_cached_response_served_on_second_request(self):
+        """Test that second request is served from cache."""
+        initial_count = ProjectType.objects.count()
+        ProjectType.objects.create(value='cached_type_unique')
+        
+        response1 = self.client.get('/project-types/')
+        self.assertEqual(response1.status_code, 200)
+        cached_count = len(response1.json())
+        
+        ProjectType.objects.create(value='another_type_unique')
+        
+        response2 = self.client.get('/project-types/')
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(len(response2.json()), cached_count)
 

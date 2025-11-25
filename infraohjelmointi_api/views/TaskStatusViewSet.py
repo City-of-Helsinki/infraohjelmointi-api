@@ -1,10 +1,9 @@
-from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers.TaskStatusSerializer import TaskStatusSerializer
 
+from .CachedLookupViewSet import CachedLookupViewSet
 
-class TaskStatusViewSet(BaseViewSet):
-    """
-    API endpoint that allows project types to be viewed or edited.
-    """
+
+class TaskStatusViewSet(CachedLookupViewSet):
+    """API endpoint for task statuses (cached)."""
 
     serializer_class = TaskStatusSerializer

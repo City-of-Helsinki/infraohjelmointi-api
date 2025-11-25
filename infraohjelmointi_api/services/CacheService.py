@@ -1,5 +1,5 @@
 """
-CacheService for caching expensive financial calculations.
+CacheService for caching expensive calculations.
 Uses Django's cache framework with Redis in production.
 """
 
@@ -9,7 +9,7 @@ import logging
 import sys
 import time
 from datetime import date
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from django.conf import settings
 from django.core.cache import cache
@@ -23,8 +23,10 @@ class CacheService:
     """Service for caching expensive calculations with circuit breaker pattern."""
     
     DEFAULT_TIMEOUT = getattr(settings, 'FINANCIAL_CACHE_TIMEOUT', 300)
+    LOOKUP_TIMEOUT = 3600  # 1 hour for lookup tables
     FINANCIAL_SUM_PREFIX = 'financial_sum'
     FRAME_BUDGET_PREFIX = 'frame_budget'
+    LOOKUP_PREFIX = 'lookup'
     
     _cache_failures = 0
     _cache_disabled_until = 0
@@ -40,7 +42,7 @@ class CacheService:
     def _generate_cache_key(prefix: str, *args, **kwargs) -> str:
         key_data = {'args': args, 'kwargs': sorted(kwargs.items())}
         key_string = json.dumps(key_data, sort_keys=True, default=str)
-        key_hash = hashlib.md5(key_string.encode()).hexdigest()
+        key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:32]
         return f"{prefix}:{key_hash}"
     
     @staticmethod
@@ -273,3 +275,19 @@ class CacheService:
             cache.clear()
         except Exception as e:
             logger.warning(f"Cache clear failed: {e}")
+    
+    # Lookup table caching
+    @classmethod
+    def get_lookup(cls, table_name: str) -> Optional[List[dict]]:
+        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
+        return cls._safe_cache_get(cache_key)
+    
+    @classmethod
+    def set_lookup(cls, table_name: str, data: List[dict]) -> None:
+        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
+        cls._safe_cache_set(cache_key, data, cls.LOOKUP_TIMEOUT)
+    
+    @classmethod
+    def invalidate_lookup(cls, table_name: str) -> None:
+        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
+        cls._safe_cache_delete(cache_key)

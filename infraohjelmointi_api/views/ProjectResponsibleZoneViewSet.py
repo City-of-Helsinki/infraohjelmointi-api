@@ -1,13 +1,9 @@
-from .BaseViewSet import BaseViewSet
+from infraohjelmointi_api.serializers.ProjectResponsibleZoneSerializer import ProjectResponsibleZoneSerializer
 
-from infraohjelmointi_api.serializers.ProjectResponsibleZoneSerializer import (
-    ProjectResponsibleZoneSerializer,
-)
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ProjectResponsibleZoneViewSet(BaseViewSet):
-    """
-    API endpoint that allows Planning responsible zones to be viewed or edited.
-    """
+class ProjectResponsibleZoneViewSet(CachedLookupViewSet):
+    """API endpoint for responsible zones (cached)."""
 
     serializer_class = ProjectResponsibleZoneSerializer

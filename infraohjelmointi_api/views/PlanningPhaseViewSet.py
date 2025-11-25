@@ -1,12 +1,9 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.PlanningPhaseSerializer import (
-    PlanningPhaseSerializer,
-)
+from infraohjelmointi_api.serializers.PlanningPhaseSerializer import PlanningPhaseSerializer
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class PlanningPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows Planning phases to be viewed or edited.
-    """
+class PlanningPhaseViewSet(CachedLookupViewSet):
+    """API endpoint for planning phases (cached)."""
 
     serializer_class = PlanningPhaseSerializer
