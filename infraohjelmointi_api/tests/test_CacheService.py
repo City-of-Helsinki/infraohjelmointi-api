@@ -26,6 +26,11 @@ from infraohjelmointi_api.services.CacheService import CacheService
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
 
 
+@override_settings(CACHES={
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+})
 class CacheServiceBasicTest(TestCase):
     """Basic unit tests for CacheService methods"""
     
@@ -219,6 +224,11 @@ class CacheServiceBasicTest(TestCase):
         self.assertIsNone(cached_false)
 
 
+@override_settings(CACHES={
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+})
 class CacheServiceIntegrationTest(TransactionTestCase):
     """Integration tests for CacheService with Django models"""
     

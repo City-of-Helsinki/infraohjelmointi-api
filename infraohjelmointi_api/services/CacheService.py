@@ -21,20 +21,10 @@ import hashlib
 import json
 import logging
 import time
-import signal
 from typing import Optional, Any
+from .RedisAvailabilityChecker import RedisAvailabilityChecker
 
 logger = logging.getLogger(__name__)
-
-
-class TimeoutError(Exception):
-    """Timeout exception for cache operations"""
-    pass
-
-
-def _timeout_handler(signum, frame):
-    """Signal handler for timeout"""
-    raise TimeoutError("Cache operation timed out")
 
 
 class CacheService:
@@ -50,7 +40,7 @@ class CacheService:
     # Circuit breaker: disable cache after consecutive failures
     _cache_failures = 0
     _cache_disabled_until = 0
-    _max_failures = 1  # Disable immediately on first failure
+    _max_failures = 3  # Allow 3 failures before disabling (was 1 - too aggressive)
     _disable_duration = 300  # Disable for 5 minutes after failures
     _cache_permanently_disabled = False  # Set to True if Redis is unavailable at startup
     _last_redis_check = 0  # Timestamp of last Redis availability check
@@ -84,18 +74,27 @@ class CacheService:
     @classmethod
     def _is_cache_disabled(cls) -> bool:
         """Check if cache should be disabled due to circuit breaker"""
-        # Try to re-enable cache if Redis is back online
+        cache_backend = settings.CACHES['default']['BACKEND']
+        if 'dummy' in cache_backend.lower():
+            return True
+
         if cls._cache_permanently_disabled:
             cls._try_re_enable_cache()
             if cls._cache_permanently_disabled:
+                logger.debug("Cache disabled: permanently disabled")
                 return True
-        
-        if time.time() < cls._cache_disabled_until:
-            return True
+
         if cls._cache_disabled_until > 0:
-            cls._cache_failures = 0
-            cls._cache_disabled_until = 0
-            logger.info("Cache circuit breaker reset, re-enabling cache")
+            current_time = time.time()
+            if current_time < cls._cache_disabled_until:
+                remaining = int(cls._cache_disabled_until - current_time)
+                logger.debug(f"Cache disabled: disabled until {cls._cache_disabled_until} ({remaining}s remaining)")
+                cls._try_re_enable_cache()
+                return True
+            else:
+                cls._cache_failures = 0
+                cls._cache_disabled_until = 0
+                logger.debug("Cache circuit breaker timeout expired, re-enabling cache")
         return False
     
     @classmethod
@@ -108,97 +107,33 @@ class CacheService:
     @classmethod
     def _check_redis_availability(cls) -> bool:
         """
-        Check if Redis is available by testing connection directly.
+        Check if Redis is available using RedisAvailabilityChecker.
         Returns True if Redis is available, False otherwise.
-        
-        Note: If Redis was unavailable at startup, we're using DummyCache backend
-        and cannot switch to Redis without app restart. This check is mainly useful
-        for detecting when Redis comes back after runtime failures.
         """
-        try:
-            from django.conf import settings
-            REDIS_URL = getattr(settings, 'REDIS_URL', None)
-            if not REDIS_URL:
-                return False
-            
-            # Check if we're using Redis backend (not DummyCache)
-            cache_backend = settings.CACHES['default']['BACKEND']
-            if 'dummy' in cache_backend.lower():
-                # We're using DummyCache - Redis was unavailable at startup
-                # We can detect if Redis is back, but can't use it without restart
-                # So we'll still return False to keep cache disabled
-                # (User needs to restart app to actually use Redis)
-                return False
-            
-            # We're using Redis backend - test if it's actually available
-            # Test Redis connection directly
-            import socket
-            from urllib.parse import urlparse
-            
-            parsed = urlparse(REDIS_URL)
-            host = parsed.hostname or 'localhost'
-            port = parsed.port or 6379
-            
-            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            test_socket.settimeout(0.3)
-            result = test_socket.connect_ex((host, port))
-            
-            if result == 0:
-                # Test if Redis actually responds to commands
-                try:
-                    test_socket.settimeout(0.2)
-                    test_socket.sendall(b'PING\r\n')
-                    response = test_socket.recv(1024)
-                    test_socket.close()
-                    if b'PONG' in response or b'+PONG' in response:
-                        return True
-                except Exception:
-                    test_socket.close()
-                    return False
-            else:
-                test_socket.close()
-                return False
-            
-            return False
-        except Exception:
-            return False
+        return RedisAvailabilityChecker.is_available()
     
     @classmethod
     def _try_re_enable_cache(cls):
         """
         Periodically check if Redis is back online and re-enable cache if available.
-        
-        This allows cache to recover without app restart in these scenarios:
-        - Redis was available at startup but failed at runtime (circuit breaker)
-        - Redis comes back after temporary outage
-        
-        Note: If Redis was unavailable at startup, we're using DummyCache backend
-        and cannot switch to Redis without app restart. Cache will remain disabled.
+        This allows cache to recover without app restart.
         """
         current_time = time.time()
         if current_time - cls._last_redis_check < cls._redis_check_interval:
-            return False  # Don't check too frequently
-        
+            return
+
         cls._last_redis_check = current_time
-        
-        if cls._cache_permanently_disabled:
-            if cls._check_redis_availability():
-                # Check if we're actually using Redis backend (not DummyCache)
-                from django.conf import settings
-                cache_backend = settings.CACHES['default']['BACKEND']
-                if 'dummy' in cache_backend.lower():
-                    # Redis is back but we're using DummyCache - need app restart
-                    logger.warning("Redis is back online but app is using DummyCache backend. "
-                                  "Restart app to enable Redis cache.")
-                    return False
-                
-                # Redis is back and we're using Redis backend - re-enable cache
+
+        if cls._check_redis_availability():
+            cache_backend = settings.CACHES['default']['BACKEND']
+            if 'dummy' in cache_backend.lower():
+                return
+
+            if cls._cache_permanently_disabled or cls._cache_disabled_until > 0:
                 cls._cache_permanently_disabled = False
                 cls._cache_failures = 0
                 cls._cache_disabled_until = 0
-                logger.info("Redis is back online - cache re-enabled")
-                return True
-        return False
+                logger.debug("Redis is back online - cache re-enabled")
     
     @classmethod
     def _record_cache_failure(cls):
@@ -206,7 +141,7 @@ class CacheService:
         cls._cache_failures += 1
         if cls._cache_failures >= cls._max_failures:
             cls._cache_disabled_until = time.time() + cls._disable_duration
-            logger.warning(f"Cache disabled for {cls._disable_duration}s after {cls._cache_failures} failures")
+            logger.warning(f"Cache disabled: circuit breaker triggered after {cls._cache_failures} consecutive failures (disabled for {cls._disable_duration}s)")
     
     @classmethod
     def _record_cache_success(cls):
@@ -218,79 +153,76 @@ class CacheService:
     def _safe_cache_get(cls, cache_key: str, timeout: float = 0.5) -> Optional[Any]:
         """
         Safely get from cache with timeout to prevent blocking
-        
+
         Args:
             cache_key: Cache key to get
-            timeout: Maximum time to wait in seconds
-            
+            timeout: Maximum time to wait in seconds (not used, Redis has built-in timeouts)
+
         Returns:
             Cached value or None
         """
         if cls._is_cache_disabled():
+            logger.debug(f"Cache get skipped: cache disabled (circuit breaker)")
             return None
-        
+
+        cache_backend = settings.CACHES['default']['BACKEND']
+        if 'dummy' in cache_backend.lower():
+            logger.debug(f"Cache get skipped: using DummyCache backend")
+            return None
+
+        # Don't check Redis availability here - let django-redis handle it with IGNORE_EXCEPTIONS
+        # This allows cache to work even if Redis is temporarily unavailable
         try:
-            # Try signal-based timeout (Unix/Docker)
-            if hasattr(signal, 'SIGALRM'):
-                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-                signal.alarm(int(timeout) + 1)
-                try:
-                    result = cache.get(cache_key)
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-                    cls._record_cache_success()
-                    return result
-                except TimeoutError:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-                    cls._record_cache_failure()
-                    logger.warning(f"Cache get timed out, disabling cache")
-                    return None
-            else:
-                # Windows or signal not available - fall back to try-except
-                result = cache.get(cache_key)
+            result = cache.get(cache_key)
+            if result is not None:
                 cls._record_cache_success()
-                return result
+            return result
         except Exception as e:
             cls._record_cache_failure()
-            logger.warning(f"Cache get failed: {e}, disabling cache")
+            logger.warning(f"Cache get failed: {e}")
             return None
     
     @classmethod
     def _safe_cache_set(cls, cache_key: str, data: Any, timeout: int):
         """
         Safely set cache with timeout to prevent blocking
-        
+
         Args:
             cache_key: Cache key to set
             data: Data to cache
             timeout: Cache timeout in seconds
         """
         if cls._is_cache_disabled():
+            logger.debug(f"Cache set skipped: cache disabled (circuit breaker)")
             return
-        
+
+        cache_backend = settings.CACHES['default']['BACKEND']
+        if 'dummy' in cache_backend.lower():
+            logger.debug(f"Cache set skipped: using DummyCache backend")
+            return
+
+        # Don't check Redis availability here - let django-redis handle it with IGNORE_EXCEPTIONS
+        # This allows cache to work even if Redis is temporarily unavailable
         try:
-            # Try signal-based timeout (Unix/Docker)
-            if hasattr(signal, 'SIGALRM'):
-                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-                signal.alarm(1)
-                try:
-                    cache.set(cache_key, data, timeout)
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-                    cls._record_cache_success()
-                except TimeoutError:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-                    cls._record_cache_failure()
-                    logger.warning(f"Cache set timed out, disabling cache")
-            else:
-                # Windows or signal not available - fall back to try-except
-                cache.set(cache_key, data, timeout)
+            result = cache.set(cache_key, data, timeout)
+            if result:
                 cls._record_cache_success()
+                logger.debug(f"Cache set successful: {cache_key[:60]}...")
+            else:
+                # With IGNORE_EXCEPTIONS=True, False is expected when Redis is unavailable
+                # Don't treat it as a failure - it's graceful degradation
+                # Also, LocMemCache and other backends might return False in edge cases
+                ignore_exceptions = settings.CACHES['default'].get('OPTIONS', {}).get('IGNORE_EXCEPTIONS', False)
+                is_locmem = 'locmem' in cache_backend.lower()
+                if ignore_exceptions or is_locmem:
+                    # For Redis with IGNORE_EXCEPTIONS or LocMemCache, False is acceptable
+                    logger.debug(f"Cache set returned False (backend: {cache_backend.split('.')[-1]}): {cache_key[:60]}...")
+                else:
+                    logger.warning(f"Cache set returned False: {cache_key[:60]}...")
+                    cls._record_cache_failure()
         except Exception as e:
             cls._record_cache_failure()
-            logger.warning(f"Cache set failed: {e}, disabling cache")
+            logger.warning(f"Cache set failed: {cache_key[:60]}... - {e}", exc_info=False)
     
     @classmethod
     def get_financial_sum(cls, instance_id: str, instance_type: str, year: int, 
@@ -316,7 +248,12 @@ class CacheService:
             for_frame_view=for_frame_view,
             for_coordinator=for_coordinator
         )
-        return cls._safe_cache_get(cache_key)
+        result = cls._safe_cache_get(cache_key)
+        if result is not None:
+            logger.info(f"Cache HIT: financial_sum for {instance_type} {instance_id} (year={year}, frame={for_frame_view}, coordinator={for_coordinator})")
+        else:
+            logger.debug(f"Cache MISS: financial_sum for {instance_type} {instance_id} (year={year}, frame={for_frame_view}, coordinator={for_coordinator})")
+        return result
     
     @classmethod
     def set_financial_sum(cls, instance_id: str, instance_type: str, year: int,
@@ -343,6 +280,7 @@ class CacheService:
             for_coordinator=for_coordinator
         )
         cls._safe_cache_set(cache_key, data, timeout or cls.DEFAULT_TIMEOUT)
+        logger.info(f"Cache SET: financial_sum for {instance_type} {instance_id} (year={year}, frame={for_frame_view}, coordinator={for_coordinator})")
     
     @classmethod
     def get_frame_budgets(cls, year: int, for_frame_view: bool) -> Optional[dict]:
@@ -361,7 +299,12 @@ class CacheService:
             year=year,
             for_frame_view=for_frame_view
         )
-        return cls._safe_cache_get(cache_key)
+        result = cls._safe_cache_get(cache_key)
+        if result is not None:
+            logger.info(f"Cache HIT: frame_budgets (year={year}, frame={for_frame_view})")
+        else:
+            logger.debug(f"Cache MISS: frame_budgets (year={year}, frame={for_frame_view})")
+        return result
     
     @classmethod
     def set_frame_budgets(cls, year: int, for_frame_view: bool, 
@@ -381,6 +324,7 @@ class CacheService:
             for_frame_view=for_frame_view
         )
         cls._safe_cache_set(cache_key, data, timeout or cls.DEFAULT_TIMEOUT)
+        logger.info(f"Cache SET: frame_budgets (year={year}, frame={for_frame_view})")
     
     @classmethod
     def invalidate_financial_sum(cls, instance_id: str, instance_type: str) -> None:

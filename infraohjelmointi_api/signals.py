@@ -201,6 +201,7 @@ def get_financial_sums(
 @receiver(post_save, sender=ProjectFinancial)
 @receiver(post_save, sender=ClassFinancial)
 @receiver(post_save, sender=LocationFinancial)
+@on_transaction_commit
 def get_notified_financial_sums(sender, instance, created, **kwargs):
     """
     Sends a django event stream event with all financial sums effected by a save on ProjectFinancial, ClassFinancial or LocationFinancial table.
@@ -304,7 +305,6 @@ def invalidate_project_financial_cache(sender, instance, **kwargs):
                 instance_type='ProjectGroup'
             )
 
-        # Reduced logging for performance: Cache invalidated for ProjectFinancial
     except Exception as e:
         logger.error(f"Error invalidating cache for ProjectFinancial: {e}")
 
@@ -415,7 +415,6 @@ def invalidate_project_cache(sender, instance, created, **kwargs):
                     instance_type='ProjectGroup'
                 )
 
-            pass  # Reduced logging: Cache invalidated for Project change
     except Exception as e:
         logger.error(f"Error invalidating cache for Project: {e}")
 

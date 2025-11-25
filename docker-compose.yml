@@ -45,8 +45,10 @@ services:
       - "127.0.0.1:8000:8000"
     container_name: infraohjelmointi-api
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
 volumes:
   database-volume: {}

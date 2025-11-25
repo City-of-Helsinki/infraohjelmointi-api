@@ -233,17 +233,30 @@ class FinancialSumSerializer(serializers.ModelSerializer):
 
         frame_budgets = self.context.get("frame_budgets")
         if frame_budgets is None:
-            from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
-            frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(year, for_frame_view=forced_to_frame)
+            from infraohjelmointi_api.views.BaseClassLocationViewSet import (
+                BaseClassLocationViewSet,
+            )
+            frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(
+                year, for_frame_view=forced_to_frame
+            )
 
+        # Coordinator classes/locations should always be cached (best performance benefit)
+        # Planning classes should not be cached (depend on coordinator finances for overlap)
         use_cache = True
-        if not for_coordinator:
-            if _type == "ProjectClass":
-                if getattr(instance, "coordinatorClass", None):
-                    use_cache = False
-            elif _type == "ProjectLocation":
-                if getattr(instance, "coordinatorLocation", None):
-                    use_cache = False
+        if _type == "ProjectClass":
+            # Coordinator classes: always cache
+            if getattr(instance, "forCoordinatorOnly", False):
+                use_cache = True
+            # Planning classes: don't cache (have coordinatorClass attribute)
+            elif getattr(instance, "coordinatorClass", None):
+                use_cache = False
+        elif _type == "ProjectLocation":
+            # Coordinator locations: always cache
+            if getattr(instance, "forCoordinatorOnly", False):
+                use_cache = True
+            # Planning locations: don't cache (have coordinatorLocation attribute)
+            elif getattr(instance, "coordinatorLocation", None):
+                use_cache = False
 
         cached_result = None
         if use_cache:
@@ -293,14 +306,15 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         for i in range(11):
             summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
 
-        CacheService.set_financial_sum(
-            instance_id=instance.id,
-            instance_type=_type,
-            year=year,
-            for_frame_view=forced_to_frame,
-            data=summed_finances,
-            for_coordinator=for_coordinator
-        )
+        if use_cache:
+            CacheService.set_financial_sum(
+                instance_id=instance.id,
+                instance_type=_type,
+                year=year,
+                for_frame_view=forced_to_frame,
+                data=summed_finances,
+                for_coordinator=for_coordinator
+            )
 
         return summed_finances
 
@@ -382,8 +396,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     Project.objects.select_related(
                         "projectClass",
                         "projectClass__coordinatorClass",
+                        "projectClass__parent",
                         "projectClass__parent__coordinatorClass",
                     )
+                    .prefetch_related("finances")  # CRITICAL: Prevents N+1 queries when aggregating ProjectFinancial
                     .filter(
                         (
                             Q(projectClass__name__icontains="suurpiiri")

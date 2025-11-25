@@ -12,17 +12,15 @@ class InfraohjelmointiApiConfig(AppConfig):
 
     def ready(self):
         import infraohjelmointi_api.signals
+        from infraohjelmointi_api.services.CacheService import CacheService
 
         register_serializer("yml", "django.core.serializers.pyyaml")
-        
-        # Disable cache permanently if Redis is unavailable
-        # This runs after Django apps are loaded, so imports are safe
+
         REDIS_URL = getattr(settings, 'REDIS_URL', None)
-        if REDIS_URL and not getattr(settings, 'REDIS_AVAILABLE', False):
-            from infraohjelmointi_api.services.CacheService import CacheService
+        REDIS_AVAILABLE = getattr(settings, 'REDIS_AVAILABLE', False)
+
+        if not REDIS_URL:
             CacheService.disable_cache_permanently()
-            logger.warning("Cache permanently disabled - Redis unavailable at startup")
-        elif not REDIS_URL:
-            from infraohjelmointi_api.services.CacheService import CacheService
-            CacheService.disable_cache_permanently()
-            logger.info("Cache permanently disabled - Redis not configured")
+            logger.info("Cache disabled - REDIS_URL not configured")
+        elif not REDIS_AVAILABLE:
+            logger.debug("Redis not immediately available at startup - cache will attempt connection on first use")
