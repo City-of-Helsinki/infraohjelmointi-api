@@ -9,15 +9,18 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
-from os import path
+import concurrent.futures
+import logging
 import os
 import socket
+import sys
 import time
+from os import path
 from pathlib import Path
 from urllib.parse import urlparse
+
 import dj_database_url
 import environ
-import logging
 
 # Initialize logger early for use in settings configuration
 logger = logging.getLogger(__name__)
@@ -300,23 +303,39 @@ REDIS_URL = env('REDIS_URL', default=None)
 REDIS_AVAILABLE = False
 
 
+def _is_test_environment() -> bool:
+    return 'test' in sys.argv or (sys.argv and 'pytest' in sys.argv[0])
+
+
 def check_redis_availability(redis_url: str, max_retries: int = 5, initial_delay: float = 0.5) -> bool:
-    """
-    Check if Redis is available by testing socket connection.
-    Retries with exponential backoff for Docker Compose startup timing.
-    
-    Args:
-        redis_url: Redis connection URL
-        max_retries: Maximum number of connection attempts
-        initial_delay: Initial delay between retries in seconds
-        
-    Returns:
-        True if Redis is available, False otherwise
-    """
+    """Check if Redis is available. Uses thread-based timeout in test environments."""
     parsed = urlparse(redis_url)
     host = parsed.hostname or 'localhost'
     port = parsed.port or 6379
     
+    # In test environments, use single attempt with thread-based timeout
+    # to handle DNS hanging issues when Redis container is stopped
+    if _is_test_environment():
+        def try_connect():
+            try:
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.settimeout(0.5)
+                result = test_socket.connect_ex((host, port))
+                test_socket.close()
+                return result == 0
+            except Exception:
+                return False
+        
+        # Use ThreadPoolExecutor with timeout to handle DNS hanging
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(try_connect)
+                return future.result(timeout=1.0)  # 1 second total timeout including DNS
+        except (concurrent.futures.TimeoutError, Exception):
+            logger.info("Test environment: Redis check timed out or failed")
+            return False
+    
+    # Production: use normal retry logic
     retry_delay = initial_delay
     
     for attempt in range(max_retries):
@@ -339,15 +358,6 @@ def check_redis_availability(redis_url: str, max_retries: int = 5, initial_delay
 
 
 def parse_redis_url(redis_url: str) -> dict:
-    """
-    Parse Redis URL and extract connection parameters.
-    
-    Args:
-        redis_url: Redis connection URL
-        
-    Returns:
-        Dictionary with host, port, db, and optionally password
-    """
     parsed = urlparse(redis_url)
     config = {
         'host': parsed.hostname or 'localhost',
@@ -409,14 +419,25 @@ if REDIS_URL:
     # Configure django-eventstream to use Redis for SSE event storage (fixes IO-725)
     # EVENTSTREAM_REDIS is the correct way to configure Redis for django-eventstream
     # This enables multi-pod event sharing via Redis
-    redis_config = parse_redis_url(REDIS_URL)
-    EVENTSTREAM_REDIS = {
-        'host': redis_config['host'],
-        'port': redis_config['port'],
-        'db': redis_config['db'],
-    }
-    if 'password' in redis_config:
-        EVENTSTREAM_REDIS['password'] = redis_config['password']
+    # Only configure EVENTSTREAM_REDIS if Redis is actually available at startup
+    # If not available, django-eventstream will fall back to in-memory storage
+    # Note: If Redis goes down after startup, EVENTSTREAM_REDIS will still be set,
+    # but django-eventstream should handle connection failures gracefully by falling back
+    # to in-memory storage (events won't be shared across pods, but app will work)
+    if REDIS_AVAILABLE:
+        redis_config = parse_redis_url(REDIS_URL)
+        EVENTSTREAM_REDIS = {
+            'host': redis_config['host'],
+            'port': redis_config['port'],
+            'db': redis_config['db'],
+        }
+        if 'password' in redis_config:
+            EVENTSTREAM_REDIS['password'] = redis_config['password']
+        logger.info("django-eventstream configured to use Redis for multi-pod event sharing")
+    else:
+        # Don't set EVENTSTREAM_REDIS - django-eventstream will use in-memory storage
+        # This allows the app to work without Redis (events won't be shared across pods, but that's OK)
+        logger.info("Redis not available - django-eventstream will use in-memory storage (single-pod only)")
     
     safe_url = REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL
     logger.info("Redis cache configured: %s", safe_url)
