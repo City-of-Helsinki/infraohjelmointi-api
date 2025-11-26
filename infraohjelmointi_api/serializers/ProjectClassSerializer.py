@@ -13,6 +13,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Pattern for TA-kohtien suffixes to remove (IO-758)
+SUFFIX_PATTERN = re.compile(
+    r',\s*(?:Kylkn|kylkn|Kaupunkiympäristölautakunnan|kaupunkiympäristölautakunnan|'
+    r'KHN|Khn|khn|Kaupunginhallituksen|kaupunginhallituksen)\s+käytettäväksi'
+)
+
+# Pattern for numbering prefix (e.g., "8 03 01 01")
+NUMBERING_PATTERN = re.compile(r'^(\d+\s+\d+(?:\s+\d+){0,2})')
+
 
 class ProjectClassSerializer(FinancialSumSerializer):
     defaultProgrammer = ProjectProgrammerSerializer(read_only=True)
@@ -23,106 +32,100 @@ class ProjectClassSerializer(FinancialSumSerializer):
     class Meta(BaseMeta):
         model = ProjectClass
 
-    def _extract_numbering(self, name, suffix_pattern):
-        """Extract numbering prefix from a name (e.g., '8 03 01 01' from '8 03 01 01 Name')."""
-        name_clean = re.sub(suffix_pattern, '', name).strip()
-        match = re.match(r'^(\d+\s+\d+(?:\s+\d+){0,2})', name_clean)
+    # -------------------------------------------------------------------------
+    # Name transformation helpers (IO-455, IO-758)
+    # -------------------------------------------------------------------------
+
+    def _extract_numbering(self, name):
+        """Extract numbering prefix (e.g., '8 03 01 01' from '8 03 01 01 Name')."""
+        clean_name = SUFFIX_PATTERN.sub('', name).strip()
+        match = NUMBERING_PATTERN.match(clean_name)
         return match.group(1) if match else None
 
-    def _get_coordinator_numbering(self, programming_class, suffix_pattern):
+    def _get_coordinator_numbering(self, obj):
         """
-        Get numbering from programming class's coordinator hierarchy.
-        
-        Traverses up coordinator parent chain until numbering is found.
-        Returns None if no coordinator or no numbering found.
+        Get numbering from coordinator hierarchy.
+        Traverses up the coordinator parent chain until numbering is found.
         """
         try:
-            coordinator = programming_class.coordinatorClass
+            coord = obj.coordinatorClass
         except (AttributeError, ProjectClass.DoesNotExist):
             return None
-        
-        if not coordinator:
-            return None
-        
-        current = coordinator
-        max_depth = 10
-        
-        while current and max_depth > 0:
-            numbering = self._extract_numbering(current.name, suffix_pattern)
+
+        for _ in range(10):  # max depth safety
+            if not coord:
+                break
+            numbering = self._extract_numbering(coord.name)
             if numbering:
                 return numbering
-            current = current.parent
-            max_depth -= 1
-        
+            coord = coord.parent
+
         return None
 
-    def _would_get_numbering_from_coordinator(self, programming_class, suffix_pattern):
+    def _find_ancestor_numbering(self, obj):
         """
-        Check if programming class would GET numbering from coordinator.
-        
-        Returns True only if the class's numbering would change after serialization.
-        This distinguishes between:
-        - Classes with static numbering that won't change (e.g., "8 03 Kadut...")
-        - Classes that will get/update numbering from coordinator
+        Find numbering that would be applied to the nearest ancestor.
+        Returns None if no ancestor's name would change.
         """
-        if programming_class.forCoordinatorOnly:
-            return False
-        
-        raw_numbering = self._extract_numbering(programming_class.name, suffix_pattern)
-        coordinator_numbering = self._get_coordinator_numbering(programming_class, suffix_pattern)
-        
-        if not coordinator_numbering:
-            return False
-        
-        return raw_numbering != coordinator_numbering
+        parent = obj.parent
+        for _ in range(10):  # max depth safety
+            if not parent or parent.forCoordinatorOnly:
+                break
 
-    def _any_ancestor_would_get_numbering(self, programming_class, suffix_pattern):
-        """Check if any ancestor would get numbering from coordinator."""
-        current = programming_class.parent
-        max_depth = 10
+            raw = self._extract_numbering(parent.name)
+            coord = self._get_coordinator_numbering(parent)
+
+            # If parent's numbering would change, return what it would become
+            if coord and raw != coord:
+                return coord
+
+            parent = parent.parent
+
+        return None
+
+    def _is_more_specific(self, child_num, ancestor_num):
+        """Check if child numbering extends ancestor's (e.g., '8 08 01 01' extends '8 08 01')."""
+        return child_num.startswith(ancestor_num) and len(child_num) > len(ancestor_num)
+
+    def _get_numbering_to_apply(self, obj):
+        """
+        Determine what numbering (if any) should be applied to this class.
         
-        while current and max_depth > 0:
-            if self._would_get_numbering_from_coordinator(current, suffix_pattern):
-                return True
-            current = current.parent
-            max_depth -= 1
-        
-        return False
+        Rules:
+        - No numbering for coordinator-only classes or suurpiiri classes
+        - No numbering if it would duplicate an ancestor's
+        - Allow numbering if it's more specific than ancestor's
+        """
+        if obj.forCoordinatorOnly or 'suurpiiri' in obj.name.lower():
+            return None
+
+        my_numbering = self._get_coordinator_numbering(obj)
+        if not my_numbering:
+            return None
+
+        ancestor_numbering = self._find_ancestor_numbering(obj)
+        if not ancestor_numbering:
+            return my_numbering
+
+        # Allow if more specific (e.g., "8 08 01 01" extends "8 08 01")
+        if self._is_more_specific(my_numbering, ancestor_numbering):
+            return my_numbering
+
+        return None  # Block: same or unrelated numbering
 
     def get_name(self, obj):
         """
-        Apply name transformations: suffix removal (IO-758) and numbering addition (IO-455).
-        Modifications are applied at serialization only; database remains unchanged.
+        Transform name for display (IO-758, IO-455).
+        - Removes TA-kohtien suffixes
+        - Adds numbering from coordinator (for programming view)
         """
-        name = obj.name
+        name = SUFFIX_PATTERN.sub('', obj.name).strip()
 
-        suffix_pattern = (r',\s*('
-                          r'Kylkn|'
-                          r'kylkn|'
-                          r'Kaupunkiympäristölautakunnan|'
-                          r'kaupunkiympäristölautakunnan|'
-                          r'KHN|'
-                          r'Khn|'
-                          r'khn|'
-                          r'Kaupunginhallituksen|'
-                          r'kaupunginhallituksen'
-                          r')\s+käytettäväksi')
-        name = re.sub(suffix_pattern, '', name).strip()
-
-        if obj.forCoordinatorOnly:
-            return name
-        
-        if 'suurpiiri' in obj.name.lower():
-            return name
-        
-        if self._any_ancestor_would_get_numbering(obj, suffix_pattern):
-            return name
-        
-        numbering = self._get_coordinator_numbering(obj, suffix_pattern)
+        numbering = self._get_numbering_to_apply(obj)
         if numbering:
-            name_without_numbering = re.sub(r'^(\d+\s+\d+(?:\s+\d+){0,2})\s+', '', name)
-            name = f"{numbering} {name_without_numbering}"
-        
+            name_without_num = NUMBERING_PATTERN.sub('', name).strip()
+            return f"{numbering} {name_without_num}"
+
         return name
 
     def get_computedDefaultProgrammer(self, obj):
