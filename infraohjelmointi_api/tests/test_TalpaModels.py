@@ -131,18 +131,28 @@ class TalpaModelsTestCase(TestCase):
         self.assertTrue(project_type.isActive)
 
     def test_talpa_project_type_unique_constraint(self):
-        """Test that TalpaProjectType code must be unique"""
+        """Test that TalpaProjectType code + priority combination must be unique"""
         TalpaProjectType.objects.create(
             code="8 03 01 01",
             name="First",
+            priority="A",
             isActive=True
         )
 
-        # Try to create another with same code
+        # Same code with different priority should succeed
+        TalpaProjectType.objects.create(
+            code="8 03 01 01",
+            name="Second",
+            priority="B",
+            isActive=True
+        )
+
+        # Same code with same priority should fail
         with self.assertRaises(Exception):  # Should raise IntegrityError
             TalpaProjectType.objects.create(
                 code="8 03 01 01",
-                name="Second",
+                name="Third",
+                priority="A",  # Same as first
                 isActive=True
             )
 

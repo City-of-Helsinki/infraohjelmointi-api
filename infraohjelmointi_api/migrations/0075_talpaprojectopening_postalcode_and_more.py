@@ -45,8 +45,4 @@ class Migration(migrations.Migration):
             name='unit',
             field=models.CharField(blank=True, choices=[('Tontit', 'Tontit - Plots'), ('Mao', 'Mao - Land Use'), ('Geo', 'Geo - Geotechnical')], max_length=50, null=True),
         ),
-        migrations.AlterUniqueTogether(
-            name='projectprogrammer',
-            unique_together={('firstName', 'lastName')},
-        ),
     ]

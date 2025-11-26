@@ -52,56 +52,130 @@ class Command(BaseCommand):
         self.stdout.write("  - GET /api/talpa-project-ranges/")
 
     def seed_project_types(self):
-        """Seed TalpaProjectType with sample data from SAP_Lajit ja prioriteetit"""
+        """
+        Seed TalpaProjectType with sample data from SAP_Lajit ja prioriteetit.
+        
+        The 'priority' field contains letter codes (A, B, C, etc.) from the PRIOR column.
+        These letters identify sub-variants within a project type (e.g., different districts).
+        """
         self.stdout.write("\nSeeding TalpaProjectType...")
         
         project_types = [
             # 2814I - Infrastructure Investment (Kadut, Puistot)
+            # Code 8 03 01 01 - Uudisrakentaminen - different districts (A=Eteläinen, B=Läntinen, etc.)
             {
                 "code": "8 03 01 01",
                 "name": "Katujen uudisrakentaminen",
                 "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
-                "priority": "Normaali",
-                "description": "Katujen uudisrakentaminen - uudet kadut ja liikenneväylät",
+                "priority": "A",  # Eteläinen suurpiiri
+                "description": "Eteläinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "B",  # Läntinen suurpiiri
+                "description": "Läntinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "C",  # Keskinen suurpiiri
+                "description": "Keskinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "D",  # Pohjoinen suurpiiri
+                "description": "Pohjoinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "E",  # Koillinen suurpiiri
+                "description": "Koillinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "F",  # Kaakkoinen suurpiiri
+                "description": "Kaakkoinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "G",  # Itäinen suurpiiri
+                "description": "Itäinen suurpiiri",
+                "isActive": True,
+            },
+            {
+                "code": "8 03 01 01",
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "H",  # Östersundomin suurpiiri
+                "description": "Östersundomin suurpiiri",
+                "isActive": True,
+            },
+            # Code 8 03 01 02 - Perusparantaminen ja liikennejärjestelyt
+            {
+                "code": "8 03 01 02",
+                "name": "Katujen perusparantaminen ja liikennejärjestelyt",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "priority": "A",  # Eteläinen suurpiiri
+                "description": "Eteläinen suurpiiri",
                 "isActive": True,
             },
             {
                 "code": "8 03 01 02",
                 "name": "Katujen perusparantaminen ja liikennejärjestelyt",
                 "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
-                "priority": "Normaali",
-                "description": "Katujen peruskorjaukset ja liikennejärjestelyt",
+                "priority": "B",  # Läntinen suurpiiri
+                "description": "Läntinen suurpiiri",
                 "isActive": True,
             },
-            {
-                "code": "8 03 01 03",
-                "name": "Muut investoinnit",
-                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
-                "priority": "Normaali",
-                "description": "Muut kadunpidon investoinnit",
-                "isActive": True,
-            },
+            # Code 8 03 03 - Yhteishankkeet (no district subdivision)
             {
                 "code": "8 03 03",
                 "name": "Yhteishankkeet Väyläviraston kanssa",
                 "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
-                "priority": "Korkea",
+                "priority": None,  # No sub-variant
                 "description": "Yhteishankkeet valtion väyläviranomaisen kanssa",
+                "isActive": True,
+            },
+            # Code 8 04 01 01 - Puistot
+            {
+                "code": "8 04 01 01",
+                "name": "Uudet puistot ja puistojen peruskorjaus",
+                "category": "PUISTORAKENTAMINEN",
+                "priority": "A",  # Eteläinen suurpiiri
+                "description": "Eteläinen suurpiiri",
                 "isActive": True,
             },
             {
                 "code": "8 04 01 01",
                 "name": "Uudet puistot ja puistojen peruskorjaus",
                 "category": "PUISTORAKENTAMINEN",
-                "priority": "Normaali",
-                "description": "Puistojen rakentaminen ja peruskorjaukset",
+                "priority": "B",  # Läntinen suurpiiri
+                "description": "Läntinen suurpiiri",
                 "isActive": True,
             },
+            # Code 8 04 01 02 - Liikuntapaikat
             {
                 "code": "8 04 01 02",
                 "name": "Liikuntapaikat ja ulkoilualueet",
                 "category": "PUISTORAKENTAMINEN",
-                "priority": "Normaali",
+                "priority": None,  # No sub-variant in example
                 "description": "Liikuntapaikkojen ja ulkoilualueiden rakentaminen",
                 "isActive": True,
             },
@@ -110,7 +184,7 @@ class Command(BaseCommand):
                 "code": "8 01 03 01",
                 "name": "Muu esirakentaminen",
                 "category": "ESIRAKENTAMINEN",
-                "priority": "Normaali",
+                "priority": None,
                 "description": "Muu esirakentaminen, alueiden käyttöönotto",
                 "isActive": True,
                 "notes": "2814E-projekti - vaatii Yksikkö-valinnan (Tontit/Mao/Geo)",
@@ -118,8 +192,8 @@ class Command(BaseCommand):
             {
                 "code": "8 08 01 02",
                 "name": "Länsisatama esirakentaminen",
-                "category": "ESIRAKENTAMINEN",
-                "priority": "Normaali",
+                "category": "PROJEKTIALUEIDEN ESIRAKENTAMINEN",
+                "priority": None,
                 "description": "Länsisataman alueen esirakentaminen",
                 "isActive": True,
                 "notes": "2814E-projekti",
@@ -127,8 +201,8 @@ class Command(BaseCommand):
             {
                 "code": "8 08 01 03",
                 "name": "Kalasatama esirakentaminen",
-                "category": "ESIRAKENTAMINEN",
-                "priority": "Normaali",
+                "category": "PROJEKTIALUEIDEN ESIRAKENTAMINEN",
+                "priority": None,
                 "description": "Kalasataman alueen esirakentaminen",
                 "isActive": True,
                 "notes": "2814E-projekti",
@@ -136,8 +210,8 @@ class Command(BaseCommand):
             {
                 "code": "8 09 01 01",
                 "name": "Malminkartano-Kannelmäki esirakentaminen",
-                "category": "ESIRAKENTAMINEN",
-                "priority": "Normaali",
+                "category": "KAUPUNKIUUDISTUSALUEET",
+                "priority": None,
                 "description": "Malminkartano-Kannelmäki KU esirakentaminen",
                 "isActive": True,
                 "notes": "2814E-projekti",
@@ -146,18 +220,20 @@ class Command(BaseCommand):
             {
                 "code": "8 08 01 01",
                 "name": "Kamppi-Töölönlahti (EI KÄYTÖSSÄ)",
-                "category": "ESIRAKENTAMINEN",
-                "priority": "Normaali",
+                "category": "PROJEKTIALUEIDEN ESIRAKENTAMINEN",
+                "priority": None,
                 "description": "Tämä ei enää käytössä",
                 "isActive": False,
-                "notes": "EI ENÄÄ KÄYTÖSSÄ",
+                "notes": "EI ENÄÄ KÄYTÖSSÄ - LAKKAUTETTU V. 2017 JÄLKEEN!",
             },
         ]
 
         created = 0
         for pt in project_types:
+            # Use code + priority as unique identifier
             obj, was_created = TalpaProjectType.objects.update_or_create(
                 code=pt["code"],
+                priority=pt.get("priority"),  # Can be None
                 defaults=pt,
             )
             if was_created:
