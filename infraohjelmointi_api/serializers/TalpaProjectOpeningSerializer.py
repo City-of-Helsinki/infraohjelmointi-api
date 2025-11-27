@@ -1,4 +1,4 @@
-from infraohjelmointi_api.models import TalpaProjectOpening, TalpaProjectType, TalpaServiceClass, TalpaAssetClass
+from infraohjelmointi_api.models import TalpaProjectOpening, TalpaProjectType, TalpaServiceClass, TalpaAssetClass, TalpaProjectNumberRange
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.PersonSerializer import PersonSerializer
 from rest_framework import serializers
@@ -25,6 +25,14 @@ class TalpaAssetClassSerializer(serializers.ModelSerializer):
     class Meta:
         model = TalpaAssetClass
         fields = ["id", "componentClass", "account", "name", "holdingPeriodYears", "hasHoldingPeriod", "category", "isActive"]
+
+
+class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
+    """Serializer for TalpaProjectNumberRange in dropdowns"""
+    class Meta:
+        model = TalpaProjectNumberRange
+        fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd", 
+                  "majorDistrict", "majorDistrictName", "area", "unit", "isActive"]
 
 
 class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
@@ -60,6 +68,11 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
     # UI uses plural "assetClassesId" - accept both
     assetClassesId = serializers.PrimaryKeyRelatedField(
         queryset=TalpaAssetClass.objects.all(), source="assetClass", write_only=True, required=False, allow_null=True
+    )
+    # Project number range - replaces individual projectNumber
+    projectNumberRange = TalpaProjectNumberRangeSerializer(read_only=True)
+    projectNumberRangeId = serializers.PrimaryKeyRelatedField(
+        queryset=TalpaProjectNumberRange.objects.all(), source="projectNumberRange", write_only=True, required=False, allow_null=True
     )
     
     # =========================================================================
@@ -110,9 +123,44 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
     # =========================================================================
     # Validation
     # =========================================================================
+    
+    # Define field alias mappings for conflict detection
+    # Format: (alias_field, canonical_field, field_description)
+    FIELD_ALIAS_CONFLICTS = [
+        ("projectStart", "projectStartDate", "project start date"),
+        ("projectEnd", "projectEndDate", "project end date"),
+        ("assetClassesId", "assetClassId", "asset class"),
+    ]
+    
+    def _check_conflicting_aliases(self, initial_data):
+        """
+        Check if both an alias and its canonical field are provided with different values.
+        Returns list of conflict error messages.
+        """
+        conflicts = []
+        for alias, canonical, description in self.FIELD_ALIAS_CONFLICTS:
+            if alias in initial_data and canonical in initial_data:
+                # Both provided - check if they have different values
+                alias_val = initial_data.get(alias)
+                canonical_val = initial_data.get(canonical)
+                if alias_val != canonical_val:
+                    conflicts.append(
+                        f"Conflicting values for {description}: "
+                        f"'{alias}' ({alias_val}) vs '{canonical}' ({canonical_val}). "
+                        f"Please provide only one."
+                    )
+        return conflicts
+    
     @override
     def validate(self, attrs):
-        """Validate that locked forms cannot be updated"""
+        """Validate that locked forms cannot be updated and check for conflicting aliases"""
+        # Check for conflicting field aliases
+        if hasattr(self, 'initial_data'):
+            conflicts = self._check_conflicting_aliases(self.initial_data)
+            if conflicts:
+                raise ValidationError({"detail": conflicts})
+        
+        # Check lock status
         instance = self.instance
         if instance and instance.is_locked:
             # Check if trying to update any field (except status which can be changed by system)

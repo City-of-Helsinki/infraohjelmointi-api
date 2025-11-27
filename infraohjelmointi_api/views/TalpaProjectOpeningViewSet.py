@@ -4,6 +4,7 @@ from infraohjelmointi_api.models import TalpaProjectOpening
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from overrides import override
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -11,6 +12,10 @@ import uuid
 import logging
 
 logger = logging.getLogger("infraohjelmointi_api")
+
+# Custom actions that should be accessible with just IsAuthenticated
+TALPA_READ_ONLY_ACTIONS = ["get_by_project", "get_priorities", "get_subjects"]
+TALPA_WRITE_ACTIONS = ["send_to_talpa"]
 
 
 class TalpaProjectOpeningViewSet(BaseViewSet):
@@ -21,6 +26,22 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
     serializer_class = TalpaProjectOpeningSerializer
 
     @override
+    def get_permissions(self):
+        """
+        Override permissions for custom Talpa actions.
+        
+        The BaseViewSet permission classes check for specific action names,
+        but custom actions like 'get_by_project' are not in those lists.
+        This override allows authenticated users to access Talpa-specific actions.
+        """
+        # If permission_classes is empty (e.g., in tests), allow all
+        if not self.permission_classes:
+            return []
+        if self.action in TALPA_READ_ONLY_ACTIONS + TALPA_WRITE_ACTIONS:
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @override
     def get_queryset(self):
         """Get queryset with related objects"""
         return TalpaProjectOpening.objects.select_related(
@@ -28,6 +49,7 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
             "projectType",
             "serviceClass",
             "assetClass",
+            "projectNumberRange",
             "createdBy",
             "updatedBy",
         ).all()
@@ -53,6 +75,17 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().partial_update(request, *args, **kwargs)
+
+    @override
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to prevent deleting locked forms"""
+        instance = self.get_object()
+        if instance.is_locked:
+            return Response(
+                {"detail": "Form is locked. Cannot delete when status is 'sent_to_talpa'."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @swagger_auto_schema(
         operation_description="Get TalpaProjectOpening by project ID",
@@ -93,7 +126,8 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
         try:
             uuid.UUID(str(project_id))  # Validate UUID
             try:
-                instance = TalpaProjectOpening.objects.get(project_id=project_id)
+                # Use get_queryset() to benefit from select_related optimization
+                instance = self.get_queryset().get(project_id=project_id)
                 serializer = self.get_serializer(instance)
                 return Response(serializer.data)
             except TalpaProjectOpening.DoesNotExist:
@@ -107,9 +141,29 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Required fields that must be filled before sending to Talpa
+    REQUIRED_FIELDS_FOR_TALPA = [
+        ("projectName", "Project name (SAP nimi)"),
+        ("subject", "Subject (Aihe)"),
+        ("projectType", "Project type (Laji)"),
+        ("projectNumberRange", "Project number range (Projektinumeroväli)"),
+    ]
+
+    def _validate_form_completeness(self, instance):
+        """
+        Validate that all required fields are filled before sending to Talpa.
+        Returns list of missing field names, or empty list if complete.
+        """
+        missing = []
+        for field_name, display_name in self.REQUIRED_FIELDS_FOR_TALPA:
+            value = getattr(instance, field_name, None)
+            if value is None or value == "":
+                missing.append(display_name)
+        return missing
+
     @swagger_auto_schema(
-        operation_description="Send Talpa opening to Talpa and lock the form. Updates status to 'sent_to_talpa'.",
-        responses={200: TalpaProjectOpeningSerializer, 400: "Already sent"},
+        operation_description="Send Talpa opening to Talpa and lock the form. Updates status to 'sent_to_talpa'. Validates required fields before locking.",
+        responses={200: TalpaProjectOpeningSerializer, 400: "Already sent or missing required fields"},
     )
     @action(
         methods=["post"],
@@ -119,7 +173,10 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
     )
     def send_to_talpa(self, request, pk=None):
         """
-        Custom action to update status to "sent_to_talpa" and lock the form
+        Custom action to update status to "sent_to_talpa" and lock the form.
+        
+        Validates that all required fields are filled before locking.
+        Once locked, the form cannot be edited or deleted.
 
         Usage
         ----------
@@ -129,6 +186,10 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
         -------
         JSON
             Updated TalpaProjectOpening instance
+            
+        Errors
+        ------
+        400: Form already sent, or missing required fields
         """
         instance = self.get_object()
 
@@ -136,6 +197,17 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
         if instance.status == "sent_to_talpa":
             return Response(
                 {"detail": "Form has already been sent to Talpa."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate form completeness before locking
+        missing_fields = self._validate_form_completeness(instance)
+        if missing_fields:
+            return Response(
+                {
+                    "detail": "Cannot send to Talpa. The following required fields are missing:",
+                    "missing_fields": missing_fields,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

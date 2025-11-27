@@ -456,9 +456,10 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
     # The status check above ensures we only update locked forms
 
     # Update status to "project_number_opened"
-    # Use update_fields to avoid triggering validation that might block the update
-    talpa_opening.status = "project_number_opened"
-    talpa_opening.save(update_fields=["status"])
+    # Use update() to avoid triggering signals and validation
+    TalpaProjectOpening.objects.filter(pk=talpa_opening.pk).update(
+        status="project_number_opened"
+    )
     logger.info(
         f"TalpaProjectOpening status updated to 'project_number_opened' for project {instance.id} "
         f"(sapProject: {instance.sapProject})"

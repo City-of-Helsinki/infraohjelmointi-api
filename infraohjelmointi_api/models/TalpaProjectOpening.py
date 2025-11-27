@@ -5,6 +5,7 @@ from .Person import Person
 from .TalpaProjectType import TalpaProjectType
 from .TalpaServiceClass import TalpaServiceClass
 from .TalpaAssetClass import TalpaAssetClass
+from .TalpaProjectNumberRange import TalpaProjectNumberRange
 
 
 class TalpaProjectOpening(models.Model):
@@ -68,7 +69,7 @@ class TalpaProjectOpening(models.Model):
     service = models.CharField(
         max_length=100, default="SAP-projektinumeron avauspyyntö", blank=False, null=False
     )  # SAP project number opening request - Talpa portal default
-    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, blank=False, null=False)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, blank=False, null=False, default="Normaali")
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, blank=False, null=False)
     organization = models.CharField(max_length=50, default="2800 Kymp", blank=False, null=False)
     additionalInformation = models.TextField(blank=True, null=True)  # "Lisätietoja" - Talpa portal notes
@@ -86,7 +87,9 @@ class TalpaProjectOpening(models.Model):
     )  # "Talousarviokohdan numero" - e.g., "8030101A"
     majorDistrict = models.CharField(max_length=50, blank=True, null=True)  # "Suurpiiri" - used for validation
     area = models.CharField(max_length=100, blank=True, null=True)  # "Alue" - used for validation
-    projectNumber = models.CharField(max_length=20, blank=True, null=True)  # "Projektinumero" - validated against ranges
+    projectNumberRange = models.ForeignKey(
+        TalpaProjectNumberRange, on_delete=models.DO_NOTHING, blank=True, null=True
+    )  # "Projektinumeroväli" - Selected project number range (replaces individual projectNumber)
 
     # Address fields - Excel column "Osoite+postinumero=Työmaa-avain"
     streetAddress = models.CharField(
