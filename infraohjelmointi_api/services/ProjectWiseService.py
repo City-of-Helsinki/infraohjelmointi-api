@@ -4,6 +4,7 @@ import environ
 import re
 import logging
 import time
+from dataclasses import dataclass
 
 from datetime import datetime
 
@@ -37,6 +38,35 @@ if path.exists(".env"):
     env.read_env(".env")
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
+
+
+@dataclass
+class UpdateResult:
+    """Result of a ProjectWise update operation."""
+    normal_success: int = 0
+    normal_total: int = 0
+    hierarchical_success: int = 0
+    hierarchical_total: int = 0
+
+    @property
+    def total_success(self) -> int:
+        """Total number of successfully updated fields."""
+        return self.normal_success + self.hierarchical_success
+
+    @property
+    def total_attempted(self) -> int:
+        """Total number of fields attempted to update."""
+        return self.normal_total + self.hierarchical_total
+
+    @property
+    def success_rate(self) -> float:
+        """Success rate as a fraction (0.0 to 1.0)."""
+        return self.total_success / self.total_attempted if self.total_attempted else 0.0
+
+    @property
+    def any_success(self) -> bool:
+        """Whether any fields were successfully updated."""
+        return self.total_success > 0
 
 
 class ProjectWiseService:
@@ -184,7 +214,7 @@ class ProjectWiseService:
                     try:
                         error_detail = response.json()
                         error_message = error_detail.get('errorMessage', 'Unknown')
-                    except:
+                    except Exception:
                         pass
                     PWLogger.log_hierarchical_field_result(field_name, field_value, False, response.status_code, error_message)
 
@@ -291,7 +321,7 @@ class ProjectWiseService:
                             try:
                                 error_detail = response.json()
                                 logger.error(f"  Error: {error_detail}")
-                            except:
+                            except Exception:
                                 logger.error(f"  Error: {response.reason}")
 
                             # Raise exception if normal fields fail - this is unexpected
@@ -329,7 +359,7 @@ class ProjectWiseService:
                     logger.info("No hierarchical fields to update")
 
                 # Overall result
-                total_attempted, total_succeeded = self._calculate_update_results(
+                result = self._calculate_update_results(
                     normal_to_update, normal_success, hierarchical_success_count, hierarchical_total_count
                 )
 
@@ -337,16 +367,16 @@ class ProjectWiseService:
                 PWLogger.log_sync_result(
                     project.name, 
                     project.hkrId, 
-                    total_attempted, 
-                    total_succeeded,
-                    len(normal_to_update),
-                    hierarchical_total_count,
+                    result.total_attempted, 
+                    result.total_success,
+                    result.normal_total,
+                    result.hierarchical_total,
                     sync_start_time
                 )
 
                 # Don't raise exception if at least some fields updated successfully
                 # This allows partial updates (e.g., normal fields succeed even if hierarchical fail)
-                if total_succeeded == 0 and total_attempted > 0:
+                if not result.any_success and result.total_attempted > 0:
                     raise PWProjectResponseError(
                         f"All field updates failed for '{project.name}' (HKR {project.hkrId})"
                     )
@@ -374,16 +404,19 @@ class ProjectWiseService:
         return hierarchical_to_update, normal_to_update
 
     def _calculate_update_results(self, normal_to_update: dict, normal_success: bool, 
-                                hierarchical_success_count: int, hierarchical_total_count: int) -> tuple[int, int]:
+                                hierarchical_success_count: int, hierarchical_total_count: int) -> UpdateResult:
         """
-        Calculate total attempted and succeeded field updates.
+        Calculate update results and return as UpdateResult dataclass.
         
         Returns:
-            tuple: (total_attempted, total_succeeded)
+            UpdateResult: Dataclass with success/total counts and computed properties
         """
-        total_attempted = len(normal_to_update) + hierarchical_total_count
-        total_succeeded = (len(normal_to_update) if normal_success else 0) + hierarchical_success_count
-        return total_attempted, total_succeeded
+        return UpdateResult(
+            normal_success=len(normal_to_update) if normal_success else 0,
+            normal_total=len(normal_to_update),
+            hierarchical_success=hierarchical_success_count,
+            hierarchical_total=hierarchical_total_count
+        )
 
     def _get_pw_instance_and_url(self, current_pw_data: dict) -> tuple[str, str]:
         """
