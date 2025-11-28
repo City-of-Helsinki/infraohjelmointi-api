@@ -1,10 +1,12 @@
 from datetime import date
+from io import BytesIO
 from unittest.mock import patch
 import uuid
 
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
+from openpyxl import load_workbook
 
 from infraohjelmointi_api.models import (
     Project,
@@ -242,7 +244,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         response = self.client.post(url)
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("already been sent", response.data["detail"])
+        self.assertIn("Already sent", response.data["detail"])
 
     def test_update_locked_form_returns_403(self):
         """Test that updating a locked form returns 403"""
@@ -535,9 +537,9 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("missing_fields", response.data)
-        self.assertIn("Project name (SAP nimi)", response.data["missing_fields"])
-        self.assertIn("Project type (Laji)", response.data["missing_fields"])
-        self.assertIn("Project number range (Projektinumeroväli)", response.data["missing_fields"])
+        self.assertIn("SAP nimi", response.data["missing_fields"])
+        self.assertIn("Laji", response.data["missing_fields"])
+        self.assertIn("Projektinumeroväli", response.data["missing_fields"])
 
     def test_send_to_talpa_with_complete_form_succeeds(self):
         """Test that sending complete form to Talpa succeeds"""
@@ -614,4 +616,90 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.priority, "Normaali")
+
+    # =========================================================================
+    # Excel Download Tests
+    # =========================================================================
+
+    def test_download_excel_returns_file(self):
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectName="Test Project",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_project_number_range,
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn(".xlsx", response["Content-Disposition"])
+        self.assertGreater(len(response.content), 0)
+
+    def test_download_excel_updates_status(self):
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectName="Test Project",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_project_number_range,
+            status="excel_generated",
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        talpa_opening.refresh_from_db()
+        self.assertEqual(talpa_opening.status, "excel_generated")
+
+    def test_download_excel_sets_status_to_excel_generated(self):
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectName="Test Project",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_project_number_range,
+            status="sent_to_talpa",
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        talpa_opening.refresh_from_db()
+        self.assertEqual(talpa_opening.status, "sent_to_talpa")
+
+    def test_download_excel_valid_excel_content(self):
+        talpa_opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            priority="Normaali",
+            subject="Uusi",
+            projectName="Test Project",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_project_number_range,
+            projectStartDate=date(2026, 1, 15),
+            projectEndDate=date(2032, 12, 31),
+        )
+        
+        url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
+        response = self.client.get(url)
+        
+        excel_data = BytesIO(response.content)
+        wb = load_workbook(excel_data)
+        ws = wb.active
+        
+        self.assertEqual(ws.title, "Projektin avauslomake")
+        self.assertEqual(ws["F2"].value, "Test Project")
+        self.assertEqual(ws["G2"].value, "15.01.2026")
+        self.assertEqual(ws["H2"].value, "31.12.2032")
 
