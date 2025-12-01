@@ -28,6 +28,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
+    CacheService,
     ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
@@ -250,6 +251,27 @@ class ProjectViewSet(BaseViewSet):
 
                     if update_finances:
                         ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
+                
+                # Invalidate cache for all affected projects (bulk operations bypass signals)
+                affected_project_ids = {f.project_id for f in finance_instances}
+                for project_id in affected_project_ids:
+                    affected_project = Project.objects.get(id=project_id)
+                    if affected_project.projectClass:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectClass.id,
+                            instance_type='ProjectClass'
+                        )
+                    if affected_project.projectLocation:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectLocation.id,
+                            instance_type='ProjectLocation'
+                        )
+                    if affected_project.projectGroup:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectGroup.id,
+                            instance_type='ProjectGroup'
+                        )
+                
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
                 post_save.send(
@@ -1245,6 +1267,12 @@ class ProjectViewSet(BaseViewSet):
         if update_location_finances:
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
+
+        current_year = date.today().year
+        for year_offset in range(-2, 13):
+            year = current_year + year_offset
+            CacheService.invalidate_frame_budgets(year=year)
+        CacheService.clear_all()
 
         forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
 

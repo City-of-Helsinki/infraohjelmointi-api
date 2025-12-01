@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class CacheService:
     """Service for caching expensive calculations with circuit breaker pattern."""
 
-    DEFAULT_TIMEOUT = getattr(settings, 'FINANCIAL_CACHE_TIMEOUT', 300)
+    DEFAULT_TIMEOUT = getattr(settings, 'FINANCIAL_CACHE_TIMEOUT', 43200)
     LOOKUP_TIMEOUT = 3600  # 1 hour for lookup tables
     FINANCIAL_SUM_PREFIX = 'financial_sum'
     FRAME_BUDGET_PREFIX = 'frame_budget'
