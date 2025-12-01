@@ -4,6 +4,8 @@ from infraohjelmointi_api.models import TalpaAssetClass
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from overrides import override
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
 
 
 class TalpaAssetClassFilter(django_filters.FilterSet):
@@ -25,6 +27,8 @@ class TalpaAssetClassViewSet(BaseViewSet):
     http_method_names = ["get"]  # Read-only
     filter_backends = [DjangoFilterBackend]
     filterset_class = TalpaAssetClassFilter
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
 
     @override
     def get_queryset(self):

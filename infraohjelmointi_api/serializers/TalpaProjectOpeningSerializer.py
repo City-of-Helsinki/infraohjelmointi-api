@@ -31,25 +31,26 @@ class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
     """Serializer for TalpaProjectNumberRange in dropdowns"""
     class Meta:
         model = TalpaProjectNumberRange
-        fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd", 
+        fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd",
                   "majorDistrict", "majorDistrictName", "area", "unit", "isActive"]
+        ref_name = "TalpaProjectNumberRangeNested"
 
 
 class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
     """
     Serializer for TalpaProjectOpening with lock checking.
-    
+
     Field Aliases (UI compatibility):
     - projectStart -> projectStartDate
     - projectEnd -> projectEndDate
     - assetClassesId -> assetClassId (UI uses plural)
-    
+
     Deprecated Fields (accepted but not used in Excel export):
     - projectDescription
     - responsiblePersonEmail
     - responsiblePersonPhone
     """
-    
+
     # =========================================================================
     # Foreign Key Fields - Read with nested serializer, write with ID
     # =========================================================================
@@ -74,14 +75,14 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
     projectNumberRangeId = serializers.PrimaryKeyRelatedField(
         queryset=TalpaProjectNumberRange.objects.all(), source="projectNumberRange", write_only=True, required=False, allow_null=True
     )
-    
+
     # =========================================================================
     # Metadata Fields
     # =========================================================================
     createdBy = PersonSerializer(read_only=True)
     updatedBy = PersonSerializer(read_only=True)
     isLocked = serializers.SerializerMethodField()
-    
+
     # =========================================================================
     # UI Field Aliases - Accept UI field names, map to model fields
     # These allow the UI to use its preferred field names while the API
@@ -96,7 +97,7 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
         source="projectEndDate", required=False, allow_null=True,
         help_text="Alias for projectEndDate - UI compatibility"
     )
-    
+
     # Holding time derived from assetClass (read-only computed field)
     holdingTime = serializers.SerializerMethodField(
         help_text="Holding period in years, derived from assetClass.holdingPeriodYears"
@@ -106,14 +107,14 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
         model = TalpaProjectOpening
         # BaseMeta already excludes "createdDate", so we don't need to set exclude again
         # Note: We don't need to explicitly list deprecated fields - they're accepted via the model
-    
+
     # =========================================================================
     # Computed Fields
     # =========================================================================
     def get_isLocked(self, obj):
         """Check if the form is locked (status = sent_to_talpa)"""
         return obj.is_locked
-    
+
     def get_holdingTime(self, obj):
         """Get holding period from asset class"""
         if obj.assetClass and obj.assetClass.holdingPeriodYears:
@@ -123,7 +124,7 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
     # =========================================================================
     # Validation
     # =========================================================================
-    
+
     # Define field alias mappings for conflict detection
     # Format: (alias_field, canonical_field, field_description)
     FIELD_ALIAS_CONFLICTS = [
@@ -131,7 +132,7 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
         ("projectEnd", "projectEndDate", "project end date"),
         ("assetClassesId", "assetClassId", "asset class"),
     ]
-    
+
     def _check_conflicting_aliases(self, initial_data):
         """
         Check if both an alias and its canonical field are provided with different values.
@@ -150,7 +151,7 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
                         f"Please provide only one."
                     )
         return conflicts
-    
+
     @override
     def validate(self, attrs):
         """Validate that locked forms cannot be updated and check for conflicting aliases"""
@@ -159,7 +160,7 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
             conflicts = self._check_conflicting_aliases(self.initial_data)
             if conflicts:
                 raise ValidationError({"detail": conflicts})
-        
+
         # Check lock status
         instance = self.instance
         if instance and instance.is_locked:
@@ -180,17 +181,17 @@ class TalpaProjectOpeningSerializer(serializers.ModelSerializer):
                 {"detail": "Form is locked. Cannot update when status is 'sent_to_talpa'."}
             )
         return super().update(instance, validated_data)
-    
+
     def to_representation(self, instance):
         """
         Include both model field names and UI aliases in the response.
         This ensures UI can read using its preferred field names.
         """
         data = super().to_representation(instance)
-        
+
         # Add UI aliases for date fields (in addition to model field names)
         data['projectStart'] = data.get('projectStartDate')
         data['projectEnd'] = data.get('projectEndDate')
-        
+
         return data
 

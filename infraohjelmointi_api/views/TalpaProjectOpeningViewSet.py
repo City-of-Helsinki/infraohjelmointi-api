@@ -17,7 +17,7 @@ from infraohjelmointi_api.services import TalpaExcelService
 
 logger = logging.getLogger("infraohjelmointi_api")
 
-TALPA_ACTIONS = ["get_by_project", "get_priorities", "get_subjects", "download_excel", "send_to_talpa"]
+TALPA_GET_ACTIONS = ["get_by_project", "get_priorities", "get_subjects", "download_excel"]
 
 
 class TalpaProjectOpeningViewSet(BaseViewSet):
@@ -36,8 +36,10 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
     def get_permissions(self):
         if not self.permission_classes:
             return []
-        if self.action in TALPA_ACTIONS:
+        # Allow IsAuthenticated for GET operations (Swagger compatibility)
+        if self.action in ["list", "retrieve"] or self.action in TALPA_GET_ACTIONS:
             return [IsAuthenticated()]
+        # Use AD group permissions for write operations (POST, PUT, PATCH, DELETE, send_to_talpa)
         return super().get_permissions()
 
     @override
@@ -59,16 +61,24 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
         if hasattr(request.user, "person"):
             instance.updatedBy = request.user.person
 
+    @swagger_auto_schema(auto_schema=None)
+    @override
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @swagger_auto_schema(auto_schema=None)
     @override
     def update(self, request, *args, **kwargs):
         error = self._check_locked(self.get_object())
         return error if error else super().update(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     @override
     def partial_update(self, request, *args, **kwargs):
         error = self._check_locked(self.get_object())
         return error if error else super().partial_update(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     @override
     def destroy(self, request, *args, **kwargs):
         error = self._check_locked(self.get_object())
@@ -92,10 +102,7 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
         except TalpaProjectOpening.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    @swagger_auto_schema(
-        operation_description="Lock form and update status to 'sent_to_talpa'",
-        responses={200: TalpaProjectOpeningSerializer, 400: "Validation error"},
-    )
+    @swagger_auto_schema(auto_schema=None)
     @action(methods=["post"], detail=True, url_path=r"send-to-talpa")
     def send_to_talpa(self, request, pk=None):
         instance = self.get_object()
@@ -125,7 +132,7 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
 
     @swagger_auto_schema(
         operation_description="Download Excel for Talpa submission",
-        responses={200: openapi.Response(description="Excel file", schema=openapi.Schema(type=openapi.TYPE_FILE))},
+        responses={200: openapi.Response(description="Excel file")},
     )
     @action(methods=["get"], detail=True, url_path=r"download-excel")
     def download_excel(self, request, pk=None):
