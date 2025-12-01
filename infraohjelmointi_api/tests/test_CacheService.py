@@ -629,9 +629,10 @@ class LookupCacheTest(TestCase):
         result = CacheService.get_lookup('NonExistentModel')
         self.assertIsNone(result)
     
-    def test_lookup_timeout_is_one_hour(self):
-        """Verify lookup cache timeout is 1 hour."""
-        self.assertEqual(CacheService.LOOKUP_TIMEOUT, 3600)
+    def test_cache_timeout_uses_setting(self):
+        """Verify cache timeout uses CACHE_TIMEOUT setting."""
+        expected_timeout = getattr(settings, 'CACHE_TIMEOUT', 43200)
+        self.assertEqual(CacheService.CACHE_TIMEOUT, expected_timeout)
 
 
 @override_settings(CACHES=LOCMEM_CACHE)

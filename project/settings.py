@@ -52,7 +52,7 @@ env = environ.Env(
     SOCIAL_AUTH_TUNNISTAMO_SCOPE=(str, "ad_group"),
     TWISTED_MAX_LINE_LENGTH=(int, 32768),
     RESTRICTED_PROGRAMMER_AD_GROUP=(str, "sg_kymp_sso_io_rajoitetut_ohjelmoijat"),
-    FINANCIAL_CACHE_TIMEOUT=(int, 43200),
+    CACHE_TIMEOUT=(int, 43200),
 )
 
 # Read .env file, but environment variables take precedence
@@ -303,7 +303,7 @@ else:
 REDIS_URL = env('REDIS_URL', default=None)
 REDIS_AVAILABLE = False
 
-FINANCIAL_CACHE_TIMEOUT = env('FINANCIAL_CACHE_TIMEOUT')
+CACHE_TIMEOUT = env('CACHE_TIMEOUT')
 
 
 def _is_test_environment() -> bool:

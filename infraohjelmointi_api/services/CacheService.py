@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 class CacheService:
     """Service for caching expensive calculations with circuit breaker pattern."""
 
-    DEFAULT_TIMEOUT = getattr(settings, 'FINANCIAL_CACHE_TIMEOUT', 43200)
-    LOOKUP_TIMEOUT = 3600  # 1 hour for lookup tables
+    CACHE_TIMEOUT = getattr(settings, 'CACHE_TIMEOUT', 43200)
     FINANCIAL_SUM_PREFIX = 'financial_sum'
     FRAME_BUDGET_PREFIX = 'frame_budget'
     LOOKUP_PREFIX = 'lookup'
@@ -201,7 +200,7 @@ class CacheService:
             for_frame_view=for_frame_view,
             for_coordinator=for_coordinator
         )
-        cls._safe_cache_set(cache_key, data, timeout or cls.DEFAULT_TIMEOUT)
+        cls._safe_cache_set(cache_key, data, timeout or cls.CACHE_TIMEOUT)
 
     @classmethod
     def get_frame_budgets(cls, year: int, for_frame_view: bool) -> Optional[dict]:
@@ -220,7 +219,7 @@ class CacheService:
             year=year,
             for_frame_view=for_frame_view
         )
-        cls._safe_cache_set(cache_key, data, timeout or cls.DEFAULT_TIMEOUT)
+        cls._safe_cache_set(cache_key, data, timeout or cls.CACHE_TIMEOUT)
 
     @classmethod
     def invalidate_financial_sum(cls, instance_id: str, instance_type: str) -> None:
@@ -285,7 +284,7 @@ class CacheService:
     @classmethod
     def set_lookup(cls, table_name: str, data: List[dict]) -> None:
         cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
-        cls._safe_cache_set(cache_key, data, cls.LOOKUP_TIMEOUT)
+        cls._safe_cache_set(cache_key, data, cls.CACHE_TIMEOUT)
 
     @classmethod
     def invalidate_lookup(cls, table_name: str) -> None:
