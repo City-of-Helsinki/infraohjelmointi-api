@@ -18,3 +18,4 @@ from .LocationFinancialService import LocationFinancialService
 from .SapApiService import SapApiService
 from .SapCostService import SapCostService
 from .AppStateValueService import AppStateValueService
+from .CacheService import CacheService
