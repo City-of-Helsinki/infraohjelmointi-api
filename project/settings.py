@@ -9,11 +9,21 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
-from os import path
+import concurrent.futures
+import logging
 import os
+import socket
+import sys
+import time
+from os import path
 from pathlib import Path
+from urllib.parse import urlparse
+
 import dj_database_url
 import environ
+
+# Initialize logger early for use in settings configuration
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,8 +54,44 @@ env = environ.Env(
     RESTRICTED_PROGRAMMER_AD_GROUP=(str, "sg_kymp_sso_io_rajoitetut_ohjelmoijat"),
 )
 
+# Read .env file, but environment variables take precedence
+# IMPORTANT: docker-compose processes env_file FIRST, then environment: section overrides it
+# So when Django starts, environment variables from docker-compose should already be in os.environ
+# read_env() with overwrite=False will NOT overwrite existing environment variables
+# However, if env_file loaded .env first, we need to ensure environment: values take precedence
 if path.exists(".env"):
-    environ.Env().read_env(".env")
+    # Store original values before reading .env (in case they were set by docker-compose)
+    original_redis_url = os.environ.get('REDIS_URL')
+    original_db_url = os.environ.get('DATABASE_URL')
+    
+    # Log what's in environment before reading .env
+    logger.info("Environment variables before .env read:")
+    for key, value in [('REDIS_URL', original_redis_url), ('DATABASE_URL', original_db_url)]:
+        if value:
+            safe_value = value.split('@')[-1] if '@' in value else value
+            logger.info(f"  {key}={safe_value}")
+        else:
+            logger.info(f"  {key}=<not set>")
+    
+    # Read .env file (won't overwrite existing env vars due to overwrite=False)
+    env.read_env(".env", overwrite=False)
+    
+    # Restore original values if they were set (docker-compose environment: takes precedence)
+    if original_redis_url:
+        os.environ['REDIS_URL'] = original_redis_url
+        logger.info(f"Restored REDIS_URL from docker-compose: {original_redis_url.split('@')[-1] if '@' in original_redis_url else original_redis_url}")
+    if original_db_url:
+        os.environ['DATABASE_URL'] = original_db_url
+    
+    # Log final values
+    logger.info("Environment variables after .env read and restore:")
+    for key in ['REDIS_URL', 'DATABASE_URL']:
+        value = os.environ.get(key)
+        if value:
+            safe_value = value.split('@')[-1] if '@' in value else value
+            logger.info(f"  {key}={safe_value}")
+        else:
+            logger.info(f"  {key}=<not set>")
 
 DEBUG = env("DEBUG")
 DJANGO_LOG_LEVEL = env("DJANGO_LOG_LEVEL")
@@ -241,15 +287,177 @@ LOGGING = {
 }
 
 
-# Caching framework defaults
+# Caching framework - Redis for production, LocMemCache as fallback
+# Note: logger is already defined at the top of the file
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
-        "OPTIONS": {"MAX_ENTRIES": 300},
+# Get REDIS_URL from environment (docker-compose or .env)
+# Also log what's actually in os.environ to debug docker-compose override
+redis_url_from_os = os.environ.get('REDIS_URL')
+if redis_url_from_os:
+    safe_os_url = redis_url_from_os.split('@')[-1] if '@' in redis_url_from_os else redis_url_from_os
+    logger.info(f"REDIS_URL from os.environ (before env() call): {safe_os_url}")
+else:
+    logger.info("REDIS_URL not in os.environ (before env() call)")
+
+REDIS_URL = env('REDIS_URL', default=None)
+REDIS_AVAILABLE = False
+
+
+def _is_test_environment() -> bool:
+    return 'test' in sys.argv or (sys.argv and 'pytest' in sys.argv[0])
+
+
+def check_redis_availability(redis_url: str, max_retries: int = 5, initial_delay: float = 0.5) -> bool:
+    """Check if Redis is available. Uses thread-based timeout in test environments."""
+    parsed = urlparse(redis_url)
+    host = parsed.hostname or 'localhost'
+    port = parsed.port or 6379
+    
+    # In test environments, use single attempt with thread-based timeout
+    # to handle DNS hanging issues when Redis container is stopped
+    if _is_test_environment():
+        def try_connect():
+            try:
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.settimeout(0.5)
+                result = test_socket.connect_ex((host, port))
+                test_socket.close()
+                return result == 0
+            except Exception:
+                return False
+        
+        # Use ThreadPoolExecutor with timeout to handle DNS hanging
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(try_connect)
+                return future.result(timeout=1.0)  # 1 second total timeout including DNS
+        except (concurrent.futures.TimeoutError, Exception):
+            logger.info("Test environment: Redis check timed out or failed")
+            return False
+    
+    # Production: use normal retry logic
+    retry_delay = initial_delay
+    
+    for attempt in range(max_retries):
+        try:
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.settimeout(2.0)
+            result = test_socket.connect_ex((host, port))
+            test_socket.close()
+            
+            if result == 0:
+                return True
+        except Exception:
+            pass
+        
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+            retry_delay *= 1.5  # Exponential backoff
+    
+    return False
+
+
+def parse_redis_url(redis_url: str) -> dict:
+    parsed = urlparse(redis_url)
+    config = {
+        'host': parsed.hostname or 'localhost',
+        'port': parsed.port or 6379,
+        'db': int(parsed.path.lstrip('/') or 0) if parsed.path else 0,
     }
-}
+    if parsed.password:
+        config['password'] = parsed.password
+    return config
+
+
+# Configure Redis if URL is provided
+if REDIS_URL:
+    # Log the REDIS_URL being used (mask password if present)
+    if '@' in REDIS_URL:
+        safe_url = REDIS_URL.split('@')[-1]
+        logger.info(f"Using REDIS_URL: redis://***@{safe_url}")
+    else:
+        logger.info(f"Using REDIS_URL: {REDIS_URL}")
+    
+    # Test Redis connectivity with retries (for Docker Compose startup timing)
+    # django-redis will handle actual connection and errors gracefully
+    REDIS_AVAILABLE = check_redis_availability(REDIS_URL)
+    
+    if not REDIS_AVAILABLE:
+        parsed = urlparse(REDIS_URL)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 6379
+        logger.debug(f"Redis not immediately available at {host}:{port}, will attempt connection on first use")
+else:
+    logger.info("REDIS_URL not configured")
+
+# Configure Redis cache backend if REDIS_URL is provided
+# Always configure Redis backend if URL is set, even if not immediately available
+# django-redis with IGNORE_EXCEPTIONS will handle connection failures gracefully
+# This allows cache to work when Redis becomes available without restart
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "IGNORE_EXCEPTIONS": True,
+                "SOCKET_CONNECT_TIMEOUT": 1,
+                "SOCKET_TIMEOUT": 1,
+                "CONNECTION_POOL_KWARGS": {
+                    "max_connections": 10,
+                    "retry_on_timeout": False,
+                    "socket_connect_timeout": 1,
+                    "socket_timeout": 1,
+                },
+            },
+            "KEY_PREFIX": "infraohjelmointi",
+            "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
+        }
+    }
+
+    # Configure django-eventstream to use Redis for SSE event storage (fixes IO-725)
+    # EVENTSTREAM_REDIS is the correct way to configure Redis for django-eventstream
+    # This enables multi-pod event sharing via Redis
+    # Only configure EVENTSTREAM_REDIS if Redis is actually available at startup
+    # If not available, django-eventstream will fall back to in-memory storage
+    # Note: If Redis goes down after startup, EVENTSTREAM_REDIS will still be set,
+    # but django-eventstream should handle connection failures gracefully by falling back
+    # to in-memory storage (events won't be shared across pods, but app will work)
+    if REDIS_AVAILABLE:
+        redis_config = parse_redis_url(REDIS_URL)
+        EVENTSTREAM_REDIS = {
+            'host': redis_config['host'],
+            'port': redis_config['port'],
+            'db': redis_config['db'],
+        }
+        if 'password' in redis_config:
+            EVENTSTREAM_REDIS['password'] = redis_config['password']
+        logger.info("django-eventstream configured to use Redis for multi-pod event sharing")
+    else:
+        # Don't set EVENTSTREAM_REDIS - django-eventstream will use in-memory storage
+        # This allows the app to work without Redis (events won't be shared across pods, but that's OK)
+        logger.info("Redis not available - django-eventstream will use in-memory storage (single-pod only)")
+    
+    safe_url = REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL
+    logger.info("Redis cache configured: %s", safe_url)
+    if not REDIS_AVAILABLE:
+        logger.info("Redis URL configured but not available at startup - cache will attempt connection on first use")
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        }
+    }
+    logger.info("Redis not configured - cache disabled (development/local)")
+
+# GRIP proxy configuration (optional - not needed for your scale)
+GRIP_URL = env('GRIP_URL', default=None)
+if GRIP_URL:
+    GRIP_PROXIES = [GRIP_URL]
+    logger.info("GRIP proxy configured: %s", GRIP_URL)
+else:
+    logger.debug("Using direct SSE (no GRIP proxy)")
 
 
 # Swagger settings

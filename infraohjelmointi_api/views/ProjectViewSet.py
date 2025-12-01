@@ -925,6 +925,7 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
+                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
                 .filter(
                     Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
@@ -949,6 +950,7 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
+                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
             )
         masterClass = self.request.query_params.getlist("masterClass", [])

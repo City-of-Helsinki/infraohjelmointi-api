@@ -1,8 +1,6 @@
-version: "3.9"
-
 services:
   db:
-    image: postgres
+    image: postgres:17
     volumes:
       - database-volume:/var/lib/postgresql/data
     environment:
@@ -12,6 +10,25 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     container_name: infraohjelmointi-api-database
+
+  redis:
+    image: redis:7-alpine
+    container_name: infraohjelmointi-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command:
+      - redis-server
+      - --save 60 1              # Persist every 60s if ≥1 key changed
+      - --loglevel warning       # Less verbose logging
+      - --maxmemory 200mb        # Memory limit
+      - --maxmemory-policy allkeys-lru  # Evict least-used when full
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   api:
     image: infraohjelmointi_api
@@ -26,10 +43,14 @@ services:
       - "127.0.0.1:8000:8000"
     container_name: infraohjelmointi-api
     depends_on:
-      - db
+      db:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
 volumes:
   database-volume: {}
+  redis-data: {}
 
 networks:
   default:

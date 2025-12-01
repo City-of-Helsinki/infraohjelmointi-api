@@ -28,3 +28,9 @@ class ProjectLocation(models.Model):
         null=True,
     )
     forCoordinatorOnly = models.BooleanField(default=False)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['parent'], name='idx_projectlocation_parent'),
+            models.Index(fields=['parentClass'], name='idx_projloc_parentclass'),
+        ]

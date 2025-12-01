@@ -39,11 +39,19 @@ class ProjectGroupViewSet(BaseViewSet):
             JSON
                 List of ProjectGroup instances with financial sums for projects under each group
         """
+        from django.db.models import Prefetch
+        from infraohjelmointi_api.models import Project
+        
         year = request.query_params.get("year", date.today().year)
         qs = self.get_queryset().select_related(
             "classRelation",
             "locationRelation",
             "location",
+        ).prefetch_related(
+            Prefetch(
+                'project_set',
+                queryset=Project.objects.filter(programmed=True).prefetch_related('finances'),
+            ),
         )
         serializer = self.get_serializer(qs, many=True, context={"finance_year": year})
 

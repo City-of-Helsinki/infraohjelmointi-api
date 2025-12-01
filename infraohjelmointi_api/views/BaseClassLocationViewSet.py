@@ -7,6 +7,7 @@ from rest_framework import status
 
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.models import ClassFinancial, LocationFinancial
+from infraohjelmointi_api.services.CacheService import CacheService
 
 
 class BaseClassLocationViewSet(BaseViewSet):
@@ -18,6 +19,7 @@ class BaseClassLocationViewSet(BaseViewSet):
     def build_frame_budgets_context(year: int, for_frame_view: bool = False) -> defaultdict:
         """
         Build frame_budgets context for consistent budget overlap logic.
+        Uses caching for performance optimization.
         
         Args:
             year: Starting year for frame budget collection
@@ -25,13 +27,13 @@ class BaseClassLocationViewSet(BaseViewSet):
             
         Returns:
             defaultdict: Dictionary with keys "{year}-{relation_id}" and frameBudget values
-            
-        Note:
-            The for_frame_view parameter helps avoid counting duplicate records created by IO-353.
-            IO-353 introduced forFrameView field and created duplicate financial records.
-            Use for_frame_view=False to count only original records (recommended for budget overlap).
         """
-        # Filter financial records by year and forFrameView to avoid counting duplicates
+        cached_frame_budgets = CacheService.get_frame_budgets(year=year, for_frame_view=for_frame_view)
+        if cached_frame_budgets is not None:
+            frame_budgets = defaultdict(lambda: 0)
+            frame_budgets.update(cached_frame_budgets)
+            return frame_budgets
+        
         class_financials = ClassFinancial.objects.filter(
             year__in=range(year, year+11),
             forFrameView=for_frame_view
@@ -45,7 +47,16 @@ class BaseClassLocationViewSet(BaseViewSet):
         financials = class_financials.union(location_financials)
         frame_budgets = defaultdict(lambda: 0)
         for f in financials:
-            frame_budgets[f"{f['year']}-{f['relation']}"] = f["frameBudget"]
+            relation_id = str(f['relation']) if f['relation'] else None
+            if relation_id:
+                frame_budgets[f"{f['year']}-{relation_id}"] = f["frameBudget"]
+        
+        CacheService.set_frame_budgets(
+            year=year,
+            for_frame_view=for_frame_view,
+            data=dict(frame_budgets)
+        )
+        
         return frame_budgets
 
     @staticmethod
@@ -267,7 +278,14 @@ class BaseClassLocationViewSet(BaseViewSet):
             obj.finance_year = start_year
             obj.save()
             
-            # Update frame view if needed
+            CacheService.invalidate_financial_sum(
+                instance_id=entity_id,
+                instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
+            )
+            for year_offset in range(-10, 1):
+                affected_year = year + year_offset
+                if affected_year >= 2000:
+                    CacheService.invalidate_frame_budgets(year=affected_year)
             self._update_frame_view_if_needed(
                 forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
             )
@@ -283,7 +301,14 @@ class BaseClassLocationViewSet(BaseViewSet):
             obj.finance_year = start_year
             obj.save()
             
-            # Update frame view if needed
+            CacheService.invalidate_financial_sum(
+                instance_id=entity_id,
+                instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
+            )
+            for year_offset in range(-10, 1):
+                affected_year = year + year_offset
+                if affected_year >= 2000:
+                    CacheService.invalidate_frame_budgets(year=affected_year)
             self._update_frame_view_if_needed(
                 forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
             )
@@ -324,9 +349,6 @@ class BaseClassLocationViewSet(BaseViewSet):
         """
         year = int(request.query_params.get("year", date.today().year))
         qs = self.get_queryset()
-        
-        # Build frame_budgets context for consistent budget overlap logic
-        # This ensures programming and coordination views use the same method
         frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
         
         serializer = self.get_serializer(
@@ -338,6 +360,22 @@ class BaseClassLocationViewSet(BaseViewSet):
             }
         )
 
+        return Response(serializer.data)
+
+    @override
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        year = int(request.query_params.get("year", date.today().year))
+        frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
+        
+        serializer = self.get_serializer(
+            instance,
+            context={
+                "finance_year": year,
+                "frame_budgets": frame_budgets
+            }
+        )
+        
         return Response(serializer.data)
 
     def is_patch_data_valid(self, data):

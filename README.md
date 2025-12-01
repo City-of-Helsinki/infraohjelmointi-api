@@ -14,6 +14,7 @@ Technical documentation can be found from [Confluence](https://helsinkisolutiono
 - [Add or delete API token](#add-or-delete-api-token)
 - [Managing project packages](#managing-project-packages)
 - [Tests](#tests)
+- [Caching](#caching)
 - [External data sources](#external-data-sources)
 - [Production release](#production-release)
 
@@ -223,6 +224,31 @@ the % locally, a report can be created with pytest-cov.
     pytest --cov=infraohjelmointi_api/
     ```
     to get the test coverage report from the whole project. You can also specify folders or files by changing the value given to `--cov=`
+
+## Caching
+
+The API uses Redis to cache expensive financial calculations. Caching is 
+optional: the application works without Redis but with slower response times for financial data.
+
+### Local development
+
+Redis runs automatically via docker-compose. No configuration needed.
+
+### Production
+
+Set the `REDIS_URL` environment variable in the Azure DevOps variable group:
+
+```
+REDIS_URL=redis://redis:6379/0
+```
+
+The Redis deployment is handled by the pipeline (`devops/redis-deployment.yml`).
+
+### Behavior
+
+- If Redis is unavailable, the application continues to work (graceful degradation)
+- A circuit breaker disables cache operations after repeated failures to prevent cascading issues
+- Cache is automatically re-enabled when Redis becomes available again
 
 ## External data sources
 

@@ -1,12 +1,9 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.ProjectPhaseSerializer import (
-    ProjectPhaseSerializer,
-)
+from infraohjelmointi_api.serializers.ProjectPhaseSerializer import ProjectPhaseSerializer
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ProjectPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows project phase to be viewed or edited.
-    """
+class ProjectPhaseViewSet(CachedLookupViewSet):
+    """API endpoint for project phases (cached)."""
 
     serializer_class = ProjectPhaseSerializer
