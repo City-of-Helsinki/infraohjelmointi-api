@@ -4,6 +4,7 @@ import environ
 import re
 import logging
 import time
+from dataclasses import dataclass
 
 from datetime import datetime
 
@@ -17,13 +18,18 @@ from ..models import (
 from .PersonService import PersonService
 from .ProjectService import ProjectService
 from .ProjectLocationService import ProjectLocationService
+from .ProjectPhaseService import ProjectPhaseService
+from .ProjectAreaService import ProjectAreaService
+from .ProjectTypeService import ProjectTypeService
+from .ResponsibleZoneService import ResponsibleZoneService
+from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 
 from .utils import (
     ProjectWiseDataMapper,
-    ProjectWiseDataFieldNotFound,
     create_comprehensive_project_data,
 )
-from .utils.ProjectWiseDataMapper import to_pw_map
+from .utils.PWConfig import PWConfig
+from .utils.PWLogger import PWLogger
 
 env = environ.Env()
 env.escape_proxy = True
@@ -34,7 +40,49 @@ if path.exists(".env"):
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 
 
+@dataclass
+class UpdateResult:
+    """Result of a ProjectWise update operation."""
+    normal_success: int = 0
+    normal_total: int = 0
+    hierarchical_success: int = 0
+    hierarchical_total: int = 0
+
+    @property
+    def total_success(self) -> int:
+        """Total number of successfully updated fields."""
+        return self.normal_success + self.hierarchical_success
+
+    @property
+    def total_attempted(self) -> int:
+        """Total number of fields attempted to update."""
+        return self.normal_total + self.hierarchical_total
+
+    @property
+    def success_rate(self) -> float:
+        """Success rate as a fraction (0.0 to 1.0)."""
+        return self.total_success / self.total_attempted if self.total_attempted else 0.0
+
+    @property
+    def any_success(self) -> bool:
+        """Whether any fields were successfully updated."""
+        return self.total_success > 0
+
+
 class ProjectWiseService:
+    """Service for ProjectWise integration."""
+
+    # Class constants - defined once, used everywhere
+    HIERARCHICAL_FIELD_ORDER = [
+        'PROJECT_Pluokka',           # Main classification
+        'PROJECT_Luokka',            # Sub-classification
+        'PROJECT_Alaluokka',         # Sub-sub-classification
+        'PROJECT_Suurpiirin_nimi',   # District
+        'PROJECT_Kaupunginosan_nimi',# Sub-district
+        'PROJECT_Osa_alue'           # Sub-area
+    ]
+    HIERARCHICAL_FIELDS = set(HIERARCHICAL_FIELD_ORDER)  # O(1) lookup
+
     def __init__(self) -> None:
         self.session = requests.Session()
         self.session.auth = (env("PW_USERNAME"), env("PW_PASSWORD"))
@@ -46,21 +94,6 @@ class ProjectWiseService:
         self.pw_sync_enabled = env.bool("PW_SYNC_ENABLED", default=False)
         
         self.project_wise_data_mapper = ProjectWiseDataMapper()
-
-        # preload data from DB to optimize performance
-        self.project_phases = self.project_wise_data_mapper.load_and_transform_phases()
-        self.project_areas = (
-            self.project_wise_data_mapper.load_and_transform_project_areas()
-        )
-        self.responsible_zones = (
-            self.project_wise_data_mapper.load_and_transform_responsible_zones()
-        )
-        self.construction_phase_details = (
-            self.project_wise_data_mapper.load_and_transform_construction_phase_details()
-        )
-        self.project_types = (
-            self.project_wise_data_mapper.load_and_transform_project_types()
-        )
 
     @staticmethod
     def _normalize_classification_format(value):
@@ -143,21 +176,14 @@ class ProjectWiseService:
         Returns:
             Tuple of (success_count, total_count)
         """
-        HIERARCHICAL_FIELD_ORDER = [
-            'PROJECT_Pluokka',
-            'PROJECT_Luokka',
-            'PROJECT_Alaluokka',
-            'PROJECT_Suurpiirin_nimi',
-            'PROJECT_Kaupunginosan_nimi',
-            'PROJECT_Osa_alue'
-        ]
+        # Use class constant instead of local definition
 
         success_count = 0
         total_count = len(hierarchical_fields)
 
-        logger.info(f"Updating {total_count} hierarchical fields one-at-a-time for '{project_name}' (HKR {hkr_id})")
+        PWLogger.log_hierarchical_field_update_start(project_name, hkr_id, total_count)
 
-        for field_name in HIERARCHICAL_FIELD_ORDER:
+        for field_name in self.HIERARCHICAL_FIELD_ORDER:
             if field_name not in hierarchical_fields:
                 continue
 
@@ -181,21 +207,22 @@ class ProjectWiseService:
                 response = self.session.post(url=api_url, json=pw_update_data)
 
                 if response.status_code == 200:
-                    logger.info(f"  [OK] {field_name}: '{field_value}' - SUCCESS")
+                    PWLogger.log_hierarchical_field_result(field_name, field_value, True)
                     success_count += 1
                 else:
-                    logger.warning(f"  [FAIL] {field_name}: '{field_value}' - FAILED (status {response.status_code})")
+                    error_message = None
                     try:
                         error_detail = response.json()
-                        logger.warning(f"    Error: {error_detail.get('errorMessage', 'Unknown')}")
-                    except:
+                        error_message = error_detail.get('errorMessage', 'Unknown')
+                    except Exception:
                         pass
+                    PWLogger.log_hierarchical_field_result(field_name, field_value, False, response.status_code, error_message)
 
                 # Small delay between updates
-                time.sleep(0.5)
+                time.sleep(PWConfig.HIERARCHICAL_FIELD_DELAY)
 
             except Exception as e:
-                logger.error(f"  [ERROR] {field_name}: Exception - {str(e)}")
+                PWLogger.log_hierarchical_field_result(field_name, str(e), False)
 
         return success_count, total_count
 
@@ -203,11 +230,7 @@ class ProjectWiseService:
         """Method to synchronise project with given PW id to PW, or sync given project with data.\n"""
         
         if not self.pw_sync_enabled:
-            logger.warning(
-                "ProjectWise sync is DISABLED (PW_SYNC_ENABLED=False). "
-                "Skipping sync to prevent dev/local data from reaching production PW. "
-                "Set PW_SYNC_ENABLED=True in production environment only."
-            )
+            PWLogger.log_sync_disabled_warning()
             return
 
         if pw_id:
@@ -215,6 +238,7 @@ class ProjectWiseService:
             project_obj = ProjectService.get_by_hkr_id(hkr_id=pw_id)
             self.__sync_project_to_pw(data={}, project=project_obj)
         elif project and data is not None:
+            PWLogger.log_sync_start(project.name, project.hkrId, "AUTOMATIC SYNC")
             logger.debug(f"Synchronizing project '{project.name}' (ID: {project.id}) to PW")
             self.__sync_project_to_pw(data=data, project=project)
         else:
@@ -237,21 +261,10 @@ class ProjectWiseService:
 
             # Log filtered fields for diagnostics
             filtered_out = {k: v for k, v in data.items() if k not in filtered_data}
-            if filtered_out:
-                logger.debug(f"Fields filtered out by overwrite rules for '{project.name}': {list(filtered_out.keys())}")
-                
-                field_categories = {
-                    'classification': [f for f in filtered_out.keys() if f in ['projectClass', 'projectDistrict']],
-                    'protected': [f for f in filtered_out.keys() if f in ['description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']],
-                    'empty_tool': [f for f in filtered_out.keys() if f not in ['projectClass', 'projectDistrict', 'description', 'presenceStartDate', 'presenceEndDate', 'visibilityStartDate', 'visibilityEndDate', 'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']]
-                }
-                
-                for category, fields in field_categories.items():
-                    if fields:
-                        logger.info(f"  Filtered ({category}): {fields}")
+            PWLogger.log_overwrite_rules(project.name, filtered_out)
 
             if not filtered_data:
-                logger.info(f"No data to update for project '{project.name}' (HKR ID: {project.hkrId}) - all fields filtered by overwrite rules")
+                PWLogger.log_no_data_to_sync(project.name, project.hkrId, "all fields filtered by overwrite rules")
                 logger.debug(f"Original data had {len(data)} fields: {list(data.keys())}")
                 logger.debug(f"Current PW data: {current_pw_properties}")
                 return
@@ -260,33 +273,21 @@ class ProjectWiseService:
                 data=filtered_data, project=project
             )
 
-            # Log data being sent to PW
-            logger.info(f"Sending {len(pw_project_data)} fields to PW for '{project.name}': {list(pw_project_data.keys())}")
-            logger.debug(f"Full PW data payload: {pw_project_data}")
+            # Log comprehensive data analysis (matching mass update quality)
+            PWLogger.log_data_preparation(project.name, pw_project_data, data)
 
             if pw_project_data:
-                pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
+                pw_instance_id, api_url = self._get_pw_instance_and_url(current_pw_data)
 
-                schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
-                api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
-
-                logger.info(f"=" * 80)
-                logger.info(f"UPDATING PROJECT: '{project.name}' (HKR ID: {project.hkrId})")
-                logger.info(f"PW Instance ID: {pw_instance_id}")
+                # Performance tracking (matching mass update)
+                sync_start_time = time.time()
 
                 # Split hierarchical fields from normal fields
                 # Hierarchical fields need one-at-a-time updates due to PW governance rules
-                HIERARCHICAL_FIELDS = {
-                    'PROJECT_Pluokka',
-                    'PROJECT_Luokka',
-                    'PROJECT_Alaluokka',
-                    'PROJECT_Suurpiirin_nimi',
-                    'PROJECT_Kaupunginosan_nimi',
-                    'PROJECT_Osa_alue'
-                }
-
-                hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in HIERARCHICAL_FIELDS}
-                normal_to_update = {k: v for k, v in pw_project_data.items() if k not in HIERARCHICAL_FIELDS}
+                hierarchical_to_update, normal_to_update = self._split_fields_by_type(pw_project_data)
+                
+                # Log update operation details
+                PWLogger.log_update_operation(project.name, project.hkrId, pw_instance_id, normal_to_update, hierarchical_to_update)
 
                 normal_success = False
                 hierarchical_success_count = 0
@@ -294,9 +295,10 @@ class ProjectWiseService:
 
                 # Update normal fields in batch (existing behavior)
                 if normal_to_update:
-                    logger.info(f"Updating {len(normal_to_update)} normal fields in batch")
-                    logger.debug(f"Normal fields: {list(normal_to_update.keys())}")
 
+                    # Extract schema and class names from endpoint
+                    schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
+                    
                     pw_update_data = {
                         "instance": {
                             "schemaName": schema_name,
@@ -311,14 +313,15 @@ class ProjectWiseService:
                         response = self.session.post(url=api_url, json=pw_update_data)
 
                         if response.status_code == 200:
-                            logger.info("[OK] Normal fields updated successfully")
+                            PWLogger.log_field_update_result(True, "Normal", len(normal_to_update))
                             normal_success = True
                         else:
-                            logger.error(f"[FAIL] Normal fields update failed (status {response.status_code})")
+                            PWLogger.log_field_update_result(False, "Normal", len(normal_to_update))
+                            logger.error(f"Normal fields update failed (status {response.status_code})")
                             try:
                                 error_detail = response.json()
                                 logger.error(f"  Error: {error_detail}")
-                            except:
+                            except Exception:
                                 logger.error(f"  Error: {response.reason}")
 
                             # Raise exception if normal fields fail - this is unexpected
@@ -356,19 +359,24 @@ class ProjectWiseService:
                     logger.info("No hierarchical fields to update")
 
                 # Overall result
-                total_attempted = len(normal_to_update) + hierarchical_total_count
-                total_succeeded = (len(normal_to_update) if normal_success else 0) + hierarchical_success_count
-
-                logger.info(f"=" * 80)
-                logger.info(
-                    f"UPDATE RESULT: {total_succeeded}/{total_attempted} fields updated for "
-                    f"'{project.name}' (HKR {project.hkrId})"
+                result = self._calculate_update_results(
+                    normal_to_update, normal_success, hierarchical_success_count, hierarchical_total_count
                 )
-                logger.info(f"=" * 80)
+
+                # Log final sync result with performance metrics
+                PWLogger.log_sync_result(
+                    project.name, 
+                    project.hkrId, 
+                    result.total_attempted, 
+                    result.total_success,
+                    result.normal_total,
+                    result.hierarchical_total,
+                    sync_start_time
+                )
 
                 # Don't raise exception if at least some fields updated successfully
                 # This allows partial updates (e.g., normal fields succeed even if hierarchical fail)
-                if total_succeeded == 0 and total_attempted > 0:
+                if not result.any_success and result.total_attempted > 0:
                     raise PWProjectResponseError(
                         f"All field updates failed for '{project.name}' (HKR {project.hkrId})"
                     )
@@ -379,11 +387,48 @@ class ProjectWiseService:
             PWProjectResponseError,
             PWProjectNotFoundError,
         ) as e:
-            logger.error(
-                f"Error occured while syncing project '{project.id}' to PW with data '{data}'. {e}"
-            )
+            # Enhanced error logging (matching mass update quality)
+            PWLogger.log_sync_error(project.name, project.hkrId, e, data)
             # Re-raise the exception so mass update can count it as an error
             raise
+
+    def _split_fields_by_type(self, pw_project_data: dict) -> tuple[dict, dict]:
+        """
+        Split PW project data into hierarchical and normal fields.
+        
+        Returns:
+            tuple: (hierarchical_fields, normal_fields)
+        """
+        hierarchical_to_update = {k: v for k, v in pw_project_data.items() if k in self.HIERARCHICAL_FIELDS}
+        normal_to_update = {k: v for k, v in pw_project_data.items() if k not in self.HIERARCHICAL_FIELDS}
+        return hierarchical_to_update, normal_to_update
+
+    def _calculate_update_results(self, normal_to_update: dict, normal_success: bool, 
+                                hierarchical_success_count: int, hierarchical_total_count: int) -> UpdateResult:
+        """
+        Calculate update results and return as UpdateResult dataclass.
+        
+        Returns:
+            UpdateResult: Dataclass with success/total counts and computed properties
+        """
+        return UpdateResult(
+            normal_success=len(normal_to_update) if normal_success else 0,
+            normal_total=len(normal_to_update),
+            hierarchical_success=hierarchical_success_count,
+            hierarchical_total=hierarchical_total_count
+        )
+
+    def _get_pw_instance_and_url(self, current_pw_data: dict) -> tuple[str, str]:
+        """
+        Extract PW instance ID and build API URL for project update.
+        
+        Returns:
+            tuple: (instance_id, api_url)
+        """
+        pw_instance_id = current_pw_data["relationshipInstances"][0]["relatedInstance"]["instanceId"]
+        schema_name, class_name, *_ = self.pw_api_project_update_endpoint.split("/")
+        api_url = f"{self.pw_api_url}{self.pw_api_project_update_endpoint}{pw_instance_id}"
+        return pw_instance_id, api_url
 
     def _apply_overwrite_rules(self, data: dict, project: Project, current_pw_properties: dict) -> dict:
         """
@@ -406,8 +451,7 @@ class ProjectWiseService:
                     filtered_data[field_name] = field_value
 
             except Exception as e:
-                logger.error(f"Error processing field '{field_name}': {str(e)}")
-                logger.warning(f"SKIP: Field '{field_name}' - validation failed, not sending to PW")
+                PWLogger.log_field_processing_error(field_name, e)
                 # BUG FIX: SKIP fields that fail validation instead of including them
                 # Previously we included failed fields "to be safe", but this caused us to send
                 # locked/invalid fields to PW, which PW would silently reject
@@ -420,16 +464,7 @@ class ProjectWiseService:
         Determine if a specific field should be included in the PW update based on overwrite rules.
         """
         # Protected fields: never overwrite if PW has data (IO-396 requirements)
-        protected_fields = {
-            'description',           # Protected per ticket requirements
-            'presenceStart',         # Esilläolo - never overwrite
-            'presenceEnd',           # Esilläolo - never overwrite
-            'visibilityStart',       # Nähtävilläolo - never overwrite
-            'visibilityEnd',         # Nähtävilläolo - never overwrite
-            'masterPlanAreaNumber',  # Write: never
-            'trafficPlanNumber',     # Write: never
-            'bridgeNumber'           # Write: never
-        }
+        protected_fields = PWConfig.PROTECTED_FIELDS
 
         # Get PW field mapping
         pw_field_name = self._get_pw_field_mapping().get(field_name)
@@ -451,7 +486,7 @@ class ProjectWiseService:
         # Verbose logging for critical fields
         if field_name in ['programmed', 'phase', 'type', 'projectClass', 'projectDistrict']:
             project_obj_value = getattr(project, field_name, None)
-            logger.info(f"CRITICAL FIELD '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
+            logger.debug(f"Field '{field_name}': data_value={field_value}, project_obj={project_obj_value}, pw_value={pw_value}, tool_empty={project_empty}, pw_has_data={pw_has_data}")
 
         # Classification hierarchy fields (projectClass, projectDistrict): attempt to send
         # If PW rejects (e.g., folder structure doesn't exist), the try-catch mechanism will handle it
@@ -464,68 +499,53 @@ class ProjectWiseService:
         if field_name in protected_fields:
             # Protected field: never overwrite if PW has data
             if pw_has_data:
-                logger.debug(f"SKIP: Protected field '{field_name}' - PW has data: '{pw_value}'")
+                PWLogger.log_field_decision(field_name, "SKIP", "Protected field", pw_value=pw_value)
                 return False
             else:
-                logger.debug(f"INCLUDE: Protected field '{field_name}' - PW has no data")
+                PWLogger.log_field_decision(field_name, "INCLUDE", "Protected field")
                 return True
         else:
             # Regular field: only skip if infra tool is empty but PW has data
             if project_empty and pw_has_data:
-                logger.debug(f"SKIP: Field '{field_name}' - infra tool empty but PW has data: '{pw_value}'")
+                PWLogger.log_field_decision(field_name, "SKIP", "Field", pw_value=pw_value)
                 return False
             else:
                 if not project_empty:
-                    logger.debug(f"INCLUDE: Field '{field_name}' - infra tool has data (value: {field_value})")
+                    PWLogger.log_field_decision(field_name, "INCLUDE", "Field", data_value=str(field_value))
                 else:
-                    logger.debug(f"INCLUDE: Field '{field_name}' - both infra tool and PW are empty")
+                    PWLogger.log_field_decision(field_name, "INCLUDE", "Field")
                 return True
 
     def _get_pw_field_mapping(self) -> dict:
         """
         Get the mapping from project fields to PW field names.
-        Uses ProjectWiseDataMapper.to_pw_map for complete and accurate mappings.
+        Uses ProjectWiseDataMapper field config for complete and accurate mappings.
         """
-
-        # Build simplified mapping for _should_include_field_in_update logic
-        # Extract the actual PW field names from the complex mapping structure
+        mapper = ProjectWiseDataMapper()
         field_mapping = {}
 
-        for field_name, mapping in to_pw_map.items():
-            if isinstance(mapping, str):
-                # Simple string mapping
-                field_mapping[field_name] = mapping
-            elif isinstance(mapping, dict) and 'field' in mapping:
-                # Complex mapping with 'field' key
-                field_mapping[field_name] = mapping['field']
-            elif isinstance(mapping, dict) and 'values' in mapping:
-                # Enum mapping - use first field name from values list
-                if isinstance(mapping['values'], list) and mapping['values']:
-                    field_mapping[field_name] = mapping['values'][0]
+        # Get all supported fields and their PW field names
+        for field_name in mapper.field_config.BASIC_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+        
+        for field_name in mapper.field_config.BOOLEAN_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.INTEGER_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.DATE_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        for field_name in mapper.field_config.LIST_VALUE_FIELDS:
+            field_mapping[field_name] = mapper.field_config.get_pw_field_name(field_name)
+            
+        # For enum fields, use the first value as representative
+        for field_name in mapper.field_config.ENUM_FIELDS:
+            field_mapping[field_name] = mapper.field_config.ENUM_FIELDS[field_name].values[0]
 
         return field_mapping
 
-    def _filter_projects_for_test_scope(self, projects):
-        """
-        Filter projects for the test scope: 8 04 Puistot ja liikunta-alueet Puistojen peruskorjaus Keskinen suurpiiri
-        Uses environment variable PW_TEST_SCOPE_CLASS_ID for flexibility between environments.
-        """
-        # Get test scope class ID from environment variable
-        test_scope_subclass_id = env("PW_TEST_SCOPE_CLASS_ID", default=None)
-
-        if not test_scope_subclass_id:
-            logger.warning("PW_TEST_SCOPE_CLASS_ID environment variable not set - returning empty queryset")
-            return projects.none()
-
-        try:
-            filtered_projects = projects.filter(projectClass__id=test_scope_subclass_id)
-            logger.info(f"Filtered projects for test scope: {filtered_projects.count()} projects found under subClass {test_scope_subclass_id}")
-            return filtered_projects
-        except Exception as e:
-            logger.error(f"Error filtering projects for test scope: {str(e)}")
-            logger.error(f"Make sure PW_TEST_SCOPE_CLASS_ID environment variable is set to a valid ProjectClass UUID")
-            logger.warning("Returning empty queryset due to filtering error")
-            return projects.none()
 
     def sync_all_projects_to_pw(self):
         """
@@ -533,50 +553,32 @@ class ProjectWiseService:
         Implements overwrite rules and comprehensive logging.
         Only processes programmed projects with HKR IDs.
         """
-        return self._mass_update_projects_to_pw(use_test_scope=False)
+        return self._mass_update_projects_to_pw()
 
-    def sync_all_projects_to_pw_with_test_scope(self):
-        """
-        TEST-SCOPE mass update of programmed projects to PW.
-        Only processes projects under the specific test scope class hierarchy.
-        """
-        return self._mass_update_projects_to_pw(use_test_scope=True)
-
-    def _mass_update_projects_to_pw(self, use_test_scope: bool = False):
+    def _mass_update_projects_to_pw(self):
         """
         Core mass update implementation with overwrite rules and comprehensive logging.
-
-        Args:
-            use_test_scope: If True, only process test scope projects. If False, process all programmed projects.
+        Processes all programmed projects with HKR IDs.
 
         Returns:
             List of update logs with detailed results for each project
         """
         if not self.pw_sync_enabled:
             logger.error(
-                "=" * 100 + "\n"
+                "=" * PWConfig.LOG_SEPARATOR_LENGTH + "\n"
                 "MASS UPDATE BLOCKED: ProjectWise sync is DISABLED\n"
                 "PW_SYNC_ENABLED=False prevents dev/local environments from syncing to production PW.\n"
                 "This is a safety feature. Set PW_SYNC_ENABLED=True in production .env only.\n" +
-                "=" * 100
+                "=" * PWConfig.LOG_SEPARATOR_LENGTH
             )
             return []
         
-        all_projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
-
-        # Apply test scope filter if requested
-        if use_test_scope:
-            projects = self._filter_projects_for_test_scope(all_projects)
-            scope_description = "test scope"
-        else:
-            projects = all_projects
-            scope_description = "all programmed projects"
-
+        projects = Project.objects.filter(programmed=True, hkrId__isnull=False)
         total_projects = projects.count()
-        logger.info(f"Starting mass update of {total_projects} {scope_description} to PW")
+        PWLogger.log_mass_update_start(total_projects)
 
         if total_projects == 0:
-            logger.warning(f"No projects found for mass update ({scope_description})")
+            PWLogger.log_mass_update_no_projects()
             return []
 
         update_log = []
@@ -585,9 +587,7 @@ class ProjectWiseService:
         errors = 0
 
         for i, project in enumerate(projects, 1):
-            logger.info(f"\n{'='*100}")
-            logger.info(f"PROCESSING PROJECT {i}/{total_projects}: {project.name} (HKR ID: {project.hkrId})")
-            logger.info(f"{'='*100}")
+            PWLogger.log_mass_update_progress(project.name, project.hkrId, i, total_projects)
 
             try:
                 # Create comprehensive project data for mass update
@@ -595,7 +595,7 @@ class ProjectWiseService:
                 logger.debug(f"Created project data with {len(project_data)} fields: {list(project_data.keys())}")
 
                 if not project_data:
-                    logger.info(f"No data to sync for project '{project.name}' - all fields are None")
+                    PWLogger.log_no_data_to_sync(project.name, project.hkrId, "all fields are None")
                     update_log.append({
                         'project_id': str(project.id),
                         'project_name': project.name,
@@ -619,7 +619,7 @@ class ProjectWiseService:
                 successful_updates += 1
 
             except Exception as e:
-                logger.error(f"Failed to update project {project.name}: {str(e)}")
+                PWLogger.log_project_processing_error(project.name, e)
                 update_log.append({
                     'project_id': str(project.id),
                     'project_name': project.name,
@@ -630,10 +630,7 @@ class ProjectWiseService:
                 errors += 1
 
         # Log comprehensive summary
-        logger.info(f"Mass update completed ({scope_description}): {successful_updates} successful, {skipped_updates} skipped, {errors} errors")
-
-        if errors > 0:
-            logger.warning(f"{errors} projects failed to update - check logs for details")
+        PWLogger.log_mass_update_summary(successful_updates, skipped_updates, errors)
 
         return update_log
 
@@ -675,9 +672,9 @@ class ProjectWiseService:
         data = create_comprehensive_project_data(project)
 
         if 'programmed' in data:
-            logger.debug(f"Project '{project.name}' programmed status: {project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
+            PWLogger.log_data_processing(project.name, "Project programmed status", 1, f"{project.programmed} (will convert to {'Kyllä' if project.programmed else 'Ei'})")
 
-        logger.debug(f"Built project data for {project.name} with {len(data)} fields")
+        PWLogger.log_data_processing(project.name, "Built project data", len(data))
         return data
 
     def get_project_from_pw(self, id: str):
@@ -685,11 +682,11 @@ class ProjectWiseService:
         start_time = time.perf_counter()
         api_url = f"{self.pw_api_url}{self.pw_api_project_metadata_endpoint}{id}"
 
-        logger.debug("Requesting API {}".format(api_url))
+        PWLogger.log_api_request(api_url, "PW Project")
         response = self.session.get(api_url)
         response_time = time.perf_counter() - start_time
 
-        logger.debug(f"PW responded in {response_time}s")
+        PWLogger.log_api_response(response_time, operation="PW Project")
 
         # Check if PW responded with error
         if response.status_code != 200:
@@ -713,7 +710,7 @@ class ProjectWiseService:
         """
         api_url = f"{self.pw_api_url}{self.pw_api_location_endpoint}"
 
-        logger.debug("Requesting API {}".format(api_url))
+        PWLogger.log_api_request(api_url, "PW Location")
 
         response = self.session.get(api_url)
 
@@ -723,7 +720,7 @@ class ProjectWiseService:
                 f"PW responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
             )
         locations = response.json()["instances"]
-        logger.info(f"PW responded with {len(locations)} locations")
+        PWLogger.log_api_response(0, len(locations), "PW Location")
 
         # Iterate the result received from PW
         for model_data in locations:
@@ -805,11 +802,17 @@ class ProjectWiseService:
             project.address = project_properties["PROJECT_Kadun_tai_puiston_nimi"]
 
         if project_properties["PROJECT_Hankkeen_vaihe"]:
-            project.phase = (
-                self.project_phases[project_properties["PROJECT_Hankkeen_vaihe"]]
-                if project_properties["PROJECT_Hankkeen_vaihe"] in self.project_phases
-                else self.project_phases["2. Ohjelmointi"]
-            )
+            try:
+                # Find phase by PW value using reverse mapping
+                phase_value = project_properties["PROJECT_Hankkeen_vaihe"]
+                phase = ProjectPhaseService.find_by_value(phase_value)
+                if not phase:
+                    # Fallback to default phase
+                    phase = ProjectPhaseService.find_by_value("2. Ohjelmointi")
+                project.phase = phase
+            except Exception as e:
+                logger.warning(f"Failed to find phase for value '{phase_value}': {e}")
+                project.phase = ProjectPhaseService.find_by_value("2. Ohjelmointi")
 
         if project_properties["PROJECT_Louheen"]:
             project.louhi = project_properties["PROJECT_Louheen"] != "Ei"
@@ -818,9 +821,11 @@ class ProjectWiseService:
             project.gravel = project_properties["PROJECT_Sorakatu"] != "Ei"
 
         if project_properties["PROJECT_Projektialue"]:
-            project.area = self.project_areas[
-                project_properties["PROJECT_Projektialue"]
-            ]
+            try:
+                area_value = project_properties["PROJECT_Projektialue"]
+                project.area = ProjectAreaService.find_by_value(area_value)
+            except Exception as e:
+                logger.warning(f"Failed to find area for value '{area_value}': {e}")
 
         if project_properties["PROJECT_Aluekokonaisuuden_nimi"]:
             project.entityName = project_properties["PROJECT_Aluekokonaisuuden_nimi"]
@@ -829,17 +834,25 @@ class ProjectWiseService:
             project.programmed = project_properties["PROJECT_Ohjelmoitu"] != "Ei"
 
         if project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]:
-            project.constructionPhaseDetail = self.construction_phase_details[
-                project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]
-            ]
+            try:
+                detail_value = project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]
+                project.constructionPhaseDetail = ConstructionPhaseDetailService.find_by_value(detail_value)
+            except Exception as e:
+                logger.warning(f"Failed to find construction phase detail for value '{detail_value}': {e}")
 
         if project_properties["PROJECT_Toimiala"]:
-            project.type = self.project_types[project_properties["PROJECT_Toimiala"]]
+            try:
+                type_value = project_properties["PROJECT_Toimiala"]
+                project.type = ProjectTypeService.find_by_value(type_value)
+            except Exception as e:
+                logger.warning(f"Failed to find project type for value '{type_value}': {e}")
 
         if project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]:
-            project.responsibleZone = self.responsible_zones[
-                project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
-            ]
+            try:
+                zone_value = project_properties["PROJECT_Alue_rakennusviraston_vastuujaon_mukaan"]
+                project.responsibleZone = ResponsibleZoneService.find_by_value(zone_value)
+            except Exception as e:
+                logger.warning(f"Failed to find responsible zone for value '{zone_value}': {e}")
 
         if project_properties["PROJECT_Louhi__hankkeen_aloitusvuosi"]:
             project.planningStartYear = project_properties[
