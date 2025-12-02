@@ -788,6 +788,127 @@ class ProjectClassSerializerTestCase(TestCase):
             "8 03 01 01 Child category"
         )
 
+    def test_location_specific_child_gets_more_specific_numbering(self):
+        """
+        Test IO-455: Location-specific children get MORE SPECIFIC numbering than parent.
+        
+        This is the production scenario for Projektialueiden infrarakentaminen:
+        - Parent: "Esirakentaminen" gets numbering "8 08 01" from coordinator
+        - Child: "Kamppi-Töölönlahti" gets MORE SPECIFIC numbering "8 08 01 01"
+        - Child SHOULD get its numbering because it's more specific (extends parent's)
+        
+        The key insight is that "8 08 01 01" starts with "8 08 01" but is longer,
+        so it represents a more specific category, not a duplicate.
+        """
+        # Create parent coordinator class
+        parent_coord = ProjectClass.objects.create(
+            name="8 08 01 Esirakentaminen, Khn käytettäväksi",
+            path="8/8 08/8 08 01",
+            forCoordinatorOnly=True
+        )
+
+        # Create parent programming class (no numbering in raw name)
+        parent_prog = ProjectClass.objects.create(
+            name="Esirakentaminen",
+            path="8/Esirakentaminen",
+            forCoordinatorOnly=False
+        )
+
+        parent_coord.relatedTo = parent_prog
+        parent_coord.save()
+
+        # Create child coordinator with MORE SPECIFIC numbering
+        child_coord = ProjectClass.objects.create(
+            name="8 08 01 01 Kamppi-Töölönlahti, Khn käytettäväksi",
+            path="8/8 08/8 08 01/8 08 01 01",
+            parent=parent_coord,
+            forCoordinatorOnly=True
+        )
+
+        # Create child programming class (location-specific)
+        child_prog = ProjectClass.objects.create(
+            name="Kamppi-Töölönlahti",
+            path="8/Esirakentaminen/Kamppi-Töölönlahti",
+            parent=parent_prog,
+            forCoordinatorOnly=False
+        )
+
+        child_coord.relatedTo = child_prog
+        child_coord.save()
+
+        # Parent should get numbering "8 08 01"
+        parent_serializer = ProjectClassSerializer(parent_prog)
+        self.assertEqual(
+            parent_serializer.data['name'],
+            "8 08 01 Esirakentaminen"
+        )
+
+        # Child SHOULD get MORE SPECIFIC numbering "8 08 01 01"
+        # because it extends the parent's numbering (not duplicates it)
+        child_serializer = ProjectClassSerializer(child_prog)
+        self.assertEqual(
+            child_serializer.data['name'],
+            "8 08 01 01 Kamppi-Töölönlahti"
+        )
+
+    def test_multiple_location_children_get_their_specific_numbering(self):
+        """
+        Test IO-455: Multiple location-specific children each get their own numbering.
+        
+        Based on Vesa's report, under "Esirakentaminen" there are multiple locations:
+        - Kamppi-Töölönlahti → 8 08 01 01
+        - Länsisatama → 8 08 01 02
+        - Kalasatama → 8 08 01 03
+        All should get their specific numbering.
+        """
+        # Create parent structure
+        parent_coord = ProjectClass.objects.create(
+            name="8 08 01 Esirakentaminen, Khn käytettäväksi",
+            path="8/8 08/8 08 01",
+            forCoordinatorOnly=True
+        )
+
+        parent_prog = ProjectClass.objects.create(
+            name="Esirakentaminen",
+            path="8/Esirakentaminen",
+            forCoordinatorOnly=False
+        )
+
+        parent_coord.relatedTo = parent_prog
+        parent_coord.save()
+
+        # Create multiple location children
+        locations = [
+            ("Kamppi-Töölönlahti", "8 08 01 01"),
+            ("Länsisatama", "8 08 01 02"),
+            ("Kalasatama", "8 08 01 03"),
+        ]
+
+        for location_name, expected_numbering in locations:
+            child_coord = ProjectClass.objects.create(
+                name=f"{expected_numbering} {location_name}, Khn käytettäväksi",
+                path=f"8/8 08/8 08 01/{expected_numbering}",
+                parent=parent_coord,
+                forCoordinatorOnly=True
+            )
+
+            child_prog = ProjectClass.objects.create(
+                name=location_name,
+                path=f"8/Esirakentaminen/{location_name}",
+                parent=parent_prog,
+                forCoordinatorOnly=False
+            )
+
+            child_coord.relatedTo = child_prog
+            child_coord.save()
+
+            serializer = ProjectClassSerializer(child_prog)
+            self.assertEqual(
+                serializer.data['name'],
+                f"{expected_numbering} {location_name}",
+                f"Location {location_name} should have numbering {expected_numbering}"
+            )
+
 
 class ComputedDefaultProgrammerTestCase(TestCase):
     """Test computedDefaultProgrammer field with hierarchical fallback logic"""
