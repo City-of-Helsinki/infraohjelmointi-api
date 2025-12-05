@@ -100,10 +100,10 @@ class TalpaModelsTestCase(TestCase):
         talpa_opening.save()
         self.assertTrue(talpa_opening.is_locked)
 
-        # project_number_opened should not be locked
+        # project_number_opened should also be locked
         talpa_opening.status = "project_number_opened"
         talpa_opening.save()
-        self.assertFalse(talpa_opening.is_locked)
+        self.assertTrue(talpa_opening.is_locked)
 
     def test_talpa_project_opening_default_status(self):
         """Test that default status is excel_generated"""

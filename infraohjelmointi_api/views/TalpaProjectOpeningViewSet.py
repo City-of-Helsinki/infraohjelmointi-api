@@ -52,7 +52,7 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
     def _check_locked(self, instance):
         if instance.is_locked:
             return Response(
-                {"detail": "Form is locked. Cannot modify when status is 'sent_to_talpa'."},
+                {"detail": "Form is locked. Cannot modify when status is 'sent_to_talpa' or 'project_number_opened'."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return None
@@ -107,6 +107,9 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
     def send_to_talpa(self, request, pk=None):
         instance = self.get_object()
 
+        if instance.status == "project_number_opened":
+            return Response({"detail": "Project number already opened in SAP."}, status=status.HTTP_400_BAD_REQUEST)
+
         if instance.status == "sent_to_talpa":
             return Response({"detail": "Already sent to Talpa."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -149,4 +152,5 @@ class TalpaProjectOpeningViewSet(BaseViewSet):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         response["Content-Disposition"] = f'attachment; filename="{service.get_filename(instance)}"'
+        response["Access-Control-Expose-Headers"] = "Content-Disposition"
         return response

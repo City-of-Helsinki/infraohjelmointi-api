@@ -11,10 +11,10 @@ from .TalpaProjectNumberRange import TalpaProjectNumberRange
 class TalpaProjectOpening(models.Model):
     """
     Model for Talpa project opening data.
-    
+
     This stores all fields needed for the Talpa Excel export form
     ("Projektin avauslomake Infra").
-    
+
     Field Reference (from Excel form):
     - Section 1: Budget item selection (2814I/2814E) - derived from projectType
     - Section 2: Project identifiers (budgetAccount, projectNumber, templateProject, etc.)
@@ -22,7 +22,7 @@ class TalpaProjectOpening(models.Model):
     - Section 4: Address & contacts (streetAddress, postalCode, responsiblePerson)
     - Section 5: Classes (serviceClass, assetClass, profileName, investmentProfile, readiness)
     """
-    
+
     STATUS_CHOICES = [
         ("excel_generated", "Avauspyyntö-Excel muodostettu"),
         ("sent_to_talpa", "Avauspyyntö lähetetty Talpaan"),
@@ -164,6 +164,6 @@ class TalpaProjectOpening(models.Model):
 
     @property
     def is_locked(self):
-        """Check if the form is locked (status = sent_to_talpa)"""
-        return self.status == "sent_to_talpa"
+        """Check if the form is locked (status = sent_to_talpa or project_number_opened)"""
+        return self.status in ("sent_to_talpa", "project_number_opened")
 

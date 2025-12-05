@@ -32,7 +32,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
     def setUp(self):
         """Set up test data"""
         self.client = APIClient()
-        
+
         # Create test Person
         self.person = Person.objects.create(
             id=uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc"),
@@ -40,31 +40,31 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             lastName="User",
             email="test@example.com"
         )
-        
+
         # Create test ProjectType
         self.project_type = ProjectType.objects.create(
             id=uuid.UUID("844e3102-7fb0-453b-ad7b-cf69b1644166"),
             value="Test Project Type"
         )
-        
+
         # Create test ProjectPhase
         self.project_phase = ProjectPhase.objects.create(
             id=uuid.UUID("081ff330-5b0a-4ddc-b39b-cd9e53070256"),
             value="Test Phase"
         )
-        
+
         # Create test ProjectCategory
         self.project_category = ProjectCategory.objects.create(
             id=uuid.UUID("dbc92a70-8a8a-4a25-8014-14c7d16eb86c"),
             value="K5.1"
         )
-        
+
         # Create test ProjectClass
         self.project_class = ProjectClass.objects.create(
             id=uuid.UUID("5f65a339-b3c9-48ee-a9b9-cb177546c241"),
             name="Test Class"
         )
-        
+
         # Create test Project
         self.project = Project.objects.create(
             id=uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042"),
@@ -75,7 +75,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             category=self.project_category,
             projectClass=self.project_class,
         )
-        
+
         # Create test TalpaProjectType
         self.talpa_project_type = TalpaProjectType.objects.create(
             code="8 03 01 01",
@@ -84,7 +84,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             priority="Normaali",
             isActive=True
         )
-        
+
         # Create test TalpaServiceClass
         self.talpa_service_class = TalpaServiceClass.objects.create(
             code="4601",
@@ -92,7 +92,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectTypePrefix="2814I",
             isActive=True
         )
-        
+
         # Create test TalpaAssetClass
         self.talpa_asset_class = TalpaAssetClass.objects.create(
             componentClass="8103000",
@@ -101,7 +101,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             category="Kiinteät rakenteet ja laitteet",
             isActive=True
         )
-        
+
         # Create test TalpaProjectNumberRange
         self.talpa_project_number_range = TalpaProjectNumberRange.objects.create(
             projectTypePrefix="2814I",
@@ -134,12 +134,12 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             "serviceClassId": str(self.talpa_service_class.id),
             "assetClassId": str(self.talpa_asset_class.id),
         }
-        
+
         response = self.client.post(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(TalpaProjectOpening.objects.count(), 1)
-        
+
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.projectName, "Test Talpa Project")
         self.assertEqual(talpa_opening.status, "excel_generated")
@@ -155,10 +155,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             projectName="Test Project"
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["projectName"], "Test Project")
         self.assertEqual(response.data["status"], "excel_generated")
@@ -172,10 +172,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             projectName="Test Project"
         )
-        
+
         url = f"/talpa-project-opening/by-project/{self.project.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["projectName"], "Test Project")
         self.assertEqual(response.data["id"], str(talpa_opening.id))
@@ -184,7 +184,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         """Test getting TalpaProjectOpening by project ID when it doesn't exist"""
         url = f"/talpa-project-opening/by-project/{self.project.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_talpa_opening(self):
@@ -195,15 +195,15 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             projectName="Original Name"
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         data = {
             "projectName": "Updated Name",
             "projectDescription": "Updated description"
         }
-        
+
         response = self.client.patch(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         talpa_opening.refresh_from_db()
         self.assertEqual(talpa_opening.projectName, "Updated Name")
@@ -220,10 +220,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectNumberRange=self.talpa_project_number_range,
             status="excel_generated"
         )
-        
+
         url = f"/api/talpa-project-opening/{talpa_opening.id}/send-to-talpa/"
         response = self.client.post(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         talpa_opening.refresh_from_db()
         self.assertEqual(talpa_opening.status, "sent_to_talpa")
@@ -239,10 +239,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectName="Test Project",
             status="sent_to_talpa"
         )
-        
+
         url = f"/api/talpa-project-opening/{talpa_opening.id}/send-to-talpa/"
         response = self.client.post(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Already sent", response.data["detail"])
 
@@ -255,12 +255,12 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectName="Test Project",
             status="sent_to_talpa"
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         data = {"projectName": "Updated Name"}
-        
+
         response = self.client.patch(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("locked", response.data["detail"].lower())
 
@@ -268,7 +268,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         """Test getting priority choices"""
         url = "/talpa-project-opening/priorities/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         priorities = [item["value"] for item in response.data]
@@ -279,7 +279,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         """Test getting subject choices"""
         url = "/talpa-project-opening/subjects/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 3)
         subjects = [item["value"] for item in response.data]
@@ -296,14 +296,15 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             status="excel_generated"
         )
         self.assertFalse(talpa_opening.is_locked)
-        
+
         talpa_opening.status = "sent_to_talpa"
         talpa_opening.save()
         self.assertTrue(talpa_opening.is_locked)
-        
+
+        # project_number_opened should also be locked
         talpa_opening.status = "project_number_opened"
         talpa_opening.save()
-        self.assertFalse(talpa_opening.is_locked)
+        self.assertTrue(talpa_opening.is_locked)
 
     def test_default_status_is_excel_generated(self):
         """Test that default status is excel_generated"""
@@ -312,7 +313,7 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             priority="Normaali",
             subject="Uusi"
         )
-        
+
         self.assertEqual(talpa_opening.status, "excel_generated")
 
     def test_foreign_key_relationships(self):
@@ -325,10 +326,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             serviceClass=self.talpa_service_class,
             assetClass=self.talpa_asset_class
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(response.data["projectType"])
         self.assertEqual(response.data["projectType"]["code"], "8 03 01 01")
@@ -347,23 +348,23 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             "streetAddress": "Testikatu 1",
             "postalCode": "00100",
         }
-        
+
         response = self.client.post(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.streetAddress, "Testikatu 1")
         self.assertEqual(talpa_opening.postalCode, "00100")
 
-    def test_create_with_schedule_field_aliases(self):
-        """Test creating with UI field aliases (projectStart/projectEnd)"""
+    def test_create_with_schedule_fields(self):
+        """Test creating with schedule date fields"""
         url = "/talpa-project-opening/"
         data = {
             "project": str(self.project.id),
             "priority": "Normaali",
             "subject": "Uusi",
-            "projectStart": "2025-01-01",
-            "projectEnd": "2030-12-31",
+            "projectStartDate": "2025-01-01",
+            "projectEndDate": "2030-12-31",
         }
         
         response = self.client.post(url, data, format="json")
@@ -373,8 +374,8 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         self.assertEqual(str(talpa_opening.projectStartDate), "2025-01-01")
         self.assertEqual(str(talpa_opening.projectEndDate), "2030-12-31")
 
-    def test_response_includes_schedule_aliases(self):
-        """Test that response includes both model field names and aliases"""
+    def test_response_includes_schedule_fields(self):
+        """Test that response includes schedule date fields"""
         talpa_opening = TalpaProjectOpening.objects.create(
             project=self.project,
             priority="Normaali",
@@ -389,9 +390,8 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("projectStartDate", response.data)
         self.assertIn("projectEndDate", response.data)
-        self.assertIn("projectStart", response.data)
-        self.assertIn("projectEnd", response.data)
-        self.assertEqual(response.data["projectStart"], response.data["projectStartDate"])
+        self.assertEqual(response.data["projectStartDate"], "2025-01-01")
+        self.assertEqual(response.data["projectEndDate"], "2030-12-31")
 
     def test_create_with_readiness_field(self):
         """Test creating with readiness field"""
@@ -402,9 +402,9 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             "subject": "Uusi",
             "readiness": "Kesken",
         }
-        
+
         response = self.client.post(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.readiness, "Kesken")
@@ -413,28 +413,28 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         """Test that holdingTime is computed from assetClass"""
         self.talpa_asset_class.holdingPeriodYears = 20
         self.talpa_asset_class.save()
-        
+
         talpa_opening = TalpaProjectOpening.objects.create(
             project=self.project,
             priority="Normaali",
             subject="Uusi",
             assetClass=self.talpa_asset_class
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["holdingTime"], 20)
 
-    def test_asset_classes_id_alias(self):
-        """Test that assetClassesId alias works (UI uses plural)"""
+    def test_create_with_asset_class_id(self):
+        """Test that assetClassId works correctly"""
         url = "/talpa-project-opening/"
         data = {
             "project": str(self.project.id),
             "priority": "Normaali",
             "subject": "Uusi",
-            "assetClassesId": str(self.talpa_asset_class.id),
+            "assetClassId": str(self.talpa_asset_class.id),
         }
         
         response = self.client.post(url, data, format="json")
@@ -456,9 +456,9 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             "projectName": "Test Project",
             "projectNumberRangeId": str(self.talpa_project_number_range.id),
         }
-        
+
         response = self.client.post(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.projectNumberRange, self.talpa_project_number_range)
@@ -471,10 +471,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             projectNumberRange=self.talpa_project_number_range
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(response.data["projectNumberRange"])
         self.assertEqual(response.data["projectNumberRange"]["rangeStart"], "2814100003")
@@ -493,10 +493,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             status="excel_generated"
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.delete(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(TalpaProjectOpening.objects.count(), 0)
 
@@ -508,10 +508,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             subject="Uusi",
             status="sent_to_talpa"
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/"
         response = self.client.delete(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("locked", response.data["detail"].lower())
         # Verify it wasn't deleted
@@ -531,10 +531,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             status="excel_generated"
             # Missing: projectName, projectType, projectNumberRange
         )
-        
+
         url = f"/api/talpa-project-opening/{talpa_opening.id}/send-to-talpa/"
         response = self.client.post(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("missing_fields", response.data)
         self.assertIn("SAP nimi", response.data["missing_fields"])
@@ -552,51 +552,31 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectNumberRange=self.talpa_project_number_range,
             status="excel_generated"
         )
-        
+
         url = f"/api/talpa-project-opening/{talpa_opening.id}/send-to-talpa/"
         response = self.client.post(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         talpa_opening.refresh_from_db()
         self.assertEqual(talpa_opening.status, "sent_to_talpa")
         self.assertTrue(talpa_opening.is_locked)
 
-    # =========================================================================
-    # Conflicting Field Aliases Tests
-    # =========================================================================
-
-    def test_conflicting_date_aliases_returns_error(self):
-        """Test that providing both projectStart and projectStartDate with different values returns error"""
+    def test_unknown_field_ignored(self):
+        """Test that unknown fields are ignored (e.g., old alias fields)"""
         url = "/talpa-project-opening/"
         data = {
             "project": str(self.project.id),
             "subject": "Uusi",
-            "projectStart": "2025-01-01",
-            "projectStartDate": "2025-06-01",  # Different value!
+            "unknownField": "some value",  # Unknown field should be ignored
+            "projectStartDate": "2025-01-01",
         }
         
         response = self.client.post(url, data, format="json")
         
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("detail", response.data)
-        # Check that error mentions the conflict
-        error_text = str(response.data["detail"])
-        self.assertIn("Conflicting", error_text)
-        self.assertIn("projectStart", error_text)
-
-    def test_same_value_aliases_allowed(self):
-        """Test that providing both alias and canonical field with SAME value is allowed"""
-        url = "/talpa-project-opening/"
-        data = {
-            "project": str(self.project.id),
-            "subject": "Uusi",
-            "projectStart": "2025-01-01",
-            "projectStartDate": "2025-01-01",  # Same value - should be OK
-        }
-        
-        response = self.client.post(url, data, format="json")
-        
+        # Should succeed - unknown fields are ignored
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
+        self.assertEqual(str(talpa_opening.projectStartDate), "2025-01-01")
 
     # =========================================================================
     # Default Priority Test
@@ -610,9 +590,9 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             "subject": "Uusi",
             # No priority provided
         }
-        
+
         response = self.client.post(url, data, format="json")
-        
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         talpa_opening = TalpaProjectOpening.objects.get(project=self.project)
         self.assertEqual(talpa_opening.priority, "Normaali")
@@ -630,10 +610,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectType=self.talpa_project_type,
             projectNumberRange=self.talpa_project_number_range,
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response["Content-Type"],
@@ -653,10 +633,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectNumberRange=self.talpa_project_number_range,
             status="excel_generated",
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         talpa_opening.refresh_from_db()
         self.assertEqual(talpa_opening.status, "excel_generated")
@@ -671,10 +651,10 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectNumberRange=self.talpa_project_number_range,
             status="sent_to_talpa",
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         talpa_opening.refresh_from_db()
         self.assertEqual(talpa_opening.status, "sent_to_talpa")
@@ -690,14 +670,14 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectStartDate=date(2026, 1, 15),
             projectEndDate=date(2032, 12, 31),
         )
-        
+
         url = f"/talpa-project-opening/{talpa_opening.id}/download-excel/"
         response = self.client.get(url)
-        
+
         excel_data = BytesIO(response.content)
         wb = load_workbook(excel_data)
         ws = wb.active
-        
+
         self.assertEqual(ws.title, "Projektin avauslomake")
         self.assertEqual(ws["F2"].value, "Test Project")
         self.assertEqual(ws["G2"].value, "15.01.2026")

@@ -22,7 +22,7 @@ def column_exists(table_name, column_name):
 
 class SkipRemoveFieldIfNotExists(migrations.operations.fields.RemoveField):
     """RemoveField operation that skips if field doesn't exist in database, but always updates state"""
-    
+
     def state_forwards(self, app_label, state):
         """Always try to remove from state if it exists (idempotent)"""
         model_name_lower = self.model_name.lower()
@@ -32,16 +32,16 @@ class SkipRemoveFieldIfNotExists(migrations.operations.fields.RemoveField):
             # Field exists in state, remove it
             super().state_forwards(app_label, state)
         # If field doesn't exist in state, that's fine - state is already correct
-    
+
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         """Update database, but skip if column doesn't exist"""
         table_name = f"{app_label}_{self.model_name.lower()}"
         column_name = self.name
-        
+
         if not column_exists(table_name, column_name):
             # Column doesn't exist in database, skip removal
             return
-        
+
         # Column exists, remove it
         super().database_forwards(app_label, schema_editor, from_state, to_state)
 
@@ -150,7 +150,7 @@ class Migration(migrations.Migration):
             options={
                 'ordering': ['code', 'priority'],
             },
-        ), 
+        ),
         migrations.CreateModel(
             name='TalpaServiceClass',
             fields=[
