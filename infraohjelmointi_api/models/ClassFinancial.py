@@ -43,6 +43,12 @@ class ClassFinancial(models.Model):
                 name="Unique together Constraint Class Financial",
             )
         ]
+        indexes = [
+            models.Index(fields=['year'], name='idx_classfinancial_year'),
+            models.Index(fields=['forFrameView'], name='idx_classfinancial_frameview'),
+            models.Index(fields=['classRelation'], name='idx_classfinancial_class'),
+            models.Index(fields=['classRelation', 'year', 'forFrameView'], name='idx_classfinancial_composite'),
+        ]
 
     # Overriding clean() method to validate classRelation
     @override

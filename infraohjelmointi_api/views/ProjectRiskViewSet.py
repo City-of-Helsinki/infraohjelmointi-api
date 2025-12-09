@@ -1,10 +1,9 @@
-from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers.ProjectRiskSerializer import ProjectRiskSerializer
 
+from .CachedLookupViewSet import CachedLookupViewSet
 
-class ProjectRiskViewSet(BaseViewSet):
-    """
-    API endpoint that allows project risk assessments to be viewed or edited.
-    """
+
+class ProjectRiskViewSet(CachedLookupViewSet):
+    """API endpoint for project risks (cached)."""
 
     serializer_class = ProjectRiskSerializer

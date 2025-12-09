@@ -1,13 +1,10 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.ProjectCategorySerializer import (
-    ProjectCategorySerializer,
-)
+from infraohjelmointi_api.serializers.ProjectCategorySerializer import ProjectCategorySerializer
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ProjectCategoryViewSet(BaseViewSet):
-    """
-    API endpoint that allows project cetagories to be viewed or edited.
-    """
+class ProjectCategoryViewSet(CachedLookupViewSet):
+    """API endpoint for project categories (cached)."""
 
     serializer_class = ProjectCategorySerializer
 

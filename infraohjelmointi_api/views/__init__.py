@@ -1,4 +1,5 @@
 from .BaseViewSet import *
+from .CachedLookupViewSet import *
 from .ProjectFinancialViewSet import *
 from .ProjectLockViewSet import *
 from .ProjectHashtagViewSet import *

@@ -1,6 +1,8 @@
 from datetime import date
+from django.db.models import Prefetch
 from .BaseClassLocationViewSet import BaseClassLocationViewSet
 from infraohjelmointi_api.serializers import ProjectClassSerializer
+from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.models.ClassFinancial import ClassFinancial
 from infraohjelmointi_api.services import ProjectClassService, ClassFinancialService
 from overrides import override
@@ -9,74 +11,88 @@ from rest_framework.decorators import action
 
 
 class ProjectClassViewSet(BaseClassLocationViewSet):
-    """
+    '''
     API endpoint that allows Project Classes to be viewed or edited.
-    """
+    '''
 
     serializer_class = ProjectClassSerializer
 
     @override
     def get_queryset(self):
-        """Default is programmer view with user role filtering"""
+        '''Default is programmer view with user role filtering'''
         queryset = (
             ProjectClassService.list_all()
-            .select_related("coordinatorClass")
-            .prefetch_related("coordinatorClass__finances")
+            .select_related('coordinatorClass', 'coordinatorClass__parent', 'coordinatorClass__parent__parent', 'parent', 'defaultProgrammer')
+            .prefetch_related(
+                'coordinatorClass__finances',
+                Prefetch(
+                    'finances',
+                    queryset=ClassFinancial.objects.filter(forFrameView=False).order_by('year'),
+                ),
+                Prefetch(
+                    'project_set',
+                    queryset=Project.objects.filter(programmed=True)
+                    .select_related('projectClass')
+                    .prefetch_related('finances'),
+                ),
+            )
         )
 
-        # Apply user role-based filtering
         user = self.request.user
-        if hasattr(user, 'groups'):
-            # Check if user is project area planner (should only see 808 classes)
-            if user.groups.filter(name='project_area_planners').exists():
-                queryset = queryset.filter(
-                    name__startswith='808'
-                ) | queryset.filter(
-                    name__startswith='8 08'
-                )
+        planner_flag = getattr(user, 'is_project_area_planner', None)
+        if planner_flag is True:
+            return queryset.filter(name__startswith='808') | queryset.filter(name__startswith='8 08')
+        if planner_flag is False:
+            return queryset
+
+        group_names = getattr(user, '_cached_group_names', None)
+        if group_names is None and hasattr(user, 'groups'):
+            group_names = set(user.groups.values_list('name', flat=True))
+            setattr(user, '_cached_group_names', group_names)
+
+        if group_names and 'project_area_planners' in group_names:
+            queryset = queryset.filter(name__startswith='808') | queryset.filter(name__startswith='8 08')
+            setattr(user, 'is_project_area_planner', True)
+        else:
+            setattr(user, 'is_project_area_planner', False)
 
         return queryset
 
     @action(
-        methods=["get"],
+        methods=['get'],
         detail=False,
-        url_path=r"coordinator",
-        name="get_coordinator_classes",
+        url_path='coordinator',
+        name='get_coordinator_classes',
     )
     def get_coordinator_classes(self, request):
-        """Get coordinator classes with filtering"""
+        '''Get coordinator classes with filtering'''
         return self.list_for_coordinator(request)
 
     @action(
-        methods=["get"],
+        methods=['get'],
         detail=False,
-        url_path=r"hierarchy/(?P<parent_id>[^/.]+)",
-        name="get_class_hierarchy",
+        url_path='hierarchy/(?P<parent_id>[^/.]+)',
+        name='get_class_hierarchy',
     )
     def get_class_hierarchy(self, request, parent_id=None):
-        """
+        '''
         Get class hierarchy for a given parent class.
         Returns master classes, classes, and subclasses based on the parent.
-        """
+        '''
         try:
-            # Get the parent class
             parent_class = self.get_queryset().get(id=parent_id)
-
-            # Get all classes for the hierarchy
             all_classes = self.get_queryset()
 
-            # Determine what type of parent this is and return appropriate children
-            if parent_class.parent is None:  # Master class
+            if parent_class.parent is None:
                 classes = all_classes.filter(parent=parent_id)
                 subclasses = all_classes.filter(parent__in=classes.values_list('id', flat=True))
-            elif parent_class.parent and all_classes.filter(parent=parent_class.parent).exists():  # Class
+            elif parent_class.parent and all_classes.filter(parent=parent_class.parent).exists():
                 subclasses = all_classes.filter(parent=parent_id)
                 classes = all_classes.filter(id=parent_id)
-            else:  # Subclass
+            else:
                 subclasses = all_classes.filter(id=parent_id)
                 classes = all_classes.filter(id=parent_class.parent)
 
-            # Serialize the results
             serializer = self.get_serializer_class()
             return Response({
                 'masterClasses': serializer([parent_class] if parent_class.parent is None else [], many=True).data,
@@ -85,13 +101,13 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             })
         except Exception as e:
             return Response({'error': str(e)}, status=400)
-    def list_for_coordinator(self, request):
-        # Dynamic docstring - see BaseClassLocationViewSet._get_coordinator_list_docstring("class", "project-classes")
-        """Dynamic docstring generated by BaseClassLocationViewSet._get_coordinator_list_docstring"""
 
-        year = int(request.query_params.get("year", date.today().year))
+    def list_for_coordinator(self, request):
+        '''Dynamic docstring generated by BaseClassLocationViewSet._get_coordinator_list_docstring'''
+
+        year = int(request.query_params.get('year', date.today().year))
         forcedToFrame = self.parse_forced_to_frame_param(
-            request.query_params.get("forcedToFrame", False)
+            request.query_params.get('forcedToFrame', False)
         )
 
         frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
@@ -99,38 +115,40 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         serializer = ProjectClassSerializer(
             ProjectClassService.list_all_for_coordinator()
             .select_related(
-                "parent",
-                "relatedTo",
-                "relatedLocation",
-                "coordinatorClass"
+                'parent',
+                'relatedTo',
+                'relatedLocation',
+                'defaultProgrammer',
+                'coordinatorClass',
+                'coordinatorClass__parent',
+                'coordinatorClass__parent__parent'
             ),
             many=True,
             context={
-                "finance_year": year,
-                "for_coordinator": True,
-                "forcedToFrame": forcedToFrame,
-                "frame_budgets": frame_budgets
+                'finance_year': year,
+                'for_coordinator': True,
+                'forcedToFrame': forcedToFrame,
+                'frame_budgets': frame_budgets
             },
         )
 
         return Response(serializer.data)
 
     @action(
-        methods=["patch"],
+        methods=['patch'],
         detail=False,
-        url_path=r"coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})",
-        name="patch_coordinator_class_finances",
+        url_path='coordinator/(?P<class_id>[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12})',
+        name='patch_coordinator_class_finances',
     )
     def patch_coordinator_class_finances(self, request, class_id):
-        # Dynamic docstring - see BaseClassLocationViewSet._get_coordinator_patch_docstring("class", "project-classes", "class_id")
-        """Dynamic docstring generated by BaseClassLocationViewSet._get_coordinator_patch_docstring"""
+        '''Dynamic docstring generated by BaseClassLocationViewSet._get_coordinator_patch_docstring'''
         success, result = self.validate_and_process_patch_finances(
             request=request,
             entity_id=class_id,
             entity_service=ProjectClassService,
             financial_service=ClassFinancialService,
             financial_model=ClassFinancial,
-            relation_field="classRelation"
+            relation_field='classRelation'
         )
 
         if not success:
@@ -138,7 +156,7 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
 
         return self.create_patch_response(
             entity_id=class_id,
-            start_year=result["start_year"],
+            start_year=result['start_year'],
             entity_service=ProjectClassService,
             serializer_class=ProjectClassSerializer
         )

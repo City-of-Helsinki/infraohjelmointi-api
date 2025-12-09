@@ -28,6 +28,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
+    CacheService,
     ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
@@ -250,6 +251,27 @@ class ProjectViewSet(BaseViewSet):
 
                     if update_finances:
                         ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
+                
+                # Invalidate cache for all affected projects (bulk operations bypass signals)
+                affected_project_ids = {f.project_id for f in finance_instances}
+                for project_id in affected_project_ids:
+                    affected_project = Project.objects.get(id=project_id)
+                    if affected_project.projectClass:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectClass.id,
+                            instance_type='ProjectClass'
+                        )
+                    if affected_project.projectLocation:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectLocation.id,
+                            instance_type='ProjectLocation'
+                        )
+                    if affected_project.projectGroup:
+                        CacheService.invalidate_financial_sum(
+                            instance_id=affected_project.projectGroup.id,
+                            instance_type='ProjectGroup'
+                        )
+                
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
                 post_save.send(
@@ -925,6 +947,7 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
+                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
                 .filter(
                     Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
@@ -949,6 +972,7 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
+                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
             )
         masterClass = self.request.query_params.getlist("masterClass", [])
@@ -1244,6 +1268,12 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
+        current_year = date.today().year
+        for year_offset in range(-2, 13):
+            year = current_year + year_offset
+            CacheService.invalidate_frame_budgets(year=year)
+        CacheService.clear_all()
+
         forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
 
         forced_to_frame_data_updated_serializer = AppStateValueSerializer(forced_to_frame_data_updated)
@@ -1392,6 +1422,16 @@ class ProjectViewSet(BaseViewSet):
                     default=len(projectIds),
                 )
                 qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
+                
+                # IO-775: Capture original hkrId values BEFORE update for PW sync detection
+                original_hkr_ids = {str(p.id): p.hkrId for p in qs}
+                # Also capture which projects are getting hkrId in this request
+                hkr_ids_in_request = {
+                    projectData["id"]: projectData["data"].get("hkrId")
+                    for projectData in data
+                    if "hkrId" in projectData.get("data", {})
+                }
+                
                 financesData = [
                     {
                         "project": projectData["id"],
@@ -1449,8 +1489,47 @@ class ProjectViewSet(BaseViewSet):
                     },
                 )
                 serializer.is_valid(raise_exception=True)
-                serializer.save()
-                return Response(data=serializer.data, status=200)
+                updated_projects = serializer.save()
+                
+                # IO-775: Trigger PW sync for projects where hkrId was added for the first time
+                pw_sync_errors = []
+                for updated_project in updated_projects:
+                    project_id_str = str(updated_project.id)
+                    original_hkr_id = original_hkr_ids.get(project_id_str)
+                    new_hkr_id = hkr_ids_in_request.get(project_id_str)
+                    
+                    # Check if hkrId was added for the first time
+                    hkr_id_added_first_time = (
+                        new_hkr_id and
+                        (not original_hkr_id or str(original_hkr_id).strip() == "")
+                    )
+                    
+                    if hkr_id_added_first_time:
+                        logger.info(f"BULK UPDATE: HKR ID added for first time to project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
+                        try:
+                            automatic_update_data = create_comprehensive_project_data(updated_project)
+                            self.projectWiseService.sync_project_to_pw(
+                                data=automatic_update_data, project=updated_project
+                            )
+                            logger.info(f"BULK UPDATE: PW sync completed for '{updated_project.name}'")
+                        except Exception as e:
+                            logger.error(f"BULK UPDATE: PW sync failed for '{updated_project.name}': {str(e)}")
+                            pw_sync_errors.append({
+                                "project": updated_project.name,
+                                "hkrId": updated_project.hkrId,
+                                "error": str(e)
+                            })
+                
+                response_data = serializer.data
+                if pw_sync_errors:
+                    # Include PW sync errors in response but don't fail the request
+                    response_data = {
+                        "projects": serializer.data,
+                        "pw_sync_errors": pw_sync_errors,
+                        "message": f"Projects updated successfully but {len(pw_sync_errors)} PW sync(s) failed"
+                    }
+                
+                return Response(data=response_data, status=200)
             else:
                 return Response(
                     data={"message": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST
@@ -1672,19 +1751,37 @@ class ProjectViewSet(BaseViewSet):
             original_project: Project state before update
             updated_project: Project state after update
         """
+        # IO-775: Enhanced diagnostic logging for debugging sync issues
+        hkr_id_in_request = 'hkrId' in request_data
+        hkr_id_value = request_data.get('hkrId')
+        original_had_hkr_id = bool(original_project.hkrId and str(original_project.hkrId).strip())
+        
+        logger.debug(
+            f"PW SYNC CHECK for '{updated_project.name}': "
+            f"hkrId_in_request={hkr_id_in_request}, "
+            f"hkrId_value={hkr_id_value}, "
+            f"original_hkrId={original_project.hkrId}, "
+            f"original_had_hkr_id={original_had_hkr_id}"
+        )
+        
         # Check if hkrId is being added for the first time (automatic update)
         hkr_id_added_first_time = (
-            'hkrId' in request_data and
-            request_data['hkrId'] and
-            (not original_project.hkrId or str(original_project.hkrId).strip() == "")
+            hkr_id_in_request and
+            hkr_id_value and
+            not original_had_hkr_id
         )
+        
+        if not hkr_id_added_first_time:
+            if hkr_id_in_request and hkr_id_value:
+                logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': Project already had hkrId={original_project.hkrId}")
+            elif hkr_id_in_request:
+                logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': hkrId in request but value is falsy: {hkr_id_value}")
+            else:
+                logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': hkrId not in request data")
 
         if hkr_id_added_first_time:
             # This is the first time PW ID is added - perform automatic update with all project data
-            logger.info(f"=" * 80)
-            logger.info(f"HKR ID ADDED for first time to project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
-            logger.info(f"Performing automatic comprehensive PW sync...")
-            logger.info(f"=" * 80)
+            logger.info(f"Automatic PW sync triggered for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
 
             try:
                 # Create comprehensive data dict for automatic update
@@ -1699,12 +1796,10 @@ class ProjectViewSet(BaseViewSet):
                 
             except Exception as e:
                 # Log detailed error but don't break the update
-                logger.error(f"=" * 80)
-                logger.error(f"AUTOMATIC PW SYNC FAILED for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
+                logger.error(f"Automatic PW sync failed for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
                 logger.error(f"Error type: {type(e).__name__}")
                 logger.error(f"Error message: {str(e)}")
                 logger.error(f"Project update succeeded but PW sync failed - data may be out of sync")
-                logger.error(f"=" * 80)
                 # Re-raise to make the failure visible in the UI
                 raise ValidationError({
                     "hkrId": f"Project updated successfully but failed to sync to ProjectWise: {str(e)}. Please use 'Update to PW' button to retry."

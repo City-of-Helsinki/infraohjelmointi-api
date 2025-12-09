@@ -1,12 +1,9 @@
-from .BaseViewSet import BaseViewSet
-import logging
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
 
-logger = logging.getLogger("infraohjelmointi_api")
+from .CachedLookupViewSet import CachedLookupViewSet
 
-class ProjectTypeViewSet(BaseViewSet):
-    """
-    API endpoint that allows project types to be viewed or edited.
-    """
+
+class ProjectTypeViewSet(CachedLookupViewSet):
+    """API endpoint for project types (cached)."""
 
     serializer_class = ProjectTypeSerializer

@@ -1,12 +1,9 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import (
-    ConstructionPhaseSerializer,
-)
+from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import ConstructionPhaseSerializer
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ConstructionPhaseViewSet(BaseViewSet):
-    """
-    API endpoint that allows Construction phases to be viewed or edited.
-    """
+class ConstructionPhaseViewSet(CachedLookupViewSet):
+    """API endpoint for construction phases (cached)."""
 
     serializer_class = ConstructionPhaseSerializer

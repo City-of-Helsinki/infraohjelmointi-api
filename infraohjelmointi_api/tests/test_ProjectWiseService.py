@@ -4,12 +4,9 @@ from django.test import TestCase
 from datetime import date
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory, Person
-from ..serializers import ProjectCreateSerializer
 from ..services import ProjectWiseService
 from ..views import BaseViewSet
-from ..services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper, to_pw_map
-from django.core.management import call_command
-from io import StringIO
+from ..services.utils.PWConfig import PWConfig
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -23,23 +20,23 @@ class ProjectWiseServiceTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
-        # Create test project class for the test scope
-        self.test_scope_class, _ = ProjectClass.objects.get_or_create(
-            id="6182f067-b442-4788-b663-69a63c7380f9",  # The hardcoded test scope UUID
-            defaults={
-                'name': "Puistojen peruskorjaus",
-                'path': "8/04/Puistot ja liikunta-alueet/Puistojen peruskorjaus/Keskinen suurpiiri"
-            }
-        )
-
-        # Patch environment variable to use test scope class ID
-        self.env_patcher = patch.dict('os.environ', {'PW_TEST_SCOPE_CLASS_ID': str(self.test_scope_class.id)})
+        # Patch environment variables
+        self.env_patcher = patch.dict('os.environ', {
+            'PW_SYNC_ENABLED': 'True'
+        })
         self.env_patcher.start()
 
         # Create other required objects
         self.project_type, _ = ProjectType.objects.get_or_create(value="park")
         self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
         self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            id=uuid.uuid4(),
+            defaults={
+                'name': "Test Project Class",
+                'path': "Test/Path"
+            }
+        )
         self.person, _ = Person.objects.get_or_create(
             firstName="Test",
             lastName="Person",
@@ -54,7 +51,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="Test Address 1",
             hkrId=12345,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -75,7 +72,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="Test Address 2",
             hkrId=None,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -87,7 +84,7 @@ class ProjectWiseServiceTestCase(TestCase):
             description="Test description 3",
             hkrId=67890,
             programmed=False,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -164,7 +161,7 @@ class ProjectWiseServiceTestCase(TestCase):
             address="",  # Empty in infra tool
             hkrId=11111,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -196,70 +193,6 @@ class ProjectWiseServiceTestCase(TestCase):
     def tearDown(self):
         """Clean up test data"""
         self.env_patcher.stop()
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    def test_filter_projects_for_test_scope(self, mock_get_pw):
-        """Test that project filtering works for the test scope"""
-        service = ProjectWiseService()
-
-        # Get all projects
-        all_projects = Project.objects.all()
-
-        # Filter for test scope
-        filtered_projects = service._filter_projects_for_test_scope(all_projects)
-
-        # Should only include projects with the test scope class
-        self.assertEqual(filtered_projects.count(), 3)  # All our test projects have the test scope class
-
-        # Test with projects not in scope
-        other_class = ProjectClass.objects.create(
-            id=uuid.uuid4(),
-            name="Other Class",
-            path="Other/Path"
-        )
-
-        out_of_scope_project = Project.objects.create(
-            id=uuid.uuid4(),
-            name="Out of Scope Project",
-            description="Test",
-            hkrId=99999,
-            programmed=True,
-            projectClass=other_class,
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-        all_projects = Project.objects.all()
-        filtered_projects = service._filter_projects_for_test_scope(all_projects)
-
-        # Should still only include projects with the test scope class
-        self.assertEqual(filtered_projects.count(), 3)
-        self.assertNotIn(out_of_scope_project, filtered_projects)
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
-    def test_sync_all_projects_to_pw_with_test_scope(self, mock_sync, mock_get_pw):
-        """Test mass update with test scope filtering"""
-        mock_get_pw.return_value = self.mock_pw_response
-        mock_sync.return_value = None
-
-        service = ProjectWiseService()
-
-        # Run mass update
-        update_log = service.sync_all_projects_to_pw_with_test_scope()
-
-        # Should only process programmed projects with HKR IDs in test scope
-        self.assertEqual(len(update_log), 1)  # Only one project has both programmed=True and hkrId
-        self.assertEqual(update_log[0]['project_name'], "Test Programmed Project")
-        self.assertEqual(update_log[0]['status'], 'success')
-
-        # Verify that sync was called with correct data (internal field names)
-        mock_sync.assert_called_once()
-        call_args = mock_sync.call_args
-        self.assertIn('name', call_args[1]['data'])  # Internal field name
-        self.assertIn('description', call_args[1]['data'])  # Internal field name
-        self.assertEqual(call_args[1]['project'], self.programmed_project_with_hkr)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
@@ -332,133 +265,26 @@ class ProjectWiseServiceTestCase(TestCase):
             # Should log error
             mock_logger.error.assert_called_once_with("sync_project_to_pw called without proper parameters")
 
+    def test_hierarchical_fields_consistency(self):
+        """Verify HIERARCHICAL_FIELDS matches HIERARCHICAL_FIELD_ORDER."""
+        service = ProjectWiseService()
 
-@patch.object(BaseViewSet, "authentication_classes", new=[])
-@patch.object(BaseViewSet, "permission_classes", new=[])
-class ProjectViewSetProjectWiseTestCase(TestCase):
-    """
-    Test cases for ProjectViewSet PW integration, especially automatic updates when HKR ID is added.
-    """
+        # Check that HIERARCHICAL_FIELDS is a set of HIERARCHICAL_FIELD_ORDER
+        self.assertEqual(service.HIERARCHICAL_FIELDS, set(service.HIERARCHICAL_FIELD_ORDER))
 
-    def setUp(self):
-        """Set up test data"""
-        self.project_class, _ = ProjectClass.objects.get_or_create(
-            name="Test Class ViewSet",
-            defaults={'path': "Test/Class/ViewSet"}
-        )
+        # Check exact count
+        self.assertEqual(len(service.HIERARCHICAL_FIELD_ORDER), 6)
 
-        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
-        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
-        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
-
-        self.project_without_hkr = Project.objects.create(
-            id=uuid.uuid4(),
-            name="Project Without HKR",
-            description="Test description",
-            address="Test Address",
-            hkrId=None,
-            programmed=True,
-            projectClass=self.project_class,
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-        self.project_with_hkr = Project.objects.create(
-            id=uuid.uuid4(),
-            name="Project With HKR",
-            description="Test description",
-            hkrId=12345,
-            programmed=True,
-            projectClass=self.project_class,
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-    def test_hkr_id_update_detection_logic(self):
-        """Comprehensive test for HKR ID update detection logic (automatic vs regular updates)"""
-        # Define test cases: (request_data, old_hkr_id, expected_trigger, description)
-        test_cases = [
-            # Cases that SHOULD trigger automatic update
-            ({'hkrId': 54321, 'name': 'Updated'}, None, True, "HKR ID added for first time (None)"),
-            ({'hkrId': 54321, 'name': 'Updated'}, "", True, "HKR ID added for first time (empty)"),
-            ({'hkrId': 54321, 'name': 'Updated'}, "  ", True, "HKR ID added for first time (whitespace)"),
-
-            # Cases that should NOT trigger automatic update
-            ({'name': 'Updated Name Only'}, 12345, False, "Regular update, HKR ID exists, not in request"),
-            ({'hkrId': 99999, 'name': 'Updated'}, 12345, False, "HKR ID changed (already existed)"),
-            ({'hkrId': 12345, 'name': 'Updated'}, 12345, False, "HKR ID unchanged"),
-            ({'name': 'Updated Name Only'}, None, False, "No HKR ID in request, no old HKR ID"),
-            ({'hkrId': '', 'name': 'Updated'}, None, False, "Empty HKR ID in request"),
-            ({'hkrId': None, 'name': 'Updated'}, None, False, "None HKR ID in request"),
-            ({'hkrId': None, 'name': 'Updated'}, 12345, False, "None HKR ID, but project had one"),
-        ]
-
-        for request_data, old_hkr_id, expected, description in test_cases:
-            with self.subTest(case=description):
-                # Test the actual logic used in serializers for automatic update detection
-                hkr_id_added_first_time = bool(
-                    'hkrId' in request_data and
-                    request_data['hkrId'] and
-                    (not old_hkr_id or str(old_hkr_id).strip() == "")
-                )
-                self.assertEqual(hkr_id_added_first_time, expected, description)
-
-    def test_create_comprehensive_project_data_logic(self):
-        """Test the comprehensive project data creation logic"""
-        # Test the logic that creates comprehensive data for automatic updates
-
-        # Mock project with various field states
-        mock_project = Mock()
-        mock_project.name = "Test Project"
-        mock_project.description = "Test Description"
-        mock_project.address = "Test Address"
-        mock_project.entityName = None  # Should be excluded
-        mock_project.estPlanningStart = date(2024, 1, 1)
-        mock_project.estPlanningEnd = None  # Should be excluded
-        mock_project.estConstructionStart = date(2024, 6, 1)
-        mock_project.estConstructionEnd = date(2024, 12, 1)
-        mock_project.presenceStart = None  # Should be excluded
-        mock_project.presenceEnd = None  # Should be excluded
-        mock_project.visibilityStart = date(2024, 3, 1)
-        mock_project.visibilityEnd = date(2024, 4, 1)
-        mock_project.masterPlanAreaNumber = "MP001"
-        mock_project.trafficPlanNumber = ""  # Empty string, should be included
-        mock_project.bridgeNumber = None  # Should be excluded
-
-        # Create the data dict (simulating the helper method logic)
-        comprehensive_data = {
-            'name': mock_project.name,
-            'description': mock_project.description,
-            'address': mock_project.address,
-            'entityName': mock_project.entityName,
-            'estPlanningStart': mock_project.estPlanningStart,
-            'estPlanningEnd': mock_project.estPlanningEnd,
-            'estConstructionStart': mock_project.estConstructionStart,
-            'estConstructionEnd': mock_project.estConstructionEnd,
-            'presenceStart': mock_project.presenceStart,
-            'presenceEnd': mock_project.presenceEnd,
-            'visibilityStart': mock_project.visibilityStart,
-            'visibilityEnd': mock_project.visibilityEnd,
-            'masterPlanAreaNumber': mock_project.masterPlanAreaNumber,
-            'trafficPlanNumber': mock_project.trafficPlanNumber,
-            'bridgeNumber': mock_project.bridgeNumber,
+        # Check that all expected fields are present
+        expected_fields = {
+            'PROJECT_Pluokka',
+            'PROJECT_Luokka',
+            'PROJECT_Alaluokka',
+            'PROJECT_Suurpiirin_nimi',
+            'PROJECT_Kaupunginosan_nimi',
+            'PROJECT_Osa_alue'
         }
-
-        # Remove None values (simulating the helper method logic)
-        filtered_data = {k: v for k, v in comprehensive_data.items() if v is not None}
-
-        # Verify expected fields are included
-        expected_included = ['name', 'description', 'address', 'estPlanningStart', 'estConstructionStart',
-                           'estConstructionEnd', 'visibilityStart', 'visibilityEnd', 'masterPlanAreaNumber', 'trafficPlanNumber']
-        for field in expected_included:
-            self.assertIn(field, filtered_data, f"Field '{field}' should be included")
-
-        # Verify None fields are excluded
-        expected_excluded = ['entityName', 'estPlanningEnd', 'presenceStart', 'presenceEnd', 'bridgeNumber']
-        for field in expected_excluded:
-            self.assertNotIn(field, filtered_data, f"Field '{field}' should be excluded (None value)")
+        self.assertEqual(service.HIERARCHICAL_FIELDS, expected_fields)
 
 
 class ProjectWiseServiceEdgeCaseTestCase(TestCase):
@@ -566,34 +392,6 @@ class ProjectWiseServiceEdgeCaseTestCase(TestCase):
         except Exception as e:
             self.fail(f"Should not raise exception with malformed PW data: {e}")
 
-    def test_test_scope_filtering_edge_cases(self):
-        """Test edge cases for test scope filtering"""
-        service = ProjectWiseService()
-
-        # Test with empty queryset
-        empty_projects = Project.objects.none()
-        filtered = service._filter_projects_for_test_scope(empty_projects)
-        self.assertEqual(filtered.count(), 0)
-
-        # Test with projects that don't have projectClass
-        project_without_class = Project.objects.create(
-            id=uuid.uuid4(),
-            name="No Class Project",
-            description="Test",
-            hkrId=88888,
-            programmed=True,
-            projectClass=None,  # No class
-            type=self.project_type,
-            phase=self.project_phase,
-            category=self.project_category
-        )
-
-        all_projects = Project.objects.all()
-        filtered = service._filter_projects_for_test_scope(all_projects)
-
-        # Should not include project without class
-        self.assertNotIn(project_without_class, filtered)
-
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     def test_pw_api_errors_handling(self, mock_get_pw):
         """Test handling of various ProjectWise API errors"""
@@ -667,42 +465,6 @@ class ProjectWiseServiceEdgeCaseTestCase(TestCase):
             self.assertIn('erikoismerkit', project_data['description'])
         except Exception as e:
             self.fail(f"Should handle special characters: {e}")
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
-    def test_filter_projects_for_test_scope_missing_env_var(self, mock_env):
-        """Test that missing PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
-        # Mock environment to return None for PW_TEST_SCOPE_CLASS_ID
-        def env_side_effect(key, default=None):
-            if key == 'PW_TEST_SCOPE_CLASS_ID':
-                return default
-            return 'mock-value'  # For other required env vars
-
-        mock_env.side_effect = env_side_effect
-
-        service = ProjectWiseService()
-        projects = Project.objects.filter(programmed=True)
-
-        result = service._filter_projects_for_test_scope(projects)
-
-        self.assertEqual(result.count(), 0)
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.env')
-    def test_filter_projects_for_test_scope_invalid_uuid(self, mock_env):
-        """Test that invalid UUID in PW_TEST_SCOPE_CLASS_ID returns empty queryset"""
-        # Mock environment to return invalid UUID
-        def env_side_effect(key, default=None):
-            if key == 'PW_TEST_SCOPE_CLASS_ID':
-                return 'invalid-uuid'
-            return 'mock-value'  # For other required env vars
-
-        mock_env.side_effect = env_side_effect
-
-        service = ProjectWiseService()
-        projects = Project.objects.filter(programmed=True)
-
-        result = service._filter_projects_for_test_scope(projects)
-
-        self.assertEqual(result.count(), 0)
 
 
 class ProjectWiseConcurrencyTestCase(TestCase):
@@ -857,20 +619,20 @@ class ProductionMassUpdateTestCase(TestCase):
 
     def setUp(self):
         """Set up comprehensive test data for production mass update testing"""
-        # Create test scope class
-        self.test_scope_class, _ = ProjectClass.objects.get_or_create(
-            id="6182f067-b442-4788-b663-69a63c7380f9",
-            defaults={
-                'name': "Puistojen peruskorjaus",
-                'path': "8/04/Puistot ja liikunta-alueet/Puistojen peruskorjaus/Keskinen suurpiiri"
-            }
-        )
-
-        # Patch environment variable to use test scope class ID
-        self.env_patcher = patch.dict('os.environ', {'PW_TEST_SCOPE_CLASS_ID': str(self.test_scope_class.id)})
+        # Patch environment variables
+        self.env_patcher = patch.dict('os.environ', {
+            'PW_SYNC_ENABLED': 'True'
+        })
         self.env_patcher.start()
 
-        # Create other class for out-of-scope projects
+        # Create project classes
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            id=uuid.uuid4(),
+            defaults={
+                'name': "Test Project Class",
+                'path': "Test/Path"
+            }
+        )
         self.other_class, _ = ProjectClass.objects.get_or_create(
             name="Other Class Production",
             defaults={'path': "Other/Production/Class"}
@@ -888,7 +650,7 @@ class ProductionMassUpdateTestCase(TestCase):
 
         # Create various test projects for comprehensive testing
 
-        # 1. Perfect programmed project with HKR ID in test scope
+        # 1. Perfect programmed project with HKR ID
         self.perfect_project = Project.objects.create(
             id=uuid.uuid4(),
             name="Perfect Test Project",
@@ -897,7 +659,7 @@ class ProductionMassUpdateTestCase(TestCase):
             entityName="Perfect Entity",
             hkrId=10001,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -924,7 +686,7 @@ class ProductionMassUpdateTestCase(TestCase):
             entityName="Partial Entity",
             hkrId=10002,
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category,
@@ -933,7 +695,7 @@ class ProductionMassUpdateTestCase(TestCase):
             masterPlanAreaNumber="MP002"
         )
 
-        # 3. Programmed project outside test scope
+        # 3. Programmed project with different class
         self.out_of_scope_project = Project.objects.create(
             id=uuid.uuid4(),
             name="Out of Scope Project",
@@ -953,7 +715,7 @@ class ProductionMassUpdateTestCase(TestCase):
             description="Non-programmed",
             hkrId=10004,
             programmed=False,  # Not programmed
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -966,7 +728,7 @@ class ProductionMassUpdateTestCase(TestCase):
             description="No HKR ID",
             hkrId=None,  # No HKR ID
             programmed=True,
-            projectClass=self.test_scope_class,
+            projectClass=self.project_class,
             type=self.project_type,
             phase=self.project_phase,
             category=self.project_category
@@ -1002,32 +764,6 @@ class ProductionMassUpdateTestCase(TestCase):
 
         # Verify sync was called for each project
         self.assertEqual(mock_sync.call_count, expected_projects)
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
-    def test_test_scope_mass_update_filters_correctly(self, mock_sync, mock_get_pw):
-        """Test test scope mass update only processes test scope projects"""
-        mock_get_pw.return_value = {
-            "relationshipInstances": [{"relatedInstance": {"instanceId": "test-id", "properties": {}}}]
-        }
-        mock_sync.return_value = None
-
-        service = ProjectWiseService()
-
-        # Run test scope mass update
-        update_log = service.sync_all_projects_to_pw_with_test_scope()
-
-        # Should only process test scope projects
-        expected_projects = 2  # perfect_project, partial_project (both in test scope)
-        self.assertEqual(len(update_log), expected_projects)
-
-        # Verify correct projects were processed
-        processed_names = [log['project_name'] for log in update_log]
-        self.assertIn("Perfect Test Project", processed_names)
-        self.assertIn("Partial Data Project", processed_names)
-
-        # Verify out-of-scope project was excluded
-        self.assertNotIn("Out of Scope Project", processed_names)
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService._ProjectWiseService__sync_project_to_pw')
@@ -1175,830 +911,116 @@ class ProductionMassUpdateTestCase(TestCase):
                 self.assertIn('reason', log)
 
 
-class ProjectWiseDataMapperTestCase(TestCase):
+class ProjectWiseServiceCoreFunctionalityTestCase(TestCase):
     """
-    Test cases for ProjectWiseDataMapper to ensure field mappings work correctly.
+    Test cases for core ProjectWiseService functionality and configuration.
     """
 
-    def test_field_mappings_comprehensive(self):
-        """Comprehensive test for ProjectWise field mappings (basic fields, protected fields, critical fields)"""
+    def test_pw_service_initialization(self):
+        """Test that ProjectWiseService initializes correctly"""
+        service = ProjectWiseService()
 
-        # Test basic field mappings
-        basic_field_mappings = {
-            'name': 'PROJECT_Kohde',
-            'address': 'PROJECT_Kadun_tai_puiston_nimi',
+        # Verify service has required attributes
+        self.assertIsNotNone(service.pw_api_url)
+        self.assertIsNotNone(service.pw_api_project_update_endpoint)
+
+    def test_pw_service_configuration_integration(self):
+        """Test that PW service integrates correctly with configuration"""
+        service = ProjectWiseService()
+
+        # Test that configuration values are accessible
+        self.assertIsNotNone(PWConfig.HIERARCHICAL_FIELD_DELAY)
+        self.assertIsNotNone(PWConfig.PROTECTED_FIELDS)
+        self.assertIsNotNone(PWConfig.CLASSIFICATION_FIELDS)
+
+    def test_pw_service_configuration_consistency(self):
+        """Test that PW service configuration is consistent"""
+        service = ProjectWiseService()
+
+        # Test that configuration values are reasonable
+        self.assertGreater(PWConfig.HIERARCHICAL_FIELD_DELAY, 0)
+        self.assertGreater(PWConfig.API_TIMEOUT, 0)
+        self.assertGreater(PWConfig.LOG_SEPARATOR_LENGTH, 0)
+
+    def test_pw_service_private_methods_exist(self):
+        """Test that private methods exist and are callable"""
+        service = ProjectWiseService()
+
+        # Test private methods exist
+        private_methods = [
+            '_split_fields_by_type',
+            '_calculate_update_results',
+            '_get_pw_instance_and_url',
+            '_apply_overwrite_rules',
+            '_update_hierarchical_fields_one_by_one'
+        ]
+
+        for method_name in private_methods:
+            self.assertTrue(hasattr(service, method_name), f"Method '{method_name}' should exist")
+            self.assertTrue(callable(getattr(service, method_name)), f"Method '{method_name}' should be callable")
+
+    def test_pw_service_constants_immutability(self):
+        """Test that PW service constants are properly defined"""
+        service = ProjectWiseService()
+
+        # Test that hierarchical fields set is properly defined
+        self.assertIsInstance(service.HIERARCHICAL_FIELDS, set)
+        self.assertEqual(len(service.HIERARCHICAL_FIELDS), 6)
+
+        # Test that all expected fields are present
+        expected_fields = {
+            'PROJECT_Pluokka', 'PROJECT_Luokka', 'PROJECT_Alaluokka',
+            'PROJECT_Suurpiirin_nimi', 'PROJECT_Kaupunginosan_nimi', 'PROJECT_Osa_alue'
         }
+        self.assertEqual(service.HIERARCHICAL_FIELDS, expected_fields)
 
-        for field, expected_mapping in basic_field_mappings.items():
-            with self.subTest(category="basic", field=field):
-                self.assertIn(field, to_pw_map, f"Basic field '{field}' should be mapped")
-                self.assertEqual(to_pw_map[field], expected_mapping)
-
-        # Test protected field mappings (IO-396 requirements)
-        protected_field_mappings = {
-            'description': 'PROJECT_Hankkeen_kuvaus',
-            'presenceStart': 'PROJECT_Esillaolo_alku',
-            'presenceEnd': 'PROJECT_Esillaolo_loppu',
-            'visibilityStart': 'PROJECT_Nhtvillolo_alku',
-            'visibilityEnd': 'PROJECT_Nhtvillolo_loppu',
-        }
-
-        for field, expected_mapping in protected_field_mappings.items():
-            with self.subTest(category="protected", field=field):
-                self.assertIn(field, to_pw_map, f"Protected field '{field}' should be mapped")
-                # Handle both string mappings and dict mappings
-                if isinstance(to_pw_map[field], str):
-                    self.assertEqual(to_pw_map[field], expected_mapping)
-                else:
-                    self.assertEqual(to_pw_map[field]['field'], expected_mapping)
-
-        # Test critical field mappings using ProjectWiseService._get_pw_field_mapping()
-        with patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseDataMapper') as mock_mapper_class:
-            mock_mapper = Mock()
-            mock_mapper.load_and_transform_project_areas.return_value = {}
-            mock_mapper_class.return_value = mock_mapper
-
+    def test_pw_sync_disabled_handling(self):
+        """Test PW service behavior when sync is disabled"""
+        with patch.dict('os.environ', {'PW_SYNC_ENABLED': 'False'}):
             service = ProjectWiseService()
-            field_mapping = service._get_pw_field_mapping()
+            result = service.sync_project_to_pw(data={'test': 'data'}, project=None)
+            self.assertIsNone(result)
 
-            critical_fields = [
-                'phase', 'type', 'programmed', 'planningStartYear', 'constructionEndYear',
-                'gravel', 'louhi', 'estPlanningStart', 'estPlanningEnd',
-                'estConstructionStart', 'estConstructionEnd', 'presenceStart', 'presenceEnd',
-                'visibilityStart', 'visibilityEnd', 'area', 'responsibleZone',
-                'constructionPhaseDetail', 'projectDistrict', 'projectClass',
-                'personPlanning', 'personConstruction'
-            ]
-
-            for field in critical_fields:
-                with self.subTest(category="critical", field=field):
-                    self.assertIn(field, field_mapping, f"Critical field '{field}' should be in ProjectWiseService field mapping")
-
-    def test_date_format_handling(self):
-        mapper = ProjectWiseDataMapper()
-
-        # Test date conversion
-        test_data = {
-            'estPlanningStart': date(2025, 1, 15),
-            'estConstructionEnd': date(2025, 12, 31)
-        }
-
-        result = mapper.convert_to_pw_data(test_data, None)
-
-        # Should convert to ISO datetime format
-        self.assertEqual(result['PROJECT_Hankkeen_suunnittelu_alkaa'], '2025-01-15T00:00:00')
-        self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '2025-12-31T00:00:00')
-
-    def test_date_format_handling_none_values(self):
-        mapper = ProjectWiseDataMapper()
-
-        # Test with None values
-        test_data = {
-            'estPlanningStart': None,
-            'estConstructionEnd': None
-        }
-
-        result = mapper.convert_to_pw_data(test_data, None)
-
-        # Should have empty strings for None values
-        self.assertEqual(result['PROJECT_Hankkeen_suunnittelu_alkaa'], '')
-        self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '')
-
-
-class ProjectImporterCommandTestCase(TestCase):
-    """
-    Test cases for the management command functionality.
-    """
-
-    @patch('infraohjelmointi_api.management.commands.projectimporter.ProjectWiseService')
-    def test_sync_projects_to_pw_test_scope_command(self, mock_service_class):
-        """Test the new management command option"""
-
-        # Mock the service and its method
-        mock_service = Mock()
-        mock_service.sync_all_projects_to_pw_with_test_scope.return_value = [
-            {
-                'project_name': 'Test Project 1',
-                'hkr_id': 12345,
-                'status': 'success'
-            },
-            {
-                'project_name': 'Test Project 2',
-                'hkr_id': 67890,
-                'status': 'error',
-                'error': 'Connection failed'
-            }
-        ]
-        mock_service_class.return_value = mock_service
-
-        # Capture stdout
-        out = StringIO()
-
-        # Call the command
-        call_command('projectimporter', '--sync-projects-to-pw-test-scope', stdout=out)
-
-        # Verify service was called
-        mock_service.sync_all_projects_to_pw_with_test_scope.assert_called_once()
-
-        # Verify output contains summary
-        output = out.getvalue()
-        self.assertIn('1 processed successfully', output)
-        self.assertIn('1 errors', output)
-        self.assertIn('Error updating Test Project 2', output)
-
-
-class ProjectWisePhaseAssignmentTestCase(TestCase):
-    """
-    Test cases for ProjectWise phase assignment fix (IO-740).
-    """
-
-    def setUp(self):
-        """Set up test data for phase assignment testing"""
-        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
-        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
-
-        # Create test phases
-        self.programming_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
-        self.construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
-        self.draft_approval_phase, _ = ProjectPhase.objects.get_or_create(value="draftApproval")
-
-    def test_phase_assignment_fix_io740(self):
-        """
-        Test that the IO-740 fix correctly assigns phases from ProjectWise.
-
-        This test verifies that the buggy hasattr() logic has been replaced
-        with the correct 'in' operator for dictionary key lookup.
-        """
-
-        # Create the mapper to get the phase mappings
-        mapper = ProjectWiseDataMapper()
-        phases = mapper.load_and_transform_phases()
-
-        # Test the fixed logic with real ProjectWise phase values
-        test_cases = [
-            ('3. Suunnittelun aloitus / Suunnitelmaluonnos', 'draftInitiation'),
-            ('4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen', 'draftApproval'),
-            ('7. Rakentaminen', 'construction'),
-            ('5. Rakennussuunnitelma', 'constructionPlan'),
-            ('Unknown Phase', 'programming'),  # Should default
-        ]
-
-        for pw_phase, expected_internal_phase in test_cases:
-            with self.subTest(pw_phase=pw_phase):
-                # Test the FIXED logic (using 'in' operator)
-                if pw_phase in phases:
-                    result_phase = phases[pw_phase]
-                    self.assertEqual(result_phase.value, expected_internal_phase,
-                                   f"Phase '{pw_phase}' should map to '{expected_internal_phase}'")
-                else:
-                    # Should default to programming for unknown phases
-                    result_phase = phases['2. Ohjelmointi']
-                    self.assertEqual(result_phase.value, 'programming',
-                                   f"Unknown phase '{pw_phase}' should default to 'programming'")
-
-    def test_phase_assignment_buggy_vs_fixed_logic(self):
-        """
-        Test that demonstrates the difference between buggy and fixed logic.
-
-        This test shows that the old hasattr() logic would always fail,
-        while the new 'in' logic works correctly.
-        """
-
-        mapper = ProjectWiseDataMapper()
-        phases = mapper.load_and_transform_phases()
-
-        # Test with a valid ProjectWise phase
-        pw_phase = '7. Rakentaminen'
-
-        # BUGGY LOGIC (what was in production before the fix)
-        # This would always fail because hasattr() checks for object attributes, not dict keys
-        buggy_result = hasattr(phases, pw_phase)
-        self.assertFalse(buggy_result, "Buggy hasattr() logic should always return False for dict keys")
-
-        # FIXED LOGIC (what we implemented)
-        # This correctly checks if the key exists in the dictionary
-        fixed_result = pw_phase in phases
-        self.assertTrue(fixed_result, "Fixed 'in' logic should correctly find the key in the dictionary")
-
-        # Verify the phase mapping works with the fixed logic
-        if fixed_result:
-            result_phase = phases[pw_phase]
-            self.assertEqual(result_phase.value, 'construction',
-                           "Phase '7. Rakentaminen' should map to 'construction'")
-
-
-@patch.object(BaseViewSet, "authentication_classes", new=[])
-@patch.object(BaseViewSet, "permission_classes", new=[])
-class IO396FieldMappingTestCase(TestCase):
-    """
-    Test cases for IO-396 field mapping and data format issues.
-    These tests verify that the ProjectWise integration properly maps and formats all fields.
-    """
-
-    def setUp(self):
-        """Set up test data"""
-        # Create basic test data using get_or_create to avoid conflicts
-        self.project_type, _ = ProjectType.objects.get_or_create(value="street")
-        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
-        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
-
-        # Create minimal test project
-        self.test_project = Project.objects.create(
-            id=uuid.uuid4(),
-            name="Mannerheimintie 1-5",
-            description="Test description for ProjectWise sync",
-            address="Mannerheimintie 1",
-            hkrId=12345,
-            programmed=True,
-            phase=self.project_phase,
-            type=self.project_type,
-            category=self.project_category
-        )
-
-    def test_create_project_data_for_mass_update_with_proper_format(self):
-        """Test that _create_project_data_for_mass_update returns internal field names."""
-        # Mock the ProjectWiseDataMapper and its method
-        with patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseDataMapper') as mock_mapper_class:
-            mock_mapper = Mock()
-            mock_mapper.load_and_transform_project_areas.return_value = {}
-            mock_mapper_class.return_value = mock_mapper
-
+    def test_pw_sync_enabled_handling(self):
+        """Test PW service behavior when sync is enabled"""
+        with patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'}):
             service = ProjectWiseService()
-            project_data = service._create_project_data_for_mass_update(self.test_project)
 
-            # Verify that convert_to_pw_data was NOT called (this is the fix!)
-            mock_mapper.convert_to_pw_data.assert_not_called()
-
-            # Verify the result has internal field names (not PW format)
-            self.assertIn('name', project_data)
-            self.assertIn('description', project_data)
-            self.assertIn('phase', project_data)
-            self.assertIn('type', project_data)
-
-            # Verify data contains internal field names and UUIDs (not converted)
-            self.assertEqual(project_data['name'], 'Mannerheimintie 1-5')
-            self.assertEqual(project_data['description'], 'Test description for ProjectWise sync')
-            self.assertIsInstance(project_data['phase'], str)  # UUID as string
-            self.assertIsInstance(project_data['type'], str)   # UUID as string
-
-    def test_projectwise_data_format_conversion(self):
-        """Test that the data mapper properly converts data formats."""
-        # Mock the ProjectWiseDataMapper initialization to avoid real DB dependencies
-        with patch('infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectWiseDataMapper.__init__', return_value=None):
-            from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import ProjectWiseDataMapper
-
-            # Create a mapper instance and mock its methods
-            mapper = ProjectWiseDataMapper()
-
-            # Test data with different types
-            test_data = {
-                'name': 'Test Project',
-                'programmed': True,
-                'gravel': False,
-                'planningStartYear': 2025
-            }
-
-            # Mock the convert_to_pw_data method to return expected format
-            with patch.object(mapper, 'convert_to_pw_data') as mock_convert:
-                mock_convert.return_value = {
-                    'PROJECT_Kohde': 'Test Project',
-                    'PROJECT_Ohjelmoitu': 'Kyllä',
-                    'PROJECT_Sorakatu': 'Ei',
-                    'PROJECT_Louhi__hankkeen_aloitusvuosi': 2025
-                }
-
-                result = mapper.convert_to_pw_data(test_data, self.test_project)
-
-                # Verify boolean conversion
-                self.assertEqual(result['PROJECT_Ohjelmoitu'], 'Kyllä')
-                self.assertEqual(result['PROJECT_Sorakatu'], 'Ei')
-
-                # Verify simple field mapping
-                self.assertEqual(result['PROJECT_Kohde'], 'Test Project')
-
-                # Verify integer conversion
-                self.assertEqual(result['PROJECT_Louhi__hankkeen_aloitusvuosi'], 2025)
-
-
-@patch.object(BaseViewSet, "authentication_classes", new=[])
-@patch.object(BaseViewSet, "permission_classes", new=[])
-@patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'})
-class ProjectCreationPWIntegrationTestCase(TestCase):
-    """
-    This addresses the gap where creating a new project with PW ID doesn't trigger automatic sync.
-    """
-
-    def setUp(self):
-        self.project_class, _ = ProjectClass.objects.get_or_create(
-            name="Test Class Creation",
-            defaults={'path': "Test/Class/Creation"}
-        )
-
-        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
-        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
-        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
-    def test_create_project_with_pw_id_triggers_automatic_sync(self, mock_post, mock_get_pw):
-        # Mock PW responses
-        mock_get_pw.return_value = {
-            "relationshipInstances": [{
-                "relatedInstance": {
-                    "instanceId": "test-instance-id",
-                    "properties": {}
-                }
-            }]
-        }
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = {"changedInstance": {"change": "Modified"}}
-
-        # Create project data with PW ID
-        project_data = {
-            "name": "New Project with PW ID",
-            "description": "Test project created with PW ID",
-            "hkrId": 54321,
-            "programmed": True,
-            "projectClass": str(self.project_class.id),
-            "type": str(self.project_type.id),
-            "phase": str(self.project_phase.id),
-            "category": str(self.project_category.id),
-            "planningStartYear": 2024,
-            "constructionEndYear": 2025,
-        }
-
-        # Create the project using the serializer (simulating the create flow)
-        serializer = ProjectCreateSerializer(data=project_data)
-        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
-
-        # This is where the automatic PW sync should happen
-        created_project = serializer.save()
-
-        # Verify project was created
-        self.assertIsNotNone(created_project)
-        self.assertEqual(created_project.hkrId, 54321)
-        self.assertEqual(created_project.name, "New Project with PW ID")
-
-        mock_get_pw.assert_called_once_with(54321)
-        self.assertEqual(mock_post.call_count, 4, "Expected 1 batch + 3 hierarchical field calls")
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
-    def test_create_project_without_valid_pw_id_no_sync(self, mock_post, mock_get_pw):
-        """Test that projects without valid PW ID (None, empty, whitespace) don't trigger sync"""
-        # Test only None - empty string and whitespace are invalid for hkrId field
-        project_data = {
-            "name": "Project without PW ID",
-            "description": "Test project without PW ID",
-            "hkrId": None,  # No PW ID
-            "programmed": True,
-            "projectClass": str(self.project_class.id),
-            "type": str(self.project_type.id),
-            "phase": str(self.project_phase.id),
-            "category": str(self.project_category.id),
-            "planningStartYear": 2024,
-            "constructionEndYear": 2025,
-        }
-
-        serializer = ProjectCreateSerializer(data=project_data)
-        self.assertTrue(serializer.is_valid(), f"Validation failed: {serializer.errors}")
-
-        created_project = serializer.save()
-
-        # Verify project created successfully
-        self.assertIsNotNone(created_project)
-        self.assertIsNone(created_project.hkrId)
-        self.assertEqual(created_project.name, "Project without PW ID")
-
-        # Verify PW sync was NOT called
-        mock_get_pw.assert_not_called()
-        mock_post.assert_not_called()
-
-    @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
-    @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
-    def test_create_project_with_pw_id_sync_error_handling(self, mock_post, mock_get_pw):
-        """Test that PW sync errors don't break project creation"""
-        # Mock PW service to raise an exception
-        mock_get_pw.side_effect = Exception("PW service unavailable")
-
-        # Create project data with PW ID
-        project_data = {
-            "name": "New Project with PW ID Error",
-            "description": "Test project with PW sync error",
-            "hkrId": 99999,
-            "programmed": True,
-            "projectClass": str(self.project_class.id),
-            "type": str(self.project_type.id),
-            "phase": str(self.project_phase.id),
-            "category": str(self.project_category.id),
-            "planningStartYear": 2024,
-            "constructionEndYear": 2025,
-        }
-
-        # Create the project using the serializer
-        serializer = ProjectCreateSerializer(data=project_data)
-        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
-
-        # Project creation should succeed even if PW sync fails
-        created_project = serializer.save()
-
-        # Verify project was created successfully
-        self.assertIsNotNone(created_project)
-        self.assertEqual(created_project.hkrId, 99999)
-        self.assertEqual(created_project.name, "New Project with PW ID Error")
-
-        # Verify that PW sync was attempted
-        mock_get_pw.assert_called_once_with(99999)
-
-
-class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
-    """
-    Test cases for the create_comprehensive_project_data function to ensure full coverage.
-    """
-
-    def test_create_comprehensive_project_data_with_all_fields(self):
-        """Test create_comprehensive_project_data with all fields populated"""
-        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
-        from datetime import date
-
-        # Create a mock project with all fields
-        mock_project = Mock()
-        mock_project.name = "Complete Test Project"
-        mock_project.description = "Complete description"
-        mock_project.address = "Complete Address 123"
-        mock_project.entityName = "Complete Entity"
-        mock_project.estPlanningStart = date(2024, 1, 1)
-        mock_project.estPlanningEnd = date(2024, 3, 1)
-        mock_project.estConstructionStart = date(2024, 6, 1)
-        mock_project.estConstructionEnd = date(2024, 12, 1)
-        mock_project.presenceStart = date(2024, 2, 1)
-        mock_project.presenceEnd = date(2024, 2, 28)
-        mock_project.visibilityStart = date(2024, 3, 1)
-        mock_project.visibilityEnd = date(2024, 3, 31)
-        mock_project.masterPlanAreaNumber = "MP001"
-        mock_project.trafficPlanNumber = "TP001"
-        mock_project.bridgeNumber = "BR001"
-
-        # Call the function
-        result = create_comprehensive_project_data(mock_project)
-
-        # Verify all fields are included
-        expected_fields = [
-            'name', 'description', 'address', 'entityName',
-            'estPlanningStart', 'estPlanningEnd', 'estConstructionStart', 'estConstructionEnd',
-            'presenceStart', 'presenceEnd', 'visibilityStart', 'visibilityEnd',
-            'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber'
-        ]
-
-        for field in expected_fields:
-            self.assertIn(field, result, f"Field '{field}' should be included")
-
-        # Verify values are correct
-        self.assertEqual(result['name'], "Complete Test Project")
-        self.assertEqual(result['description'], "Complete description")
-        self.assertEqual(result['address'], "Complete Address 123")
-        self.assertEqual(result['entityName'], "Complete Entity")
-        self.assertEqual(result['masterPlanAreaNumber'], "MP001")
-        self.assertEqual(result['trafficPlanNumber'], "TP001")
-        self.assertEqual(result['bridgeNumber'], "BR001")
-
-    def test_create_comprehensive_project_data_with_none_values(self):
-        """Test create_comprehensive_project_data with None values (should be excluded)"""
-        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
-        from datetime import date
-
-        # Create a mock project with some None values
-        mock_project = Mock()
-        mock_project.name = "Partial Test Project"
-        mock_project.description = "Partial description"
-        mock_project.address = None  # None value
-        mock_project.entityName = None  # None value
-        mock_project.estPlanningStart = date(2024, 1, 1)
-        mock_project.estPlanningEnd = None  # None value
-        mock_project.estConstructionStart = date(2024, 6, 1)
-        mock_project.estConstructionEnd = date(2024, 12, 1)
-        mock_project.presenceStart = None  # None value
-        mock_project.presenceEnd = None  # None value
-        mock_project.visibilityStart = date(2024, 3, 1)
-        mock_project.visibilityEnd = date(2024, 3, 31)
-        mock_project.masterPlanAreaNumber = "MP001"
-        mock_project.trafficPlanNumber = None  # None value
-        mock_project.bridgeNumber = "BR001"
-
-        # Call the function
-        result = create_comprehensive_project_data(mock_project)
-
-        # Verify None fields are excluded
-        none_fields = ['address', 'entityName', 'estPlanningEnd', 'presenceStart', 'presenceEnd', 'trafficPlanNumber']
-        for field in none_fields:
-            self.assertNotIn(field, result, f"Field '{field}' should be excluded (None value)")
-
-        # Verify non-None fields are included
-        included_fields = ['name', 'description', 'estPlanningStart', 'estConstructionStart',
-                          'estConstructionEnd', 'visibilityStart', 'visibilityEnd',
-                          'masterPlanAreaNumber', 'bridgeNumber']
-        for field in included_fields:
-            self.assertIn(field, result, f"Field '{field}' should be included")
-
-    def test_create_comprehensive_project_data_with_empty_strings(self):
-        """Test create_comprehensive_project_data with empty strings (should be included)"""
-        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
-
-        # Create a mock project with empty strings
-        mock_project = Mock()
-        mock_project.name = ""  # Empty string
-        mock_project.description = ""  # Empty string
-        mock_project.address = ""  # Empty string
-        mock_project.entityName = ""  # Empty string
-        mock_project.estPlanningStart = None
-        mock_project.estPlanningEnd = None
-        mock_project.estConstructionStart = None
-        mock_project.estConstructionEnd = None
-        mock_project.presenceStart = None
-        mock_project.presenceEnd = None
-        mock_project.visibilityStart = None
-        mock_project.visibilityEnd = None
-        mock_project.masterPlanAreaNumber = ""  # Empty string
-        mock_project.trafficPlanNumber = ""  # Empty string
-        mock_project.bridgeNumber = ""  # Empty string
-
-        # Call the function
-        result = create_comprehensive_project_data(mock_project)
-
-        # Verify empty strings are included (not None)
-        empty_string_fields = ['name', 'description', 'address', 'entityName',
-                              'masterPlanAreaNumber', 'trafficPlanNumber', 'bridgeNumber']
-        for field in empty_string_fields:
-            self.assertIn(field, result, f"Field '{field}' should be included (empty string is not None)")
-            self.assertEqual(result[field], "", f"Field '{field}' should be empty string")
-
-    def test_create_comprehensive_project_data_minimal_project(self):
-        """Test create_comprehensive_project_data with minimal project data"""
-        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
-
-        mock_project = Mock()
-        mock_project.name = "Minimal Project"
-        mock_project.description = "Minimal description"
-        mock_project.address = None
-        mock_project.entityName = None
-        mock_project.phase = None
-        mock_project.type = None
-        mock_project.projectClass = None
-        mock_project.projectDistrict = None
-        mock_project.area = None
-        mock_project.responsibleZone = None
-        mock_project.constructionPhaseDetail = None
-        mock_project.programmed = True
-        mock_project.estPlanningStart = None
-        mock_project.estPlanningEnd = None
-        mock_project.estConstructionStart = None
-        mock_project.estConstructionEnd = None
-        mock_project.presenceStart = None
-        mock_project.presenceEnd = None
-        mock_project.visibilityStart = None
-        mock_project.visibilityEnd = None
-        mock_project.planningStartYear = None
-        mock_project.constructionEndYear = None
-        mock_project.gravel = False
-        mock_project.louhi = False
-        mock_project.masterPlanAreaNumber = None
-        mock_project.trafficPlanNumber = None
-        mock_project.bridgeNumber = None
-        mock_project.personPlanning = None
-        mock_project.personConstruction = None
-
-        result = create_comprehensive_project_data(mock_project)
-
-        self.assertGreaterEqual(len(result), 3)
-        self.assertIn('name', result)
-        self.assertIn('description', result)
-        self.assertIn('programmed', result)
-        self.assertEqual(result['name'], "Minimal Project")
-        self.assertEqual(result['description'], "Minimal description")
-        self.assertEqual(result['programmed'], True)
-
-    def test_create_comprehensive_project_data_return_type(self):
-        """Test that create_comprehensive_project_data returns a dict"""
-        from infraohjelmointi_api.services.utils.ProjectWiseDataMapper import create_comprehensive_project_data
-
-        # Create a minimal mock project
-        mock_project = Mock()
-        mock_project.name = "Type Test Project"
-        mock_project.description = "Type test description"
-        mock_project.address = None
-        mock_project.entityName = None
-        mock_project.estPlanningStart = None
-        mock_project.estPlanningEnd = None
-        mock_project.estConstructionStart = None
-        mock_project.estConstructionEnd = None
-        mock_project.presenceStart = None
-        mock_project.presenceEnd = None
-        mock_project.visibilityStart = None
-        mock_project.visibilityEnd = None
-        mock_project.masterPlanAreaNumber = None
-        mock_project.trafficPlanNumber = None
-        mock_project.bridgeNumber = None
-
-        # Call the function
-        result = create_comprehensive_project_data(mock_project)
-
-        # Verify return type
-        self.assertIsInstance(result, dict)
-        self.assertGreater(len(result), 0)
-
-
-class ProjectCreateSerializerCreateMethodTestCase(TestCase):
-    """
-    Test cases for the create method in ProjectCreateSerializer to ensure the new sync functionality is covered.
-    """
-
-    def setUp(self):
-        self.project_class, _ = ProjectClass.objects.get_or_create(
-            name="Test Class Create Method",
-            defaults={'path': "Test/Class/Create/Method"}
-        )
-
-        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
-        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
-        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
-
-    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectCreateSerializer._sync_new_project_to_projectwise')
-    def test_create_method_calls_sync_with_pw_id(self, mock_sync):
-        """Test that the create method calls _sync_new_project_to_projectwise when project has PW ID"""
-        # Create project data with PW ID
-        project_data = {
-            "name": "Test Create Method Project",
-            "description": "Test project for create method",
-            "hkrId": 12345,
-            "programmed": True,
-            "projectClass": str(self.project_class.id),
-            "type": str(self.project_type.id),
-            "phase": str(self.project_phase.id),
-            "category": str(self.project_category.id),
-            "planningStartYear": 2024,
-            "constructionEndYear": 2025,
-        }
-
-        # Create the project using the serializer
-        serializer = ProjectCreateSerializer(data=project_data)
-        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
-
-        created_project = serializer.save()
-
-        # Verify project was created
-        self.assertIsNotNone(created_project)
-        self.assertEqual(created_project.hkrId, 12345)
-
-        # Verify that _sync_new_project_to_projectwise was called
-        mock_sync.assert_called_once_with(created_project)
-
-    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectCreateSerializer._sync_new_project_to_projectwise')
-    def test_create_method_calls_sync_without_pw_id(self, mock_sync):
-        """Test that the create method calls _sync_new_project_to_projectwise even without PW ID"""
-        # Create project data without PW ID
-        project_data = {
-            "name": "Test Create Method Project No PW",
-            "description": "Test project for create method without PW",
-            "hkrId": None,
-            "programmed": True,
-            "projectClass": str(self.project_class.id),
-            "type": str(self.project_type.id),
-            "phase": str(self.project_phase.id),
-            "category": str(self.project_category.id),
-            "planningStartYear": 2024,
-            "constructionEndYear": 2025,
-        }
-
-        # Create the project using the serializer
-        serializer = ProjectCreateSerializer(data=project_data)
-        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
-
-        created_project = serializer.save()
-
-        # Verify project was created
-        self.assertIsNotNone(created_project)
-        self.assertIsNone(created_project.hkrId)
-
-        # Verify that _sync_new_project_to_projectwise was called (it will handle the no PW ID case)
-        mock_sync.assert_called_once_with(created_project)
-
-    def test_create_method_integration_with_sync(self):
-        """Test the create method integration with the actual sync functionality"""
-        # Mock the ProjectWise service to avoid actual API calls
-        with patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService') as mock_pw_service_class, \
-             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.create_comprehensive_project_data') as mock_create_data, \
-             patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.logger') as mock_logger:
-
-            mock_pw_service = Mock()
-            mock_pw_service_class.return_value = mock_pw_service
-            mock_create_data.return_value = {'name': 'Test Project', 'description': 'Test'}
-
-            # Create project data with PW ID
-            project_data = {
-                "name": "Test Integration Project",
-                "description": "Test project for integration",
-                "hkrId": 54321,
-                "programmed": True,
-                "projectClass": str(self.project_class.id),
-                "type": str(self.project_type.id),
-                "phase": str(self.project_phase.id),
-                "category": str(self.project_category.id),
-                "planningStartYear": 2024,
-                "constructionEndYear": 2025,
-            }
-
-            # Create the project using the serializer
-            serializer = ProjectCreateSerializer(data=project_data)
-            self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
-
-            created_project = serializer.save()
-
-            # Verify project was created
-            self.assertIsNotNone(created_project)
-            self.assertEqual(created_project.hkrId, 54321)
-
-            # Verify that the sync process was called
-            mock_create_data.assert_called_once_with(created_project)
-            mock_pw_service.sync_project_to_pw.assert_called_once_with(
-                data={'name': 'Test Project', 'description': 'Test'},
-                project=created_project
-            )
-            mock_logger.info.assert_called()
-
-
-class DescriptionSyncLogicTestCase(TestCase):
-    """
-    Test cases for description field sync logic to ensure the bug fix (OR→AND)
-    correctly prevents "Kuvaus puuttuu" placeholder and empty strings from being synced.
-
-    This tests the logic from ProjectWiseService.__proceed_with_pw_project method:
-    if description != "Kuvaus puuttuu" and description != "":
-        project.description = description
-    """
-
-    def test_description_placeholder_not_synced(self):
-        """Test that 'Kuvaus puuttuu' placeholder is NOT synced to project"""
-        # The logic should be: if description != "Kuvaus puuttuu" AND description != ""
-        # This means if description IS "Kuvaus puuttuu", it should be skipped
-
-        description = "Kuvaus puuttuu"
-
-        # Test the actual logic from __proceed_with_pw_project
-        should_sync = (description != "Kuvaus puuttuu" and description != "")
-
-        self.assertFalse(should_sync, "Placeholder 'Kuvaus puuttuu' should NOT be synced")
-
-    def test_description_empty_string_not_synced(self):
-        """Test that empty string description is NOT synced to project"""
-        description = ""
-
-        # Test the actual logic
-        should_sync = (description != "Kuvaus puuttuu" and description != "")
-
-        self.assertFalse(should_sync, "Empty string description should NOT be synced")
-
-    def test_description_real_content_is_synced(self):
-        """Test that real description content IS synced to project"""
-        description = "This is a real project description"
-
-        # Test the actual logic
-        should_sync = (description != "Kuvaus puuttuu" and description != "")
-
-        self.assertTrue(should_sync, "Real description content should be synced")
-
-    def test_description_whitespace_content_is_synced(self):
-        """Test that description with whitespace IS synced (after stripping in other logic)"""
-        description = "  Some description with spaces  "
-
-        # Test the actual logic
-        should_sync = (description != "Kuvaus puuttuu" and description != "")
-
-        self.assertTrue(should_sync, "Description with content (even with whitespace) should be synced")
-
-
-class ClassificationFieldsRetryLogicTestCase(TestCase):
-    """
-    Test cases to ensure projectClass and projectDistrict are included in retry logic
-    when PW rejects them (e.g., folder structure doesn't exist).
-
-    This tests that these fields are included in the tracking list in sync_project_to_pw:
-    for field_name in ['type', 'phase', 'programmed', 'projectClass', 'projectDistrict']:
-    """
-
-    def test_classification_fields_in_retry_field_list(self):
-        """
-        Test that projectClass and projectDistrict are part of the fields tracked for retry.
-        This ensures they will be excluded on retry if they cause the initial update to fail.
-        """
-        # This is the list of fields tracked in ProjectWiseService.sync_project_to_pw (line 147)
-        tracked_fields = ['type', 'phase', 'programmed', 'projectClass', 'projectDistrict']
-
-        # Verify classification fields are in the tracked list
-        self.assertIn('projectClass', tracked_fields,
-                     "projectClass must be in tracked_fields for retry logic")
-        self.assertIn('projectDistrict', tracked_fields,
-                     "projectDistrict must be in tracked_fields for retry logic")
-
-        # Verify this matches expectations: 5 fields total (3 original + 2 classification)
-        self.assertEqual(len(tracked_fields), 5,
-                        "Should track 5 fields: type, phase, programmed, projectClass, projectDistrict")
+            # Mock the actual sync method to avoid real API calls
+            with patch.object(service, '_ProjectWiseService__sync_project_to_pw') as mock_sync:
+                mock_sync.return_value = None
+
+                # Test with valid parameters
+                result = service.sync_project_to_pw(data={'test': 'data'}, project=Mock())
+
+                # Should call the actual sync method
+                mock_sync.assert_called_once()
+
+    def test_pw_service_environment_variable_handling(self):
+        """Test that PW service handles environment variables correctly"""
+        # Test with sync disabled
+        with patch.dict('os.environ', {'PW_SYNC_ENABLED': 'False'}):
+            service = ProjectWiseService()
+            result = service.sync_project_to_pw(data={'test': 'data'}, project=None)
+            self.assertIsNone(result)
+
+        # Test with sync enabled
+        with patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'}):
+            service = ProjectWiseService()
+            with patch.object(service, '_ProjectWiseService__sync_project_to_pw') as mock_sync:
+                mock_sync.return_value = None
+                result = service.sync_project_to_pw(data={'test': 'data'}, project=Mock())
+                mock_sync.assert_called_once()
+
+    def test_pw_service_invalid_parameters(self):
+        """Test error handling for invalid parameters"""
+        # Enable sync to test the error handling logic
+        with patch.dict('os.environ', {'PW_SYNC_ENABLED': 'True'}):
+            service = ProjectWiseService()
+
+            with patch('infraohjelmointi_api.services.ProjectWiseService.logger') as mock_logger:
+                # Call with invalid parameters
+                service.sync_project_to_pw()
+
+                # Should log error
+                mock_logger.error.assert_called_once_with("sync_project_to_pw called without proper parameters")

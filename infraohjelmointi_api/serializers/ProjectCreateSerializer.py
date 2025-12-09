@@ -429,10 +429,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         """
         # Check if project was created with a PW ID
         if project.hkrId is not None and str(project.hkrId).strip() != "":
-            logger.info(f"=" * 80)
-            logger.info(f"NEW PROJECT CREATED with PW ID: '{project.name}' (HKR ID: {project.hkrId})")
-            logger.info(f"Performing automatic comprehensive PW sync...")
-            logger.info(f"=" * 80)
+            logger.info(f"Automatic PW sync triggered for new project '{project.name}' (HKR ID: {project.hkrId})")
 
             try:
                 # Create comprehensive data dict for automatic update
@@ -449,12 +446,10 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
             except Exception as e:
                 # Log detailed error
-                logger.error(f"=" * 80)
-                logger.error(f"AUTOMATIC PW SYNC FAILED for new project '{project.name}' (HKR ID: {project.hkrId})")
+                logger.error(f"Automatic PW sync failed for new project '{project.name}' (HKR ID: {project.hkrId})")
                 logger.error(f"Error type: {type(e).__name__}")
                 logger.error(f"Error message: {str(e)}")
                 logger.error(f"Project created successfully but PW sync failed - data may be out of sync")
-                logger.error(f"=" * 80)
                 # Don't raise - allow project creation to succeed, user can retry sync with button
         else:
             logger.debug(f"New project '{project.name}' created without PW ID - skipping PW sync")

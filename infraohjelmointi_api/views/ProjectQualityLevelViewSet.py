@@ -1,12 +1,9 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.ProjectQualityLevelSerializer import (
-    ProjectQualityLevelSerializer,
-)
+from infraohjelmointi_api.serializers.ProjectQualityLevelSerializer import ProjectQualityLevelSerializer
+
+from .CachedLookupViewSet import CachedLookupViewSet
 
 
-class ProjectQualityLevelViewSet(BaseViewSet):
-    """
-    API endpoint that allows Project quality levels to be viewed or edited.
-    """
+class ProjectQualityLevelViewSet(CachedLookupViewSet):
+    """API endpoint for project quality levels (cached)."""
 
     serializer_class = ProjectQualityLevelSerializer
