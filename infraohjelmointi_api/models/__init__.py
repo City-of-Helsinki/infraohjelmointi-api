@@ -39,3 +39,4 @@ from .TalpaServiceClass import TalpaServiceClass
 from .TalpaAssetClass import TalpaAssetClass
 from .TalpaProjectNumberRange import TalpaProjectNumberRange
 from .TalpaProjectOpening import TalpaProjectOpening
+from .ClassProgrammerAssignment import ClassProgrammerAssignment
