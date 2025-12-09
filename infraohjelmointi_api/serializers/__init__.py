@@ -46,3 +46,4 @@ from .AuditLogSerializer import AuditLogSerializer
 from .SapCurrentYearSerializer import SapCurrentYearSerializer
 from .BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
 from .ProjectProgrammerSerializer import ProjectProgrammerSerializer
+from .TalpaProjectOpeningSerializer import TalpaProjectOpeningSerializer

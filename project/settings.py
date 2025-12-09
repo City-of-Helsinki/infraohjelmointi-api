@@ -373,7 +373,11 @@ def parse_redis_url(redis_url: str) -> dict:
 
 
 # Configure Redis if URL is provided
-if REDIS_URL:
+# Skip Redis check for management commands that don't need it (e.g., makemigrations, migrate)
+_skip_redis_check_commands = ['makemigrations', 'migrate', 'showmigrations', 'sqlmigrate', 'sqlflush', 'inspectdb', 'collectstatic', 'check']
+_skip_redis_check = len(sys.argv) > 1 and sys.argv[1] in _skip_redis_check_commands
+
+if REDIS_URL and not _skip_redis_check:
     # Log the REDIS_URL being used (mask password if present)
     if '@' in REDIS_URL:
         safe_url = REDIS_URL.split('@')[-1]
@@ -383,15 +387,25 @@ if REDIS_URL:
     
     # Test Redis connectivity with retries (for Docker Compose startup timing)
     # django-redis will handle actual connection and errors gracefully
-    REDIS_AVAILABLE = check_redis_availability(REDIS_URL)
+    # Use a timeout wrapper to prevent hanging
+    try:
+        REDIS_AVAILABLE = check_redis_availability(REDIS_URL)
+    except Exception as e:
+        logger.warning(f"Redis availability check failed: {e}, assuming unavailable")
+        REDIS_AVAILABLE = False
     
     if not REDIS_AVAILABLE:
         parsed = urlparse(REDIS_URL)
         host = parsed.hostname or 'localhost'
         port = parsed.port or 6379
         logger.debug(f"Redis not immediately available at {host}:{port}, will attempt connection on first use")
+elif REDIS_URL:
+    # For management commands, assume Redis is available (will be checked when actually used)
+    REDIS_AVAILABLE = True
 else:
-    logger.info("REDIS_URL not configured")
+    REDIS_AVAILABLE = False
+    if not _skip_redis_check:
+        logger.info("REDIS_URL not configured")
 
 # Configure Redis cache backend if REDIS_URL is provided
 # Always configure Redis backend if URL is set, even if not immediately available

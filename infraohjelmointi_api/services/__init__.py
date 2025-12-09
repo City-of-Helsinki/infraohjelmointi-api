@@ -19,3 +19,4 @@ from .SapApiService import SapApiService
 from .SapCostService import SapCostService
 from .AppStateValueService import AppStateValueService
 from .CacheService import CacheService
+from .TalpaExcelService import TalpaExcelService

@@ -40,4 +40,35 @@ def api_router():
         basename="apiProject"
     )
 
+    # Talpa endpoints for Swagger documentation
+    router.register(
+        r"api/talpa-project-opening",
+        views.TalpaProjectOpeningViewSet,
+        basename="talpaProjectOpening"
+    )
+
+    router.register(
+        r"api/talpa-project-types",
+        views.TalpaProjectTypeViewSet,
+        basename="talpaProjectTypes"
+    )
+
+    router.register(
+        r"api/talpa-service-classes",
+        views.TalpaServiceClassViewSet,
+        basename="talpaServiceClasses"
+    )
+
+    router.register(
+        r"api/talpa-asset-classes",
+        views.TalpaAssetClassViewSet,
+        basename="talpaAssetClasses"
+    )
+
+    router.register(
+        r"api/talpa-project-ranges",
+        views.TalpaProjectNumberRangeViewSet,
+        basename="talpaProjectRanges"
+    )
+
     return router

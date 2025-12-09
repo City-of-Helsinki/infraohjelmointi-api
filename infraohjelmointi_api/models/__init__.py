@@ -34,3 +34,8 @@ from .SapBaseModel import SapBaseModel
 from .AuditLog import AuditLog
 from .BudgetOverrunReason import BudgetOverrunReason
 from .ProjectProgrammer import ProjectProgrammer
+from .TalpaProjectType import TalpaProjectType
+from .TalpaServiceClass import TalpaServiceClass
+from .TalpaAssetClass import TalpaAssetClass
+from .TalpaProjectNumberRange import TalpaProjectNumberRange
+from .TalpaProjectOpening import TalpaProjectOpening
