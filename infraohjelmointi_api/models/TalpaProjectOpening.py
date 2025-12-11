@@ -79,16 +79,19 @@ class TalpaProjectOpening(models.Model):
     # These map directly to columns in "Projektin avauslomake Infra" Excel
     # =========================================================================
     projectName = models.CharField(max_length=24, blank=True, null=True)  # "SAP nimi" - max 24 chars including spaces
+    
     projectType = models.ForeignKey(
-        TalpaProjectType, on_delete=models.DO_NOTHING, blank=True, null=True
+        TalpaProjectType, on_delete=models.SET_NULL, blank=True, null=True
     )  # "Laji" - Project type selection
+    
     budgetAccount = models.CharField(
         max_length=50, blank=True, null=True
     )  # "Talousarviokohdan numero" - e.g., "8030101A"
     majorDistrict = models.CharField(max_length=50, blank=True, null=True)  # "Suurpiiri" - used for validation
     area = models.CharField(max_length=100, blank=True, null=True)  # "Alue" - used for validation
+    
     projectNumberRange = models.ForeignKey(
-        TalpaProjectNumberRange, on_delete=models.DO_NOTHING, blank=True, null=True
+        TalpaProjectNumberRange, on_delete=models.SET_NULL, blank=True, null=True
     )  # "Projektinumeroväli" - Selected project number range (replaces individual projectNumber)
 
     # Address fields - Excel column "Osoite+postinumero=Työmaa-avain"
@@ -123,11 +126,12 @@ class TalpaProjectOpening(models.Model):
     # Classification Fields (Hankkeen luokat) - Excel Form Fields
     # =========================================================================
     serviceClass = models.ForeignKey(
-        TalpaServiceClass, on_delete=models.DO_NOTHING, blank=True, null=True
+        TalpaServiceClass, on_delete=models.SET_NULL, blank=True, null=True
     )  # "Palveluluokka" - e.g., 4601, 4701, 3551, 5361
     assetClass = models.ForeignKey(
-        TalpaAssetClass, on_delete=models.DO_NOTHING, blank=True, null=True
+        TalpaAssetClass, on_delete=models.SET_NULL, blank=True, null=True
     )  # "Käyttöomaisuusluokat" - Asset class with holding period
+    
     unit = models.CharField(
         max_length=50, choices=UNIT_CHOICES, blank=True, null=True
     )  # "Yksikkö" - REQUIRED for 2814E projects: Tontit, Mao, Geo
@@ -166,4 +170,3 @@ class TalpaProjectOpening(models.Model):
     def is_locked(self):
         """Check if the form is locked (status = sent_to_talpa or project_number_opened)"""
         return self.status in ("sent_to_talpa", "project_number_opened")
-

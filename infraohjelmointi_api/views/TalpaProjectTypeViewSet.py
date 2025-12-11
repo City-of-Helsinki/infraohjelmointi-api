@@ -1,11 +1,15 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.serializers.TalpaProjectOpeningSerializer import TalpaProjectTypeSerializer
-from infraohjelmointi_api.models import TalpaProjectType
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from overrides import override
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from helusers.oidc import ApiTokenAuthentication
+
+from infraohjelmointi_api.models import TalpaProjectType
+from infraohjelmointi_api.serializers.TalpaProjectOpeningSerializer import (
+    TalpaProjectTypeSerializer,
+)
+from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
 
 
 class TalpaProjectTypeFilter(django_filters.FilterSet):
@@ -28,7 +32,7 @@ class TalpaProjectTypeViewSet(BaseViewSet):
     http_method_names = ["get"]  # Read-only
     filter_backends = [DjangoFilterBackend]
     filterset_class = TalpaProjectTypeFilter
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     @override

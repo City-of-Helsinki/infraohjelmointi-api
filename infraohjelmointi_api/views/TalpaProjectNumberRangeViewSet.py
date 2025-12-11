@@ -1,21 +1,15 @@
-from .BaseViewSet import BaseViewSet
-from infraohjelmointi_api.models import TalpaProjectNumberRange
-from rest_framework import serializers
-from infraohjelmointi_api.serializers import BaseMeta
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from overrides import override
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from helusers.oidc import ApiTokenAuthentication
 
-
-class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
-    """Serializer for TalpaProjectNumberRange"""
-    class Meta(BaseMeta):
-        model = TalpaProjectNumberRange
-        ref_name = "TalpaProjectNumberRange"
-        # Don't set fields when using exclude from BaseMeta
-
+from .BaseViewSet import BaseViewSet
+from infraohjelmointi_api.models import TalpaProjectNumberRange
+from infraohjelmointi_api.serializers.TalpaProjectOpeningSerializer import (
+    TalpaProjectNumberRangeSerializer,
+)
 
 class TalpaProjectNumberRangeFilter(django_filters.FilterSet):
     """Filter for TalpaProjectNumberRange"""
@@ -40,7 +34,7 @@ class TalpaProjectNumberRangeViewSet(BaseViewSet):
     http_method_names = ["get"]  # Read-only
     filter_backends = [DjangoFilterBackend]
     filterset_class = TalpaProjectNumberRangeFilter
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     @override
