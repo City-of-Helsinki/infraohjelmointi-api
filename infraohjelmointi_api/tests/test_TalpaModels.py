@@ -118,7 +118,7 @@ class TalpaModelsTestCase(TestCase):
     def test_talpa_project_type_creation(self):
         """Test creating a TalpaProjectType"""
         project_type = TalpaProjectType.objects.create(
-            code="8 03 01 01",
+            code="9 99 99 99",
             name="Katujen uudisrakentaminen",
             category="KADUT, LIIKENNEVÄYLÄT JA RADAT",
             priority="Normaali",
@@ -126,14 +126,14 @@ class TalpaModelsTestCase(TestCase):
         )
 
         self.assertIsNotNone(project_type.id)
-        self.assertEqual(project_type.code, "8 03 01 01")
+        self.assertEqual(project_type.code, "9 99 99 99")
         self.assertEqual(project_type.name, "Katujen uudisrakentaminen")
         self.assertTrue(project_type.isActive)
 
     def test_talpa_project_type_unique_constraint(self):
         """Test that TalpaProjectType code + priority combination must be unique"""
         TalpaProjectType.objects.create(
-            code="8 03 01 01",
+            code="9 99 99 99",
             name="First",
             priority="A",
             isActive=True
@@ -141,7 +141,7 @@ class TalpaModelsTestCase(TestCase):
 
         # Same code with different priority should succeed
         TalpaProjectType.objects.create(
-            code="8 03 01 01",
+            code="9 99 99 99",
             name="Second",
             priority="B",
             isActive=True
@@ -150,7 +150,7 @@ class TalpaModelsTestCase(TestCase):
         # Same code with same priority should fail
         with self.assertRaises(Exception):  # Should raise IntegrityError
             TalpaProjectType.objects.create(
-                code="8 03 01 01",
+                code="9 99 99 99",
                 name="Third",
                 priority="A",  # Same as first
                 isActive=True
@@ -159,21 +159,21 @@ class TalpaModelsTestCase(TestCase):
     def test_talpa_service_class_creation(self):
         """Test creating a TalpaServiceClass"""
         service_class = TalpaServiceClass.objects.create(
-            code="4601",
+            code="9999",
             name="Kadut ja yleiset alueet",
             projectTypePrefix="2814I",
             isActive=True
         )
 
         self.assertIsNotNone(service_class.id)
-        self.assertEqual(service_class.code, "4601")
+        self.assertEqual(service_class.code, "9999")
         self.assertEqual(service_class.projectTypePrefix, "2814I")
         self.assertTrue(service_class.isActive)
 
     def test_talpa_service_class_unique_constraint(self):
         """Test that TalpaServiceClass code must be unique"""
         TalpaServiceClass.objects.create(
-            code="4601",
+            code="9999",
             name="First",
             isActive=True
         )
@@ -181,7 +181,7 @@ class TalpaModelsTestCase(TestCase):
         # Try to create another with same code
         with self.assertRaises(Exception):  # Should raise IntegrityError
             TalpaServiceClass.objects.create(
-                code="4601",
+                code="9999",
                 name="Second",
                 isActive=True
             )
@@ -189,8 +189,8 @@ class TalpaModelsTestCase(TestCase):
     def test_talpa_asset_class_creation(self):
         """Test creating a TalpaAssetClass"""
         asset_class = TalpaAssetClass.objects.create(
-            componentClass="8103000",
-            account="103000",
+            componentClass="9999999",
+            account="999999",
             name="Maa- ja vesialueet",
             category="Kiinteät rakenteet ja laitteet",
             holdingPeriodYears=30,
@@ -199,16 +199,16 @@ class TalpaModelsTestCase(TestCase):
         )
 
         self.assertIsNotNone(asset_class.id)
-        self.assertEqual(asset_class.componentClass, "8103000")
-        self.assertEqual(asset_class.account, "103000")
+        self.assertEqual(asset_class.componentClass, "9999999")
+        self.assertEqual(asset_class.account, "999999")
         self.assertEqual(asset_class.holdingPeriodYears, 30)
         self.assertTrue(asset_class.hasHoldingPeriod)
 
     def test_talpa_asset_class_unique_constraint(self):
         """Test that TalpaAssetClass componentClass+account must be unique"""
         TalpaAssetClass.objects.create(
-            componentClass="8103000",
-            account="103000",
+            componentClass="9999999",
+            account="999999",
             name="First",
             isActive=True
         )
@@ -216,8 +216,8 @@ class TalpaModelsTestCase(TestCase):
         # Try to create another with same componentClass and account
         with self.assertRaises(Exception):  # Should raise IntegrityError
             TalpaAssetClass.objects.create(
-                componentClass="8103000",
-                account="103000",
+                componentClass="9999999",
+                account="999999",
                 name="Second",
                 isActive=True
             )
@@ -225,11 +225,11 @@ class TalpaModelsTestCase(TestCase):
     def test_talpa_project_number_range_creation(self):
         """Test creating a TalpaProjectNumberRange"""
         project_range = TalpaProjectNumberRange.objects.create(
-            projectTypePrefix="2814I",
-            budgetAccount="8 03 01 01",
-            budgetAccountNumber="2814100000",
-            rangeStart="2814100003",
-            rangeEnd="2814100300",
+            projectTypePrefix="9999I",
+            budgetAccount="9 99 99 99",
+            budgetAccountNumber="9999999999",
+            rangeStart="9999999991",
+            rangeEnd="9999999999",
             majorDistrict="01",
             majorDistrictName="Eteläinen",
             area="011 Keskusta",
@@ -237,9 +237,9 @@ class TalpaModelsTestCase(TestCase):
         )
 
         self.assertIsNotNone(project_range.id)
-        self.assertEqual(project_range.projectTypePrefix, "2814I")
-        self.assertEqual(project_range.rangeStart, "2814100003")
-        self.assertEqual(project_range.rangeEnd, "2814100300")
+        self.assertEqual(project_range.projectTypePrefix, "9999I")
+        self.assertEqual(project_range.rangeStart, "9999999991")
+        self.assertEqual(project_range.rangeEnd, "9999999999")
 
     def test_talpa_project_number_range_make_format(self):
         """Test creating a MAKE format range (2814E)"""
@@ -280,23 +280,30 @@ class TalpaModelsTestCase(TestCase):
 
     def test_talpa_project_opening_foreign_key_relationships(self):
         """Test foreign key relationships"""
-        project_type = TalpaProjectType.objects.create(
+        project_type, _ = TalpaProjectType.objects.get_or_create(
             code="8 03 01 01",
-            name="Test Type",
-            isActive=True
+            priority="Normaali",
+            defaults={
+                "name": "Test Type",
+                "isActive": True
+            }
         )
 
-        service_class = TalpaServiceClass.objects.create(
+        service_class, _ = TalpaServiceClass.objects.get_or_create(
             code="4601",
-            name="Test Service",
-            isActive=True
+            defaults={
+                "name": "Test Service",
+                "isActive": True
+            }
         )
 
-        asset_class = TalpaAssetClass.objects.create(
+        asset_class, _ = TalpaAssetClass.objects.get_or_create(
             componentClass="8103000",
             account="103000",
-            name="Test Asset",
-            isActive=True
+            defaults={
+                "name": "Test Asset",
+                "isActive": True
+            }
         )
 
         talpa_opening = TalpaProjectOpening.objects.create(
