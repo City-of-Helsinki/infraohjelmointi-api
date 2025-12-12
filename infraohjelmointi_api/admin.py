@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from infraohjelmointi_api import models
+from infraohjelmointi_api.models.ClassProgrammerAssignment import ClassProgrammerAssignmentAdmin
 
 admin.site.register(models.Project)
 admin.site.register(models.ProjectArea)
@@ -30,3 +31,4 @@ admin.site.register(models.AppStateValue)
 admin.site.register(models.SapCurrentYear)
 admin.site.register(models.AuditLog)
 admin.site.register(models.ProjectProgrammer)
+admin.site.register(models.ClassProgrammerAssignment, ClassProgrammerAssignmentAdmin)
