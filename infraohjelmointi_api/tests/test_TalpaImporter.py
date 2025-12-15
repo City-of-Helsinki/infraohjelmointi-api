@@ -204,6 +204,63 @@ class TalpaImporterParsingTestCase(TestCase):
             self.assertEqual(result['majorDistrictName'], expected_name, f"Name mismatch for {district_input}")
 
 
+class TalpaProjectTypeParsingTestCase(TestCase):
+    """Test the Project Type parsing and logic of talpaimporter"""
+
+    def setUp(self):
+        self.command = Command()
+        self.command.stdout = MagicMock()
+        self.command.style = MagicMock()
+
+    def test_parse_laji_header_std(self):
+        """Test parsing standard Laji header: '03 (Yhteishankkeet...)'"""
+        header = "03 (Yhteishankkeet, Väyläviraston kanssa)"
+        code, name = self.command._parse_laji_header_cell(header)
+        self.assertEqual(code, '03')
+        self.assertEqual(name, 'Yhteishankkeet')
+
+    def test_parse_laji_header_irr(self):
+        """Test parsing irregular Laji header: 'H (Laji 13, Uudet puistot)'"""
+        header = "H (Laji 13, Uudet puistot, Östersundomin suurpiiri)"
+        code, name = self.command._parse_laji_header_cell(header)
+        self.assertEqual(code, '13')
+        self.assertEqual(name, 'Uudet puistot')
+
+    def test_build_laji_lookup_priority(self):
+        """Test prioritization logic: Area > Park > Generic"""
+        laji_map = {
+            '07': {'category': 'Projektialueiden kadut', 'search_name': 'Länsisatama'}, # Score 3
+            '13': {'category': 'Puistorakentaminen', 'search_name': 'Uudet puistot'},   # Score 2
+            '03': {'category': 'Muu', 'search_name': 'Muu esirakentaminen'},            # Score 1
+            '21': {'category': 'Esirakentaminen', 'search_name': 'Esirakentaminen'},    # Score 0
+        }
+        
+        lookup = self.command._build_laji_lookup_list(laji_map)
+        
+        # Order should be Länsisatama, Uudet puistot, Muu esirakentaminen, Esirakentaminen
+        self.assertEqual(lookup[0][0], 'Länsisatama')
+        self.assertEqual(lookup[0][2], 3)
+        
+        self.assertEqual(lookup[1][0], 'Uudet puistot')
+        self.assertEqual(lookup[1][2], 2)
+        
+        self.assertEqual(lookup[2][0], 'Muu esirakentaminen')
+        self.assertEqual(lookup[2][2], 1)
+        
+        self.assertEqual(lookup[3][0], 'Esirakentaminen')
+        self.assertEqual(lookup[3][2], 0)
+
+    def test_parse_talous_row(self):
+        """Test Talousarviokohdat row parsing and formatting"""
+        row = [MagicMock(value="8040101 Uudet puistot")]
+        data = self.command._parse_talous_row(row)
+        
+        self.assertIsNotNone(data)
+        self.assertEqual(data['code'], '8 04 01 01')
+        self.assertEqual(data['laji_id'], '01') # Code-based ID extraction (raw code slicing: 8040101 -> 01)
+        self.assertEqual(data['name'], 'Uudet puistot')
+
+
 class TalpaImporterIntegrationTestCase(TestCase):
     """Integration tests for talpaimporter command using real (generated) Excel files"""
 

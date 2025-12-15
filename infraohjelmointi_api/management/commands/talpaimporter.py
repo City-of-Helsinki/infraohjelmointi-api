@@ -5,6 +5,7 @@ This imports:
 - TalpaProjectNumberRange (from 2814I and 2814E project number range tabs)
 - TalpaServiceClass (from Palveluluokat tab)
 - TalpaAssetClass (from Käyttöomaisuusluokat tab)
+- TalpaProjectType (from Talousarviokohdat and Lajit ja prioriteetit tabs)
 
 Usage:
     python manage.py talpaimporter --file path/to/Projektin_avauslomake_Infra.xlsx
@@ -25,6 +26,7 @@ from infraohjelmointi_api.models import (
     TalpaProjectNumberRange,
     TalpaServiceClass,
     TalpaAssetClass,
+    TalpaProjectType,
 )
 
 
@@ -76,6 +78,11 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip importing asset classes'
         )
+        parser.add_argument(
+            '--skip-project-types',
+            action='store_true',
+            help='Skip importing project types and priorities'
+        )
 
     def handle(self, *args, **options):
         file_path = options['file']
@@ -118,6 +125,8 @@ class Command(BaseCommand):
             'services_updated': 0,
             'assets_created': 0,
             'assets_updated': 0,
+            'priorities_updated': 0,
+            'project_types_created': 0,
             'errors': []
         }
 
@@ -142,6 +151,9 @@ class Command(BaseCommand):
         if not options['skip_ranges']:
             self._preview_project_number_ranges(wb, stats, options)
 
+        if not options['skip_project_types']:
+            self._preview_project_types(wb, stats)
+
     @transaction.atomic
     def _execute_import(self, wb, options, stats, clear_existing):
         """Execute the actual import"""
@@ -156,6 +168,9 @@ class Command(BaseCommand):
 
         if not options['skip_ranges']:
             self._import_project_number_ranges(wb, stats, options)
+
+        if not options['skip_project_types']:
+            self._import_project_types(wb, stats)
 
     def _clear_existing_data(self, options, stats):
         """Clear existing Talpa reference data"""
@@ -176,6 +191,10 @@ class Command(BaseCommand):
             TalpaAssetClass.objects.all().delete()
             self.stdout.write(f"Deleted {count} asset classes")
 
+        if not options['skip_project_types']:
+             # We don't delete Project Types as they might be linked.
+             pass
+
     # =========================================================================
     # ASSET CLASSES (Käyttöomaisuusluokat)
     # =========================================================================
@@ -189,10 +208,6 @@ class Command(BaseCommand):
 
     def _parse_asset_class_row(self, row):
         """Parse a row from the asset class sheet"""
-        # Expected columns based on Excel image:
-        # Poisto-ryhmä | Käyttöomaisuusluokka | Kom-luokka | Tili | Pito-aika | Kom-luokka (nimi)
-        # Example: Aineelliset... | Maa- ja vesialueet | 8103000 | 103000 | EP | 8103000 (Maa- ja vesialueet)
-
         try:
             component_class = str(row[2].value).strip() if row[2].value else None
             account = str(row[3].value).strip() if row[3].value else None
@@ -234,7 +249,7 @@ class Command(BaseCommand):
                 'category': category,
                 'isActive': True,
             }
-        except Exception as e:
+        except Exception:
             return None
 
     def _preview_asset_classes(self, wb, stats):
@@ -267,9 +282,23 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("  Sheet not found, skipping"))
             return
 
+        current_category = None
+
         for row in list(sheet.rows)[1:]:
+            # Check for category header in first column regardless of whether it's a data row
+            col0 = str(row[0].value).strip() if row[0].value else None
+            
+            # Update 'current_category' if we see a value in Col 0
+            # Ignore the specific table header 'Poisto-ryhmä'
+            if col0 and 'poisto-ryhm' not in col0.lower():
+                current_category = col0
+            
             data = self._parse_asset_class_row(row)
             if data:
+                # Apply the current category to the item
+                if current_category:
+                    data['category'] = current_category
+
                 obj, created = TalpaAssetClass.objects.update_or_create(
                     componentClass=data['componentClass'],
                     account=data['account'],
@@ -293,38 +322,10 @@ class Command(BaseCommand):
                 return wb[name]
         return None
 
-    def _parse_service_class_row(self, row, project_type_prefix=None):
-        """Parse a row from the service class data"""
-        try:
-            # Expected format: Code (name) | Code | Description
-            # Example: 4601 (Kadut ja yleiset alueet) | 4601 | Kadut ja yleiset alueet | ...
-            code = str(row[1].value).strip() if row[1].value else None
-            name = str(row[2].value).strip() if row[2].value else None
-            description = str(row[3].value).strip() if len(row) > 3 and row[3].value else None
-
-            if not code or not name:
-                return None
-
-            # Skip header rows
-            if code.lower() in ['koodi', 'code', 'palveluluokka']:
-                return None
-
-            return {
-                'code': code,
-                'name': name,
-                'description': description,
-                'projectTypePrefix': project_type_prefix,
-                'isActive': True,
-            }
-        except Exception:
-            return None
-
     def _preview_service_classes(self, wb, stats):
         """Preview service class import"""
         self.stdout.write("Previewing Service Classes...")
 
-        # Service classes may be embedded in main sheet rather than separate tab
-        # Based on images: 4601, 4701, 3551 for 2814I and 5361 for 2814E
         service_classes = [
             {'code': '4601', 'name': 'Kadut ja yleiset alueet', 'projectTypePrefix': '2814I'},
             {'code': '4701', 'name': 'Puistot ja viheralueet', 'projectTypePrefix': '2814I'},
@@ -335,7 +336,6 @@ class Command(BaseCommand):
         sheet = self._find_service_class_sheet(wb)
         if sheet:
             self.stdout.write(f"  Found sheet: {sheet.title}")
-            # Parse from sheet if found
         else:
             self.stdout.write("  No dedicated sheet found, using known values from form")
 
@@ -348,7 +348,6 @@ class Command(BaseCommand):
         """Import service classes"""
         self.stdout.write("Importing Service Classes...")
 
-        # Known service classes from the Excel form structure
         service_classes = [
             {
                 'code': '4601',
@@ -397,20 +396,13 @@ class Command(BaseCommand):
     # =========================================================================
 
     def _find_project_range_sheets(self, wb):
-        """Find the 2814I and 2814E project range worksheets
-
-        Known sheet names:
-        - '2814I-projektinumerovälit' for 2814I ranges
-        - 'Esirakentaminen projektinumerov' for 2814E ranges
-        """
+        """Find the 2814I and 2814E project range worksheets"""
         sheets = {'2814I': None, '2814E': None}
 
         for name in wb.sheetnames:
             name_lower = name.lower()
-            # Match 2814I sheet (contains '2814i' in name)
             if '2814i' in name_lower:
                 sheets['2814I'] = wb[name]
-            # Match 2814E sheet (contains 'esirakentaminen' or '2814e')
             elif 'esirakentaminen' in name_lower or '2814e' in name_lower:
                 sheets['2814E'] = wb[name]
 
@@ -419,53 +411,60 @@ class Command(BaseCommand):
     def _parse_2814I_range_row(self, row):
         """Parse a row from the 2814I project number range sheet"""
         try:
-            # Expected format from Excel image:
-            # RangeStart-RangeEnd (BudgetAccount) Description, DISTRICT_NAME
-            # Example: 2814100003-2814100300 (8 03 01 01) Katujen uudisrakentaminen, ETELÄINEN SUURPIIRI
-
             cell_value = str(row[0].value).strip() if row[0].value else None
             if not cell_value:
                 return None
 
-            # Skip if it looks like a header
             if 'projektinumero' in cell_value.lower() or 'projektiväl' in cell_value.lower():
                 return None
 
-            # Normalize dashes (en-dash U+2013, em-dash U+2014) to regular hyphen
             cell_value = cell_value.replace('\u2013', '-').replace('\u2014', '-')
 
-            # Parse format: "2814100003-2814100300 (8 03 01 01) Description, DISTRICT"
-            # or: "2814100003-2814100300 8 03 01 01 Description"
-
-            # Parse using Regex to handle variations like:
-            # "2814I00003-2814I00300" (no spaces)
-            # "2814I00003 - 2814I00300" (spaces)
-            # "2814I00003- 2814I00300" (space after)
+            # Regex: "2814I00003-2814I00300"
             range_pattern = r'^\s*(2814[IE]\d+)\s*[-]\s*(2814[IE]?\d+)'
-
             match = re.match(range_pattern, cell_value)
 
             if match:
                 range_start = match.group(1)
                 range_end = match.group(2)
-
-                # If end doesn't have prefix (e.g. "2814I001-002"), add it?
-                # (Assuming full format for now based on audit)
             else:
                 return None
 
-            # Try to extract budget account (format like "8 03 01 01" or "(8 03 01 01)")
             budget_account = None
             budget_account_number = None
+            notes = None
 
-            # Look for pattern like "(8 03 01 01)" or "8 03 01 01"
-            budget_match = re.search(r'\(?(8\s*\d{2}\s*\d{2}\s*\d{2}[A-H]?)\)?', cell_value)
-            if budget_match:
-                budget_account = budget_match.group(1).strip()
-                # Create compact version for budgetAccountNumber
-                budget_account_number = budget_account.replace(' ', '')
+            paren_match = re.search(r'\(([^)]+)\)', cell_value)
+            if paren_match:
+                paren_content = paren_match.group(1).strip()
+                
+                budget_match = re.match(r'^(8\s*\d{2}\s*\d{2}\s*\d{2}[A-H]?)', paren_content)
+                
+                if budget_match:
+                    budget_account = budget_match.group(1).strip()
+                    remaining = paren_content[budget_match.end():].strip()
+                    if remaining.startswith(','):
+                        notes = remaining[1:].strip()
+                    elif remaining:
+                        notes = remaining.strip()
+                else:
+                    if ',' in paren_content:
+                        parts = paren_content.split(',', 1)
+                        potential_budget = parts[0].strip()
+                        if potential_budget.startswith('8') and len(potential_budget) <= 15:
+                            budget_account = potential_budget
+                            notes = parts[1].strip() if len(parts) > 1 else None
+                        else:
+                            notes = paren_content
+                    else:
+                        if paren_content.startswith('8') and len(paren_content) <= 15:
+                            budget_account = paren_content
+                        else:
+                            notes = paren_content
+                
+                if budget_account:
+                    budget_account_number = budget_account.replace(' ', '')
 
-            # Try to extract district name (usually at the end)
             district_name = None
             district_code = None
 
@@ -494,6 +493,7 @@ class Command(BaseCommand):
                 'rangeEnd': range_end,
                 'majorDistrict': district_code,
                 'majorDistrictName': district_name,
+                'notes': notes,
                 'isActive': True,
             }
         except Exception:
@@ -506,21 +506,17 @@ class Command(BaseCommand):
             if not cell_value:
                 return None
 
-            # Skip headers
             if 'projektinumero' in cell_value.lower() or '2814e-' in cell_value.lower():
                 return None
 
-            # Parse format: "2814E02000 - 2814E02999 (8 01 03 01) Description"
             parts = cell_value.split()
             if len(parts) < 2:
                 return None
 
-            # Extract range
             range_part = parts[0]
             range_start = range_part.strip()
             range_end = range_start
 
-            # Look for range end after "-"
             for i, part in enumerate(parts):
                 if part == '-' and i + 1 < len(parts):
                     range_end = parts[i + 1].strip()
@@ -531,7 +527,6 @@ class Command(BaseCommand):
                         range_end = range_split[1].strip()
                     break
 
-            # Extract budget account
             budget_account = None
             budget_account_number = None
             budget_match = re.search(r'\(?(8\s*\d{2}\s*\d{2}\s*\d{2})\)?', cell_value)
@@ -539,13 +534,7 @@ class Command(BaseCommand):
                 budget_account = budget_match.group(1).strip()
                 budget_account_number = budget_account.replace(' ', '')
 
-            # Extract area/unit info (for 2814E these are more complex)
             area = None
-            unit = None
-            contact_person = None
-            contact_email = None
-
-            # Common areas
             area_patterns = [
                 'Kalasatama', 'Länsisatama', 'Pasila', 'Kruunuvuorenranta',
                 'Kuninkaankolmio', 'Malmi', 'Malminkartano', 'Mellunkylä',
@@ -563,19 +552,13 @@ class Command(BaseCommand):
                 'rangeStart': range_start,
                 'rangeEnd': range_end,
                 'area': area,
-                'unit': unit,
-                'contactPerson': contact_person,
-                'contactEmail': contact_email,
                 'isActive': True,
             }
         except Exception:
             return None
 
     def _parse_sap_range_row(self, row):
-        """Parse a row from SAP_Projektinumerovälit.xlsx format
-
-        Format: Column 1 = District/Area name, Column 2 = Range (e.g., 2814I00003-2814I00300)
-        """
+        """Parse a row from SAP_Projektinumerovälit.xlsx format"""
         try:
             area_or_district = str(row[0].value).strip() if row[0].value else None
             range_value = str(row[1].value).strip() if row[1].value else None
@@ -583,7 +566,6 @@ class Command(BaseCommand):
             if not range_value:
                 return None
 
-            # Parse range from column 2 (format: 2814I00003-2814I00300)
             if '-' not in range_value:
                 return None
 
@@ -591,20 +573,16 @@ class Command(BaseCommand):
             range_start = range_parts[0].strip()
             range_end = range_parts[1].strip() if len(range_parts) > 1 else range_start
 
-            # Skip if not a valid range format
             if not range_start.startswith('2814'):
                 return None
 
-            # Determine project type prefix
             if range_start.startswith('2814I') or 'I' in range_start[4:5].upper():
                 project_type_prefix = '2814I'
             elif range_start.startswith('2814E') or 'E' in range_start[4:5].upper():
                 project_type_prefix = '2814E'
             else:
-                # Default to 2814I if ambiguous
                 project_type_prefix = '2814I'
 
-            # Parse district info for 2814I
             district_code = None
             district_name = None
             area = None
@@ -627,13 +605,12 @@ class Command(BaseCommand):
                         district_name = name
                         break
 
-                # If no district match, use as area (for 2814E)
                 if not district_name:
                     area = area_or_district
 
             return {
                 'projectTypePrefix': project_type_prefix,
-                'budgetAccount': None,  # SAP file doesn't have budget account in this format
+                'budgetAccount': None,
                 'budgetAccountNumber': None,
                 'rangeStart': range_start,
                 'rangeEnd': range_end,
@@ -649,7 +626,6 @@ class Command(BaseCommand):
         """Preview project number range import"""
         self.stdout.write("Previewing Project Number Ranges...")
 
-        # Check if we have a separate ranges file
         ranges_wb = options.get('_ranges_wb') if options else None
 
         if ranges_wb:
@@ -675,7 +651,6 @@ class Command(BaseCommand):
             stats['ranges_created'] = total
             return
 
-        # Fall back to main workbook
         sheets = self._find_project_range_sheets(wb)
 
         total = 0
@@ -705,16 +680,13 @@ class Command(BaseCommand):
         """Import project number ranges"""
         self.stdout.write("Importing Project Number Ranges...")
 
-        # Check if we have a separate ranges file
         ranges_wb = options.get('_ranges_wb') if options else None
 
         if ranges_wb:
             self.stdout.write("  Using separate ranges file (SAP format)")
             for sheet_name in ranges_wb.sheetnames:
                 sheet = ranges_wb[sheet_name]
-                self.stdout.write(f"  Processing sheet: {sheet_name}")
-
-                for row in list(sheet.rows)[1:]:  # Skip header
+                for row in list(sheet.rows)[1:]:
                     data = self._parse_sap_range_row(row)
                     if data:
                         obj, created = TalpaProjectNumberRange.objects.update_or_create(
@@ -727,19 +699,15 @@ class Command(BaseCommand):
                             stats['ranges_created'] += 1
                         else:
                             stats['ranges_updated'] += 1
-
+            
             self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
             return
 
-        # Fall back to main workbook
         sheets = self._find_project_range_sheets(wb)
 
         for prefix, sheet in sheets.items():
             if not sheet:
-                self.stdout.write(f"  {prefix} sheet not found, skipping")
                 continue
-
-            self.stdout.write(f"  Processing {prefix} from: {sheet.title}")
 
             for row in list(sheet.rows)[1:]:
                 if prefix == '2814I':
@@ -761,6 +729,257 @@ class Command(BaseCommand):
 
         self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
 
+    # =========================================================================
+    # PROJECT TYPES (Talousarviokohdat + Lajit ja prioriteetit)
+    # =========================================================================
+
+    def _find_sheet_by_keyword(self, wb, keyword):
+        """Find sheet containing keyword in title"""
+        for name in wb.sheetnames:
+            if keyword.lower() in name.lower():
+                return wb[name]
+        return None
+
+    def _parse_laji_header_cell(self, cell_value):
+        """
+        Parse Laji ID and Name from header cell.
+        Returns (laji_code, search_name) or (None, None).
+        
+        Formats supported:
+        - Standard: "03 (Yhteishankkeet...)"
+        - Irregular: "H (Laji 13, Uudet puistot, ...)"
+        """
+        laji_code = None
+        search_name = "Unknown"
+        
+        # Try Standard format first
+        match_std = re.match(r'^(\d+)\s*\((.+)\)', cell_value.replace('\n', ' '))
+        if match_std:
+            laji_code = match_std.group(1)
+            content = match_std.group(2)
+            search_name = content.split(',')[0].strip()
+            return laji_code, search_name
+        
+        # Try Irregular "Laji X" format
+        if 'laji' in cell_value.lower():
+            match_irr = re.search(r'Laji\s*(\d+)', cell_value, re.IGNORECASE)
+            if match_irr:
+                laji_code = match_irr.group(1)
+                parts = cell_value.split(',')
+                if len(parts) > 1:
+                    search_name = parts[1].strip()
+                return laji_code, search_name
+                
+        return None, None
+
+    def _collect_priorities(self, sheet):
+        """
+        Parse Lajit sheet to collect metadata for each Laji group.
+        Returns: { 'LajiCode': { 'priorities': [], 'category': '', 'search_name': '' } }
+        """
+        laji_data = {}
+        current_laji_code = None
+        current_category = None
+        
+        for row in sheet.rows:
+            col0 = str(row[0].value).strip() if row[0].value else None
+            col1 = str(row[1].value).strip() if row[1].value and len(str(row[1].value)) < 10 else None
+            col3 = str(row[3].value).strip() if len(row) > 3 and row[3].value else None
+
+            if col0:
+                # 1. Attempt to parse Laji Header
+                laji_code, search_name = self._parse_laji_header_cell(col0)
+                if laji_code:
+                    current_laji_code = laji_code
+                    laji_data[current_laji_code] = {
+                        'priorities': [], 
+                        'category': current_category,
+                        'search_name': search_name
+                    }
+                    continue
+
+                # 2. Check for Category Header (uppercase text, no numbers/keywords)
+                if not laji_code and len(col0) > 3:
+                     # Heuristic: Uppercase, not a Laji, not priority, not date
+                     if not re.match(r'^\d', col0) and 'laji' not in col0.lower() and 'prior' not in col0.lower():
+                        clean_cat = col0.replace(')', '').strip()
+                        current_category = clean_cat.capitalize()
+                        continue
+
+            # 3. Check for Priority Row (must be under a valid Laji)
+            if current_laji_code and col1 and len(col1) <= 2:
+                 if current_laji_code in laji_data:
+                    laji_data[current_laji_code]['priorities'].append({
+                        'priority': col1,
+                        'description': col3
+                    })
+
+        return laji_data
+
+    def _parse_talous_row(self, row):
+        """Parse Talousarviokohdat row: '8030101 Code Name' -> Code, Name"""
+        val = str(row[0].value).strip() if row[0].value else None
+        if not val:
+            return None
+        
+        # SonarQube fix: Use split instead of regex to avoid potential ReDoS (python:S5852)
+        # "8030101 Code Name" -> ["8030101", "Code Name"]
+        parts = val.split(maxsplit=1)
+        
+        if len(parts) == 2:
+            raw_code = parts[0]
+            name = parts[1]
+            
+            # Verify code format (7 or 8 digits)
+            if raw_code.isdigit() and (7 <= len(raw_code) <= 8):
+                # Format raw_code "8030101" -> "8 03 01 01"
+                if len(raw_code) == 7:
+                     formatted_code = f"{raw_code[0]} {raw_code[1:3]} {raw_code[3:5]} {raw_code[5:7]}"
+                     laji_id = raw_code[3:5] 
+                else: # len == 8
+                     formatted_code = f"{raw_code[0]} {raw_code[1:3]} {raw_code[3:5]} {raw_code[5:7].strip()}"
+                     laji_id = raw_code[3:5]
+
+                return {
+                    'code': formatted_code,
+                    'name': name,
+                    'laji_id': laji_id
+                }
+        return None
+
+    def _build_laji_lookup_list(self, laji_map):
+        """
+        Build a list for fuzzy matching project types to Laji IDs.
+        Returns list of (SearchName, LajiID, PriorityScore).
+        """
+        laji_lookups = []
+        for lid, info in laji_map.items():
+            sname = info.get('search_name')
+            cat = info.get('category') or ''
+            
+            if sname and len(sname) > 3:
+                score = 1
+                if 'projektialueiden' in cat.lower():
+                    score = 3
+                elif 'puisto' in cat.lower():
+                    score = 2
+                
+                # Penalize generic "Esirakentaminen"
+                if lid == '21' or sname.lower() == 'esirakentaminen':
+                    score = 0
+                
+                laji_lookups.append((sname, lid, score))
+        
+        # Sort by Score (Desc), then Length (Desc)
+        laji_lookups.sort(key=lambda x: (x[2], len(x[0])), reverse=True)
+        return laji_lookups
+
+    def _format_name_with_id(self, original_name, laji_id):
+        """Prepend Laji ID to name if not already present."""
+        if laji_id and not original_name.startswith(laji_id):
+             return f"{laji_id} {original_name}"
+        return original_name
+
+    def _preview_project_types(self, wb, stats):
+        """Preview Project Types & Priorities import"""
+        self.stdout.write("Previewing Project Types & Priorities...")
+        
+        lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
+        talous_sheet = self._find_sheet_by_keyword(wb, 'talousarviokohdat')
+        
+        if not lajit_sheet or not talous_sheet:
+            self.stdout.write(self.style.WARNING("  Required sheets not found"))
+            return
+
+        priorities_map = self._collect_priorities(lajit_sheet)
+        self.stdout.write(f"  Found {len(priorities_map)} Priority Groups (Lajit)")
+        
+        count = 0
+        for row in list(talous_sheet.rows)[:20]:
+            data = self._parse_talous_row(row)
+            if data:
+                count += 1
+                laji_id = data['laji_id']
+                prios = priorities_map.get(laji_id, {}).get('priorities', [])
+                if count <= 5:
+                    self.stdout.write(f"  {data['code']} {data['name']} -> Laji {laji_id} ({len(prios)} priorities)")
+
+        stats['project_types_created'] = 0
+
+    def _import_project_types(self, wb, stats):
+        """Import Project Types and apply Priorities"""
+        self.stdout.write("Importing Project Types & Priorities...")
+        
+        lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
+        talous_sheet = self._find_sheet_by_keyword(wb, 'talousarviokohdat')
+        
+        if not lajit_sheet or not talous_sheet:
+            self.stdout.write(self.style.WARNING("  Required sheets not found, skipping"))
+            return
+
+        # 1. Collect Metadata
+        laji_map = self._collect_priorities(lajit_sheet)
+        self.stdout.write(f"  Loaded metadata for {len(laji_map)} Laji groups")
+        
+        # 2. Build Lookup List
+        laji_lookups = self._build_laji_lookup_list(laji_map)
+        
+        created_count = 0
+        
+        # 3. Iterate Talousarviokohdat
+        for row in talous_sheet.rows:
+            data = self._parse_talous_row(row)
+            if not data:
+                continue
+
+            laji_id = data['laji_id']
+            talous_name_lower = data['name'].lower()
+            
+            # Find best match from lookup list
+            for sname, lid, score in laji_lookups:
+                if sname.lower() in talous_name_lower:
+                    laji_id = lid
+                    break
+            
+            laji_info = laji_map.get(laji_id)
+            prios = laji_info['priorities'] if laji_info else []
+            category = laji_info['category'] if laji_info else None
+
+            base_defaults = {
+                'name': data['name'],
+                'isActive': True,
+                'category': category
+            }
+
+            if not prios:
+                final_name = self._format_name_with_id(data['name'], laji_id)
+                TalpaProjectType.objects.update_or_create(
+                    code=data['code'],
+                    priority=None,
+                    defaults={
+                        **base_defaults,
+                        'name': final_name
+                    }
+                )
+                created_count += 1
+            else:
+                for p in prios:
+                    defaults = base_defaults.copy()
+                    if p['description']:
+                        defaults['description'] = p['description']
+                    
+                    defaults['name'] = self._format_name_with_id(data['name'], laji_id)
+
+                    TalpaProjectType.objects.update_or_create(
+                        code=data['code'],
+                        priority=p['priority'],
+                        defaults=defaults
+                    )
+                    created_count += 1
+                    
+        self.stdout.write(f"  Processed {created_count} project type definitions")
+        stats['project_types_created'] = created_count
+
     def _print_summary(self, stats, dry_run):
         """Print import summary"""
         self.stdout.write(self.style.SUCCESS("IMPORT SUMMARY"))
@@ -768,6 +987,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Asset Classes:   {stats['assets_created']} created, {stats['assets_updated']} updated")
         self.stdout.write(f"Service Classes: {stats['services_created']} created, {stats['services_updated']} updated")
         self.stdout.write(f"Number Ranges:   {stats['ranges_created']} created, {stats['ranges_updated']} updated")
+        self.stdout.write(f"Project Types:   {stats.get('project_types_created', 0)} created/updated")
 
         if stats['errors']:
             self.stdout.write(self.style.ERROR(f"\nErrors ({len(stats['errors'])}):"))

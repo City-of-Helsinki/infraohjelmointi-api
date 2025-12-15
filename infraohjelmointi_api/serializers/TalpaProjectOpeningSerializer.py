@@ -32,7 +32,7 @@ class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TalpaProjectNumberRange
         fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd",
-                  "majorDistrict", "majorDistrictName", "area", "unit", "isActive"]
+                  "majorDistrict", "majorDistrictName", "area", "unit", "notes", "isActive"]
         ref_name = "TalpaProjectNumberRangeNested"
 
 
