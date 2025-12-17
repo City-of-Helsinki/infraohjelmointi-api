@@ -287,12 +287,12 @@ class Command(BaseCommand):
         for row in list(sheet.rows)[1:]:
             # Check for category header in first column regardless of whether it's a data row
             col0 = str(row[0].value).strip() if row[0].value else None
-            
+
             # Update 'current_category' if we see a value in Col 0
             # Ignore the specific table header 'Poisto-ryhmä'
             if col0 and 'poisto-ryhm' not in col0.lower():
                 current_category = col0
-            
+
             data = self._parse_asset_class_row(row)
             if data:
                 # Apply the current category to the item
@@ -437,9 +437,9 @@ class Command(BaseCommand):
             paren_match = re.search(r'\(([^)]+)\)', cell_value)
             if paren_match:
                 paren_content = paren_match.group(1).strip()
-                
+
                 budget_match = re.match(r'^(8\s*\d{2}\s*\d{2}\s*\d{2}[A-H]?)', paren_content)
-                
+
                 if budget_match:
                     budget_account = budget_match.group(1).strip()
                     remaining = paren_content[budget_match.end():].strip()
@@ -461,7 +461,7 @@ class Command(BaseCommand):
                             budget_account = paren_content
                         else:
                             notes = paren_content
-                
+
                 if budget_account:
                     budget_account_number = budget_account.replace(' ', '')
 
@@ -699,7 +699,7 @@ class Command(BaseCommand):
                             stats['ranges_created'] += 1
                         else:
                             stats['ranges_updated'] += 1
-            
+
             self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
             return
 
@@ -744,7 +744,7 @@ class Command(BaseCommand):
         """
         Parse Laji ID, Name, and Category from header cell.
         Returns (laji_code, search_name, category) or (None, None, None).
-        
+
         Format: "01 (Uudisrakentaminen, KADUT, LIIKENNEVÄYLÄT JA RADAT)"
         - First comma-separated value = Laji Name
         - Second comma-separated value = Category
@@ -752,45 +752,86 @@ class Command(BaseCommand):
         laji_code = None
         search_name = "Unknown"
         category = None
-        
+
         # Try Standard format: NN (Name, Category...) or NN (Name)
-        # Regex: ID, Name (non-greedy until comma or paren), Optional (Comma + Category + closing paren)
-        match_std = re.match(r'^(\d+)\s*\(([^,)]+)(?:,\s*([^)]+))?\)', cell_value.replace('\n', ' '))
-        if match_std:
-            laji_code = match_std.group(1)
-            search_name = match_std.group(2).strip()
-            
-            if match_std.group(3):
-                category = match_std.group(3).strip().title()
+        # Replaced regex with string splitting to avoid ReDoS (python:S5852)
+        # Format: "01 (Uudisrakentaminen, KADUT, ...)"
+
+        # 1. Extract ID (digits at start)
+        first_space = cell_value.find(' ')
+        if first_space > 0 and cell_value[:first_space].isdigit():
+            laji_code = cell_value[:first_space]
+
+            # 2. Check for parentheses content
+            start_paren = cell_value.find('(')
+            end_paren = cell_value.rfind(')')
+
+            if start_paren > first_space and end_paren > start_paren:
+                content = cell_value[start_paren+1:end_paren]
+
+                # 3. Split content by comma
+                # Use maxsplit=1 because Category may contain punctuation (e.g. "KADUT, RADAT")
+                parts = [p.strip() for p in content.split(',', 1)]
+                if parts:
+                    search_name = parts[0]
+                    if len(parts) > 1:
+                        category = parts[1].title()
 
             return laji_code, search_name, category
-        
+
         # Try Irregular "H (Laji X, Name...)" format
         if 'laji' in cell_value.lower():
-            match_irr = re.search(r'Laji\s*(\d+)', cell_value, re.IGNORECASE)
-            if match_irr:
-                laji_code = match_irr.group(1)
-                parts = [p.strip() for p in cell_value.split(',')]
-                if len(parts) > 1:
-                    search_name = parts[1].strip()
-                if len(parts) > 2:
-                    # Strip potential trailing ')' from category logic
-                    category = parts[2].strip().rstrip(')').title()
-                return laji_code, search_name, category
-                
+            # "H (Laji 13, Uudet puistot, PUISTOT)"
+            # Find "Laji NN" first
+            laji_start = cell_value.lower().find('laji')
+            if laji_start != -1:
+                # Extract part after "Laji "
+                substring = cell_value[laji_start+5:] # Skip "Laji "
+
+                # Find space or comma ending the ID
+                # "13, Uudet puistot..."
+                separator = -1
+                for i, char in enumerate(substring):
+                    if not char.isdigit():
+                        separator = i
+                        break
+
+                if separator > 0:
+                    laji_code = substring[:separator]
+
+                    # Parse the rest
+                    # Expected: ", Uudet puistot, PUISTOT)"
+                    rest = substring[separator:]
+
+                    # Remove closing paren if present
+                    end_paren = rest.rfind(')')
+                    if end_paren != -1:
+                        rest = rest[:end_paren]
+
+                    parts = [p.strip() for p in rest.split(',')]
+                    # parts[0] might be empty if separator was comma
+                    real_parts = [p for p in parts if p]
+
+                    if real_parts:
+                        search_name = real_parts[0]
+                        if len(real_parts) > 1:
+                            category = real_parts[1].title()
+
+                    return laji_code, search_name, category
+
         return None, None, None
 
     def _collect_priorities(self, sheet):
         """
         Parse Lajit sheet to collect metadata for each Laji group.
         Returns: { 'LajiCode': { 'priorities': [], 'category': '', 'search_name': '' } }
-        
+
         Category is extracted from within the Laji header cell itself,
         not from separate rows.
         """
         laji_data = {}
         current_laji_code = None
-        
+
         for row in sheet.rows:
             col0 = str(row[0].value).strip() if row[0].value else None
             col1 = str(row[1].value).strip() if row[1].value and len(str(row[1].value)) < 10 else None
@@ -808,7 +849,7 @@ class Command(BaseCommand):
                             category = "Projektialueiden Puistot"
                         elif laji_code == '13':
                             category = "Puistorakentaminen"
-                    
+
                 if laji_code:
                     current_laji_code = laji_code
                     # Prevent overwriting if Laji code appears multiple times (use first occurrence)
@@ -820,7 +861,7 @@ class Command(BaseCommand):
                              search_name = search_name.capitalize()
 
                         laji_data[current_laji_code] = {
-                            'priorities': [], 
+                            'priorities': [],
                             'category': category,
                             'search_name': search_name
                         }
@@ -840,15 +881,22 @@ class Command(BaseCommand):
                         if val:
                             desc = val
                             break
-                    
+
                     if desc:
                         # Clean Description "A (Laji 01, Real Name)" -> "Real Name"
-                        # Also handles "C (Laji C, Real Name)"
-                        match_desc = re.search(r'\(Laji\s*[^,]+,\s*(.+)\)$', desc, re.IGNORECASE)
-                        if match_desc:
-                            desc = match_desc.group(1).strip()
-                            # Do NOT strip trailing ')' again, regex handles the wrapper.
-                            # Keeps "(name)" intact inside the string.
+                        # Replaced regex with string logic
+                        if '(laji' in desc.lower():
+                            laji_idx = desc.lower().find('(laji')
+                            if laji_idx != -1:
+                                # Extract content inside parens of "(Laji ...)"
+                                end_paren = desc.rfind(')', laji_idx)
+                                if end_paren > laji_idx:
+                                    inner = desc[laji_idx+1:end_paren] # "Laji 01, Real Name"
+
+                                    # Split by comma
+                                    parts = inner.split(',', 1)
+                                    if len(parts) > 1:
+                                        desc = parts[1].strip()
 
                         laji_data[current_laji_code]['priorities'].append({
                             'priority': prio,
@@ -868,16 +916,16 @@ class Command(BaseCommand):
     def _preview_project_types(self, wb, stats):
         """Preview Project Types & Priorities import"""
         self.stdout.write("Previewing Project Types & Priorities...")
-        
+
         lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
-        
+
         if not lajit_sheet:
             self.stdout.write(self.style.WARNING("  Required 'Lajit' sheet not found"))
             return
 
         laji_map = self._collect_priorities(lajit_sheet)
         self.stdout.write(f"  Found {len(laji_map)} Priority Groups (Lajit)")
-        
+
         count = 0
         for laji_id, info in laji_map.items():
             count += 1
@@ -892,9 +940,9 @@ class Command(BaseCommand):
     def _import_project_types(self, wb, stats):
         """Import Project Types and apply Priorities"""
         self.stdout.write("Importing Project Types & Priorities...")
-        
+
         lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
-        
+
         if not lajit_sheet:
             self.stdout.write(self.style.WARNING("  Required 'Lajit' sheet not found, skipping"))
             return
@@ -902,7 +950,7 @@ class Command(BaseCommand):
         # 1. Collect Metadata
         laji_map = self._collect_priorities(lajit_sheet)
         self.stdout.write(f"  Loaded metadata for {len(laji_map)} Laji groups")
-        
+
         if not laji_map:
             self.stdout.write("No Laji data collected!")
             return
@@ -915,10 +963,10 @@ class Command(BaseCommand):
             laji_name = info['search_name'] # e.g. "Uudisrakentaminen"
             category = info['category']     # e.g. "Kadut, liikenneväylät ja radat"
             priorities = info['priorities'] # List of dicts
-            
+
             # 1. Create Base Laji Item (e.g. "01 Uudisrakentaminen")
             base_name = self._format_name_with_id(laji_name, laji_id)
-            
+
             TalpaProjectType.objects.update_or_create(
                 code=laji_id,
                 priority=None,
@@ -931,19 +979,19 @@ class Command(BaseCommand):
                 }
             )
             created_count += 1
-            
+
             # 2. Create Priority Items
             for i, p in enumerate(priorities):
                 p_code = p['priority']
                 p_desc = p['description']
-                
+
                 # Handling missing priority codes to avoid collision with Base Item (priority=None)
                 if not p_code:
                      p_code = f"SUB_{i+1}"
 
                 if p_desc:
                     p_name = self._format_name_with_id(p_desc, laji_id)
-                    
+
                     TalpaProjectType.objects.update_or_create(
                         code=laji_id, # Same Laji ID
                         priority=p_code, # Unique per Laji
@@ -955,7 +1003,7 @@ class Command(BaseCommand):
                         }
                     )
                     created_count += 1
-                    
+
         self.stdout.write(f"  Processed {created_count} project type definitions")
         stats['project_types_created'] = created_count
 
