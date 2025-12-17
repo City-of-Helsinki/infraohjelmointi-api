@@ -10,7 +10,7 @@ class TalpaProjectTypeSerializer(serializers.ModelSerializer):
     """Serializer for TalpaProjectType in dropdowns"""
     class Meta:
         model = TalpaProjectType
-        fields = ["id", "code", "name", "category", "priority", "description", "isActive", "notes"]
+        fields = ["id", "code", "name", "category", "priority", "description", "sortOrder", "isActive", "notes"]
 
 
 class TalpaServiceClassSerializer(serializers.ModelSerializer):

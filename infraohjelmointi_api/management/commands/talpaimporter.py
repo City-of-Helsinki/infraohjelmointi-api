@@ -742,44 +742,54 @@ class Command(BaseCommand):
 
     def _parse_laji_header_cell(self, cell_value):
         """
-        Parse Laji ID and Name from header cell.
-        Returns (laji_code, search_name) or (None, None).
+        Parse Laji ID, Name, and Category from header cell.
+        Returns (laji_code, search_name, category) or (None, None, None).
         
-        Formats supported:
-        - Standard: "03 (Yhteishankkeet...)"
-        - Irregular: "H (Laji 13, Uudet puistot, ...)"
+        Format: "01 (Uudisrakentaminen, KADUT, LIIKENNEVÄYLÄT JA RADAT)"
+        - First comma-separated value = Laji Name
+        - Second comma-separated value = Category
         """
         laji_code = None
         search_name = "Unknown"
+        category = None
         
-        # Try Standard format first
-        match_std = re.match(r'^(\d+)\s*\((.+)\)', cell_value.replace('\n', ' '))
+        # Try Standard format: NN (Name, Category...) or NN (Name)
+        # Regex: ID, Name (non-greedy until comma or paren), Optional (Comma + Category + closing paren)
+        match_std = re.match(r'^(\d+)\s*\(([^,)]+)(?:,\s*([^)]+))?\)', cell_value.replace('\n', ' '))
         if match_std:
             laji_code = match_std.group(1)
-            content = match_std.group(2)
-            search_name = content.split(',')[0].strip()
-            return laji_code, search_name
+            search_name = match_std.group(2).strip()
+            
+            if match_std.group(3):
+                category = match_std.group(3).strip().title()
+
+            return laji_code, search_name, category
         
-        # Try Irregular "Laji X" format
+        # Try Irregular "H (Laji X, Name...)" format
         if 'laji' in cell_value.lower():
             match_irr = re.search(r'Laji\s*(\d+)', cell_value, re.IGNORECASE)
             if match_irr:
                 laji_code = match_irr.group(1)
-                parts = cell_value.split(',')
+                parts = [p.strip() for p in cell_value.split(',')]
                 if len(parts) > 1:
                     search_name = parts[1].strip()
-                return laji_code, search_name
+                if len(parts) > 2:
+                    # Strip potential trailing ')' from category logic
+                    category = parts[2].strip().rstrip(')').title()
+                return laji_code, search_name, category
                 
-        return None, None
+        return None, None, None
 
     def _collect_priorities(self, sheet):
         """
         Parse Lajit sheet to collect metadata for each Laji group.
         Returns: { 'LajiCode': { 'priorities': [], 'category': '', 'search_name': '' } }
+        
+        Category is extracted from within the Laji header cell itself,
+        not from separate rows.
         """
         laji_data = {}
         current_laji_code = None
-        current_category = None
         
         for row in sheet.rows:
             col0 = str(row[0].value).strip() if row[0].value else None
@@ -787,92 +797,67 @@ class Command(BaseCommand):
             col3 = str(row[3].value).strip() if len(row) > 3 and row[3].value else None
 
             if col0:
-                # 1. Attempt to parse Laji Header
-                laji_code, search_name = self._parse_laji_header_cell(col0)
+                # Attempt to parse Laji Header (includes embedded category)
+                laji_code, search_name, category = self._parse_laji_header_cell(col0)
+                if laji_code:
+                    # Fallback Category Logic for Inconsistent Excel Data
+                    if not category or category == 'None' or len(category) < 3:
+                        if laji_code in ['06', '07', '08']:
+                            category = "Projektialueiden Kadut"
+                        elif laji_code in ['15', '16', '17', '18', '19']:
+                            category = "Projektialueiden Puistot"
+                        elif laji_code == '13':
+                            category = "Puistorakentaminen"
+                    
                 if laji_code:
                     current_laji_code = laji_code
-                    laji_data[current_laji_code] = {
-                        'priorities': [], 
-                        'category': current_category,
-                        'search_name': search_name
-                    }
+                    # Prevent overwriting if Laji code appears multiple times (use first occurrence)
+                    if current_laji_code not in laji_data:
+                        # Clean Name if it has prefixes like "8 09 01 "
+                        # e.g. "8 09 01 Malminkartano" -> "Malminkartano"
+                        search_name = re.sub(r'^[\d\s]{3,}', '', search_name).strip()
+                        if search_name.isupper():
+                             search_name = search_name.capitalize()
+
+                        laji_data[current_laji_code] = {
+                            'priorities': [], 
+                            'category': category,
+                            'search_name': search_name
+                        }
                     continue
 
-                # 2. Check for Category Header (uppercase text, no numbers/keywords)
-                if not laji_code and len(col0) > 3:
-                     # Heuristic: Uppercase, not a Laji, not priority, not date
-                     if not re.match(r'^\d', col0) and 'laji' not in col0.lower() and 'prior' not in col0.lower():
-                        clean_cat = col0.replace(')', '').strip()
-                        current_category = clean_cat.capitalize()
-                        continue
+            # Check for Priority Row (col1 = 'A', 'B', etc.)
+            val1 = str(row[1].value).strip() if len(row) > 1 and row[1].value else None
+            # Priority rows usually have a single letter or number in Col 1
+            if val1 and (len(val1) <= 2 or val1.isdigit()):
+                if current_laji_code and current_laji_code in laji_data:
+                    prio = val1
+                    desc = None
+                    # Search for description in columns C, D, E (Indexes 2, 3, 4)
+                    # Some rows have description in Col 2, others in Col 3
+                    for col_idx in range(2, min(5, len(row))):
+                        val = str(row[col_idx].value).strip() if row[col_idx].value else None
+                        if val:
+                            desc = val
+                            break
+                    
+                    if desc:
+                        # Clean Description "A (Laji 01, Real Name)" -> "Real Name"
+                        # Also handles "C (Laji C, Real Name)"
+                        match_desc = re.search(r'\(Laji\s*[^,]+,\s*(.+)\)$', desc, re.IGNORECASE)
+                        if match_desc:
+                            desc = match_desc.group(1).strip()
+                            # Do NOT strip trailing ')' again, regex handles the wrapper.
+                            # Keeps "(name)" intact inside the string.
 
-            # 3. Check for Priority Row (must be under a valid Laji)
-            if current_laji_code and col1 and len(col1) <= 2:
-                 if current_laji_code in laji_data:
-                    laji_data[current_laji_code]['priorities'].append({
-                        'priority': col1,
-                        'description': col3
-                    })
+                        laji_data[current_laji_code]['priorities'].append({
+                            'priority': prio,
+                            'description': desc
+                        })
 
         return laji_data
 
-    def _parse_talous_row(self, row):
-        """Parse Talousarviokohdat row: '8030101 Code Name' -> Code, Name"""
-        val = str(row[0].value).strip() if row[0].value else None
-        if not val:
-            return None
-        
-        # SonarQube fix: Use split instead of regex to avoid potential ReDoS (python:S5852)
-        # "8030101 Code Name" -> ["8030101", "Code Name"]
-        parts = val.split(maxsplit=1)
-        
-        if len(parts) == 2:
-            raw_code = parts[0]
-            name = parts[1]
-            
-            # Verify code format (7 or 8 digits)
-            if raw_code.isdigit() and (7 <= len(raw_code) <= 8):
-                # Format raw_code "8030101" -> "8 03 01 01"
-                if len(raw_code) == 7:
-                     formatted_code = f"{raw_code[0]} {raw_code[1:3]} {raw_code[3:5]} {raw_code[5:7]}"
-                     laji_id = raw_code[3:5] 
-                else: # len == 8
-                     formatted_code = f"{raw_code[0]} {raw_code[1:3]} {raw_code[3:5]} {raw_code[5:7].strip()}"
-                     laji_id = raw_code[3:5]
 
-                return {
-                    'code': formatted_code,
-                    'name': name,
-                    'laji_id': laji_id
-                }
-        return None
-
-    def _build_laji_lookup_list(self, laji_map):
-        """
-        Build a list for fuzzy matching project types to Laji IDs.
-        Returns list of (SearchName, LajiID, PriorityScore).
-        """
-        laji_lookups = []
-        for lid, info in laji_map.items():
-            sname = info.get('search_name')
-            cat = info.get('category') or ''
-            
-            if sname and len(sname) > 3:
-                score = 1
-                if 'projektialueiden' in cat.lower():
-                    score = 3
-                elif 'puisto' in cat.lower():
-                    score = 2
-                
-                # Penalize generic "Esirakentaminen"
-                if lid == '21' or sname.lower() == 'esirakentaminen':
-                    score = 0
-                
-                laji_lookups.append((sname, lid, score))
-        
-        # Sort by Score (Desc), then Length (Desc)
-        laji_lookups.sort(key=lambda x: (x[2], len(x[0])), reverse=True)
-        return laji_lookups
 
     def _format_name_with_id(self, original_name, laji_id):
         """Prepend Laji ID to name if not already present."""
@@ -885,24 +870,22 @@ class Command(BaseCommand):
         self.stdout.write("Previewing Project Types & Priorities...")
         
         lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
-        talous_sheet = self._find_sheet_by_keyword(wb, 'talousarviokohdat')
         
-        if not lajit_sheet or not talous_sheet:
-            self.stdout.write(self.style.WARNING("  Required sheets not found"))
+        if not lajit_sheet:
+            self.stdout.write(self.style.WARNING("  Required 'Lajit' sheet not found"))
             return
 
-        priorities_map = self._collect_priorities(lajit_sheet)
-        self.stdout.write(f"  Found {len(priorities_map)} Priority Groups (Lajit)")
+        laji_map = self._collect_priorities(lajit_sheet)
+        self.stdout.write(f"  Found {len(laji_map)} Priority Groups (Lajit)")
         
         count = 0
-        for row in list(talous_sheet.rows)[:20]:
-            data = self._parse_talous_row(row)
-            if data:
-                count += 1
-                laji_id = data['laji_id']
-                prios = priorities_map.get(laji_id, {}).get('priorities', [])
-                if count <= 5:
-                    self.stdout.write(f"  {data['code']} {data['name']} -> Laji {laji_id} ({len(prios)} priorities)")
+        for laji_id, info in laji_map.items():
+            count += 1
+            if count <= 5:
+                prios = info.get('priorities', [])
+                self.stdout.write(f"  {laji_id} {info['search_name']} ({len(prios)} priorities)")
+                if prios:
+                    self.stdout.write(f"    - First Prio: {prios[0]['description']}")
 
         stats['project_types_created'] = 0
 
@@ -911,69 +894,65 @@ class Command(BaseCommand):
         self.stdout.write("Importing Project Types & Priorities...")
         
         lajit_sheet = self._find_sheet_by_keyword(wb, 'lajit')
-        talous_sheet = self._find_sheet_by_keyword(wb, 'talousarviokohdat')
         
-        if not lajit_sheet or not talous_sheet:
-            self.stdout.write(self.style.WARNING("  Required sheets not found, skipping"))
+        if not lajit_sheet:
+            self.stdout.write(self.style.WARNING("  Required 'Lajit' sheet not found, skipping"))
             return
 
         # 1. Collect Metadata
         laji_map = self._collect_priorities(lajit_sheet)
         self.stdout.write(f"  Loaded metadata for {len(laji_map)} Laji groups")
         
-        # 2. Build Lookup List
-        laji_lookups = self._build_laji_lookup_list(laji_map)
-        
+        if not laji_map:
+            self.stdout.write("No Laji data collected!")
+            return
+
         created_count = 0
-        
-        # 3. Iterate Talousarviokohdat
-        for row in talous_sheet.rows:
-            data = self._parse_talous_row(row)
-            if not data:
-                continue
 
-            laji_id = data['laji_id']
-            talous_name_lower = data['name'].lower()
+        # 3. Create Project Types from Collected Laji Data
+        # We iterate the Clean Laji Data (Source of Truth) instead of messy Budget Lines
+        for laji_id, info in laji_map.items():
+            laji_name = info['search_name'] # e.g. "Uudisrakentaminen"
+            category = info['category']     # e.g. "Kadut, liikenneväylät ja radat"
+            priorities = info['priorities'] # List of dicts
             
-            # Find best match from lookup list
-            for sname, lid, score in laji_lookups:
-                if sname.lower() in talous_name_lower:
-                    laji_id = lid
-                    break
+            # 1. Create Base Laji Item (e.g. "01 Uudisrakentaminen")
+            base_name = self._format_name_with_id(laji_name, laji_id)
             
-            laji_info = laji_map.get(laji_id)
-            prios = laji_info['priorities'] if laji_info else []
-            category = laji_info['category'] if laji_info else None
+            TalpaProjectType.objects.update_or_create(
+                code=laji_id,
+                priority=None,
+                defaults={
+                    'name': base_name,
+                    'isActive': True,
+                    'category': category,
+                    # Ensure numerical sorting (1, 2, ... 10)
+                    'sortOrder': int(laji_id) if laji_id.isdigit() else 0
+                }
+            )
+            created_count += 1
+            
+            # 2. Create Priority Items
+            for i, p in enumerate(priorities):
+                p_code = p['priority']
+                p_desc = p['description']
+                
+                # Handling missing priority codes to avoid collision with Base Item (priority=None)
+                if not p_code:
+                     p_code = f"SUB_{i+1}"
 
-            base_defaults = {
-                'name': data['name'],
-                'isActive': True,
-                'category': category
-            }
-
-            if not prios:
-                final_name = self._format_name_with_id(data['name'], laji_id)
-                TalpaProjectType.objects.update_or_create(
-                    code=data['code'],
-                    priority=None,
-                    defaults={
-                        **base_defaults,
-                        'name': final_name
-                    }
-                )
-                created_count += 1
-            else:
-                for p in prios:
-                    defaults = base_defaults.copy()
-                    if p['description']:
-                        defaults['description'] = p['description']
+                if p_desc:
+                    p_name = self._format_name_with_id(p_desc, laji_id)
                     
-                    defaults['name'] = self._format_name_with_id(data['name'], laji_id)
-
                     TalpaProjectType.objects.update_or_create(
-                        code=data['code'],
-                        priority=p['priority'],
-                        defaults=defaults
+                        code=laji_id, # Same Laji ID
+                        priority=p_code, # Unique per Laji
+                        defaults={
+                            'name': p_name,
+                            'isActive': True,
+                            'category': category,
+                            'sortOrder': int(laji_id) if laji_id.isdigit() else 0
+                        }
                     )
                     created_count += 1
                     

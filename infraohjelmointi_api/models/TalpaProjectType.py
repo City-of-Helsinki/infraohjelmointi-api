@@ -12,6 +12,7 @@ class TalpaProjectType(models.Model):
     isActive = models.BooleanField(default=True)  # Exclude obsolete entries
     notes = models.TextField(blank=True, null=True)  # Special notes like "EI UUSIA HANKKEITA V. 2022 JÄLKEEN!"
     validityYear = models.PositiveIntegerField(blank=True, null=True)  # For year-specific data
+    sortOrder = models.PositiveIntegerField(default=0)  # Laji ID as integer for dropdown ordering
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
 
@@ -22,7 +23,7 @@ class TalpaProjectType(models.Model):
                 name="Unique constraint TalpaProjectType code and priority",
             )
         ]
-        ordering = ["code", "priority"]
+        ordering = ["category", "sortOrder", "priority"]
 
     def __str__(self):
         return f"{self.code} - {self.name}"
