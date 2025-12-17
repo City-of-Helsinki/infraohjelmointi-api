@@ -552,6 +552,7 @@ class Command(BaseCommand):
                 'rangeStart': range_start,
                 'rangeEnd': range_end,
                 'area': area,
+                'unit': area, # Map area to unit (e.g. "Tontit" -> unit="Tontit")
                 'isActive': True,
             }
         except Exception:
@@ -849,6 +850,24 @@ class Command(BaseCommand):
                             category = "Projektialueiden Puistot"
                         elif laji_code == '13':
                             category = "Puistorakentaminen"
+                        elif laji_code in ['01', '02', '03', '04', '05']:
+                             category = "Kadut, Liikenneväylät Ja Radat"
+                        elif laji_code in ['09', '10', '11', '12', '14']:
+                             category = "Puistot Ja Liikunta-Alueet"
+                        elif laji_code in ['20', '21']:
+                             category = "Esirakentaminen"
+                        elif laji_code in ['22', '23', '24']:
+                             category = "Muut Yleiset Alueet"
+                        elif laji_code == '25':
+                             category = "Maaomaisuuden Hallinta"
+                        elif laji_code in ['26', '27', '28', '33']:
+                             category = "Kaupunkiuudistusalueet"
+                        elif laji_code in ['29', '30', '31', '32']:
+                             category = "Suuret Liikennehankkeet"
+                        elif laji_code in ['34', '35', '36']:
+                             category = "Projektialueiden Kadut"
+                        elif laji_code in ['37', '38', '39']:
+                             category = "Projektialueiden Puistot"
 
                 if laji_code:
                     current_laji_code = laji_code
