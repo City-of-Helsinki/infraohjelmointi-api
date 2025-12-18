@@ -41,7 +41,7 @@ class SapApiService:
     def sync_all_projects_from_sap(self, for_financial_statement: bool, sap_year=datetime.now().year) -> None:
         """Method to synchronise projects from SAP.\n
         Given projects must have sapProject otherwise project will not be syncrhonized.
-        Will get for_financial_statement as True if called for fetching sap data for certain year only, 
+        Will get for_financial_statement as True if called for fetching sap data for certain year only,
         then also this certain year is given as parameter.
         """
 
@@ -69,21 +69,21 @@ class SapApiService:
                 # fetch costs and commitments from SAP
                 start_time = time.perf_counter()
                 sap_costs_and_commitments = {}
-                
-                # all sap data is not fetched, if function is called for getting sap data for certain year, 
+
+                # all sap data is not fetched, if function is called for getting sap data for certain year,
                 # f.g. for financial statement
                 if not for_financial_statement:
                     sap_costs_and_commitments["all_sap_data"] = (
                         self.get_all_project_costs_and_commitments_from_sap(sap_id)
                     )
-                
+
                 sap_costs_and_commitments["current_year"] = (
                     self.get_costs_and_commitments_by_year(sap_id, sap_year)
-                ) 
+                )
 
                 handling_time = time.perf_counter() - start_time
 
-                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)  
+                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)
 
                 if self.validate_costs_and_commitments(sap_costs_and_commitments):
                     costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
@@ -95,7 +95,7 @@ class SapApiService:
                         projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                         current_year=sap_year,
                     )
-                
+
                 costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
                 self.__store_sap_data(
                     service_class = SapCurrentYearService,
@@ -117,7 +117,7 @@ class SapApiService:
         logger.debug(f"Starting to fetch costs and commitments for SAP id {id} from {budat_start} to {budat_end}")
         json_response_current_year = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, id, all_sap_commitments=False)
 
-        grouped_costs_and_commitments_current_year = self.__group_costs_and_commitments( 
+        grouped_costs_and_commitments_current_year = self.__group_costs_and_commitments(
         sap_costs_and_commitments=json_response_current_year,
         sap_id=id,
         )
@@ -202,7 +202,7 @@ class SapApiService:
         json_response["commitments"] = self.__make_sap_request(api_url, id, "commitments")
 
         return json_response
-    
+
     def __store_sap_data(
         self,
         service_class,
@@ -336,44 +336,48 @@ class SapApiService:
         """Costs (actual/commitment) must be calculated for groups thus\n
         result will include two keys separating groups: 01 and others.\n
         """
-        # costs must be groupped by task
-        # 01 = Project task (planning)
-        # 02, 03, 04, 06, 99 = Production task (construction), will be grouped as one
+        # Costs must be grouped by task type:
+        # 01 = Project task (planning/suunnittelu)
+        # 02, 03, 04, 06, 99 = Production task (construction/rakentaminen)
         #
-        # Task group id is formatted as sap_id.task_id (2814I06808.01,2814I06808.02,2814I06808.03, or 2814I06808.04)
-        # Task id can also contain sub task i.e. 2814I06808.01.01, or sub sub task i.e. 2814I06808.01.01.02
-        # 
-        # NOTE: SAP returns task IDs in TWO formats:
-        #   1. OLD FORMAT (with dots): "2814I03976.01" - backward compatible
-        #   2. NEW FORMAT (concatenated): SAPID(variable length) + SUBPROJECT(3 digits) + TASK(2 digits)
-        #      Example: "2814I03976" + "001" + "01" = "2814I0397600101"
-        #      Planning tasks end with "01" (last 2 chars)
-        #      Construction tasks end with "02", "03", "04", "06", "99", etc.
-        #
-        # EDGE CASE: Some SAP IDs themselves end in "01" (e.g., "2814I03901")
-        #   - These bare IDs should NOT be classified as planning tasks
-        #   - Only extended IDs (longer than base SAP ID) ending in "01" are planning tasks
+        # SAP returns task IDs in two formats:
+        # 1. OLD FORMAT (with dots): "2814I04749.01", "2814I04749.03.01"
+        #    First segment after base SAP ID determines category (IO-789 fix)
+        # 2. NEW FORMAT (concatenated): "2814I0397600101"
+        #    Suffix ending with "01" indicates planning (IO-740 fix)
         grouped_by_task = {
             "project_task": Decimal(0.000),
             "production_task": Decimal(0.000),
         }
         for cost in values:
             posid = cost["Posid"]
-            
-            # Determine if this is a planning task using robust logic:
-            # 1. Check for old format with dots (e.g., "2814I03976.01")
-            if ".01" in posid:
-                is_planning = True
-            # 2. Check for new format: Must be longer than base SAP ID, end with "01", and start with SAP ID
-            #    This prevents false positives for bare SAP IDs that happen to end in "01"
-            elif len(posid) > len(sap_id) and posid.endswith("01") and posid.startswith(sap_id):
-                is_planning = True
+            is_planning = False
+
+            if posid.startswith(sap_id):
+                suffix = posid[len(sap_id):]
             else:
-                is_planning = False
-            
+                suffix = ""
+
+            if "." in suffix:
+                segments = suffix.split(".")
+                first_segment = next((s for s in segments if s), None)
+                is_planning = (first_segment == "01")
+            elif len(suffix) >= 3:
+                # Check first 3 digits after SAP ID (which corresponds to the subproject)
+                # 001 = Planning (.01)
+                subproject = suffix[:3]
+                if subproject == "001":
+                     is_planning = True
+                elif subproject in ["002", "003", "004", "005", "006", "099"]:
+                     # Explicit construction phases
+                     is_planning = False
+                else:
+                     # Fallback (e.g. 000): check task suffix
+                     is_planning = suffix.endswith("01")
+
             group_id = "project_task" if is_planning else "production_task"
             grouped_by_task[group_id] += Decimal(cost["Wkgbtr"])
-        
+
         return grouped_by_task
 
     def __log_response_error(self, response: requests.Response, id: str) -> None:
@@ -384,7 +388,7 @@ class SapApiService:
         logger.error(
             f"SAP responded with response.json() '{response.json()}' for given id '{id}'"
         )
-   
+
     def __make_sap_request(self, api_url, id, type):
         """Helper method to fetch costs from SAP"""
         start_time = time.perf_counter()
@@ -409,14 +413,14 @@ class SapApiService:
 
         else:
             return response.json()["d"]["results"]
-    
+
     def validate_costs_and_commitments(self, costs_and_commitments) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
             return True
-        
+
         else:
             return False
-        
+
     def __start_and_finish_log_print(self, sync_group, group_id, sap_id, project_id_list, is_start, handling_time=None):
         if (is_start):
             if sync_group:
