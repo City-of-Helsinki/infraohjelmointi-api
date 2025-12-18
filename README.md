@@ -116,6 +116,32 @@ Import new person information into responsible persons list. The list can be fou
   python manage.py responsiblepersons --file path/to/filename.xlsx
   ```
 
+### Import Talpa reference data
+
+Import Talpa project number ranges, service classes, and asset classes from the official Talpa Excel file:
+
+  ```bash
+  python manage.py talpaimporter --file path/to/Projektin_avauslomake_Infra.xlsx
+  ```
+
+Or using the import script:
+
+  ```bash
+  ./import-excels.sh -t path/to/Projektin_avauslomake_Infra.xlsx
+  ```
+
+Use `--dry-run` to preview changes before importing:
+
+  ```bash
+  python manage.py talpaimporter --file path/to/excel.xlsx --dry-run
+  ```
+
+Additional options:
+- `--clear-existing`: Clear all existing Talpa reference data before importing
+- `--skip-ranges`: Skip importing project number ranges
+- `--skip-services`: Skip importing service classes
+- `--skip-assets`: Skip importing asset classes
+
 ### Updates to database
 
 These adds missing or modifies existing data.

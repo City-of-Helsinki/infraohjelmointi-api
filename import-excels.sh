@@ -2,7 +2,7 @@
 
 set -e
 
-while getopts 'c:d:p:h' opt; do
+while getopts 'c:d:p:t:h' opt; do
   case "$opt" in
     c)
         arg="$OPTARG"
@@ -31,18 +31,24 @@ while getopts 'c:d:p:h' opt; do
         python manage.py programmerimporter --file ${OPTARG}
         ;;
 
+    t)
+        arg="$OPTARG"
+        echo "Processing Talpa reference data from '${OPTARG}' file"
+        python manage.py talpaimporter --file ${OPTARG}
+        ;;
+
     h)
-        echo "Usage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx]"
+        echo "Usage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx] [-t /path/to/talpa.xlsx]"
         exit 0
         ;;
 
     :)
-        echo -e "option requires an argument.\nUsage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx]"
+        echo -e "option requires an argument.\nUsage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx] [-t /path/to/talpa.xlsx]"
         exit 1
         ;;
 
     ?)
-        echo -e "Invalid command option.\nUsage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx]"
+        echo -e "Invalid command option.\nUsage: $(basename $0) [-c /path/to/classes.xslx] [-d /path/to/excels/files] [-p /path/to/programmers.xlsx] [-t /path/to/talpa.xlsx]"
         exit 1
         ;;
   esac

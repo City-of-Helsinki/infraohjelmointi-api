@@ -76,43 +76,51 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             projectClass=self.project_class,
         )
 
-        # Create test TalpaProjectType
-        self.talpa_project_type = TalpaProjectType.objects.create(
+        # Get available TalpaProjectType (populated by migration) or create if not exists
+        self.talpa_project_type, _ = TalpaProjectType.objects.get_or_create(
             code="8 03 01 01",
-            name="Katujen uudisrakentaminen",
-            category="KADUT, LIIKENNEVÄYLÄT JA RADAT",
             priority="Normaali",
-            isActive=True
+            defaults={
+                "name": "Katujen uudisrakentaminen",
+                "category": "KADUT, LIIKENNEVÄYLÄT JA RADAT",
+                "isActive": True
+            }
         )
 
-        # Create test TalpaServiceClass
-        self.talpa_service_class = TalpaServiceClass.objects.create(
+        # Get available TalpaServiceClass (populated by migration) or create if not exists
+        self.talpa_service_class, _ = TalpaServiceClass.objects.get_or_create(
             code="4601",
-            name="Kadut ja yleiset alueet",
-            projectTypePrefix="2814I",
-            isActive=True
+            defaults={
+                "name": "Kadut ja yleiset alueet",
+                "projectTypePrefix": "2814I",
+                "isActive": True
+            }
         )
 
-        # Create test TalpaAssetClass
-        self.talpa_asset_class = TalpaAssetClass.objects.create(
+        # Get available TalpaAssetClass (populated by migration) or create if not exists
+        self.talpa_asset_class, _ = TalpaAssetClass.objects.get_or_create(
             componentClass="8103000",
             account="103000",
-            name="Maa- ja vesialueet",
-            category="Kiinteät rakenteet ja laitteet",
-            isActive=True
+            defaults={
+                "name": "Maa- ja vesialueet",
+                "category": "Kiinteät rakenteet ja laitteet",
+                "isActive": True
+            }
         )
 
-        # Create test TalpaProjectNumberRange
-        self.talpa_project_number_range = TalpaProjectNumberRange.objects.create(
+        # Get available TalpaProjectNumberRange (populated by migration) or create if not exists
+        self.talpa_project_number_range, _ = TalpaProjectNumberRange.objects.get_or_create(
             projectTypePrefix="2814I",
-            budgetAccount="8 03 01 01",
-            budgetAccountNumber="2814100000",
             rangeStart="2814100003",
             rangeEnd="2814100300",
-            majorDistrict="01",
-            majorDistrictName="Eteläinen",
-            area="011 Keskusta",
-            isActive=True
+            defaults={
+                "budgetAccount": "8 03 01 01",
+                "budgetAccountNumber": "2814100000",
+                "majorDistrict": "01",
+                "majorDistrictName": "Eteläinen",
+                "area": "011 Keskusta",
+                "isActive": True
+            }
         )
 
     def test_create_talpa_opening(self):

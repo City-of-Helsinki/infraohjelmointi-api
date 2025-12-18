@@ -10,7 +10,7 @@ class TalpaProjectTypeSerializer(serializers.ModelSerializer):
     """Serializer for TalpaProjectType in dropdowns"""
     class Meta:
         model = TalpaProjectType
-        fields = ["id", "code", "name", "category", "priority", "description", "isActive", "notes"]
+        fields = ["id", "code", "name", "category", "priority", "description", "sortOrder", "isActive", "notes"]
 
 
 class TalpaServiceClassSerializer(serializers.ModelSerializer):
@@ -32,7 +32,7 @@ class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TalpaProjectNumberRange
         fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd",
-                  "majorDistrict", "majorDistrictName", "area", "unit", "isActive"]
+                  "majorDistrict", "majorDistrictName", "area", "unit", "notes", "isActive"]
         ref_name = "TalpaProjectNumberRangeNested"
 
 

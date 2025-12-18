@@ -57,32 +57,40 @@ class TalpaExcelServiceTestCase(TestCase):
             projectClass=self.project_class,
         )
         
-        self.talpa_project_type = TalpaProjectType.objects.create(
+        self.talpa_project_type, _ = TalpaProjectType.objects.get_or_create(
             code="INV",
-            name="Infrastructure Investment",
-            category="INVESTMENT",
             priority="03",
+            defaults={
+                "name": "Infrastructure Investment",
+                "category": "INVESTMENT",
+            }
         )
         
-        self.talpa_service_class = TalpaServiceClass.objects.create(
+        self.talpa_service_class, _ = TalpaServiceClass.objects.get_or_create(
             code="4601",
-            name="Test Service",
-            projectTypePrefix="2814I",
+            defaults={
+                "name": "Test Service",
+                "projectTypePrefix": "2814I",
+            }
         )
         
-        self.talpa_asset_class = TalpaAssetClass.objects.create(
+        self.talpa_asset_class, _ = TalpaAssetClass.objects.get_or_create(
             componentClass="K1230000",
             account="1230000",
-            name="Test Asset",
-            holdingPeriodYears=10,
+            defaults={
+                "name": "Test Asset",
+                "holdingPeriodYears": 10,
+            }
         )
         
-        self.talpa_range = TalpaProjectNumberRange.objects.create(
+        self.talpa_range, _ = TalpaProjectNumberRange.objects.get_or_create(
             projectTypePrefix="2814I",
             rangeStart="2814I01000",
             rangeEnd="2814I01599",
-            budgetAccount="8 03 01 01",
-            budgetAccountNumber="8030101",
+            defaults={
+                "budgetAccount": "8 03 01 01",
+                "budgetAccountNumber": "8030101",
+            }
         )
 
     def test_generate_excel_creates_valid_file(self):
