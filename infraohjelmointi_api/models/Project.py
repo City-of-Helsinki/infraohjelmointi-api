@@ -70,8 +70,8 @@ class Project(models.Model):
     )
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
-    postalCode = models.CharField(max_length=20, blank=True, null=True)
-    city = models.CharField(max_length=200, blank=True, null=True)
+    postalCode = models.CharField(max_length=20, blank=True)
+    city = models.CharField(max_length=200, blank=True)
     otherPersons = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(max_length=1000, blank=False, null=False)
     personPlanning = models.ForeignKey(
@@ -268,8 +268,12 @@ class Project(models.Model):
             self.address = self._strip_whitespaces(self.address)
         if self.postalCode:
             self.postalCode = self._strip_whitespaces(self.postalCode)
+        else:
+            self.postalCode = ""
         if self.city:
             self.city = self._strip_whitespaces(self.city)
+        else:
+            self.city = ""
         if self.entityName:
             self.entityName = self._strip_whitespaces(self.entityName)
         if self.neighborhood:
