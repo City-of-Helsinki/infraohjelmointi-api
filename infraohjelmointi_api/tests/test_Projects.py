@@ -933,6 +933,8 @@ class ProjectTestCase(TestCase):
         data = {
             "name": "   test      project.  name   ",
             "address": "  Address.    works   for me.",
+            "postalCode": "  00100   ",
+            "city": "  Helsinki   Center  ",
             "description": " random Description   works.  yes    ",
             "entityName": "Entity Name",
             "delays": "    100 delays   .",
@@ -943,6 +945,8 @@ class ProjectTestCase(TestCase):
         validData = {
             "name": "test project. name",
             "address": "Address. works for me.",
+            "postalCode": "00100",
+            "city": "Helsinki Center",
             "description": "random Description works. yes",
             "entityName": "Entity Name",
             "delays": "100 delays .",
@@ -974,6 +978,16 @@ class ProjectTestCase(TestCase):
             res_data["address"],
             validData["address"],
             msg="Field: address not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["postalCode"],
+            validData["postalCode"],
+            msg="Field: postalCode not trimmed successfully",
+        )
+        self.assertEqual(
+            res_data["city"],
+            validData["city"],
+            msg="Field: city not trimmed successfully",
         )
         self.assertEqual(
             res_data["description"],
