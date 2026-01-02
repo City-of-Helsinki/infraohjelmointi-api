@@ -11,12 +11,13 @@ from infraohjelmointi_api.serializers import (
 )
 from .services import ClassFinancialService, ProjectService, LocationFinancialService
 from .services.CacheService import CacheService
-from .models import ProjectFinancial
 from django.dispatch import receiver
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, pre_save
 from django_eventstream import send_event
+from .models import ProjectFinancial, ProjectCategory, ProjectPhase
 
 logger = logging.getLogger("infraohjelmointi_api")
+
 
 
 def on_transaction_commit(func):
@@ -464,3 +465,28 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
         f"TalpaProjectOpening status updated to 'project_number_opened' for project {instance.id} "
         f"(sapProject: {instance.sapProject})"
     )
+
+@receiver(pre_save, sender=Project)
+def on_project_phase_change(sender, instance, **kwargs):
+    """
+    Update category to K1 if phase is changed to construction
+    """
+    # Only act if target phase is construction
+    if not instance.phase or instance.phase.value != "construction":
+        return
+
+    try:
+        # Check if this is an update and the phase was already construction
+        if instance.id:
+            try:
+                old_instance = Project.objects.get(pk=instance.id)
+                if old_instance.phase and old_instance.phase.value == "construction":
+                    return
+            except Project.DoesNotExist:
+                pass
+
+        # Apply K1 category
+        instance.category = ProjectCategory.objects.get(value="K1")
+
+    except Exception as e:
+        logger.error(f"Error in on_project_phase_change: {e}")
