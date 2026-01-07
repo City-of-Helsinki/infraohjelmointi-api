@@ -9,6 +9,7 @@ from .ProjectArea import ProjectArea
 from .BudgetItem import BudgetItem
 from .Person import Person
 from .ProjectType import ProjectType
+from .ProjectTypeQualifier import ProjectTypeQualifier
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
@@ -68,6 +69,9 @@ class Project(models.Model):
     )
     type = models.ForeignKey(
         ProjectType, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    typeQualifier = models.ForeignKey(
+        ProjectTypeQualifier, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)

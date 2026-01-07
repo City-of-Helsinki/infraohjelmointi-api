@@ -51,6 +51,7 @@ from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
     ProjectSetCreateSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
+from infraohjelmointi_api.serializers.ProjectTypeQualifierSerializer import ProjectTypeQualifierSerializer
 from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
@@ -350,6 +351,11 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
         rep["type"] = (
             ProjectTypeSerializer(instance.type).data if instance.type != None else None
+        )
+        rep["typeQualifier"] = (
+            ProjectTypeQualifierSerializer(instance.typeQualifier).data
+            if instance.typeQualifier != None
+            else None
         )
         rep["priority"] = (
             ProjectPrioritySerializer(instance.priority).data

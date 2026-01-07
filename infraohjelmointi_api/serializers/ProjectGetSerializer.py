@@ -47,6 +47,7 @@ from infraohjelmointi_api.serializers.ProjectSetCreateSerializer import (
     ProjectSetCreateSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectTypeSerializer import ProjectTypeSerializer
+from infraohjelmointi_api.serializers.ProjectTypeQualifierSerializer import ProjectTypeQualifierSerializer
 from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
     ProjectWithFinancesSerializer,
 )
@@ -71,6 +72,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     siteId = BudgetItemSerializer(read_only=True)
     area = ProjectAreaSerializer(read_only=True)
     type = ProjectTypeSerializer(read_only=True)
+    typeQualifier = ProjectTypeQualifierSerializer(read_only=True)
     priority = ProjectPrioritySerializer(read_only=True)
     phase = ProjectPhaseSerializer(read_only=True)
     personPlanning = PersonSerializer(read_only=True)

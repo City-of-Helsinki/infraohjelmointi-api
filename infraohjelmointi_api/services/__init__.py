@@ -10,6 +10,7 @@ from .ProjectPhaseService import ProjectPhaseService
 from .ProjectAreaService import ProjectAreaService
 from .ResponsibleZoneService import ResponsibleZoneService
 from .ProjectTypeService import ProjectTypeService
+from .ProjectTypeQualifierService import ProjectTypeQualifierService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from .ConstructionProcurementMethodService import ConstructionProcurementMethodService
 from .ProjectCategoryService import ProjectCategoryService
