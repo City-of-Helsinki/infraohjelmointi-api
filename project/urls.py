@@ -48,6 +48,11 @@ router.register(
     basename="constructionPhaseDetails",
 )
 router.register(
+    r"construction-procurement-methods",
+    views.ConstructionProcurementMethodViewSet,
+    basename="constructionProcurementMethods",
+)
+router.register(
     r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
 )
 router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")

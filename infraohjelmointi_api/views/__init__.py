@@ -14,6 +14,7 @@ from .ProjectViewSet import *
 from .TaskStatusViewSet import *
 from .ProjectTypeViewSet import *
 from .ConstructionPhaseDetailViewSet import *
+from .ConstructionProcurementMethodViewSet import *
 from .ProjectCategoryViewSet import *
 from .ProjectRiskViewSet import *
 from .ProjectPhaseViewSet import *

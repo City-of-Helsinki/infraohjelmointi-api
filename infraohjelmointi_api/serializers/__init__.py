@@ -1,6 +1,7 @@
 from .BaseMeta import BaseMeta
 from .BudgetItemSerializer import BudgetItemSerializer
 from .ConstructionPhaseDetailSerializer import ConstructionPhaseDetailSerializer
+from .ConstructionProcurementMethodSerializer import ConstructionProcurementMethodSerializer
 from .ConstructionPhaseSerializer import ConstructionPhaseSerializer
 from .DynamicFieldsModelSerializer import DynamicFieldsModelSerializer
 from .NoteCreateSerializer import NoteCreateSerializer

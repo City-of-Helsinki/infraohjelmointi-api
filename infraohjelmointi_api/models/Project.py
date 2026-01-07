@@ -12,6 +12,7 @@ from .ProjectType import ProjectType
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
@@ -108,6 +109,9 @@ class Project(models.Model):
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.ForeignKey(
         ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    constructionProcurementMethod = models.ForeignKey(
+        ConstructionProcurementMethod, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     planningStartYear = models.PositiveIntegerField(
         blank=True,
