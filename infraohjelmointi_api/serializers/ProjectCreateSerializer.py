@@ -21,6 +21,9 @@ from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSeri
 from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
     ConstructionPhaseDetailSerializer,
 )
+from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
+    ConstructionProcurementMethodSerializer,
+)
 from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import (
     ConstructionPhaseSerializer,
 )
@@ -391,6 +394,11 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         rep["constructionPhaseDetail"] = (
             ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
             if instance.constructionPhaseDetail != None
+            else None
+        )
+        rep["constructionProcurementMethod"] = (
+            ConstructionProcurementMethodSerializer(instance.constructionProcurementMethod).data
+            if instance.constructionProcurementMethod != None
             else None
         )
         rep["constructionPhase"] = (

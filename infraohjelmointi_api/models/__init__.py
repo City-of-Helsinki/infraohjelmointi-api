@@ -10,6 +10,7 @@ from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel

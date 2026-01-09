@@ -17,6 +17,9 @@ from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSeri
 from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
     ConstructionPhaseDetailSerializer,
 )
+from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
+    ConstructionProcurementMethodSerializer,
+)
 from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import (
     ConstructionPhaseSerializer,
 )
@@ -79,6 +82,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     frameEstPlanningEnd = serializers.DateField(format="%d.%m.%Y")
     category = ProjectCategorySerializer(read_only=True)
     constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
+    constructionProcurementMethod = ConstructionProcurementMethodSerializer(read_only=True)
     riskAssessment = ProjectRiskSerializer(read_only=True)
     estConstructionStart = serializers.DateField(format="%d.%m.%Y")
     estConstructionEnd = serializers.DateField(format="%d.%m.%Y")

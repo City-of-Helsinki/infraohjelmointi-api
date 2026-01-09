@@ -11,6 +11,7 @@ from .ProjectAreaService import ProjectAreaService
 from .ResponsibleZoneService import ResponsibleZoneService
 from .ProjectTypeService import ProjectTypeService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
+from .ConstructionProcurementMethodService import ConstructionProcurementMethodService
 from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
 from .ClassFinancialService import ClassFinancialService
