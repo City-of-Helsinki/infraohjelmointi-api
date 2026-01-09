@@ -8,24 +8,21 @@ class TalpaExcelService:
     """Generates Projektin avauslomake Infra Excel for Talpa submission."""
 
     COLUMNS = [
-        ("A", "Talousarviokohdan numero", "budgetAccount", 25),
-        ("B", "Projektinumeroväli", "_numberRange", 25),
-        ("C", "Malliprojekti", "templateProject", 15),
-        ("D", "Laji", "_typeCode", 10),
-        ("E", "Prioriteetti", "_typePriority", 12),
-        ("F", "SAP nimi", "projectName", 25),
-        ("G", "Projekti alkaa", "_startDate", 15),
-        ("H", "Projekti päättyy", "_endDate", 15),
-        ("I", "Osoite", "streetAddress", 30),
-        ("J", "Postinumero", "postalCode", 12),
-        ("K", "Vastuuhenkilö", "responsiblePerson", 25),
-        ("L", "Palveluluokka", "_serviceCode", 15),
-        ("M", "Käyttöomaisuusluokka", "_assetComponent", 20),
+        ("A", "Talousarviokohdan numero", "_budgetAccountNumber", 25),
+        ("B", "Talousarviokohdan nimi", "_budgetAccountName", 25),
+        ("C", "Projektinumeroväli", "_numberRange", 25),
+        ("D", "Malliprojekti", "templateProject", 15),
+        ("E", "Laji", "_typeCode", 10),
+        ("F", "Prioriteetti", "_typePriority", 12),
+        ("G", "SAP nimi", "projectName", 25),
+        ("H", "Osoite+postinumero", "_addressFull", 30),
+        ("I", "Projekti alkaa -päättyy, huom.takuuaika", "_scheduleFull", 30),
+        ("J", "Vastuuhenkilö", "responsiblePerson", 25),
+        ("K", "Palveluluokka", "_serviceCode", 15),
+        ("L", "Käyttöomaisuusluokat", "_assetComponent", 20),
+        ("M", "Invest. profiili", "investmentProfile", 15),
         ("N", "Profiilin nimi", "profileName", 30),
-        ("O", "Pitoaika", "_holdingPeriod", 10),
-        ("P", "Invest. profiili", "investmentProfile", 15),
-        ("Q", "Valmius", "readiness", 10),
-        ("R", "Yksikkö", "unit", 10),
+        ("O", "Valmius", "readiness", 10),
     ]
 
     HEADER_STYLE = {
@@ -51,6 +48,20 @@ class TalpaExcelService:
         return str(value) if value is not None else ""
 
     def _get_computed(self, opening, field: str) -> str:
+        if field == "_budgetAccountNumber":
+            # Extract number from "8 03 01 02 Perusparantaminen..."
+            val = opening.budgetAccount or ""
+            parts = val.split(" ")
+            if len(parts) >= 4:
+                return " ".join(parts[0:4])
+            return val
+        if field == "_budgetAccountName":
+            # Extract name part after the number
+            val = opening.budgetAccount or ""
+            parts = val.split(" ")
+            if len(parts) >= 5:
+                return " ".join(parts[4:]).strip()
+            return ""
         if field == "_numberRange" and opening.projectNumberRange:
             r = opening.projectNumberRange
             return f"{r.rangeStart} - {r.rangeEnd}"
@@ -58,17 +69,20 @@ class TalpaExcelService:
             return opening.projectType.code or ""
         if field == "_typePriority" and opening.projectType:
             return opening.projectType.priority or ""
-        if field == "_startDate" and opening.projectStartDate:
-            return opening.projectStartDate.strftime("%d.%m.%Y")
-        if field == "_endDate" and opening.projectEndDate:
-            return opening.projectEndDate.strftime("%d.%m.%Y")
+        if field == "_addressFull":
+            addr = opening.streetAddress or ""
+            zip_code = opening.postalCode or ""
+            return f"{addr} {zip_code}".strip()
+        if field == "_scheduleFull":
+            start = opening.projectStartDate.strftime("%d.%m.%Y") if opening.projectStartDate else ""
+            end = opening.projectEndDate.strftime("%d.%m.%Y") if opening.projectEndDate else ""
+            if start or end:
+                return f"{start} - {end}"
+            return ""
         if field == "_serviceCode" and opening.serviceClass:
             return opening.serviceClass.code or ""
         if field == "_assetComponent" and opening.assetClass:
             return opening.assetClass.componentClass or ""
-        if field == "_holdingPeriod" and opening.assetClass:
-            years = opening.assetClass.holdingPeriodYears
-            return str(years) if years else ""
         return ""
 
     def generate_excel(self, opening) -> BytesIO:

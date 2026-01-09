@@ -100,7 +100,7 @@ class TalpaExcelServiceTestCase(TestCase):
             projectName="Test Project Name",
             projectType=self.talpa_project_type,
             projectNumberRange=self.talpa_range,
-            budgetAccount="8 03 01 01",
+            budgetAccount="8 03 01 01 Test Budget",
             templateProject="2814I00000",
             projectStartDate=date(2026, 1, 15),
             projectEndDate=date(2032, 12, 31),
@@ -125,7 +125,7 @@ class TalpaExcelServiceTestCase(TestCase):
         
         self.assertEqual(ws.title, "Projektin avauslomake")
         self.assertEqual(ws.max_row, 2)
-        self.assertEqual(ws.max_column, 18)
+        self.assertEqual(ws.max_column, 15)
 
     def test_generate_excel_has_all_columns(self):
         opening = TalpaProjectOpening.objects.create(
@@ -143,23 +143,20 @@ class TalpaExcelServiceTestCase(TestCase):
         
         expected_headers = [
             "Talousarviokohdan numero",
+            "Talousarviokohdan nimi",
             "Projektinumeroväli",
             "Malliprojekti",
             "Laji",
             "Prioriteetti",
             "SAP nimi",
-            "Projekti alkaa",
-            "Projekti päättyy",
-            "Osoite",
-            "Postinumero",
+            "Osoite+postinumero",
+            "Projekti alkaa -päättyy, huom.takuuaika",
             "Vastuuhenkilö",
             "Palveluluokka",
-            "Käyttöomaisuusluokka",
-            "Profiilin nimi",
-            "Pitoaika",
+            "Käyttöomaisuusluokat",
             "Invest. profiili",
+            "Profiilin nimi",
             "Valmius",
-            "Yksikkö",
         ]
         
         headers = [cell.value for cell in ws[1]]
@@ -181,11 +178,9 @@ class TalpaExcelServiceTestCase(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
         
-        start_date = ws["G2"].value
-        end_date = ws["H2"].value
+        schedule = ws["I2"].value
         
-        self.assertEqual(start_date, "15.03.2026")
-        self.assertEqual(end_date, "30.11.2032")
+        self.assertEqual(schedule, "15.03.2026 - 30.11.2032")
 
     def test_generate_excel_computed_fields(self):
         opening = TalpaProjectOpening.objects.create(
@@ -194,8 +189,11 @@ class TalpaExcelServiceTestCase(TestCase):
             projectName="Test",
             projectType=self.talpa_project_type,
             projectNumberRange=self.talpa_range,
+            budgetAccount="8 03 01 02 Perusparantaminen",
             serviceClass=self.talpa_service_class,
             assetClass=self.talpa_asset_class,
+            streetAddress="Main Street 5",
+            postalCode="00100",
         )
         
         excel_file = self.service.generate_excel(opening)
@@ -203,19 +201,23 @@ class TalpaExcelServiceTestCase(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
         
-        number_range = ws["B2"].value
-        type_code = ws["D2"].value
-        type_priority = ws["E2"].value
-        service_code = ws["L2"].value
-        asset_component = ws["M2"].value
-        holding_period = ws["O2"].value
+        budget_num = ws["A2"].value
+        budget_name = ws["B2"].value
+        number_range = ws["C2"].value
+        type_code = ws["E2"].value
+        type_priority = ws["F2"].value
+        address_full = ws["H2"].value
+        service_code = ws["K2"].value
+        asset_component = ws["L2"].value
         
+        self.assertEqual(budget_num, "8 03 01 02")
+        self.assertEqual(budget_name, "Perusparantaminen")
         self.assertEqual(number_range, "2814I01000 - 2814I01599")
         self.assertEqual(type_code, "INV")
         self.assertEqual(type_priority, "03")
+        self.assertEqual(address_full, "Main Street 5 00100")
         self.assertEqual(service_code, "4601")
         self.assertEqual(asset_component, "K1230000")
-        self.assertEqual(holding_period, "10")
 
     def test_generate_excel_empty_fields(self):
         opening = TalpaProjectOpening.objects.create(
@@ -231,9 +233,8 @@ class TalpaExcelServiceTestCase(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
         
-        self.assertIn(ws["I2"].value, [None, ""])
+        self.assertIn(ws["H2"].value, [None, ""])
         self.assertIn(ws["J2"].value, [None, ""])
-        self.assertIn(ws["K2"].value, [None, ""])
 
     def test_generate_batch_excel(self):
         project2 = Project.objects.create(
@@ -267,8 +268,8 @@ class TalpaExcelServiceTestCase(TestCase):
         ws = wb.active
         
         self.assertEqual(ws.max_row, 3)
-        self.assertEqual(ws["F2"].value, "Test 1")
-        self.assertEqual(ws["F3"].value, "Test 2")
+        self.assertEqual(ws["G2"].value, "Test 1")
+        self.assertEqual(ws["G3"].value, "Test 2")
 
     def test_get_filename_with_project_name(self):
         opening = TalpaProjectOpening.objects.create(

@@ -687,7 +687,6 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
         ws = wb.active
 
         self.assertEqual(ws.title, "Projektin avauslomake")
-        self.assertEqual(ws["F2"].value, "Test Project")
-        self.assertEqual(ws["G2"].value, "15.01.2026")
-        self.assertEqual(ws["H2"].value, "31.12.2032")
+        self.assertEqual(ws["G2"].value, "Test Project")
+        self.assertEqual(ws["I2"].value, "15.01.2026 - 31.12.2032")
 
