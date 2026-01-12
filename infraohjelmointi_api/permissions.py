@@ -15,6 +15,7 @@ DJANGO_BASE_READ_ONLY_ACTIONS = ["list", "retrieve"]
 DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
     "update",
     "partial_update",
+    "send_to_talpa",
 ]
 DJANGO_BASE_CREATE_ONLY_ACTIONS = ["create"]
 DJANGO_BASE_DELETE_ONLY_ACTIONS = ["destroy"]
