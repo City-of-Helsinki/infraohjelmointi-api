@@ -40,6 +40,9 @@ class TalpaProjectNumberRange(models.Model):
     contactEmail = models.EmailField(blank=True, null=True)  # For MAKE ranges
     transferNote = models.TextField(blank=True, null=True)  # Siirtohuomautus for SAP ranges
     notes = models.TextField(blank=True, null=True)  # Transfer notes, special instructions
+    groupLabel = models.CharField(
+        max_length=200, blank=True, null=True
+    )  # Computed group label for UI dropdown grouping (e.g., "8 03 01 01 Katujen uudisrakentaminen")
     isActive = models.BooleanField(default=True)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
