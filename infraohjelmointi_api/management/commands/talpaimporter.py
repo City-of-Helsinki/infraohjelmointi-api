@@ -611,7 +611,13 @@ class Command(BaseCommand):
             if col_a and col_a.startswith('8 '):
                 current_budget_account = col_a
             if col_b and col_b not in ['', 'None']:
-                current_area = col_b
+                # Allow overriding area names with cleaner versions
+                replacements = {
+                    'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
+                    'Malmi (kenttä)': 'Malminkenttä',
+                    'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.'
+                }
+                current_area = replacements.get(col_b, col_b)
             
             # Validate unit
             valid_units = ['Tontit', 'Mao', 'Geo']
@@ -649,11 +655,20 @@ class Command(BaseCommand):
             if not range_start.startswith('2814'):
                 return None
 
-            if range_start.startswith('2814I') or 'I' in range_start[4:5].upper():
+            # Detect project type prefix:
+            # - "2814I..." or has 'I' at position 4-5 → 2814I
+            # - "2814E..." or has 'E' at position 4-5 → 2814E
+            # - Numeric format "2814100003" (10 digits, no letter) → 2814I (SAP format)
+            # - Default to 2814I for backward compatibility
+            if range_start.startswith('2814I') or (len(range_start) > 4 and range_start[4:5].upper() == 'I'):
                 project_type_prefix = '2814I'
-            elif range_start.startswith('2814E') or 'E' in range_start[4:5].upper():
+            elif range_start.startswith('2814E') or (len(range_start) > 4 and range_start[4:5].upper() == 'E'):
                 project_type_prefix = '2814E'
+            elif len(range_start) == 10 and range_start.isdigit():
+                # Numeric 10-digit format (e.g., "2814100003") is 2814I (SAP format)
+                project_type_prefix = '2814I'
             else:
+                # Default to 2814I for backward compatibility
                 project_type_prefix = '2814I'
 
             district_code = None
