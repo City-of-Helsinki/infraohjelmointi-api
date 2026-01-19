@@ -13,6 +13,7 @@ from .ConstructionPhaseViewSet import *
 from .ProjectViewSet import *
 from .TaskStatusViewSet import *
 from .ProjectTypeViewSet import *
+from .ProjectTypeQualifierViewSet import *
 from .ConstructionPhaseDetailViewSet import *
 from .ConstructionProcurementMethodViewSet import *
 from .ProjectCategoryViewSet import *

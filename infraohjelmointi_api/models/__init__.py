@@ -3,6 +3,7 @@ from .ProjectSet import ProjectSet
 from .Project import Project
 from .BudgetItem import BudgetItem
 from .ProjectType import ProjectType
+from .ProjectTypeQualifier import ProjectTypeQualifier
 from .ProjectArea import ProjectArea
 from .Task import Task
 from .ProjectPhase import ProjectPhase
