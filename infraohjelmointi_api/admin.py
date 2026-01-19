@@ -1,11 +1,13 @@
 from django.contrib import admin
 
 from infraohjelmointi_api import models
+from infraohjelmointi_api.models.ClassProgrammerAssignment import ClassProgrammerAssignmentAdmin
 
 admin.site.register(models.Project)
 admin.site.register(models.ProjectArea)
 admin.site.register(models.ProjectSet)
 admin.site.register(models.ProjectType)
+admin.site.register(models.ProjectTypeQualifier)
 admin.site.register(models.BudgetItem)
 admin.site.register(models.Task)
 admin.site.register(models.Person)
@@ -13,6 +15,7 @@ admin.site.register(models.ProjectPhase)
 admin.site.register(models.ProjectPriority)
 admin.site.register(models.ConstructionPhase)
 admin.site.register(models.ConstructionPhaseDetail)
+admin.site.register(models.ConstructionProcurementMethod)
 admin.site.register(models.Note)
 admin.site.register(models.PlanningPhase)
 admin.site.register(models.ProjectCategory)
@@ -30,3 +33,4 @@ admin.site.register(models.AppStateValue)
 admin.site.register(models.SapCurrentYear)
 admin.site.register(models.AuditLog)
 admin.site.register(models.ProjectProgrammer)
+admin.site.register(models.ClassProgrammerAssignment, ClassProgrammerAssignmentAdmin)

@@ -30,6 +30,7 @@ apirouter = api_router()
 router = routers.DefaultRouter()
 router.register(r"projects", views.ProjectViewSet, basename="projects")
 router.register(r"project-types", views.ProjectTypeViewSet, basename="projectTypes")
+router.register(r"project-type-qualifiers", views.ProjectTypeQualifierViewSet, basename="typeQualifiers")
 router.register(r"projects-mock", views.MockProjectViewSet, basename="projectsMock")
 router.register(r"persons", views.PersonViewSet, basename="persons")
 router.register(r"project-districts", views.ProjectDistrictViewSet, basename="projectDistricts")
@@ -46,6 +47,11 @@ router.register(
     r"construction-phase-details",
     views.ConstructionPhaseDetailViewSet,
     basename="constructionPhaseDetails",
+)
+router.register(
+    r"construction-procurement-methods",
+    views.ConstructionProcurementMethodViewSet,
+    basename="constructionProcurementMethods",
 )
 router.register(
     r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
@@ -157,6 +163,36 @@ router.register(
     r"audit-logs",
     views.AuditLogViewSet,
     basename="auditLogs"
+)
+
+router.register(
+    r"talpa-project-opening",
+    views.TalpaProjectOpeningViewSet,
+    basename="talpaProjectOpening"
+)
+
+router.register(
+    r"talpa-project-types",
+    views.TalpaProjectTypeViewSet,
+    basename="talpaProjectTypes"
+)
+
+router.register(
+    r"talpa-service-classes",
+    views.TalpaServiceClassViewSet,
+    basename="talpaServiceClasses"
+)
+
+router.register(
+    r"talpa-asset-classes",
+    views.TalpaAssetClassViewSet,
+    basename="talpaAssetClasses"
+)
+
+router.register(
+    r"talpa-project-ranges",
+    views.TalpaProjectNumberRangeViewSet,
+    basename="talpaProjectRanges"
 )
 
 schema_view = get_schema_view(

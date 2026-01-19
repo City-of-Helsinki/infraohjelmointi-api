@@ -2,7 +2,7 @@ from datetime import date
 import logging
 from django.db.models.signals import post_save
 from django.db import transaction
-from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation
+from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation, TalpaProjectOpening
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -11,12 +11,13 @@ from infraohjelmointi_api.serializers import (
 )
 from .services import ClassFinancialService, ProjectService, LocationFinancialService
 from .services.CacheService import CacheService
-from .models import ProjectFinancial
 from django.dispatch import receiver
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, pre_save
 from django_eventstream import send_event
+from .models import ProjectFinancial, ProjectCategory, ProjectPhase
 
 logger = logging.getLogger("infraohjelmointi_api")
+
 
 
 def on_transaction_commit(func):
@@ -419,3 +420,73 @@ def invalidate_project_cache(sender, instance, created, **kwargs):
         logger.error(f"Error invalidating cache for Project: {e}")
 
 
+
+
+@receiver(post_save, sender=Project)
+@on_transaction_commit
+def update_talpa_status_on_sap_project(sender, instance, created, update_fields, **kwargs):
+    """
+    Automatically update TalpaProjectOpening status to "project_number_opened"
+    when sapProject is set on a Project.
+
+    Only updates if:
+    1. sapProject actually changed (was None/empty, now has value)
+    2. TalpaProjectOpening exists for this project
+    3. Current status is "sent_to_talpa" (locked)
+    """
+    # Only process if sapProject was updated
+    if update_fields and "sapProject" not in update_fields:
+        return
+
+    # Only process if sapProject is set (not None/empty)
+    if not instance.sapProject:
+        return
+
+    try:
+        talpa_opening = TalpaProjectOpening.objects.get(project=instance)
+    except TalpaProjectOpening.DoesNotExist:
+        # No Talpa opening for this project, nothing to do
+        return
+
+    # Only update if status is "sent_to_talpa" (locked)
+    if talpa_opening.status != "sent_to_talpa":
+        return
+
+    # Check if sapProject actually changed (was None/empty before)
+    # We can't easily check the old value here, so we'll update if status allows it
+    # The status check above ensures we only update locked forms
+
+    # Update status to "project_number_opened"
+    # Use update() to avoid triggering signals and validation
+    TalpaProjectOpening.objects.filter(pk=talpa_opening.pk).update(
+        status="project_number_opened"
+    )
+    logger.info(
+        f"TalpaProjectOpening status updated to 'project_number_opened' for project {instance.id} "
+        f"(sapProject: {instance.sapProject})"
+    )
+
+@receiver(pre_save, sender=Project)
+def on_project_phase_change(sender, instance, **kwargs):
+    """
+    Update category to K1 if phase is changed to construction
+    """
+    # Only act if target phase is construction
+    if not instance.phase or instance.phase.value != "construction":
+        return
+
+    try:
+        # Check if this is an update and the phase was already construction
+        if instance.id:
+            try:
+                old_instance = Project.objects.get(pk=instance.id)
+                if old_instance.phase and old_instance.phase.value == "construction":
+                    return
+            except Project.DoesNotExist:
+                pass
+
+        # Apply K1 category
+        instance.category = ProjectCategory.objects.get(value="K1")
+
+    except Exception as e:
+        logger.error(f"Error in on_project_phase_change: {e}")

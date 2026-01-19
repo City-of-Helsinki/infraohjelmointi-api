@@ -9,9 +9,11 @@ from .ProjectArea import ProjectArea
 from .BudgetItem import BudgetItem
 from .Person import Person
 from .ProjectType import ProjectType
+from .ProjectTypeQualifier import ProjectTypeQualifier
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
@@ -68,8 +70,13 @@ class Project(models.Model):
     type = models.ForeignKey(
         ProjectType, on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    typeQualifier = models.ForeignKey(
+        ProjectTypeQualifier, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     name = models.CharField(max_length=200, blank=False)
     address = models.CharField(max_length=250, blank=True, null=True)
+    postalCode = models.CharField(max_length=20, blank=True)
+    city = models.CharField(max_length=200, blank=True)
     otherPersons = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(max_length=1000, blank=False, null=False)
     personPlanning = models.ForeignKey(
@@ -106,6 +113,9 @@ class Project(models.Model):
     programmed = models.BooleanField(default=False)
     constructionPhaseDetail = models.ForeignKey(
         ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    constructionProcurementMethod = models.ForeignKey(
+        ConstructionProcurementMethod, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     planningStartYear = models.PositiveIntegerField(
         blank=True,
@@ -264,6 +274,14 @@ class Project(models.Model):
         self.description = self._strip_whitespaces(self.description)
         if self.address:
             self.address = self._strip_whitespaces(self.address)
+        if self.postalCode:
+            self.postalCode = self._strip_whitespaces(self.postalCode)
+        else:
+            self.postalCode = ""
+        if self.city:
+            self.city = self._strip_whitespaces(self.city)
+        else:
+            self.city = ""
         if self.entityName:
             self.entityName = self._strip_whitespaces(self.entityName)
         if self.neighborhood:

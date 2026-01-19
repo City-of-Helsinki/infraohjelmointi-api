@@ -10,7 +10,9 @@ from .ProjectPhaseService import ProjectPhaseService
 from .ProjectAreaService import ProjectAreaService
 from .ResponsibleZoneService import ResponsibleZoneService
 from .ProjectTypeService import ProjectTypeService
+from .ProjectTypeQualifierService import ProjectTypeQualifierService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
+from .ConstructionProcurementMethodService import ConstructionProcurementMethodService
 from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
 from .ClassFinancialService import ClassFinancialService
@@ -19,3 +21,4 @@ from .SapApiService import SapApiService
 from .SapCostService import SapCostService
 from .AppStateValueService import AppStateValueService
 from .CacheService import CacheService
+from .TalpaExcelService import TalpaExcelService

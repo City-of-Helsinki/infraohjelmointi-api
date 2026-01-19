@@ -3,6 +3,7 @@ from .ProjectSet import ProjectSet
 from .Project import Project
 from .BudgetItem import BudgetItem
 from .ProjectType import ProjectType
+from .ProjectTypeQualifier import ProjectTypeQualifier
 from .ProjectArea import ProjectArea
 from .Task import Task
 from .ProjectPhase import ProjectPhase
@@ -10,6 +11,7 @@ from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
@@ -34,3 +36,9 @@ from .SapBaseModel import SapBaseModel
 from .AuditLog import AuditLog
 from .BudgetOverrunReason import BudgetOverrunReason
 from .ProjectProgrammer import ProjectProgrammer
+from .TalpaProjectType import TalpaProjectType
+from .TalpaServiceClass import TalpaServiceClass
+from .TalpaAssetClass import TalpaAssetClass
+from .TalpaProjectNumberRange import TalpaProjectNumberRange
+from .TalpaProjectOpening import TalpaProjectOpening
+from .ClassProgrammerAssignment import ClassProgrammerAssignment

@@ -1,7 +1,7 @@
 from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectClass import ProjectClass
 from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
-from infraohjelmointi_api.models import ProjectProgrammer
+from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssignment
 from rest_framework import permissions
 from django.conf import settings
 
@@ -15,6 +15,7 @@ DJANGO_BASE_READ_ONLY_ACTIONS = ["list", "retrieve"]
 DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
     "update",
     "partial_update",
+    "send_to_talpa",
 ]
 DJANGO_BASE_CREATE_ONLY_ACTIONS = ["create"]
 DJANGO_BASE_DELETE_ONLY_ACTIONS = ["destroy"]
@@ -479,47 +480,44 @@ class IsClassProgrammer(permissions.BasePermission):
         )
 
     def get_user_assigned_classes(self, request):
-        """Get project classes assigned to this user via email matching"""
+        """Get project classes assigned to this user."""
+        assigned_classes_ids = set()
 
+        # 1. Primary: Direct ClassProgrammerAssignment lookup
+        direct_assignments = ClassProgrammerAssignment.objects.filter(user=request.user)
+        assigned_classes_ids.update(direct_assignments.values_list('project_class__id', flat=True))
+
+        # 2. Fallback: Legacy email -> name matching
         # Extract name from email with robust parsing
         user_email = request.user.email
-        if not user_email or '@' not in user_email:
-            return []
+        if user_email and '@' in user_email:
+            # Get username part before @
+            username = user_email.split('@')[0]
 
-        # Get username part before @
-        username = user_email.split('@')[0]
+            # Handle various email formats
+            if '.' in username:
+                # Split by dots and clean up
+                parts = [part.strip() for part in username.split('.') if part.strip()]
 
-        # Handle various email formats
-        if '.' not in username:
-            # No dots in username (e.g., "test@hel.fi")
-            return []
+                if len(parts) >= 2:
+                    # Take first two non-empty parts
+                    first_name = parts[0].capitalize()
+                    last_name = parts[1].capitalize()
 
-        # Split by dots and clean up
-        parts = [part.strip() for part in username.split('.') if part.strip()]
+                    # Validate names are not empty
+                    if first_name and last_name:
+                        # Find ProjectProgrammer by name matching (case-insensitive)
+                        programmer = ProjectProgrammer.objects.filter(
+                            firstName__iexact=first_name,
+                            lastName__iexact=last_name
+                        ).first()
 
-        if len(parts) < 2:
-            return []
+                        if programmer:
+                            # Get classes where this programmer is the default
+                            legacy_assigned_classes = ProjectClass.objects.filter(defaultProgrammer=programmer)
+                            assigned_classes_ids.update(legacy_assigned_classes.values_list('id', flat=True))
 
-        # Take first two non-empty parts
-        first_name = parts[0].capitalize()
-        last_name = parts[1].capitalize()
-
-        # Validate names are not empty
-        if not first_name or not last_name:
-            return []
-
-        # Find ProjectProgrammer by name matching (case-insensitive)
-        programmer = ProjectProgrammer.objects.filter(
-            firstName__iexact=first_name,
-            lastName__iexact=last_name
-        ).first()
-
-        if programmer:
-            # Get classes where this programmer is the default
-            assigned_classes = ProjectClass.objects.filter(defaultProgrammer=programmer)
-            return list(assigned_classes.values_list('id', flat=True))
-
-        return []
+        return list(assigned_classes_ids)
 
     def project_has_class(self, obj):
         """Check if project has a projectClass assigned"""

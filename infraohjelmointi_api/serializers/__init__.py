@@ -1,6 +1,7 @@
 from .BaseMeta import BaseMeta
 from .BudgetItemSerializer import BudgetItemSerializer
 from .ConstructionPhaseDetailSerializer import ConstructionPhaseDetailSerializer
+from .ConstructionProcurementMethodSerializer import ConstructionProcurementMethodSerializer
 from .ConstructionPhaseSerializer import ConstructionPhaseSerializer
 from .DynamicFieldsModelSerializer import DynamicFieldsModelSerializer
 from .NoteCreateSerializer import NoteCreateSerializer
@@ -30,6 +31,7 @@ from .ProjectRiskSerializer import ProjectRiskSerializer
 from .ProjectSetCreateSerializer import ProjectSetCreateSerializer
 from .ProjectSetGetSerializer import ProjectSetGetSerializer
 from .ProjectTypeSerializer import ProjectTypeSerializer
+from .ProjectTypeQualifierSerializer import ProjectTypeQualifierSerializer
 from .SearchResultSerializer import SearchResultSerializer
 from .TaskSerializer import TaskSerializer
 from .TaskStatusSerializer import TaskStatusSerializer
@@ -46,3 +48,4 @@ from .AuditLogSerializer import AuditLogSerializer
 from .SapCurrentYearSerializer import SapCurrentYearSerializer
 from .BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
 from .ProjectProgrammerSerializer import ProjectProgrammerSerializer
+from .TalpaProjectOpeningSerializer import TalpaProjectOpeningSerializer

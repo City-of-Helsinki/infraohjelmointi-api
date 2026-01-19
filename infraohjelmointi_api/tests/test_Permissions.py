@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory
 from helusers.models import ADGroup
 from infraohjelmointi_api.models import (
-    ProjectProgrammer, ProjectClass, Project, ProjectPhase
+    ProjectProgrammer, ProjectClass, Project, ProjectPhase, ClassProgrammerAssignment
 )
 from infraohjelmointi_api.permissions import IsClassProgrammer
 from infraohjelmointi_api.views import BaseViewSet
@@ -93,6 +93,77 @@ class RestrictedProgrammerPermissionsTestCase(TestCase):
             projectClass=self.parks_804_class,
             phase=phase
         )
+
+
+
+    def test_direct_assignment_grants_access(self):
+        """IO-756: Test that ClassProgrammerAssignment grants access"""
+        # Assign programmer_user directly to snow_class
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user,
+            project_class=self.snow_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.user = self.programmer_user
+        request.data = {}
+
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # User has direct assignment to snow_class
+        has_permission = permission.has_object_permission(
+            request, view, self.snow_project
+        )
+        self.assertTrue(has_permission)
+
+    def test_no_assignment_denies_access(self):
+        """IO-756: Test that user without assignment is denied"""
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.user = self.other_user
+        request.data = {}
+
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # other_user has no assignments
+        has_permission = permission.has_object_permission(
+            request, view, self.snow_project
+        )
+        self.assertFalse(has_permission)
+
+    def test_multiple_users_can_have_same_class(self):
+        """IO-756: Test that multiple users can be assigned to same class"""
+        # Assign programmer_user to snow_class
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user,
+            project_class=self.snow_class
+        )
+
+        # Assign other_user to snow_class (which programmer_user already has)
+        ClassProgrammerAssignment.objects.create(
+            user=self.other_user,
+            project_class=self.snow_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.data = {}
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # Check programmer_user still has access
+        request.user = self.programmer_user
+        self.assertTrue(permission.has_object_permission(request, view, self.snow_project))
+
+        # Check other_user now has access
+        request.user = self.other_user
+        self.assertTrue(permission.has_object_permission(request, view, self.snow_project))
 
     def test_programmer_can_edit_assigned_class_project(self):
         factory = APIRequestFactory()
