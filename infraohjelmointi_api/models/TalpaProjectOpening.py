@@ -85,8 +85,8 @@ class TalpaProjectOpening(models.Model):
     )  # "Laji" - Project type selection
     
     budgetAccount = models.CharField(
-        max_length=50, blank=True, null=True
-    )  # "Talousarviokohdan numero" - e.g., "8030101A"
+        max_length=150, blank=True, null=True
+    )  # "Talousarviokohdan numero" - e.g., "8 03 01 02 Perusparantaminen ja liikennejärjestelyt"
     majorDistrict = models.CharField(max_length=50, blank=True, null=True)  # "Suurpiiri" - used for validation
     area = models.CharField(max_length=100, blank=True, null=True)  # "Alue" - used for validation
     

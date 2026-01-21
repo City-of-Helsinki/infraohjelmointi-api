@@ -19,8 +19,8 @@ class TalpaProjectNumberRange(models.Model):
         max_length=10, choices=PROJECT_TYPE_PREFIX_CHOICES, blank=False, null=False
     )  # "2814I" or "2814E" - distinguishes SAP vs MAKE format
     budgetAccount = models.CharField(
-        max_length=50, blank=True, null=True
-    )  # e.g., "8 03 01 01", can be alphanumeric like "8030101A"
+        max_length=150, blank=True, null=True
+    )  # e.g., "8 03 01 02 Perusparantaminen ja liikennejärjestelyt", can be alphanumeric like "8030101A"
     budgetAccountNumber = models.CharField(
         max_length=50, blank=True, null=True
     )  # Talousarviokohdan numero, e.g., "2814100000"
