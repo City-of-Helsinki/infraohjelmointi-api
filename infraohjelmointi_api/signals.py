@@ -2,7 +2,7 @@ from datetime import date
 import logging
 from django.db.models.signals import post_save
 from django.db import transaction
-from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation, TalpaProjectOpening
+from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation, TalpaProjectOpening, SapCost, SapCurrentYear
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -490,3 +490,79 @@ def on_project_phase_change(sender, instance, **kwargs):
 
     except Exception as e:
         logger.error(f"Error in on_project_phase_change: {e}")
+
+
+def _is_valid_sap_project(value: str | None) -> bool:
+    """
+    Check if a sapProject value is valid (not empty, null, or "0").
+    
+    IO-777: Users may set sapProject to "0" as a workaround when they can't delete it.
+    We treat "0" as an invalid/empty value.
+    """
+    if value is None:
+        return False
+    if value.strip() == "":
+        return False
+    if value.strip() == "0":
+        return False
+    return True
+
+
+@receiver(pre_save, sender=Project)
+def capture_old_sap_project(sender, instance, **kwargs):
+    """
+    Capture the old sapProject value before save so we can detect changes.
+    
+    IO-777: This is needed to clean up SAP cost records when sapProject changes.
+    """
+    if instance.pk:
+        try:
+            old_instance = Project.objects.get(pk=instance.pk)
+            instance._old_sap_project = old_instance.sapProject
+        except Project.DoesNotExist:
+            instance._old_sap_project = None
+    else:
+        instance._old_sap_project = None
+
+
+@receiver(post_save, sender=Project)
+def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs):
+    """
+    Delete SapCost and SapCurrentYear records when sapProject is changed or removed.
+    
+    IO-777: When a project's sapProject number is changed, the old SAP cost records
+    become stale (they contain data from the old SAP project number) and should be
+    deleted. New records will be created on the next SAP sync if the new sapProject
+    is valid.
+    
+    Scenarios handled:
+    - sapProject changed from valid value to null/empty/"0" -> delete records
+    - sapProject changed from one valid value to another -> delete records
+    - sapProject unchanged -> do nothing
+    - sapProject set from null to valid value -> do nothing (no records to delete)
+    """
+    if created:
+        # New project, no old records to clean up
+        return
+    
+    old_sap_project = getattr(instance, '_old_sap_project', None)
+    new_sap_project = instance.sapProject
+    
+    # Check if sapProject actually changed
+    old_valid = _is_valid_sap_project(old_sap_project)
+    new_valid = _is_valid_sap_project(new_sap_project)
+    
+    # If old value was valid and either:
+    # 1. New value is invalid (removed/cleared)
+    # 2. New value is different (changed to another project number)
+    # Then we should delete the old SAP cost records
+    if old_valid and (not new_valid or old_sap_project != new_sap_project):
+        deleted_sap_cost = SapCost.objects.filter(project=instance).delete()
+        deleted_sap_current_year = SapCurrentYear.objects.filter(project=instance).delete()
+        
+        logger.info(
+            f"Cleaned up SAP cost records for project {instance.id} due to sapProject change "
+            f"from '{old_sap_project}' to '{new_sap_project}': "
+            f"deleted {deleted_sap_cost[0]} SapCost records, "
+            f"{deleted_sap_current_year[0]} SapCurrentYear records"
+        )
