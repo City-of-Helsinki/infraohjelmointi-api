@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from overrides import override
 
-from infraohjelmointi_api.models import Project
+from infraohjelmointi_api.models import Project, ProjectGroup, ProjectPhase, SapCurrentYear
 from infraohjelmointi_api.services.SapApiService import SapApiService
 from infraohjelmointi_api.views import BaseViewSet, SapCurrentYearViewSet
 
@@ -205,6 +205,74 @@ class TestSAPService(TestCase):
         # Production tasks should be 0
         self.assertEqual(data_in_database['production_task_costs'], '0.000')
         self.assertEqual(data_in_database['production_task_commitments'], '0.000')
+
+    def test_group_totals_not_duplicated_for_shared_sap_id(self):
+        shared_sap_id = "2814I01001"
+        other_sap_id = "2814I02002"
+        current_year = datetime.now().year
+        group = ProjectGroup.objects.create(name="Shared SAP Group")
+        phase, _ = ProjectPhase.objects.get_or_create(value="proposal", defaults={"index": 1})
+
+        Project.objects.create(
+            name="Shared Project 1",
+            description="desc",
+            sapProject=shared_sap_id,
+            projectGroup=group,
+            phase=phase,
+        )
+        Project.objects.create(
+            name="Shared Project 2",
+            description="desc",
+            sapProject=shared_sap_id,
+            projectGroup=group,
+            phase=phase,
+        )
+        Project.objects.create(
+            name="Other Project",
+            description="desc",
+            sapProject=other_sap_id,
+            projectGroup=group,
+            phase=phase,
+        )
+
+        shared_payload = {
+            "costs": [{"Posid": f"{shared_sap_id}.01", "Wkgbtr": "100.000"}],
+            "commitments": [{"Posid": f"{shared_sap_id}.01", "Wkgbtr": "50.000"}],
+        }
+        other_payload = {
+            "costs": [{"Posid": f"{other_sap_id}.01", "Wkgbtr": "200.000"}],
+            "commitments": [{"Posid": f"{other_sap_id}.01", "Wkgbtr": "60.000"}],
+        }
+
+        zero_payload = {
+            "costs": [{"Posid": f"{self.sapProjectId}.01", "Wkgbtr": "0"}],
+            "commitments": [{"Posid": f"{self.sapProjectId}.01", "Wkgbtr": "0"}],
+        }
+
+        def fake_fetch(budat_start, budat_end, sap_id, all_sap_commitments):
+            if sap_id == shared_sap_id:
+                return shared_payload
+            if sap_id == other_sap_id:
+                return other_payload
+            if sap_id == self.sapProjectId:
+                return zero_payload
+            raise AssertionError(f"Unexpected sap id {sap_id}")
+
+        with patch.object(
+            self.sap_service,
+            "_SapApiService__fetch_costs_and_commitments_from_sap",
+            side_effect=fake_fetch,
+        ):
+            self.sap_service.sync_all_projects_from_sap(
+                for_financial_statement=True, sap_year=current_year
+            )
+
+        group_entry = SapCurrentYear.objects.get(
+            project_group=group, project__isnull=True, year=current_year
+        )
+
+        self.assertEqual(group_entry.group_combined_costs, Decimal("300.000"))
+        self.assertEqual(group_entry.group_combined_commitments, Decimal("110.000"))
 
     def test_calculate_values_with_dotted_format(self):
         """Test that old dotted format (e.g., 2814I03976.01) is correctly categorized"""

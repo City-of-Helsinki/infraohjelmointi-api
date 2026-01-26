@@ -217,10 +217,11 @@ class SapApiService:
         project_group_id = group_id if group_id != "nogroup" else None
         project_group_costs = {"costs": 0, "commitments": 0}
         costs_by_projects = len(costs_by_sap_id.keys()) > 1
-        for sap_id in costs_by_sap_id:
-            costs_and_commitments = costs_by_sap_id[sap_id]
+        for sap_id, costs_and_commitments in costs_by_sap_id.items():
             costs = costs_and_commitments.get("costs", {"project_task": 0, "production_task": 0})
             commitments = costs_and_commitments.get("commitments", {"project_task": 0, "production_task": 0})
+            sap_cost_total = costs["project_task"] + costs["production_task"]
+            sap_commitment_total = commitments["project_task"] + commitments["production_task"]
 
             for project in projects_grouped_by_sap_id[sap_id]:
                 try:
@@ -244,24 +245,12 @@ class SapApiService:
 
                 project_sap_cost.save()
 
-                if costs_by_projects:
-                    project_group_costs["costs"] += (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] += (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
-                else:
-                    project_group_costs["costs"] = (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] = (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
+            if costs_by_projects:
+                project_group_costs["costs"] += sap_cost_total
+                project_group_costs["commitments"] += sap_commitment_total
+            else:
+                project_group_costs["costs"] = sap_cost_total
+                project_group_costs["commitments"] = sap_commitment_total
         if project_group_id is not None:
             try:
                 group_sap_cost, _ = service_class.get_or_create(
