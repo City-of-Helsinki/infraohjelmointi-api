@@ -179,6 +179,9 @@ class SapApiService:
         # Initialize frozen_costs before if/else for clarity (will be populated if after freeze date)
         frozen_costs = {"project_task": Decimal(0.000), "production_task": Decimal(0.000)}
         
+        # Initialize json_response_all (will be set in either branch below)
+        json_response_all = {}
+        
         if now >= self.sap_freeze_date:
             logger.info(f"SAP Freeze Active: Fetching 2026+ costs from SAP and summing with frozen 2025 data for {id}")
             
