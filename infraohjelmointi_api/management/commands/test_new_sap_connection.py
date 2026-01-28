@@ -127,7 +127,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Testing connection to: {new_sap_url}")
             self.stdout.write(f"Probing: {test_url}")
 
-            response = session.get(test_url, verify=False, timeout=30)
+            # Note: verify=False is intentional - matches production SapApiService behavior
+            # SAP systems use self-signed certificates that require this setting
+            response = session.get(test_url, verify=False, timeout=30)  # NOSONAR
             self.stdout.write(f"Status Code: {response.status_code}")
 
             if response.status_code == 200:
@@ -174,7 +176,8 @@ class Command(BaseCommand):
 
         try:
             start_time = time.perf_counter()
-            response = session.get(costs_url, verify=False, timeout=60)
+            # Note: verify=False is intentional - matches production SapApiService behavior
+            response = session.get(costs_url, verify=False, timeout=60)  # NOSONAR
             response_time = time.perf_counter() - start_time
 
             self.stdout.write(f"Status Code: {response.status_code}")
@@ -230,7 +233,8 @@ class Command(BaseCommand):
 
         try:
             start_time = time.perf_counter()
-            response = session.get(commitments_url, verify=False, timeout=60)
+            # Note: verify=False is intentional - matches production SapApiService behavior
+            response = session.get(commitments_url, verify=False, timeout=60)  # NOSONAR
             response_time = time.perf_counter() - start_time
 
             self.stdout.write(f"Status Code: {response.status_code}")
@@ -302,7 +306,8 @@ class Command(BaseCommand):
             self.stdout.write(f"URL: {costs_url_2025}")
 
             try:
-                response = session.get(costs_url_2025, verify=False, timeout=60)
+                # Note: verify=False is intentional - matches production SapApiService behavior
+                response = session.get(costs_url_2025, verify=False, timeout=60)  # NOSONAR
                 if response.status_code == 200:
                     data = response.json()
                     results = data.get("d", {}).get("results", [])
