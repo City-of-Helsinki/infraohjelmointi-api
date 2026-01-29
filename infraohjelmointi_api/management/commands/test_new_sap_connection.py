@@ -2,14 +2,19 @@
 Test script to probe the new SAP S4 connection without modifying anything.
 
 This script:
-- Tests connection to new SAP URL
+- Tests connection to new SAP URL(s)
 - Fetches sample data (Toteumat/costs and Sidotut/commitments)
 - Shows what data is available
 - Does NOT modify database or any configuration
 - Safe to run anytime
 
 Usage:
-    python manage.py test_new_sap_connection [--sap-id SAP_ID] [--year YEAR]
+    python manage.py test_new_sap_connection [--sap-id SAP_ID] [--year YEAR] [--url URL]
+    
+    --url options:
+        both        - Test both direct instance AND load balancer (default)
+        direct      - Test only direct instance (vhhskp50ci:44300)
+        loadbalancer - Test only load balancer (s4prod:44380)
 """
 
 import json
@@ -36,6 +41,18 @@ if path.exists(".env"):
 # Allow insecure SSL (same as in SapApiService)
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = "ALL:@SECLEVEL=1"
 
+# SAP S4 URLs
+SAP_URLS = {
+    "direct": {
+        "name": "Direct Instance (P50)",
+        "url": "https://vhhskp50ci.sap.hel.fi:44300/sap/opu/odata/sap/ZINFRA_TOOL_SRV/",
+    },
+    "loadbalancer": {
+        "name": "Load Balancer (Web Dispatcher)",
+        "url": "https://s4prod.sap.hel.fi:44380/sap/opu/odata/sap/ZINFRA_TOOL_SRV/",
+    },
+}
+
 
 class Command(BaseCommand):
     help = "Test new SAP S4 connection - safe read-only probe"
@@ -57,11 +74,19 @@ class Command(BaseCommand):
             action='store_true',
             help='Also test 2025 data (to verify historical data availability)',
         )
+        parser.add_argument(
+            '--url',
+            type=str,
+            choices=['both', 'direct', 'loadbalancer'],
+            default='both',
+            help='Which URL to test: both (default), direct (vhhskp50ci:44300), or loadbalancer (s4prod:44380)',
+        )
 
     def handle(self, *args, **options):
         sap_id = options.get('sap_id')
         test_year = options.get('year', 2026)
         test_2025 = options.get('test_2025', False)
+        url_choice = options.get('url', 'both')
 
         self.stdout.write("=" * 80)
         self.stdout.write(self.style.SUCCESS("NEW SAP S4 CONNECTION TEST"))
@@ -91,8 +116,16 @@ class Command(BaseCommand):
 
         self.stdout.write("")
 
-        # New SAP configuration
-        new_sap_url = "https://vhhskp50ci.sap.hel.fi:44300/sap/opu/odata/sap/ZINFRA_TOOL_SRV/"
+        # Determine which URLs to test
+        if url_choice == 'both':
+            urls_to_test = ['direct', 'loadbalancer']
+        else:
+            urls_to_test = [url_choice]
+
+        self.stdout.write(f"Testing URL(s): {', '.join(urls_to_test)}")
+        self.stdout.write("")
+
+        # Common endpoints (same for both URLs)
         new_costs_endpoint = "ActualCostsSet?sap-client=300&$format=json&$filter=(Posid eq '{posid}') and (Budat ge datetime'{budat_start}' and Budat le datetime'{budat_end}')"
         new_commitments_endpoint = "CommitmentLinesSet?sap-client=300&$format=json&$filter=(Posid eq '{posid}') and (Budat ge datetime'{budat_start}' and Budat le datetime'{budat_end}')"
 
@@ -116,217 +149,195 @@ class Command(BaseCommand):
         session = requests.Session()
         session.auth = (sap_username, sap_password)
 
-        # Test 1: Connection test
-        self.stdout.write("-" * 80)
-        self.stdout.write(self.style.WARNING("TEST 1: Connection Test"))
-        self.stdout.write("-" * 80)
+        # Store results for comparison
+        url_results = {}
 
-        try:
-            # Try to access the service root
-            test_url = f"{new_sap_url}$metadata"
-            self.stdout.write(f"Testing connection to: {new_sap_url}")
-            self.stdout.write(f"Probing: {test_url}")
+        # Test each URL
+        for url_key in urls_to_test:
+            url_config = SAP_URLS[url_key]
+            url_name = url_config["name"]
+            base_url = url_config["url"]
 
-            # Note: verify=False is intentional - matches production SapApiService behavior
-            # SAP systems use self-signed certificates that require this setting
-            response = session.get(test_url, verify=False, timeout=30)  # NOSONAR
-            self.stdout.write(f"Status Code: {response.status_code}")
+            self.stdout.write("=" * 80)
+            self.stdout.write(self.style.SUCCESS(f"TESTING: {url_name}"))
+            self.stdout.write(f"URL: {base_url}")
+            self.stdout.write("=" * 80)
+            self.stdout.write("")
 
-            if response.status_code == 200:
-                self.stdout.write(self.style.SUCCESS("✓ Connection successful!"))
-            elif response.status_code == 401:
-                self.stdout.write(self.style.ERROR("✗ Authentication failed - check credentials"))
-                return
-            elif response.status_code == 403:
-                self.stdout.write(self.style.ERROR("✗ Access forbidden - check permissions"))
-                return
-            else:
-                self.stdout.write(self.style.WARNING(f"⚠ Unexpected status: {response.status_code}"))
-                self.stdout.write(f"Response: {response.text[:200]}")
-        except requests.exceptions.SSLError as e:
-            self.stdout.write(self.style.ERROR(f"✗ SSL Error: {e}"))
-            self.stdout.write("Note: SSL verification is disabled (same as production)")
-        except requests.exceptions.ConnectionError as e:
-            self.stdout.write(self.style.ERROR(f"✗ Connection Error: {e}"))
-            self.stdout.write("Check VPN, network, or firewall settings")
-            return
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
-            return
+            url_results[url_key] = {"name": url_name, "connection": False, "costs": None, "commitments": None}
 
-        self.stdout.write("")
-
-        # Test 2: Fetch Toteumat (Costs) for 2026
-        self.stdout.write("-" * 80)
-        self.stdout.write(self.style.WARNING(f"TEST 2: Fetch Toteumat (Costs) for {test_year}"))
-        self.stdout.write("-" * 80)
-
-        date_format = "%Y-%m-%dT%H:%M:%S"
-        budat_start = datetime.now().replace(year=test_year, month=1, day=1, hour=0, minute=0, second=0)
-        budat_end = datetime.now().replace(year=test_year + 1, month=1, day=1, hour=0, minute=0, second=0)
-
-        costs_url = f"{new_sap_url}{new_costs_endpoint}".format(
-            posid=sap_id,
-            budat_start=budat_start.strftime(date_format),
-            budat_end=budat_end.strftime(date_format),
-        )
-
-        self.stdout.write(f"URL: {costs_url}")
-        self.stdout.write(f"Date range: {budat_start.date()} to {budat_end.date()}")
-
-        try:
-            start_time = time.perf_counter()
-            # Note: verify=False is intentional - matches production SapApiService behavior
-            response = session.get(costs_url, verify=False, timeout=60)  # NOSONAR
-            response_time = time.perf_counter() - start_time
-
-            self.stdout.write(f"Status Code: {response.status_code}")
-            self.stdout.write(f"Response Time: {response_time:.2f}s")
-
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    results = data.get("d", {}).get("results", [])
-                    self.stdout.write(self.style.SUCCESS(f"✓ Success! Found {len(results)} cost entries"))
-
-                    if results:
-                        self.stdout.write("\nSample data (first 3 entries):")
-                        for i, entry in enumerate(results[:3], 1):
-                            posid = entry.get("Posid", "N/A")
-                            amount = entry.get("Wkgbtr", 0)
-                            date = entry.get("Budat", "N/A")
-                            self.stdout.write(f"  {i}. Posid: {posid}, Amount: {amount}, Date: {date}")
-
-                        # Calculate totals
-                        total = sum(Decimal(str(entry.get("Wkgbtr", 0))) for entry in results)
-                        self.stdout.write(f"\nTotal costs: {total:,.2f}")
-                    else:
-                        self.stdout.write(self.style.WARNING("⚠ No cost data found for this period"))
-                except json.JSONDecodeError as e:
-                    self.stdout.write(self.style.ERROR(f"✗ JSON parse error: {e}"))
-                    self.stdout.write(f"Response: {response.text[:500]}")
-            else:
-                self.stdout.write(self.style.ERROR(f"✗ Request failed"))
-                self.stdout.write(f"Response: {response.text[:500]}")
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
-
-        self.stdout.write("")
-
-        # Test 3: Fetch Sidotut (Commitments) for 2026
-        self.stdout.write("-" * 80)
-        self.stdout.write(self.style.WARNING(f"TEST 3: Fetch Sidotut (Commitments) for {test_year}"))
-        self.stdout.write("-" * 80)
-
-        # Commitments: from 2017 to test_year + 5 (same as production logic)
-        commit_start = datetime.now().replace(year=2017, month=1, day=1, hour=0, minute=0, second=0)
-        commit_end = datetime.now().replace(year=test_year + 6, month=1, day=1, hour=0, minute=0, second=0)
-
-        commitments_url = f"{new_sap_url}{new_commitments_endpoint}".format(
-            posid=sap_id,
-            budat_start=commit_start.strftime(date_format),
-            budat_end=commit_end.strftime(date_format),
-        )
-
-        self.stdout.write(f"URL: {commitments_url}")
-        self.stdout.write(f"Date range: {commit_start.date()} to {commit_end.date()}")
-
-        try:
-            start_time = time.perf_counter()
-            # Note: verify=False is intentional - matches production SapApiService behavior
-            response = session.get(commitments_url, verify=False, timeout=60)  # NOSONAR
-            response_time = time.perf_counter() - start_time
-
-            self.stdout.write(f"Status Code: {response.status_code}")
-            self.stdout.write(f"Response Time: {response_time:.2f}s")
-
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    results = data.get("d", {}).get("results", [])
-                    self.stdout.write(self.style.SUCCESS(f"✓ Success! Found {len(results)} commitment entries"))
-
-                    if results:
-                        self.stdout.write("\nSample data (first 3 entries):")
-                        for i, entry in enumerate(results[:3], 1):
-                            posid = entry.get("Posid", "N/A")
-                            amount = entry.get("Wkgbtr", 0)
-                            date = entry.get("Budat", "N/A")
-                            self.stdout.write(f"  {i}. Posid: {posid}, Amount: {amount}, Date: {date}")
-
-                        # Calculate totals
-                        total = sum(Decimal(str(entry.get("Wkgbtr", 0))) for entry in results)
-                        self.stdout.write(f"\nTotal commitments: {total:,.2f}")
-
-                        # Show breakdown by year if possible
-                        if results:
-                            years = {}
-                            for entry in results:
-                                date_str = entry.get("Budat", "")
-                                if date_str:
-                                    try:
-                                        year = datetime.fromisoformat(date_str.replace("Z", "+00:00")).year
-                                        years[year] = years.get(year, 0) + Decimal(str(entry.get("Wkgbtr", 0)))
-                                    except:
-                                        pass
-
-                            if years:
-                                self.stdout.write("\nBreakdown by year:")
-                                for year in sorted(years.keys()):
-                                    self.stdout.write(f"  {year}: {years[year]:,.2f}")
-                    else:
-                        self.stdout.write(self.style.WARNING("⚠ No commitment data found for this period"))
-                except json.JSONDecodeError as e:
-                    self.stdout.write(self.style.ERROR(f"✗ JSON parse error: {e}"))
-                    self.stdout.write(f"Response: {response.text[:500]}")
-            else:
-                self.stdout.write(self.style.ERROR(f"✗ Request failed"))
-                self.stdout.write(f"Response: {response.text[:500]}")
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
-
-        self.stdout.write("")
-
-        # Test 4: Test 2025 data (if requested)
-        if test_2025:
+            # Test 1: Connection test
             self.stdout.write("-" * 80)
-            self.stdout.write(self.style.WARNING("TEST 4: Fetch 2025 Data (Historical)"))
+            self.stdout.write(self.style.WARNING("TEST 1: Connection Test"))
             self.stdout.write("-" * 80)
-
-            budat_start_2025 = datetime.now().replace(year=2025, month=1, day=1, hour=0, minute=0, second=0)
-            budat_end_2025 = datetime.now().replace(year=2026, month=1, day=1, hour=0, minute=0, second=0)
-
-            costs_url_2025 = f"{new_sap_url}{new_costs_endpoint}".format(
-                posid=sap_id,
-                budat_start=budat_start_2025.strftime(date_format),
-                budat_end=budat_end_2025.strftime(date_format),
-            )
-
-            self.stdout.write(f"Testing if new SAP has 2025 cost data...")
-            self.stdout.write(f"URL: {costs_url_2025}")
 
             try:
-                # Note: verify=False is intentional - matches production SapApiService behavior
-                response = session.get(costs_url_2025, verify=False, timeout=60)  # NOSONAR
+                test_url = f"{base_url}$metadata"
+                self.stdout.write(f"Probing: {test_url}")
+
+                response = session.get(test_url, verify=False, timeout=30)
+                self.stdout.write(f"Status Code: {response.status_code}")
+
+                if response.status_code == 200:
+                    self.stdout.write(self.style.SUCCESS("✓ Connection successful!"))
+                    url_results[url_key]["connection"] = True
+                elif response.status_code == 401:
+                    self.stdout.write(self.style.ERROR("✗ Authentication failed - check credentials"))
+                    continue
+                elif response.status_code == 403:
+                    self.stdout.write(self.style.ERROR("✗ Access forbidden - check permissions"))
+                    continue
+                else:
+                    self.stdout.write(self.style.WARNING(f"⚠ Unexpected status: {response.status_code}"))
+                    self.stdout.write(f"Response: {response.text[:200]}")
+            except requests.exceptions.SSLError as e:
+                self.stdout.write(self.style.ERROR(f"✗ SSL Error: {e}"))
+                continue
+            except requests.exceptions.ConnectionError as e:
+                self.stdout.write(self.style.ERROR(f"✗ Connection Error: {e}"))
+                self.stdout.write("Check VPN, network, or firewall settings")
+                continue
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
+                continue
+
+            self.stdout.write("")
+
+            # Test 2: Fetch Toteumat (Costs)
+            self.stdout.write("-" * 80)
+            self.stdout.write(self.style.WARNING(f"TEST 2: Fetch Toteumat (Costs) for {test_year}"))
+            self.stdout.write("-" * 80)
+
+            date_format = "%Y-%m-%dT%H:%M:%S"
+            budat_start = datetime.now().replace(year=test_year, month=1, day=1, hour=0, minute=0, second=0)
+            budat_end = datetime.now().replace(year=test_year + 1, month=1, day=1, hour=0, minute=0, second=0)
+
+            costs_url = f"{base_url}{new_costs_endpoint}".format(
+                posid=sap_id,
+                budat_start=budat_start.strftime(date_format),
+                budat_end=budat_end.strftime(date_format),
+            )
+
+            self.stdout.write(f"Date range: {budat_start.date()} to {budat_end.date()}")
+
+            try:
+                start_time = time.perf_counter()
+                response = session.get(costs_url, verify=False, timeout=60)
+                response_time = time.perf_counter() - start_time
+
+                self.stdout.write(f"Status Code: {response.status_code}")
+                self.stdout.write(f"Response Time: {response_time:.2f}s")
+
                 if response.status_code == 200:
                     data = response.json()
                     results = data.get("d", {}).get("results", [])
+                    self.stdout.write(self.style.SUCCESS(f"✓ Success! Found {len(results)} cost entries"))
                     if results:
                         total = sum(Decimal(str(entry.get("Wkgbtr", 0))) for entry in results)
-                        self.stdout.write(self.style.SUCCESS(f"✓ New SAP has 2025 data: {len(results)} entries, total: {total:,.2f}"))
-                        self.stdout.write(self.style.WARNING("⚠ Note: This data will NOT be used after freeze (2025 is frozen)"))
+                        self.stdout.write(f"Total costs: {total:,.2f}")
+                        url_results[url_key]["costs"] = total
                     else:
-                        self.stdout.write(self.style.WARNING("⚠ New SAP has no 2025 data (expected - will use frozen data)"))
+                        url_results[url_key]["costs"] = Decimal(0)
                 else:
-                    self.stdout.write(self.style.WARNING(f"⚠ Could not fetch 2025 data (status: {response.status_code})"))
+                    self.stdout.write(self.style.ERROR(f"✗ Request failed"))
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"⚠ Error testing 2025 data: {e}"))
+                self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
 
-        # Summary
+            self.stdout.write("")
+
+            # Test 3: Fetch Sidotut (Commitments)
+            self.stdout.write("-" * 80)
+            self.stdout.write(self.style.WARNING(f"TEST 3: Fetch Sidotut (Commitments) for {test_year}"))
+            self.stdout.write("-" * 80)
+
+            commit_start = datetime.now().replace(year=2017, month=1, day=1, hour=0, minute=0, second=0)
+            commit_end = datetime.now().replace(year=test_year + 6, month=1, day=1, hour=0, minute=0, second=0)
+
+            commitments_url = f"{base_url}{new_commitments_endpoint}".format(
+                posid=sap_id,
+                budat_start=commit_start.strftime(date_format),
+                budat_end=commit_end.strftime(date_format),
+            )
+
+            self.stdout.write(f"Date range: {commit_start.date()} to {commit_end.date()}")
+
+            try:
+                start_time = time.perf_counter()
+                response = session.get(commitments_url, verify=False, timeout=60)
+                response_time = time.perf_counter() - start_time
+
+                self.stdout.write(f"Status Code: {response.status_code}")
+                self.stdout.write(f"Response Time: {response_time:.2f}s")
+
+                if response.status_code == 200:
+                    data = response.json()
+                    results = data.get("d", {}).get("results", [])
+                    self.stdout.write(self.style.SUCCESS(f"✓ Success! Found {len(results)} commitment entries"))
+                    if results:
+                        total = sum(Decimal(str(entry.get("Wkgbtr", 0))) for entry in results)
+                        self.stdout.write(f"Total commitments: {total:,.2f}")
+                        url_results[url_key]["commitments"] = total
+                    else:
+                        url_results[url_key]["commitments"] = Decimal(0)
+                else:
+                    self.stdout.write(self.style.ERROR(f"✗ Request failed"))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"✗ Error: {e}"))
+
+            self.stdout.write("")
+
+        # Summary comparison (if testing both)
+        self.stdout.write("=" * 80)
+        self.stdout.write(self.style.SUCCESS("TEST RESULTS SUMMARY"))
+        self.stdout.write("=" * 80)
         self.stdout.write("")
-        self.stdout.write("=" * 80)
-        self.stdout.write(self.style.SUCCESS("TEST COMPLETE"))
-        self.stdout.write("=" * 80)
+
+        if len(urls_to_test) > 1:
+            self.stdout.write("COMPARISON:")
+            self.stdout.write("-" * 60)
+            self.stdout.write(f"{'Endpoint':<30} {'Connection':<12} {'Costs':<15} {'Commitments':<15}")
+            self.stdout.write("-" * 60)
+            for url_key, result in url_results.items():
+                conn = "✓" if result["connection"] else "✗"
+                costs = f"{result['costs']:,.2f}" if result['costs'] is not None else "N/A"
+                commits = f"{result['commitments']:,.2f}" if result['commitments'] is not None else "N/A"
+                self.stdout.write(f"{result['name']:<30} {conn:<12} {costs:<15} {commits:<15}")
+            self.stdout.write("-" * 60)
+            self.stdout.write("")
+
+            # Check if results match
+            if all(r["connection"] for r in url_results.values()):
+                self.stdout.write(self.style.SUCCESS("✓ Both URLs are working!"))
+                cost_vals = [r["costs"] for r in url_results.values() if r["costs"] is not None]
+                commit_vals = [r["commitments"] for r in url_results.values() if r["commitments"] is not None]
+                if len(cost_vals) == 2 and cost_vals[0] == cost_vals[1]:
+                    self.stdout.write(self.style.SUCCESS("✓ Cost data matches between both endpoints"))
+                elif len(cost_vals) == 2:
+                    self.stdout.write(self.style.WARNING("⚠ Cost data differs between endpoints"))
+                if len(commit_vals) == 2 and commit_vals[0] == commit_vals[1]:
+                    self.stdout.write(self.style.SUCCESS("✓ Commitment data matches between both endpoints"))
+                elif len(commit_vals) == 2:
+                    self.stdout.write(self.style.WARNING("⚠ Commitment data differs between endpoints"))
+            else:
+                for url_key, result in url_results.items():
+                    if not result["connection"]:
+                        self.stdout.write(self.style.ERROR(f"✗ {result['name']} failed to connect"))
+        else:
+            result = list(url_results.values())[0]
+            if result["connection"]:
+                self.stdout.write(self.style.SUCCESS(f"✓ {result['name']} is working!"))
+            else:
+                self.stdout.write(self.style.ERROR(f"✗ {result['name']} failed"))
+
+        self.stdout.write("")
+        self.stdout.write("RECOMMENDATION:")
+        if "loadbalancer" in url_results and url_results["loadbalancer"]["connection"]:
+            self.stdout.write(self.style.SUCCESS("→ Use LOAD BALANCER URL for production (future-proof)"))
+            self.stdout.write("  https://s4prod.sap.hel.fi:44380/sap/opu/odata/sap/ZINFRA_TOOL_SRV/")
+        elif "direct" in url_results and url_results["direct"]["connection"]:
+            self.stdout.write(self.style.WARNING("→ Load balancer not working, use DIRECT URL"))
+            self.stdout.write("  https://vhhskp50ci.sap.hel.fi:44300/sap/opu/odata/sap/ZINFRA_TOOL_SRV/")
+
         self.stdout.write("")
         self.stdout.write("This was a READ-ONLY test. No data was modified.")
-        self.stdout.write("If all tests passed, the new SAP connection is ready for switch day.")
+
