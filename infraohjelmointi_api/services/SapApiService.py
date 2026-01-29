@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from os import path
 
@@ -35,8 +35,14 @@ class SapApiService:
         self.sap_api_costs_endpoint = env("SAP_COSTS_ENDPOINT")
         self.sap_api_commitments_endpoint = env("SAP_COMMITMENTS_ENDPOINT")
 
+
         # Set the sap start year to be 2017 to get all data from sap
         self.sap_fetch_all_data_start_year = 2017
+
+        # Date when we switch to new SAP and freeze 2025 data
+        # Use UTC timezone for consistent comparison across servers
+        self.sap_freeze_date = datetime(2026, 1, 30, 0, 0, 0, tzinfo=timezone.utc)
+        self.sap_freeze_year = 2025
 
     def sync_all_projects_from_sap(self, for_financial_statement: bool, sap_year=datetime.now().year) -> None:
         """Method to synchronise projects from SAP.\n
@@ -109,6 +115,32 @@ class SapApiService:
         """Method to fetch costs and commitments from SAP for given year"""
         logger.debug(f"Fetching SAP costs and commitments for year {year}")
 
+        # IO-790: After freeze date, if requesting frozen year (2025), return from DB
+        now = datetime.now(timezone.utc)
+        if now >= self.sap_freeze_date and year == self.sap_freeze_year:
+            logger.info(f"Freeze active: Returning frozen {year} data from DB for {id}")
+            # Get frozen data from DB
+            frozen_costs = {"project_task": Decimal(0.000), "production_task": Decimal(0.000)}
+            frozen_commitments = {"project_task": Decimal(0.000), "production_task": Decimal(0.000)}
+            
+            db_sap_costs = SapCostService.get_by_sap_id(id)
+            frozen_entry = next((item for item in db_sap_costs if item.year == self.sap_freeze_year), None)
+            
+            if frozen_entry:
+                frozen_costs["project_task"] = frozen_entry.project_task_costs
+                frozen_costs["production_task"] = frozen_entry.production_task_costs
+                frozen_commitments["project_task"] = frozen_entry.project_task_commitments
+                frozen_commitments["production_task"] = frozen_entry.production_task_commitments
+                logger.debug(f"Found frozen {year} data for {id}: costs={frozen_costs}, commitments={frozen_commitments}")
+            else:
+                logger.warning(f"No frozen {year} data found for {id} in DB - returning zeros")
+            
+            return {
+                "costs": frozen_costs,
+                "commitments": frozen_commitments
+            }
+
+        # Normal flow: fetch from SAP API
         # Time frame for sap fetch is from 1.1.{year} to 1.1.{year+1}
         budat_start = datetime.now().replace(year=year, month=1, day=1, hour=0, minute=0, second=0)
         budat_end = datetime.now().replace(year=year+1, month=1, day=1, hour=0, minute=0, second=0)
@@ -140,23 +172,67 @@ class SapApiService:
         # Timeframe for fetching all sap data costs is from 1.1.2017 to 1.1.{currentyear+1},
         # and for commitments from 1.1.2017 to 1.1.{currentyear+1+5}
         logger.debug(f"Starting to fetch all costs for SAP id {id} from {budat_start.year} to {budat_end.year}, and all commitments from {budat_start.year} to {budat_end.year}+5 years")
-        json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, id, all_sap_commitments=True)
+
+        # IO-790: After freeze date, we fetch only 2026+ costs from New SAP, and add frozen 2025 data from DB
+        now = datetime.now(timezone.utc)
+        
+        # Initialize frozen_costs before if/else for clarity (will be populated if after freeze date)
+        frozen_costs = {"project_task": Decimal(0.000), "production_task": Decimal(0.000)}
+        
+        # Initialize json_response_all (will be set in either branch below)
+        json_response_all = {}
+        
+        if now >= self.sap_freeze_date:
+            logger.info(f"SAP Freeze Active: Fetching 2026+ costs from SAP and summing with frozen 2025 data for {id}")
+            
+            # 1. Fetch from SAP: Costs (2026+), Commitments (2017+)
+            budat_start_costs = datetime.now().replace(year=self.sap_freeze_year + 1, month=1, day=1, hour=0, minute=0, second=0)
+            
+            json_response_all = self.__fetch_costs_and_commitments_from_sap(
+                budat_start=budat_start_costs, 
+                budat_end=budat_end, 
+                id=id, 
+                all_sap_commitments=True,
+                budat_start_commitments=budat_start # Commitments still from 2017
+            )
+            
+            # 2. Get frozen 2025 costs from DB
+            db_sap_costs = SapCostService.get_by_sap_id(id)
+            # Find the entry for the freeze year (2025)
+            # Note: DB might have multiple entries if grouped, but valid ones should have same amounts
+            frozen_entry = next((item for item in db_sap_costs if item.year == self.sap_freeze_year), None)
+            
+            if frozen_entry:
+                frozen_costs["project_task"] = frozen_entry.project_task_costs
+                frozen_costs["production_task"] = frozen_entry.production_task_costs
+                logger.debug(f"Found frozen 2025 costs for {id}: {frozen_costs}")
+            else:
+                logger.error(f"CRITICAL: No frozen 2025 data found for {id} in DB - totals will be incorrect!")
+                # Continue with zeros but log as error for monitoring
+
+        else:
+            # Standard logic (Before freeze)
+            json_response_all = self.__fetch_costs_and_commitments_from_sap(budat_start, budat_end, id, all_sap_commitments=True)
 
         grouped_costs_and_commitments_all = self.__group_costs_and_commitments(
             sap_costs_and_commitments=json_response_all,
             sap_id=id,
         )
-        sap_costs_and_commitments = []
-        sap_costs_and_commitments= grouped_costs_and_commitments_all
 
-        return sap_costs_and_commitments
+        # IO-790: Add frozen costs to new SAP data
+        if now >= self.sap_freeze_date:
+            grouped_costs_and_commitments_all["costs"]["project_task"] += frozen_costs["project_task"]
+            grouped_costs_and_commitments_all["costs"]["production_task"] += frozen_costs["production_task"]
+
+        return grouped_costs_and_commitments_all
 
     def __fetch_costs_and_commitments_from_sap(
             self,
             budat_start: datetime,
             budat_end: datetime,
             id: str,
-            all_sap_commitments: bool
+            all_sap_commitments: bool,
+            budat_start_commitments: datetime = None
         )-> dict:
         date_format = "%Y-%m-%dT%H:%M:%S"
         # Init json_response, costs and commitments are zeros by default defaults
@@ -192,9 +268,13 @@ class SapApiService:
             end_date_for_commitment_fetch = budat_end
 
         logger.debug(f"In commitment-fetch: start year: {budat_start.year} and end_year: {end_date_for_commitment_fetch.year}")
+        
+        # Use specific start date for commitments if provided (IO-790)
+        commit_start = budat_start_commitments if budat_start_commitments else budat_start
+        
         api_url = f"{self.sap_api_url}{self.sap_api_commitments_endpoint}".format(
             posid=id,
-            budat_start=budat_start.replace(year=budat_start.year).strftime(
+            budat_start=commit_start.replace(year=commit_start.year).strftime(
                 date_format
             ),
             budat_end=end_date_for_commitment_fetch.strftime(date_format),
@@ -217,10 +297,11 @@ class SapApiService:
         project_group_id = group_id if group_id != "nogroup" else None
         project_group_costs = {"costs": 0, "commitments": 0}
         costs_by_projects = len(costs_by_sap_id.keys()) > 1
-        for sap_id in costs_by_sap_id:
-            costs_and_commitments = costs_by_sap_id[sap_id]
+        for sap_id, costs_and_commitments in costs_by_sap_id.items():
             costs = costs_and_commitments.get("costs", {"project_task": 0, "production_task": 0})
             commitments = costs_and_commitments.get("commitments", {"project_task": 0, "production_task": 0})
+            sap_cost_total = costs["project_task"] + costs["production_task"]
+            sap_commitment_total = commitments["project_task"] + commitments["production_task"]
 
             for project in projects_grouped_by_sap_id[sap_id]:
                 try:
@@ -244,24 +325,12 @@ class SapApiService:
 
                 project_sap_cost.save()
 
-                if costs_by_projects:
-                    project_group_costs["costs"] += (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] += (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
-                else:
-                    project_group_costs["costs"] = (
-                        project_sap_cost.project_task_costs
-                        + project_sap_cost.production_task_costs
-                    )
-                    project_group_costs["commitments"] = (
-                        project_sap_cost.project_task_commitments
-                        + project_sap_cost.production_task_commitments
-                    )
+            if costs_by_projects:
+                project_group_costs["costs"] += sap_cost_total
+                project_group_costs["commitments"] += sap_commitment_total
+            else:
+                project_group_costs["costs"] = sap_cost_total
+                project_group_costs["commitments"] = sap_commitment_total
         if project_group_id is not None:
             try:
                 group_sap_cost, _ = service_class.get_or_create(
