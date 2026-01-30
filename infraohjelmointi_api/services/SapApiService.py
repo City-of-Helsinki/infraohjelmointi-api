@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 from datetime import datetime, timezone
 from decimal import Decimal
 from os import path
@@ -52,10 +53,15 @@ class SapApiService:
         """
 
         logger.debug("Synchronizing all projects in DB with SAP")
-        projects=ProjectService.list_with_non_null_sap_id()
+        projects = ProjectService.list_with_non_null_sap_id()
+        project_count = projects.count() if hasattr(projects, "count") else len(projects)
+        logger.info(f"SAP sync: starting with {project_count} projects with SAP IDs")
 
         # group projects by sapProject, all projects belong to same group
         projects_grouped_by_groups = self.__group_projects_by_sap_id(projects=projects)
+
+        total_sap_ids = sum(len(by_sap) for by_sap in projects_grouped_by_groups.values())
+        logger.info(f"SAP sync: {len(projects_grouped_by_groups)} groups, {total_sap_ids} SAP IDs to process")
 
         # make only one call either for ungroupped project are all groupped projects
         for group_id in projects_grouped_by_groups.keys():
@@ -65,51 +71,59 @@ class SapApiService:
             costs_by_sap_id_current_year = {}
 
             for sap_id in projects_grouped_by_sap_id.keys():
-                projects_within_group = projects_grouped_by_sap_id[sap_id]
-                sync_group: bool = len(projects_within_group) > 1
+                try:
+                    projects_within_group = projects_grouped_by_sap_id[sap_id]
+                    sync_group: bool = len(projects_within_group) > 1
 
-                project_id_list = [p.id for p in projects_within_group]
+                    project_id_list = [p.id for p in projects_within_group]
 
-                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=True)
+                    self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=True)
 
-                # fetch costs and commitments from SAP
-                start_time = time.perf_counter()
-                sap_costs_and_commitments = {}
+                    # fetch costs and commitments from SAP
+                    start_time = time.perf_counter()
+                    sap_costs_and_commitments = {}
 
-                # all sap data is not fetched, if function is called for getting sap data for certain year,
-                # f.g. for financial statement
-                if not for_financial_statement:
-                    sap_costs_and_commitments["all_sap_data"] = (
-                        self.get_all_project_costs_and_commitments_from_sap(sap_id)
+                    # all sap data is not fetched, if function is called for getting sap data for certain year,
+                    # f.g. for financial statement
+                    if not for_financial_statement:
+                        sap_costs_and_commitments["all_sap_data"] = (
+                            self.get_all_project_costs_and_commitments_from_sap(sap_id)
+                        )
+
+                    sap_costs_and_commitments["current_year"] = (
+                        self.get_costs_and_commitments_by_year(sap_id, sap_year)
                     )
 
-                sap_costs_and_commitments["current_year"] = (
-                    self.get_costs_and_commitments_by_year(sap_id, sap_year)
-                )
+                    handling_time = time.perf_counter() - start_time
 
-                handling_time = time.perf_counter() - start_time
+                    self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)
 
-                self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)
+                    if self.validate_costs_and_commitments(sap_costs_and_commitments):
+                        costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
 
-                if self.validate_costs_and_commitments(sap_costs_and_commitments):
-                    costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
+                        self.__store_sap_data(
+                            service_class = SapCostService,
+                            group_id=group_id,
+                            costs_by_sap_id=costs_by_sap_id_all,
+                            projects_grouped_by_sap_id=projects_grouped_by_sap_id,
+                            current_year=sap_year,
+                        )
 
+                    costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
                     self.__store_sap_data(
-                        service_class = SapCostService,
+                        service_class = SapCurrentYearService,
                         group_id=group_id,
-                        costs_by_sap_id=costs_by_sap_id_all,
+                        costs_by_sap_id=costs_by_sap_id_current_year,
                         projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                         current_year=sap_year,
                     )
 
-                costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
-                self.__store_sap_data(
-                    service_class = SapCurrentYearService,
-                    group_id=group_id,
-                    costs_by_sap_id=costs_by_sap_id_current_year,
-                    projects_grouped_by_sap_id=projects_grouped_by_sap_id,
-                    current_year=sap_year,
-                )
+                    logger.info(f"SAP sync: stored data for sap_id {sap_id}, continuing to next project")
+                except Exception as e:
+                    logger.error(
+                        f"SAP sync failed for sap_id {sap_id} (group_id={group_id}): {e}\n{traceback.format_exc()}"
+                    )
+                    # Continue to next project so one failure does not stop the full sync
 
     def get_costs_and_commitments_by_year(self, id: str, year) -> dict:
         """Method to fetch costs and commitments from SAP for given year"""
@@ -475,10 +489,10 @@ class SapApiService:
 
         logger.debug(f"SAP responded in {response_time}s")
 
-        # Check if SAP responded with error
+        # Check if SAP responded with error (e.g. 400 = no data for this key)
         if response.status_code != 200:
             self.__log_response_error(response, id)
-            return {}
+            return []  # Empty list so __calculate_values and callers get consistent type
 
         else:
             return response.json()["d"]["results"]
