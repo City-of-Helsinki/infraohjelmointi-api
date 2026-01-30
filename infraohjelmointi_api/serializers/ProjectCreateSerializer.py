@@ -442,7 +442,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             project: The newly created project instance
         """
         # Check if project was created with a PW ID
-        if project.hkrId is not None and str(project.hkrId).strip() != "":
+        # IO-396 requirement: Only sync programmed projects
+        if project.hkrId is not None and str(project.hkrId).strip() != "" and project.programmed:
             logger.info(f"Automatic PW sync triggered for new project '{project.name}' (HKR ID: {project.hkrId})")
 
             try:
@@ -466,5 +467,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
                 logger.error(f"Project created successfully but PW sync failed - data may be out of sync")
                 # Don't raise - allow project creation to succeed, user can retry sync with button
         else:
-            logger.debug(f"New project '{project.name}' created without PW ID - skipping PW sync")
+            if project.hkrId is None or str(project.hkrId).strip() == "":
+                logger.debug(f"New project '{project.name}' created without PW ID - skipping PW sync")
+            elif not project.programmed:
+                logger.debug(f"New project '{project.name}' created but not programmed - skipping PW sync (IO-396 requirement)")
 

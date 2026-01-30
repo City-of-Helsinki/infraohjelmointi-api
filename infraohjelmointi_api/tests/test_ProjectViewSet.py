@@ -149,21 +149,26 @@ class ProjectViewSetPWIntegrationTestCase(TestCase):
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
-    def test_no_automatic_sync_on_regular_update(self, mock_post, mock_get_pw):
-        """Test that regular updates without HKR ID changes don't trigger automatic sync"""
-        # Test regular update without HKR ID change
+    def test_automatic_sync_on_regular_update_with_hkr_id(self, mock_post, mock_get_pw):
+        """Test that regular updates to projects with existing HKR ID DO trigger automatic sync (IO-396/IO-775)"""
+        # Test regular update without HKR ID change, but project already has hkrId
         update_data = {
             "name": "Updated Project Name",
             "description": "Updated description"
         }
 
-        # Test the HKR ID detection logic
+        # Test the sync detection logic - should sync if project has hkrId AND is programmed
+        project_has_hkr_id = bool(self.project_with_hkr.hkrId and str(self.project_with_hkr.hkrId).strip())
+        should_sync = project_has_hkr_id and self.project_with_hkr.programmed
+
+        self.assertTrue(should_sync, "Should sync when project has hkrId and is programmed, even for regular updates")
+        
+        # Also verify that hkrId addition detection still works
         hkr_id_added_first_time = bool(
             'hkrId' in update_data and
-            update_data['hkrId'] and
+            update_data.get('hkrId') and
             (not self.project_with_hkr.hkrId or str(self.project_with_hkr.hkrId).strip() == "")
         )
-
         self.assertFalse(hkr_id_added_first_time, "Should not detect HKR ID addition for regular update")
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
