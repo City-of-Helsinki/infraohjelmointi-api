@@ -36,6 +36,12 @@ class Project(models.Model):
         except ProjectPhase.DoesNotExist:
             return None
 
+    def get_default_projectPriority():
+        try:
+            return ProjectPriority.objects.get(value__iexact="medium")
+        except ProjectPriority.DoesNotExist:
+            return None
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     siteId = models.ForeignKey(
         BudgetItem, on_delete=models.DO_NOTHING, null=True, blank=True
@@ -216,7 +222,11 @@ class Project(models.Model):
         ProjectRisk, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     priority = models.ForeignKey(
-        ProjectPriority, on_delete=models.DO_NOTHING, null=True, blank=True
+        ProjectPriority,
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        default=get_default_projectPriority,
     )
     comments = models.CharField(max_length=200, blank=True, null=True)
 
