@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from django.db import transaction
-from ...services import ProjectService
-from ...services import SapApiService
+from ...services import ProjectService, SapApiService, SapAuthenticationError
 
 
 class Command(BaseCommand):
@@ -24,7 +23,12 @@ class Command(BaseCommand):
         if options.get("counts_only"):
             self._print_counts_only()
             return
-        SapApiService().sync_all_projects_from_sap(for_financial_statement=False)
+        try:
+            SapApiService().sync_all_projects_from_sap(for_financial_statement=False)
+        except SapAuthenticationError as e:
+            raise CommandError(
+                f"SAP authentication failed (401). Fix credentials and retry. {e}"
+            ) from e
 
     def _print_counts_only(self):
         """Load projects, group by SAP ID, print counts. No SAP calls, no DB writes."""

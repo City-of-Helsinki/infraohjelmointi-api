@@ -17,6 +17,10 @@ from .SapCurrentYearService import SapCurrentYearService
 logger = logging.getLogger("infraohjelmointi_api")
 
 
+class SapAuthenticationError(Exception):
+    """Raised when SAP returns 401 Unauthorized. Sync should abort immediately to avoid lockout."""
+
+
 env = environ.Env()
 env.escape_proxy = True
 
@@ -119,6 +123,8 @@ class SapApiService:
                     )
 
                     logger.info(f"SAP sync: stored data for sap_id {sap_id}, continuing to next project")
+                except SapAuthenticationError:
+                    raise  # Abort entire sync on first 401 to avoid lockout
                 except Exception as e:
                     logger.error(
                         f"SAP sync failed for sap_id {sap_id} (group_id={group_id}): {e}\n{traceback.format_exc()}"
@@ -464,13 +470,15 @@ class SapApiService:
         return grouped_by_task
 
     def __log_response_error(self, response: requests.Response, id: str) -> None:
-        """Helper method to log response error"""
+        """Helper method to log response error. Safe for non-JSON bodies (e.g. 401 HTML)."""
         logger.error(
             f"SAP responded with status code '{response.status_code}' and reason '{response.reason}' for given id '{id}'"
         )
-        logger.error(
-            f"SAP responded with response.json() '{response.json()}' for given id '{id}'"
-        )
+        try:
+            body = response.json()
+        except Exception:
+            body = response.text or "(empty)"
+        logger.error(f"SAP response body for id '{id}': {body}")
 
     def __make_sap_request(self, api_url, id, type):
         """Helper method to fetch costs from SAP"""
@@ -489,13 +497,19 @@ class SapApiService:
 
         logger.debug(f"SAP responded in {response_time}s")
 
-        # Check if SAP responded with error (e.g. 400 = no data for this key)
+        # 401: abort immediately to avoid hammering SAP and triggering account lockout
+        if response.status_code == 401:
+            self.__log_response_error(response, id)
+            raise SapAuthenticationError(
+                f"SAP returned 401 Unauthorized for id '{id}'. Sync aborted to avoid lockout."
+            )
+
+        # Other errors (e.g. 400 = no data for this key)
         if response.status_code != 200:
             self.__log_response_error(response, id)
             return []  # Empty list so __calculate_values and callers get consistent type
 
-        else:
-            return response.json()["d"]["results"]
+        return response.json()["d"]["results"]
 
     def validate_costs_and_commitments(self, costs_and_commitments) -> bool:
         if 'all_sap_data' in costs_and_commitments and 'current_year' in costs_and_commitments:
