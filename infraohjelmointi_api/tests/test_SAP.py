@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -7,7 +7,7 @@ from django.test import TestCase
 from overrides import override
 
 from infraohjelmointi_api.models import Project, ProjectGroup, ProjectPhase, SapCurrentYear
-from infraohjelmointi_api.services.SapApiService import SapApiService
+from infraohjelmointi_api.services.SapApiService import SapApiService, SapAuthenticationError
 from infraohjelmointi_api.views import BaseViewSet, SapCurrentYearViewSet
 
 
@@ -41,6 +41,8 @@ class TestSAPService(TestCase):
 
     @patch('infraohjelmointi_api.services.ProjectService.ProjectService.get_by_sap_id')
     def test_get_project_costs_and_commitments_successful(self, mock_get_by_sap_id):
+        # Use pre-freeze logic so URL assertions match (otherwise after 2026-01-30 different URLs are called)
+        self.sap_service.sap_freeze_date = datetime(2030, 1, 30, 0, 0, 0, tzinfo=timezone.utc)
         # Mock the SAP API response for costs
         mock_response_all_costs = MagicMock()
         mock_response_all_costs.status_code = 200
@@ -500,4 +502,45 @@ class TestSAPService(TestCase):
         # Total Planning: 0
         self.assertEqual(result['project_task'], Decimal('0.00'))
         self.assertEqual(result['production_task'], Decimal('300.00'))
+
+    def test_make_sap_request_401_raises_sap_authentication_error(self):
+        """IO-790: 401 response raises SapAuthenticationError and aborts (no hammering SAP)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.reason = "Unauthorized"
+        mock_response.json.side_effect = ValueError("HTML body")
+        mock_response.text = "<html>Anmeldung fehlgeschlagen</html>"
+        mock_response.raw = MagicMock()
+        mock_response.content = b"<html>"
+        self.sap_service.session.get.return_value = mock_response
+
+        with self.assertRaises(SapAuthenticationError) as ctx:
+            self.sap_service._SapApiService__make_sap_request("http://fake/costs", "2814I00708", "costs")
+
+        self.assertIn("401", str(ctx.exception))
+        self.assertIn("2814I00708", str(ctx.exception))
+
+    def test_log_response_error_non_json_body(self):
+        """IO-790: __log_response_error handles non-JSON (e.g. 401 HTML) without raising."""
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.reason = "Unauthorized"
+        mock_response.json.side_effect = ValueError("Not JSON")
+        mock_response.text = "<html>Login failed</html>"
+        self.sap_service._SapApiService__log_response_error(mock_response, "test-id")
+        # No exception; would have raised JSONDecodeError before the fix
+
+    def test_sync_all_projects_from_sap_aborts_on_first_401(self):
+        """IO-790: sync aborts on first 401 and re-raises SapAuthenticationError."""
+        mock_401 = MagicMock()
+        mock_401.status_code = 401
+        mock_401.reason = "Unauthorized"
+        mock_401.json.side_effect = ValueError("HTML")
+        mock_401.text = "<html>401</html>"
+        mock_401.raw = MagicMock()
+        mock_401.content = b"<html>"
+        self.sap_service.session.get.return_value = mock_401
+
+        with self.assertRaises(SapAuthenticationError):
+            self.sap_service.sync_all_projects_from_sap(for_financial_statement=True, sap_year=datetime.now().year)
 

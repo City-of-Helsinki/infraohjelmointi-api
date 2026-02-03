@@ -2,7 +2,7 @@ from datetime import datetime
 from django.core.management.base import BaseCommand, CommandError
 
 from django.db import transaction
-from ...services import SapApiService
+from ...services import SapApiService, SapAuthenticationError
 
 
 class Command(BaseCommand):
@@ -40,5 +40,10 @@ class Command(BaseCommand):
         except ValueError as e:
             self.stdout.write(self.style.ERROR(f"Invalid year argument: {year}. Error: {e}"))
             return
-        
-        SapApiService().sync_all_projects_from_sap(for_financial_statement=True, sap_year=year)
+
+        try:
+            SapApiService().sync_all_projects_from_sap(for_financial_statement=True, sap_year=year)
+        except SapAuthenticationError as e:
+            raise CommandError(
+                f"SAP authentication failed (401). Fix credentials and retry. {e}"
+            ) from e
