@@ -102,9 +102,10 @@ class SapApiService:
 
                     self.__start_and_finish_log_print(sync_group, group_id, sap_id, project_id_list, is_start=False, handling_time=handling_time)
 
+                    logger.info(f"SAP sync: about to validate and store for sap_id {sap_id}")
                     if self.validate_costs_and_commitments(sap_costs_and_commitments):
                         costs_by_sap_id_all[sap_id] = sap_costs_and_commitments["all_sap_data"]
-
+                        logger.info(f"SAP sync: storing SapCostService for sap_id {sap_id}")
                         self.__store_sap_data(
                             service_class = SapCostService,
                             group_id=group_id,
@@ -112,8 +113,10 @@ class SapApiService:
                             projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                             current_year=sap_year,
                         )
+                        logger.info(f"SAP sync: stored SapCostService for sap_id {sap_id}")
 
                     costs_by_sap_id_current_year[sap_id] = sap_costs_and_commitments["current_year"]
+                    logger.info(f"SAP sync: storing SapCurrentYearService for sap_id {sap_id}")
                     self.__store_sap_data(
                         service_class = SapCurrentYearService,
                         group_id=group_id,
@@ -121,6 +124,7 @@ class SapApiService:
                         projects_grouped_by_sap_id=projects_grouped_by_sap_id,
                         current_year=sap_year,
                     )
+                    logger.info(f"SAP sync: stored SapCurrentYearService for sap_id {sap_id}")
 
                     logger.info(f"SAP sync: stored data for sap_id {sap_id}, continuing to next project")
                 except SapAuthenticationError:
