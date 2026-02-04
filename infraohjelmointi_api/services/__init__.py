@@ -17,7 +17,7 @@ from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
 from .ClassFinancialService import ClassFinancialService
 from .LocationFinancialService import LocationFinancialService
-from .SapApiService import SapApiService
+from .SapApiService import SapApiService, SapAuthenticationError
 from .SapCostService import SapCostService
 from .AppStateValueService import AppStateValueService
 from .CacheService import CacheService
