@@ -126,7 +126,7 @@ class ProjectWiseDataMapper:
         config = self.field_config.LIST_VALUE_FIELDS[field_name]
 
         if not value:
-            return {config.field: None}
+            return {}
 
         # Get the field mapper
         field_mapper = FIELD_MAPPER_LOOKUP[config.mapper]
@@ -134,11 +134,11 @@ class ProjectWiseDataMapper:
         # Get the actual value from the service
         service_value = self._get_service_value(field_name, value)
         if not service_value:
-            return {config.field: None}
+            return {}
 
         # Map to PW value
         pw_value = field_mapper.get(service_value)
-        return {config.field: pw_value} if pw_value else {config.field: None}
+        return {config.field: pw_value} if pw_value else {}
 
     def _map_enum_field(self, field_name: str, value: Any, project: Project) -> Dict[str, Any]:
         """Map enum fields that map to multiple PW fields."""
