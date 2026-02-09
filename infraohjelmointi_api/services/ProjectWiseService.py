@@ -996,3 +996,8 @@ class PWProjectResponseError(RuntimeError):
     """Error representing PW error with non status code of 200"""
 
     pass
+
+
+class ProjectWiseDataFieldNotFound(RuntimeError):
+    """Error representing that a requested field data was not found"""
+    pass
