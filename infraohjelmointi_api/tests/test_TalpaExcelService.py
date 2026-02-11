@@ -282,7 +282,7 @@ class TalpaExcelServiceTestCase(TestCase):
         
         filename = self.service.get_filename(opening)
         
-        self.assertEqual(filename, "talpa_avauslomake_Test Project.xlsx")
+        self.assertEqual(filename, "Talpa_avauslomake_Test Project.xlsx")
 
     def test_get_filename_format(self):
         opening = TalpaProjectOpening.objects.create(
@@ -295,7 +295,7 @@ class TalpaExcelServiceTestCase(TestCase):
         
         filename = self.service.get_filename(opening)
         
-        self.assertTrue(filename.startswith("talpa_avauslomake_"))
+        self.assertTrue(filename.startswith("Talpa_avauslomake_"))
         self.assertTrue(filename.endswith(".xlsx"))
         self.assertIn("Test Project", filename)
 

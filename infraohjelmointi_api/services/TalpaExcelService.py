@@ -122,5 +122,5 @@ class TalpaExcelService:
         if opening.project and opening.project.name:
             name = opening.project.name
             safe_name = "".join(c for c in name if c.isalnum() or c in " -_")[:50]
-            return f"talpa_avauslomake_{safe_name}.xlsx"
-        return f"talpa_avauslomake_{opening.id}.xlsx"
+            return f"Talpa_avauslomake_{safe_name}.xlsx"
+        return f"Talpa_avauslomake_{opening.id}.xlsx"
