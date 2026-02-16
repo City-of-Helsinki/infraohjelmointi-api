@@ -53,7 +53,7 @@ class ProjectWiseDataMapperTestCase(TestCase):
             'gravel', 'louhi', 'estPlanningStart', 'estPlanningEnd',
             'estConstructionStart', 'estConstructionEnd', 'presenceStart', 'presenceEnd',
             'visibilityStart', 'visibilityEnd', 'area', 'responsibleZone',
-            'constructionPhaseDetail', 'projectDistrict', 'projectClass',
+            'phaseDetail', 'projectDistrict', 'projectClass',
             'personPlanning', 'personConstruction'
         ]
 
@@ -406,7 +406,7 @@ class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
         mock_project.projectDistrict = None
         mock_project.area = None
         mock_project.responsibleZone = None
-        mock_project.constructionPhaseDetail = None
+        mock_project.phaseDetail = None
         mock_project.programmed = True
         mock_project.estPlanningStart = None
         mock_project.estPlanningEnd = None

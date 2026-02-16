@@ -148,7 +148,7 @@ class ProjectViewSet(BaseViewSet):
             "projectClass",
             "name",
             "phase",
-            "constructionPhaseDetail",
+            "phaseDetail",
             "planningStartYear",
             "constructionEndYear",
             "estPlanningStart",

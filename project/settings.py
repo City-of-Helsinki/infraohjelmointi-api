@@ -183,7 +183,12 @@ WSGI_APPLICATION = "project.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {"default": dj_database_url.parse(env("DATABASE_URL"))}
+_db_config = dj_database_url.parse(env("DATABASE_URL"))
+# Use custom PostgreSQL backend so test flush uses TRUNCATE CASCADE (avoids
+# "cannot truncate a table referenced in a foreign key constraint" in tests).
+if _db_config.get("ENGINE") == "django.db.backends.postgresql":
+    _db_config["ENGINE"] = "project.db_backends.postgresql"
+DATABASES = {"default": _db_config}
 
 HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED = env("HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED")
 

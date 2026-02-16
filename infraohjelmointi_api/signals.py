@@ -469,24 +469,45 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
 @receiver(pre_save, sender=Project)
 def on_project_phase_change(sender, instance, **kwargs):
     """
-    Update category to K1 if phase is changed to construction
+    Handle phase change side effects:
+    1. Set category to K1 when entering construction phase
+    2. Track suspension: set suspendedDate/suspendedFromPhase when entering suspended,
+       clear them when leaving suspended
     """
-    # Only act if target phase is construction
-    if not instance.phase or instance.phase.value != "construction":
+    if not instance.phase:
+        return
+
+    # Determine old phase (if this is an update)
+    old_phase_value = None
+    if instance.id:
+        try:
+            old_instance = Project.objects.get(pk=instance.id)
+            old_phase_value = old_instance.phase.value if old_instance.phase else None
+        except Project.DoesNotExist:
+            pass
+
+    new_phase_value = instance.phase.value
+
+    # Skip if phase hasn't changed
+    if old_phase_value == new_phase_value:
         return
 
     try:
-        # Check if this is an update and the phase was already construction
-        if instance.id:
-            try:
-                old_instance = Project.objects.get(pk=instance.id)
-                if old_instance.phase and old_instance.phase.value == "construction":
-                    return
-            except Project.DoesNotExist:
-                pass
+        # K1 category when entering construction
+        if new_phase_value == "construction":
+            instance.category = ProjectCategory.objects.get(value="K1")
 
-        # Apply K1 category
-        instance.category = ProjectCategory.objects.get(value="K1")
+        # Suspension tracking
+        if new_phase_value == "suspended":
+            from datetime import date
+            instance.suspendedDate = date.today()
+            if old_phase_value:
+                from infraohjelmointi_api.services import ProjectPhaseService
+                instance.suspendedFromPhase = ProjectPhaseService.get_by_value(old_phase_value)
+        elif old_phase_value == "suspended":
+            # Leaving suspended — clear fields
+            instance.suspendedDate = None
+            instance.suspendedFromPhase = None
 
     except Exception as e:
         logger.error(f"Error in on_project_phase_change: {e}")

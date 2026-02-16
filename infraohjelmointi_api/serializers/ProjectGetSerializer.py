@@ -14,8 +14,8 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectResponseError,
 )
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
-from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
-    ConstructionPhaseDetailSerializer,
+from infraohjelmointi_api.serializers.ProjectPhaseDetailSerializer import (
+    ProjectPhaseDetailSerializer,
 )
 from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
     ConstructionProcurementMethodSerializer,
@@ -83,7 +83,9 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     frameEstPlanningStart = serializers.DateField(format="%d.%m.%Y")
     frameEstPlanningEnd = serializers.DateField(format="%d.%m.%Y")
     category = ProjectCategorySerializer(read_only=True)
-    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
+    phaseDetail = ProjectPhaseDetailSerializer(read_only=True)
+    suspendedDate = serializers.DateField(format="%Y-%m-%d", read_only=True)
+    suspendedFromPhase = ProjectPhaseSerializer(read_only=True)
     constructionProcurementMethod = ConstructionProcurementMethodSerializer(read_only=True)
     riskAssessment = ProjectRiskSerializer(read_only=True)
     estConstructionStart = serializers.DateField(format="%d.%m.%Y")

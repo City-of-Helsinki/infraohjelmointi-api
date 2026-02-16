@@ -543,4 +543,3 @@ class TestSAPService(TestCase):
 
         with self.assertRaises(SapAuthenticationError):
             self.sap_service.sync_all_projects_from_sap(for_financial_statement=True, sap_year=datetime.now().year)
-

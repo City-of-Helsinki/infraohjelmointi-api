@@ -19,7 +19,7 @@ from ..models import (
     ProjectPhase,
     ProjectPriority,
     ProjectCategory,
-    ConstructionPhaseDetail,
+    ProjectPhaseDetail,
     Note,
     ProjectQualityLevel,
     PlanningPhase,
@@ -255,8 +255,9 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_1_Id, value="preConstruction"
+        self.constructionPhase_obj = ProjectPhase.objects.get_or_create(value="construction")[0]
+        self.conPhaseDetail = ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_1_Id, value="preConstruction", projectPhase=self.constructionPhase_obj
         )
         self.person_3 = Person.objects.create(
             id=self.person_3_Id,
@@ -319,7 +320,7 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=False,
             category=self.projectCategory,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -465,7 +466,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(self.conPhaseDetail.project_set.all()),
             0,
-            msg="No foreign key should exist for constructionPhaseDetail in Project with id {}".format(
+            msg="No foreign key should exist for phaseDetail in Project with id {}".format(
                 self.project_1_Id
             ),
         )
@@ -541,7 +542,7 @@ class ProjectTestCase(TestCase):
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -663,7 +664,7 @@ class ProjectTestCase(TestCase):
             "personProgramming": None,
             "personConstruction": None,
             "category": None,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
             "estPlanningStart": None,
             "estPlanningEnd": None,
             "estConstructionStart": None,
@@ -3130,8 +3131,9 @@ class ProjectTestCase(TestCase):
         self.projectPhase_6_Id = ProjectPhase.objects.get(
             value="warrantyPeriod"
         ).id.__str__()
-        ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_2_Id, value="preConstruction"
+        ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_2_Id, value="preConstruction",
+            projectPhase=ProjectPhase.objects.get(value="construction")
         )
         data = {
             "name": "Testing fields",
@@ -3373,7 +3375,7 @@ class ProjectTestCase(TestCase):
         )
 
         data = {
-            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
+            "phaseDetail": self.conPhaseDetail_2_Id,
             "phase": self.projectPhase_5_Id,
             "programmed": False,
         }
@@ -3411,7 +3413,7 @@ class ProjectTestCase(TestCase):
         data = {
             "programmed": False,
             "phase": ProjectPhase.objects.get(value="proposal").id,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),

@@ -18,8 +18,8 @@ from infraohjelmointi_api.serializers import (
 )
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import ProjectProgrammerSerializer
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
-from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
-    ConstructionPhaseDetailSerializer,
+from infraohjelmointi_api.serializers.ProjectPhaseDetailSerializer import (
+    ProjectPhaseDetailSerializer,
 )
 from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
     ConstructionProcurementMethodSerializer,
@@ -69,6 +69,7 @@ from infraohjelmointi_api.validators.ProjectValidators import (
     ProgrammedValidator,
     ProjectClassValidator,
     ProjectLocationValidator,
+    ProjectPhaseDetailValidator,
     ProjectPhaseValidator,
     VisibilityEndValidator,
     VisibilityStartValidator,
@@ -202,7 +203,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
-        # removed constructionPhaseDetail validator due to inconsistencies in imported data
+        # Re-enabled ProjectPhaseDetailValidator with generalized phase matching logic (IO-389)
         validators = [
             EstPlanningStartValidator(),
             EstPlanningEndValidator(),
@@ -216,6 +217,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             ProjectClassValidator(),
             ProjectLocationValidator(),
             ProjectPhaseValidator(),
+            ProjectPhaseDetailValidator(),
             ConstructionEndYearValidator(),
             PlanningStartYearValidator(),
             ProgrammedValidator(),
@@ -397,9 +399,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             if instance.riskAssessment != None
             else None
         )
-        rep["constructionPhaseDetail"] = (
-            ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
-            if instance.constructionPhaseDetail != None
+        rep["phaseDetail"] = (
+            ProjectPhaseDetailSerializer(instance.phaseDetail).data
+            if instance.phaseDetail != None
             else None
         )
         rep["constructionProcurementMethod"] = (
