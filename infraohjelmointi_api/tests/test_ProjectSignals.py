@@ -3,7 +3,7 @@ from infraohjelmointi_api.models import Project, ProjectPhase, ProjectCategory, 
 
 class ProjectSignalTestCase(TestCase):
     def setUp(self):
-        self.projectType, _ = ProjectType.objects.get_or_create(value="projectComplex", defaults={"valueFi": "Hankekokonaisuus"})
+        self.projectType, _ = ProjectType.objects.get_or_create(value="projectComplex")
         self.phase_proposal, _ = ProjectPhase.objects.get_or_create(value="proposal", defaults={"index": 1})
         self.phase_construction, _ = ProjectPhase.objects.get_or_create(value="construction", defaults={"index": 2})
         self.phase_other, _ = ProjectPhase.objects.get_or_create(value="planning", defaults={"index": 3})

@@ -29,11 +29,28 @@ class TalpaAssetClassSerializer(serializers.ModelSerializer):
 
 class TalpaProjectNumberRangeSerializer(serializers.ModelSerializer):
     """Serializer for TalpaProjectNumberRange in dropdowns"""
+    displayName = serializers.SerializerMethodField(
+        help_text="Computed display name for dropdown (handles null values)"
+    )
+    # groupLabel is now stored in the model (populated during Excel import)
+    # and returned directly - no computation needed here
+    
     class Meta:
         model = TalpaProjectNumberRange
         fields = ["id", "projectTypePrefix", "budgetAccount", "budgetAccountNumber", "rangeStart", "rangeEnd",
-                  "majorDistrict", "majorDistrictName", "area", "unit", "notes", "isActive"]
+                  "majorDistrict", "majorDistrictName", "area", "unit", "notes", "isActive", "displayName", "groupLabel"]
         ref_name = "TalpaProjectNumberRangeNested"
+    
+    def get_displayName(self, obj):
+        """Generate display name based on project type prefix"""
+        if obj.projectTypePrefix == "2814I":
+            # For 2814I: Use majorDistrictName, fallback to notes, fallback to "Ei suurpiiriä"
+            district_or_notes = obj.majorDistrictName or obj.notes or "Ei suurpiiriä"
+            return f"{district_or_notes} / {obj.rangeStart} - {obj.rangeEnd}"
+        else:  # 2814E
+            # For 2814E: Use unit, fallback to "Ei yksikköä"
+            unit = obj.unit or "Ei yksikköä"
+            return f"{unit} / {obj.rangeStart} - {obj.rangeEnd}"
 
 
 class TalpaProjectOpeningSerializer(serializers.ModelSerializer):

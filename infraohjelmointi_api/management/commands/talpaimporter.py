@@ -186,11 +186,12 @@ class Command(BaseCommand):
         if not options['skip_services']:
             self._import_service_classes(wb, stats)
 
-        if not options['skip_ranges']:
-            self._import_project_number_ranges(wb, stats, options)
-
+        # Import project types BEFORE ranges so we can look them up for groupLabel
         if not options['skip_project_types']:
             self._import_project_types(wb, stats)
+
+        if not options['skip_ranges']:
+            self._import_project_number_ranges(wb, stats, options)
 
     def _clear_existing_data(self, options, stats):
         """Clear existing Talpa reference data"""
@@ -458,7 +459,8 @@ class Command(BaseCommand):
             if paren_match:
                 paren_content = paren_match.group(1).strip()
 
-                budget_match = re.match(r'^(8\s*\d{2}\s*\d{2}\s*\d{2}[A-H]?)', paren_content)
+                # Match 3-part (8 XX XX) or 4-part (8 XX XX XX) budget codes, optionally with letter suffix
+                budget_match = re.match(r'^(8\s*\d{2}\s*\d{2}(?:\s*\d{2})?[A-H]?)', paren_content)
 
                 if budget_match:
                     budget_account = budget_match.group(1).strip()
@@ -581,10 +583,10 @@ class Command(BaseCommand):
     def _parse_preconstruction_row(self, row, current_budget_account=None, current_area=None):
         """
         Parse a row from Ohjelmointityökalu_projektinumerovälit.xlsx format.
-        
+
         Format: TA-kohta | Area | Yksikkö | RangeStart | RangeEnd | ContactPerson | | Email
         Example: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099|Satu Järvinen||Satu.Jarvinen@hel.fi
-        
+
         Note: Some rows are continuations where TA-kohta and Area are empty but Unit/Range are filled.
         """
         try:
@@ -602,21 +604,27 @@ class Command(BaseCommand):
             # Skip header rows
             if col_a and ('ta-kohta' in col_a.lower() or 'make-palvelu' in col_a.lower()):
                 return None, current_budget_account, current_area
-            
+
             # Skip rows without valid range data
             if not col_d or not col_d.startswith('2814E'):
                 return None, current_budget_account, current_area
-            
+
             # Update current context if this row has TA-kohta or Area
             if col_a and col_a.startswith('8 '):
                 current_budget_account = col_a
             if col_b and col_b not in ['', 'None']:
-                current_area = col_b
-            
+                # Allow overriding area names with cleaner versions
+                replacements = {
+                    'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
+                    'Malmi (kenttä)': 'Malminkenttä',
+                    'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.'
+                }
+                current_area = replacements.get(col_b, col_b)
+
             # Validate unit
             valid_units = ['Tontit', 'Mao', 'Geo']
             unit = col_c if col_c in valid_units else None
-            
+
             return {
                 'projectTypePrefix': '2814E',
                 'budgetAccount': current_budget_account,
@@ -649,11 +657,20 @@ class Command(BaseCommand):
             if not range_start.startswith('2814'):
                 return None
 
-            if range_start.startswith('2814I') or 'I' in range_start[4:5].upper():
+            # Detect project type prefix:
+            # - "2814I..." or has 'I' at position 4-5 → 2814I
+            # - "2814E..." or has 'E' at position 4-5 → 2814E
+            # - Numeric format "2814100003" (10 digits, no letter) → 2814I (SAP format)
+            # - Default to 2814I for backward compatibility
+            if range_start.startswith('2814I') or (len(range_start) > 4 and range_start[4:5].upper() == 'I'):
                 project_type_prefix = '2814I'
-            elif range_start.startswith('2814E') or 'E' in range_start[4:5].upper():
+            elif range_start.startswith('2814E') or (len(range_start) > 4 and range_start[4:5].upper() == 'E'):
                 project_type_prefix = '2814E'
+            elif len(range_start) == 10 and range_start.isdigit():
+                # Numeric 10-digit format (e.g., "2814100003") is 2814I (SAP format)
+                project_type_prefix = '2814I'
             else:
+                # Default to 2814I for backward compatibility
                 project_type_prefix = '2814I'
 
             district_code = None
@@ -749,6 +766,42 @@ class Command(BaseCommand):
 
         stats['ranges_created'] = total
 
+    def _compute_group_label(self, data):
+        """
+        Compute the groupLabel for a project number range.
+
+        For 2814I: Use budgetAccount + class name from notes (e.g., "8 03 01 01 Katujen uudisrakentaminen")
+        For 2814E: Use "{budgetAccount} {area}" format
+        """
+        project_type_prefix = data.get('projectTypePrefix')
+        budget_account = (data.get('budgetAccount') or '').strip()
+        area = (data.get('area') or '').strip()
+        notes = (data.get('notes') or '').strip()
+
+        if project_type_prefix == '2814I':
+            # For 2814I: Extract class name from notes (format: "Katujen uudisrakentaminen, ETELÄINEN SUURPIIRI")
+            # or for 3-part codes: "8 03 03 YHTEISHANKKEET VÄYLÄVIRASTON KANSSA, Turunväylä"
+            if notes:
+                # Extract class name (part before the comma, excluding district)
+                class_name = notes.split(',')[0].strip() if ',' in notes else notes
+
+                if budget_account:
+                    return f"{budget_account} {class_name}"
+                else:
+                    # For 3-part codes like "8 03 03 YHTEISHANKKEET...", notes already has the full label
+                    # Check if notes starts with a budget code pattern
+                    if class_name.startswith('8 '):
+                        return class_name
+                    return class_name
+
+            # Fallback: use budgetAccount directly
+            return budget_account if budget_account else None
+        else:  # 2814E
+            # For 2814E: Use budgetAccount + area
+            if budget_account and area:
+                return f"{budget_account} {area}"
+            return budget_account if budget_account else (area if area else None)
+
     def _import_project_number_ranges(self, wb, stats, options=None):
         """Import project number ranges"""
         self.stdout.write("Importing Project Number Ranges...")
@@ -764,6 +817,8 @@ class Command(BaseCommand):
                 for row in list(sheet.rows)[1:]:
                     data = self._parse_sap_range_row(row)
                     if data:
+                        # Compute groupLabel by looking up TalpaProjectType
+                        data['groupLabel'] = self._compute_group_label(data)
                         obj, created = TalpaProjectNumberRange.objects.update_or_create(
                             projectTypePrefix=data['projectTypePrefix'],
                             rangeStart=data['rangeStart'],
@@ -786,6 +841,8 @@ class Command(BaseCommand):
                     result = self._parse_preconstruction_row(row, current_budget_account, current_area)
                     if result[0]:  # result is (data, budget_account, area)
                         data, current_budget_account, current_area = result
+                        # Compute groupLabel
+                        data['groupLabel'] = self._compute_group_label(data)
                         obj, created = TalpaProjectNumberRange.objects.update_or_create(
                             projectTypePrefix=data['projectTypePrefix'],
                             rangeStart=data['rangeStart'],
@@ -800,31 +857,46 @@ class Command(BaseCommand):
                         # Update context even if no data returned
                         _, current_budget_account, current_area = result
 
-        # Fallback: Import from main file sheets if no separate files provided
-        if not ranges_wb and not preconstruction_wb:
-            sheets = self._find_project_range_sheets(wb)
+        # Import from main file sheets for any prefix not covered by separate files
+        sheets = self._find_project_range_sheets(wb)
 
-            for prefix, sheet in sheets.items():
-                if not sheet:
-                    continue
-
-                for row in list(sheet.rows)[1:]:
-                    if prefix == '2814I':
-                        data = self._parse_2814I_range_row(row)
+        # Import 2814I from main file if --ranges-file not provided
+        if not ranges_wb and sheets.get('2814I'):
+            self.stdout.write("  Importing 2814I from main file...")
+            sheet = sheets['2814I']
+            for row in list(sheet.rows)[1:]:
+                data = self._parse_2814I_range_row(row)
+                if data:
+                    data['groupLabel'] = self._compute_group_label(data)
+                    obj, created = TalpaProjectNumberRange.objects.update_or_create(
+                        projectTypePrefix=data['projectTypePrefix'],
+                        rangeStart=data['rangeStart'],
+                        rangeEnd=data['rangeEnd'],
+                        defaults=data
+                    )
+                    if created:
+                        stats['ranges_created'] += 1
                     else:
-                        data = self._parse_2814E_range_row(row)
+                        stats['ranges_updated'] += 1
 
-                    if data:
-                        obj, created = TalpaProjectNumberRange.objects.update_or_create(
-                            projectTypePrefix=data['projectTypePrefix'],
-                            rangeStart=data['rangeStart'],
-                            rangeEnd=data['rangeEnd'],
-                            defaults=data
-                        )
-                        if created:
-                            stats['ranges_created'] += 1
-                        else:
-                            stats['ranges_updated'] += 1
+        # Import 2814E from main file if --preconstruction-file not provided
+        if not preconstruction_wb and sheets.get('2814E'):
+            self.stdout.write("  Importing 2814E from main file...")
+            sheet = sheets['2814E']
+            for row in list(sheet.rows)[1:]:
+                data = self._parse_2814E_range_row(row)
+                if data:
+                    data['groupLabel'] = self._compute_group_label(data)
+                    obj, created = TalpaProjectNumberRange.objects.update_or_create(
+                        projectTypePrefix=data['projectTypePrefix'],
+                        rangeStart=data['rangeStart'],
+                        rangeEnd=data['rangeEnd'],
+                        defaults=data
+                    )
+                    if created:
+                        stats['ranges_created'] += 1
+                    else:
+                        stats['ranges_updated'] += 1
 
         self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
 
@@ -1132,6 +1204,42 @@ class Command(BaseCommand):
         self.stdout.write(f"Service Classes: {stats['services_created']} created, {stats['services_updated']} updated")
         self.stdout.write(f"Number Ranges:   {stats['ranges_created']} created, {stats['ranges_updated']} updated")
         self.stdout.write(f"Project Types:   {stats.get('project_types_created', 0)} created/updated")
+
+        # Validate data quality after import
+        if not dry_run and (stats['ranges_created'] > 0 or stats['ranges_updated'] > 0):
+            self.stdout.write("\nVALIDATION:")
+
+            total_ranges = TalpaProjectNumberRange.objects.count()
+            missing_budget = TalpaProjectNumberRange.objects.filter(
+                budgetAccount__isnull=True
+            ).count() + TalpaProjectNumberRange.objects.filter(
+                budgetAccount=''
+            ).count()
+            missing_group = TalpaProjectNumberRange.objects.filter(
+                groupLabel__isnull=True
+            ).count() + TalpaProjectNumberRange.objects.filter(
+                groupLabel=''
+            ).count()
+
+            self.stdout.write(f"  Total ranges: {total_ranges}")
+
+            if missing_budget > 0:
+                self.stdout.write(self.style.WARNING(
+                    f"  ⚠️  {missing_budget} ranges missing budgetAccount ({100*missing_budget//total_ranges}%)"
+                ))
+            else:
+                self.stdout.write(self.style.SUCCESS(
+                    f"  ✅ All ranges have budgetAccount"
+                ))
+
+            if missing_group > 0:
+                self.stdout.write(self.style.WARNING(
+                    f"  ⚠️  {missing_group} ranges missing groupLabel ({100*missing_group//total_ranges}%)"
+                ))
+            else:
+                self.stdout.write(self.style.SUCCESS(
+                    f"  ✅ All ranges have groupLabel"
+                ))
 
         if stats['errors']:
             self.stdout.write(self.style.ERROR(f"\nErrors ({len(stats['errors'])}):"))

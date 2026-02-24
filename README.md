@@ -118,29 +118,48 @@ Import new person information into responsible persons list. The list can be fou
 
 ### Import Talpa reference data
 
-Import Talpa project number ranges, service classes, and asset classes from the official Talpa Excel file:
+Import Talpa project number ranges, service classes, asset classes, and project types from Excel files.
+
+**Recommended production import** (replaces old data completely):
 
   ```bash
-  python manage.py talpaimporter --file path/to/Projektin_avauslomake_Infra.xlsx
+  docker exec infraohjelmointi-api python manage.py talpaimporter \
+    --file "Projektin avauslomake Infra 27.10.2025.xlsx" \
+    --preconstruction-file "Ohjelmointityökalu_projektinumerovälit.xlsx" \
+    --clear-existing
   ```
 
-Or using the import script:
+This imports:
+- **2814I ranges** (Infra Investment) from main file with budget codes and class hierarchy
+- **2814E ranges** (Pre-Construction) from preconstruction file with unit values
+- **Service classes** (Palveluluokat) from main file
+- **Asset classes** (Käyttöomaisuusluokat) from main file
+- **Project types** (Lajit & Prioriteetit) from main file
+
+**Basic import without clearing** (merges with existing):
 
   ```bash
-  ./import-excels.sh -t path/to/Projektin_avauslomake_Infra.xlsx
+  python manage.py talpaimporter --file "Projektin avauslomake Infra.xlsx"
   ```
 
-Use `--dry-run` to preview changes before importing:
+**Preview changes before importing**:
 
   ```bash
   python manage.py talpaimporter --file path/to/excel.xlsx --dry-run
   ```
 
-Additional options:
-- `--clear-existing`: Clear all existing Talpa reference data before importing
-- `--skip-ranges`: Skip importing project number ranges
-- `--skip-services`: Skip importing service classes
-- `--skip-assets`: Skip importing asset classes
+**Additional options**:
+- `--clear-existing` - Clear all existing Talpa reference data before importing
+- `--preconstruction-file` - Separate Excel file for 2814E ranges (Ohjelmointityökalu)
+- `--skip-ranges` - Skip importing project number ranges
+- `--skip-services` - Skip importing service classes  
+- `--skip-assets` - Skip importing asset classes
+- `--skip-project-types` - Skip importing project types
+- `--dry-run` - Preview changes without modifying database
+
+**Notes**:
+- Main file contains complete 2814I data with class hierarchy codes
+- Re-import after deployment if model fields change (e.g., after migration 0088)
 
 ### Updates to database
 
