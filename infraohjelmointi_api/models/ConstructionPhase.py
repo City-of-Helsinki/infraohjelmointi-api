@@ -7,3 +7,7 @@ class ConstructionPhase(models.Model):
     value = models.CharField(max_length=30)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["order"]

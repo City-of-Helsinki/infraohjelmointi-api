@@ -6,3 +6,4 @@ from rest_framework import serializers
 class ProjectResponsibleZoneSerializer(serializers.ModelSerializer):
     class Meta(BaseMeta):
         model = ResponsibleZone
+

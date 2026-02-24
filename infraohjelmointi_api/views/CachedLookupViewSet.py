@@ -1,7 +1,12 @@
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework import status
+from django.db import transaction
+from django.core.exceptions import FieldDoesNotExist
 
 from infraohjelmointi_api.services.CacheService import CacheService
 from .BaseViewSet import BaseViewSet
+
 
 
 class CachedLookupViewSet(BaseViewSet):
@@ -48,6 +53,41 @@ class CachedLookupViewSet(BaseViewSet):
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
 
+    @action(detail=False, methods=["put"], url_path="reorder")
+    def reorder(self, request):
+        model = self.get_queryset().model
 
+        try:
+            model._meta.get_field("order")
+        except FieldDoesNotExist:
+            return Response(
+                {"detail": "This model does not support ordering."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        data = request.data
 
+        if not isinstance(data, list):
+            return Response(
+                {"detail": "Expected a list of objects."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            for item in data:
+                if "id" not in item or "order" not in item:
+                    return Response(
+                        {"detail": "Each item must contain 'id' and 'order'."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                self.get_queryset().filter(id=item["id"]).update(
+                    order=item["order"]
+                )
+
+        CacheService.invalidate_lookup(self.get_cache_key_name())
+
+        return Response(
+            {"status": "order updated"},
+            status=status.HTTP_200_OK
+        )

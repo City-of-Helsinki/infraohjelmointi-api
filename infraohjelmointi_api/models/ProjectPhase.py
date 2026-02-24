@@ -8,11 +8,15 @@ class ProjectPhase(models.Model):
     index = models.PositiveIntegerField(default=0, blank=False, null=False)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
+    order = models.IntegerField(default=0)
 
     class Meta:
+        ordering = ["order"]
+
         constraints = [
             models.UniqueConstraint(
                 fields=["value"],
                 name="Unique constraint ProjectPhase",
             )
         ]
+
