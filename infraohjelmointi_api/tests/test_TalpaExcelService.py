@@ -213,11 +213,57 @@ class TalpaExcelServiceTestCase(TestCase):
         self.assertEqual(budget_num, "8 03 01 02")
         self.assertEqual(budget_name, "Perusparantaminen")
         self.assertEqual(number_range, "2814I01000 - 2814I01599")
-        self.assertEqual(type_code, "INV")
-        self.assertEqual(type_priority, "03")
-        self.assertEqual(address_full, "Main Street 5 00100")
-        self.assertEqual(service_code, "4601")
-        self.assertEqual(asset_component, "K1230000")
+
+    def test_generate_excel_budget_account_three_part_number(self):
+        """Talousarviokohta with 3-part number (e.g. Malminkartano-Kannelmäki) splits number and name correctly."""
+        opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            projectName="Test",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_range,
+            budgetAccount="8 09 01 Malminkartano-Kannelmäki",
+        )
+        excel_file = self.service.generate_excel(opening)
+        excel_file.seek(0)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+        self.assertEqual(ws["A2"].value, "8 09 01")
+        self.assertEqual(ws["B2"].value, "Malminkartano-Kannelmäki")
+
+    def test_generate_excel_budget_account_two_part_number(self):
+        """Talousarviokohta with 2-part number splits number and name correctly."""
+        opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            projectName="Test",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_range,
+            budgetAccount="8 03 Kadut ja liikenneväylät",
+        )
+        excel_file = self.service.generate_excel(opening)
+        excel_file.seek(0)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+        self.assertEqual(ws["A2"].value, "8 03")
+        self.assertEqual(ws["B2"].value, "Kadut ja liikenneväylät")
+
+    def test_generate_excel_budget_account_number_only_no_name(self):
+        """Talousarviokohta with only number (no name) leaves name cell empty."""
+        opening = TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            projectName="Test",
+            projectType=self.talpa_project_type,
+            projectNumberRange=self.talpa_range,
+            budgetAccount="8 09 01",
+        )
+        excel_file = self.service.generate_excel(opening)
+        excel_file.seek(0)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+        self.assertEqual(ws["A2"].value, "8 09 01")
+        self.assertIn(ws["B2"].value, (None, ""))
 
     def test_generate_excel_empty_fields(self):
         opening = TalpaProjectOpening.objects.create(

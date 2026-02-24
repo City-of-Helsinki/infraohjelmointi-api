@@ -49,19 +49,27 @@ class TalpaExcelService:
 
     def _get_computed(self, opening, field: str) -> str:
         if field == "_budgetAccountNumber":
-            # Extract number from "8 03 01 02 Perusparantaminen..."
+            # Extract number: leading digit-only segments (e.g. "8 03 01 01" or "8 09 01")
             val = opening.budgetAccount or ""
-            parts = val.split(" ")
-            if len(parts) >= 4:
-                return " ".join(parts[0:4])
-            return val
+            parts = val.split()
+            number_parts = []
+            for p in parts:
+                if p.isdigit():
+                    number_parts.append(p)
+                else:
+                    break
+            return " ".join(number_parts) if number_parts else val
         if field == "_budgetAccountName":
-            # Extract name part after the number
+            # Extract name part: everything after the leading digit segments
             val = opening.budgetAccount or ""
-            parts = val.split(" ")
-            if len(parts) >= 5:
-                return " ".join(parts[4:]).strip()
-            return ""
+            parts = val.split()
+            name_start = 0
+            for i, p in enumerate(parts):
+                if not p.isdigit():
+                    name_start = i
+                    break
+                name_start = i + 1
+            return " ".join(parts[name_start:]).strip() if name_start < len(parts) else ""
         if field == "_numberRange" and opening.projectNumberRange:
             r = opening.projectNumberRange
             return f"{r.rangeStart} - {r.rangeEnd}"
