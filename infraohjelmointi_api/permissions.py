@@ -17,6 +17,9 @@ DJANGO_BASE_UPDATE_ONLY_ACTIONS = [
     "partial_update",
     "send_to_talpa",
 ]
+DJANGO_BASE_REORDER_ONLY_ACTIONS = [
+    "reorder"
+]
 DJANGO_BASE_CREATE_ONLY_ACTIONS = ["create"]
 DJANGO_BASE_DELETE_ONLY_ACTIONS = ["destroy"]
 DJANGO_BASE_DELETE_OR_CREATE_ACTIONS = [
@@ -430,6 +433,7 @@ class IsAdmin(permissions.BasePermission):
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *DJANGO_BASE_REORDER_ONLY_ACTIONS,
                 *DJANGO_BASE_CREATE_ONLY_ACTIONS,
                 *DJANGO_BASE_DELETE_ONLY_ACTIONS,
                 *PROJECT_CLASS_ALL_ACTIONS,
