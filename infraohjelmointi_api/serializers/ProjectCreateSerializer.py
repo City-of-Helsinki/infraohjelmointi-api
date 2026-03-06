@@ -387,6 +387,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             if instance.personConstruction != None
             else None
         )
+        rep["otherPersons"] = PersonSerializer(instance.otherPersons, many=True).data
         rep["category"] = (
             ProjectCategorySerializer(instance.category).data
             if instance.category != None
