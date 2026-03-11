@@ -1,13 +1,14 @@
 import uuid
 from django.db import models
+from .OrderedLookupModel import OrderedLookupModel
 
-class ProjectProgrammer(models.Model):
+
+class ProjectProgrammer(OrderedLookupModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     firstName = models.CharField(max_length=200)
     lastName = models.CharField(max_length=200)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
-    order = models.IntegerField(default=0)
     person = models.ForeignKey(
         "Person",
         on_delete=models.SET_NULL,
@@ -17,7 +18,6 @@ class ProjectProgrammer(models.Model):
     )
 
     class Meta:
-        ordering = ["order"]
         # Prevent duplicate programmers with same name
         unique_together = [['firstName', 'lastName']]
 
