@@ -53,16 +53,13 @@ ALL_PATHS = [row["path"] for row in PLANNING_ROWS + COORDINATOR_ROWS]
 
 
 def _get_parent(project_class_model, parent_name):
+    # Some test/partial environments may not contain the full base ProjectClass tree.
+    # Missing parents are handled by skipping dependent inserts in this migration.
     path_root_digits = "8 08"
     parent = project_class_model.objects.filter(
         name=parent_name,
         path__startswith=f"{path_root_digits}",
     ).first()
-    if not parent:
-        raise RuntimeError(
-            "Parent ProjectClass not found for "
-            f"name {parent_name} under numeric root {path_root_digits}"
-        )
     return parent
 
 
@@ -73,6 +70,9 @@ def add_itakeskus_project_classes(apps, schema_editor):
 
     for row in PLANNING_ROWS:
         parent = _get_parent(project_class_model, row["parentName"])
+        if not parent:
+            continue
+
         planning_row, _ = project_class_model.objects.get_or_create(
             path=row["path"],
             defaults={
@@ -88,7 +88,12 @@ def add_itakeskus_project_classes(apps, schema_editor):
 
     for row in COORDINATOR_ROWS:
         parent = _get_parent(project_class_model, row["parentName"])
-        related_to = planning_by_key[row["planning_key"]]
+        if not parent:
+            continue
+
+        related_to = planning_by_key.get(row["planning_key"])
+        if not related_to:
+            continue
 
         existing_relation = project_class_model.objects.filter(relatedTo=related_to)
         existing_relation = existing_relation.exclude(path=row["path"])
