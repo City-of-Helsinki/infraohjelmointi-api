@@ -298,7 +298,6 @@ class ProjectTestCase(TestCase):
         )
 
         self.project = Project.objects.create(
-            otherPersons="Other Test Person",
             projectClass=self.projectClass,
             id=self.project_1_Id,
             projectLocation=self.projectLocation,
@@ -364,6 +363,7 @@ class ProjectTestCase(TestCase):
             effectHousing=False,
         )
         self.project.favPersons.add(self.person_1, self.person_2)
+        self.project.otherPersons.add(self.person_3)
         self.project.hashTags.add(self.projectHashTag_1, self.projectHashTag_2)
 
     def test_project_is_created(self):
@@ -510,6 +510,12 @@ class ProjectTestCase(TestCase):
             projectHashtag_1_reverse_query,
             projectHashtag_2_reverse_query,
             msg="Reverse relationship from manyTomany HashTag keys do not point to the same Project or does not exist",
+        )
+        person_3_reverse_query = self.person_3.other.all().values()[0]
+        self.assertDictEqual(
+            person_3_reverse_query,
+            person_2_reverse_query,
+            msg="Reverse relationship from manyTomany Person keys do not point to the same Project or does not exist",
         )
 
     def test_GET_all_projects(self):
@@ -728,7 +734,7 @@ class ProjectTestCase(TestCase):
             "masterPlanAreaNumber": None,
             "trafficPlanNumber": None,
             "projectGroup": None,
-            "otherPersons": None,
+            "otherPersons": [],
         }
         response = self.client.post(
             "/projects/",
@@ -756,6 +762,35 @@ class ProjectTestCase(TestCase):
             Project.objects.filter(id=new_createdId).exists(),
             True,
             msg="Project created using POST request does not exist in DB",
+        )
+
+    @mock_projectwise_create_service
+    def test_POST_project_with_other_persons(self):
+        data = {
+            "name": "Test_POST_PROJECT_otherPersons",
+            "description": "Description of POST project",
+            "otherPersons": [
+                self.person_1.id.__str__(),
+                self.person_2.id.__str__(),
+            ],
+        }
+
+        response = self.client.post(
+            "/projects/",
+            data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.json())
+        self.assertCountEqual(
+            [person["id"] for person in response.json()["otherPersons"]],
+            data["otherPersons"],
+        )
+
+        created_project = Project.objects.get(id=response.json()["id"])
+        self.assertCountEqual(
+            list(created_project.otherPersons.values_list("id", flat=True)),
+            [self.person_1.id, self.person_2.id],
         )
 
     @mock_projectwise_create_service
@@ -799,6 +834,44 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus1"], "600.00")
         self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus2"], None)
         self.assertEqual(response.json()["finances"]["preliminaryCurrentYearPlus3"], "0.00")
+
+    @mock_projectwise_create_service
+    def test_PATCH_project_other_persons_replace_and_clear(self):
+        replace_data = {
+            "otherPersons": [
+                self.person_1.id.__str__(),
+                self.person_2.id.__str__(),
+            ]
+        }
+
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            replace_data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertCountEqual(
+            [person["id"] for person in response.json()["otherPersons"]],
+            replace_data["otherPersons"],
+        )
+
+        self.project.refresh_from_db()
+        self.assertCountEqual(
+            list(self.project.otherPersons.values_list("id", flat=True)),
+            [self.person_1.id, self.person_2.id],
+        )
+
+        clear_data = {"otherPersons": []}
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            clear_data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertEqual(response.json()["otherPersons"], [])
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.otherPersons.count(), 0)
 
     def test_DELETE_project(self):
         response = self.client.delete("/projects/{}/".format(self.project_1_Id))
@@ -939,7 +1012,6 @@ class ProjectTestCase(TestCase):
             "entityName": "Entity Name",
             "delays": "    100 delays   .",
             "comments": "This comment is    random    ",
-            "otherPersons": " john    Doe  Person .",
         }
 
         validData = {
@@ -951,7 +1023,6 @@ class ProjectTestCase(TestCase):
             "entityName": "Entity Name",
             "delays": "100 delays .",
             "comments": "This comment is random",
-            "otherPersons": "John Doe Person.",
         }
 
         response = self.client.post(

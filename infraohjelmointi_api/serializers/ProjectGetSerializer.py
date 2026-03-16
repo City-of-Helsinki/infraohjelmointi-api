@@ -78,6 +78,7 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     personPlanning = PersonSerializer(read_only=True)
     personProgramming = ProjectProgrammerSerializer(read_only=True)
     personConstruction = PersonSerializer(read_only=True)
+    otherPersons = PersonSerializer(many=True, read_only=True)
     estPlanningStart = serializers.DateField(format="%d.%m.%Y")
     estPlanningEnd = serializers.DateField(format="%d.%m.%Y")
     frameEstPlanningStart = serializers.DateField(format="%d.%m.%Y")

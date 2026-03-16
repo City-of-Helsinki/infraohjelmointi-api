@@ -83,7 +83,9 @@ class Project(models.Model):
     address = models.CharField(max_length=250, blank=True, null=True)
     postalCode = models.CharField(max_length=20, blank=True)
     city = models.CharField(max_length=200, blank=True)
-    otherPersons = models.CharField(max_length=100, blank=True, null=True)
+    otherPersons = models.ManyToManyField(
+        Person, related_name="other", blank=True
+    )
     description = models.TextField(max_length=1000, blank=False, null=False)
     personPlanning = models.ForeignKey(
         Person,
@@ -300,8 +302,6 @@ class Project(models.Model):
             self.comments = self._strip_whitespaces(self.comments)
         if self.delays:
             self.delays = self._strip_whitespaces(self.delays)
-        if self.otherPersons:
-            self.otherPersons = self._strip_whitespaces(self.otherPersons)
 
     class Meta:
         constraints = [
