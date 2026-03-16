@@ -782,7 +782,10 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 201, msg=response.json())
-        self.assertCountEqual(response.json()["otherPersons"], data["otherPersons"])
+        self.assertCountEqual(
+            [person["id"] for person in response.json()["otherPersons"]],
+            data["otherPersons"],
+        )
 
         created_project = Project.objects.get(id=response.json()["id"])
         self.assertCountEqual(
@@ -847,7 +850,10 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200, msg=response.json())
-        self.assertCountEqual(response.json()["otherPersons"], replace_data["otherPersons"])
+        self.assertCountEqual(
+            [person["id"] for person in response.json()["otherPersons"]],
+            replace_data["otherPersons"],
+        )
 
         self.project.refresh_from_db()
         self.assertCountEqual(
