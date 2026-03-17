@@ -12,6 +12,7 @@ from .TaskStatus import TaskStatus
 from .Note import Note
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
 from .ConstructionProcurementMethod import ConstructionProcurementMethod
+from .StaraProcurementReason import StaraProcurementReason
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
