@@ -58,6 +58,7 @@ from infraohjelmointi_api.serializers.SapCurrentYearSerializer import SapCurrent
 from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
 from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
+from infraohjelmointi_api.serializers.serializer_utils import get_pw_folder_link_for_project
 from rest_framework import serializers
 import environ
 from overrides import override
@@ -132,22 +133,10 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         return 0
 
     def get_pw_folder_link(self, project: Project):
-        if not self.context.get("get_pw_link", False) or project.hkrId is None:
+        if not self.context.get("get_pw_link", False):
             return None
 
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
-
-        try:
-            pwInstanceId = self.projectWiseService.get_project_from_pw(
-                id=project.hkrId
-            ).get("instanceId", None)
-            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
-        except (PWProjectNotFoundError, PWProjectResponseError):
-            return None
+        return get_pw_folder_link_for_project(project, self.projectWiseService)
 
     def get_locked(self, project):
         try:

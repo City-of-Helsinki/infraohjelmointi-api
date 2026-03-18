@@ -60,6 +60,7 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
 )
 from infraohjelmointi_api.serializers.UpdateListSerializer import UpdateListSerializer
 from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
+from infraohjelmointi_api.serializers.serializer_utils import get_pw_folder_link_for_project
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,
     EstConstructionEndValidator,
@@ -226,24 +227,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         ]
 
     def get_pw_folder_link(self, project: Project):
-        if project.hkrId is None:
-            return None
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
-
-        try:
-            pwInstanceId = self.projectWiseService.get_project_from_pw(
-                id=project.hkrId
-            ).get("instanceId", None)
-            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
-        except (
-            PWProjectNotFoundError,
-            PWProjectResponseError,
-        ):
-            return None
+        return get_pw_folder_link_for_project(project, self.projectWiseService)
 
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
