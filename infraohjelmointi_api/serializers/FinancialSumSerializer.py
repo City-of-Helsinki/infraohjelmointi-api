@@ -257,6 +257,8 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             # Planning locations: don't cache (have coordinatorLocation attribute)
             elif getattr(instance, "coordinatorLocation", None):
                 use_cache = False
+        elif _type == "ProjectGroup":
+            use_cache = False
 
         cached_result = None
         if use_cache:
