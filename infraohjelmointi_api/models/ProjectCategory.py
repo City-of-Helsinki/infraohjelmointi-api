@@ -1,8 +1,9 @@
 import uuid
 from django.db import models
+from .OrderedLookupModel import OrderedLookupModel
 
 
-class ProjectCategory(models.Model):
+class ProjectCategory(OrderedLookupModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.CharField(max_length=7)
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)

@@ -1,8 +1,9 @@
 import uuid
 from django.db import models
+from .OrderedLookupModel import OrderedLookupModel
 
 
-class ProjectPhase(models.Model):
+class ProjectPhase(OrderedLookupModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     value = models.CharField(max_length=30)
     index = models.PositiveIntegerField(default=0, blank=False, null=False)
