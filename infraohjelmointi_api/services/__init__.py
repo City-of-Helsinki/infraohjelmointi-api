@@ -13,6 +13,7 @@ from .ProjectTypeService import ProjectTypeService
 from .ProjectTypeQualifierService import ProjectTypeQualifierService
 from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
 from .ConstructionProcurementMethodService import ConstructionProcurementMethodService
+from .StaraProcurementReasonService import StaraProcurementReasonService
 from .ProjectCategoryService import ProjectCategoryService
 from .ProjectFinancialService import ProjectFinancialService
 from .ClassFinancialService import ClassFinancialService

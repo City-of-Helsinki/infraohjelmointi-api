@@ -24,6 +24,9 @@ from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
 from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
     ConstructionProcurementMethodSerializer,
 )
+from infraohjelmointi_api.serializers.StaraProcurementReasonSerializer import (
+    StaraProcurementReasonSerializer,
+)
 from infraohjelmointi_api.serializers.ConstructionPhaseSerializer import (
     ConstructionPhaseSerializer,
 )
@@ -57,6 +60,7 @@ from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import (
 )
 from infraohjelmointi_api.serializers.UpdateListSerializer import UpdateListSerializer
 from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
+from infraohjelmointi_api.serializers.serializer_utils import get_pw_folder_link_for_project
 from infraohjelmointi_api.validators.ProjectValidators import (
     ConstructionEndYearValidator,
     EstConstructionEndValidator,
@@ -223,24 +227,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         ]
 
     def get_pw_folder_link(self, project: Project):
-        if project.hkrId is None:
-            return None
-        # Initializing the service here instead of when first defining the variable in the class body
-        # Because on app startup, before DB tables are created, Serializer gets initialized and
-        # causes the initialization of ProjectWiseService which calls the DB
-        if self.projectWiseService is None:
-            self.projectWiseService = ProjectWiseService()
-
-        try:
-            pwInstanceId = self.projectWiseService.get_project_from_pw(
-                id=project.hkrId
-            ).get("instanceId", None)
-            return env("PW_PROJECT_FOLDER_LINK").format(pwInstanceId)
-        except (
-            PWProjectNotFoundError,
-            PWProjectResponseError,
-        ):
-            return None
+        return get_pw_folder_link_for_project(project, self.projectWiseService)
 
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
@@ -337,102 +324,41 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         #         instance.lock.create(lockType="status_construction", lockedBy=None)
         return super(ProjectCreateSerializer, self).update(instance, validated_data)
 
+    def _serialize_optional_field(self, value, serializer_class, many=False):
+        """
+        Helper method to serialize optional nested fields.
+        Eliminates code duplication for null-checking and serialization.
+        """
+        return (
+            serializer_class(value, many=many).data
+            if value is not None
+            else None
+        )
+
     @override
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["phase"] = (
-            ProjectPhaseSerializer(instance.phase).data
-            if instance.phase != None
-            else None
-        )
-        rep["area"] = (
-            ProjectAreaSerializer(instance.area).data if instance.area != None else None
-        )
-
-        rep["type"] = (
-            ProjectTypeSerializer(instance.type).data if instance.type != None else None
-        )
-        rep["typeQualifier"] = (
-            ProjectTypeQualifierSerializer(instance.typeQualifier).data
-            if instance.typeQualifier != None
-            else None
-        )
-        rep["priority"] = (
-            ProjectPrioritySerializer(instance.priority).data
-            if instance.priority != None
-            else None
-        )
-        rep["siteId"] = (
-            BudgetItemSerializer(instance.siteId).data
-            if instance.siteId != None
-            else None
-        )
-        rep["projectSet"] = (
-            ProjectSetCreateSerializer(instance.projectSet).data
-            if instance.projectSet != None
-            else None
-        )
-        rep["personPlanning"] = (
-            PersonSerializer(instance.personPlanning).data
-            if instance.personPlanning != None
-            else None
-        )
-        rep["personProgramming"] = (
-            ProjectProgrammerSerializer(instance.personProgramming).data
-            if instance.personProgramming != None
-            else None
-        )
-        rep["personConstruction"] = (
-            PersonSerializer(instance.personConstruction).data
-            if instance.personConstruction != None
-            else None
-        )
-        rep["otherPersons"] = PersonSerializer(instance.otherPersons, many=True).data
-        rep["category"] = (
-            ProjectCategorySerializer(instance.category).data
-            if instance.category != None
-            else None
-        )
-        rep["riskAssessment"] = (
-            ProjectRiskSerializer(instance.riskAssessment).data
-            if instance.riskAssessment != None
-            else None
-        )
-        rep["constructionPhaseDetail"] = (
-            ConstructionPhaseDetailSerializer(instance.constructionPhaseDetail).data
-            if instance.constructionPhaseDetail != None
-            else None
-        )
-        rep["constructionProcurementMethod"] = (
-            ConstructionProcurementMethodSerializer(instance.constructionProcurementMethod).data
-            if instance.constructionProcurementMethod != None
-            else None
-        )
-        rep["constructionPhase"] = (
-            ConstructionPhaseSerializer(instance.constructionPhase).data
-            if instance.constructionPhase != None
-            else None
-        )
-        rep["planningPhase"] = (
-            PlanningPhaseSerializer(instance.planningPhase).data
-            if instance.planningPhase != None
-            else None
-        )
-        rep["projectQualityLevel"] = (
-            ProjectQualityLevelSerializer(instance.projectQualityLevel).data
-            if instance.projectQualityLevel != None
-            else None
-        )
-        rep["responsibleZone"] = (
-            ProjectResponsibleZoneSerializer(instance.responsibleZone).data
-            if instance.responsibleZone != None
-            else None
-        )
-        rep["budgetOverrunReason"] = (
-            BudgetOverrunReasonSerializer(instance.budgetOverrunReason).data
-            if instance.budgetOverrunReason != None
-            else None
-        )
+        rep["phase"] = self._serialize_optional_field(instance.phase, ProjectPhaseSerializer)
+        rep["area"] = self._serialize_optional_field(instance.area, ProjectAreaSerializer)
+        rep["type"] = self._serialize_optional_field(instance.type, ProjectTypeSerializer)
+        rep["typeQualifier"] = self._serialize_optional_field(instance.typeQualifier, ProjectTypeQualifierSerializer)
+        rep["priority"] = self._serialize_optional_field(instance.priority, ProjectPrioritySerializer)
+        rep["siteId"] = self._serialize_optional_field(instance.siteId, BudgetItemSerializer)
+        rep["projectSet"] = self._serialize_optional_field(instance.projectSet, ProjectSetCreateSerializer)
+        rep["personPlanning"] = self._serialize_optional_field(instance.personPlanning, PersonSerializer)
+        rep["personProgramming"] = self._serialize_optional_field(instance.personProgramming, ProjectProgrammerSerializer)
+        rep["personConstruction"] = self._serialize_optional_field(instance.personConstruction, PersonSerializer)
+        rep["otherPersons"] = self._serialize_optional_field(instance.otherPersons, PersonSerializer, many=True)
+        rep["category"] = self._serialize_optional_field(instance.category, ProjectCategorySerializer)
+        rep["riskAssessment"] = self._serialize_optional_field(instance.riskAssessment, ProjectRiskSerializer)
+        rep["constructionPhaseDetail"] = self._serialize_optional_field(instance.constructionPhaseDetail, ConstructionPhaseDetailSerializer)
+        rep["constructionProcurementMethod"] = self._serialize_optional_field(instance.constructionProcurementMethod, ConstructionProcurementMethodSerializer)
+        rep["staraProcurementReason"] = self._serialize_optional_field(instance.staraProcurementReason, StaraProcurementReasonSerializer)
+        rep["constructionPhase"] = self._serialize_optional_field(instance.constructionPhase, ConstructionPhaseSerializer)
+        rep["planningPhase"] = self._serialize_optional_field(instance.planningPhase, PlanningPhaseSerializer)
+        rep["projectQualityLevel"] = self._serialize_optional_field(instance.projectQualityLevel, ProjectQualityLevelSerializer)
+        rep["responsibleZone"] = self._serialize_optional_field(instance.responsibleZone, ProjectResponsibleZoneSerializer)
+        rep["budgetOverrunReason"] = self._serialize_optional_field(instance.budgetOverrunReason, BudgetOverrunReasonSerializer)
         return rep
 
     def _sync_new_project_to_projectwise(self, project: Project):

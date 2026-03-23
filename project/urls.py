@@ -54,6 +54,11 @@ router.register(
     basename="constructionProcurementMethods",
 )
 router.register(
+    r"stara-procurement-reasons",
+    views.StaraProcurementReasonViewSet,
+    basename="staraProcurementReasons",
+)
+router.register(
     r"project-categories", views.ProjectCategoryViewSet, basename="projectCategories"
 )
 router.register(r"project-risks", views.ProjectRiskViewSet, basename="projectRisks")
