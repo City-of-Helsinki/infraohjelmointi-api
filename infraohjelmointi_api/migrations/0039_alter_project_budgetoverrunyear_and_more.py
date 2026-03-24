@@ -3,7 +3,6 @@
 import django.core.validators
 from django.db import migrations, models
 import django.db.models.deletion
-import infraohjelmointi_api.models.Project
 from django.db.models import Q
 
 
@@ -18,11 +17,6 @@ def update_altered_field_to_new_defaults(apps, schema_editor):
     ).update(planningStartYear=None, budgetOverrunYear=None, constructionEndYear=None)
     if default_phase:
         Project.objects.filter(phase=None).update(phase=default_phase)
-
-
-def get_default_phase(apps, schema_editor):
-    ProjectPhase = apps.get_model("infraohjelmointi_api", "ProjectPhase")
-    return ProjectPhase.objects.filter(value="proposal").first()
 
 
 class Migration(migrations.Migration):
