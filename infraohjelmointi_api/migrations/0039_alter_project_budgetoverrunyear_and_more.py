@@ -3,18 +3,20 @@
 import django.core.validators
 from django.db import migrations, models
 import django.db.models.deletion
-import infraohjelmointi_api.models.Project
 from django.db.models import Q
 
 
 def update_altered_field_to_new_defaults(apps, schema_editor):
     Project = apps.get_model("infraohjelmointi_api", "Project")
+    ProjectPhase = apps.get_model("infraohjelmointi_api", "ProjectPhase")
+
+    default_phase = ProjectPhase.objects.filter(value="proposal").first()
+
     Project.objects.filter(
         Q(planningStartYear=0) | Q(budgetOverrunYear=0) | Q(constructionEndYear=0)
     ).update(planningStartYear=None, budgetOverrunYear=None, constructionEndYear=None)
-    Project.objects.filter(phase=None).update(
-        phase=infraohjelmointi_api.models.Project.get_default_projectPhase()
-    )
+    if default_phase:
+        Project.objects.filter(phase=None).update(phase=default_phase)
 
 
 class Migration(migrations.Migration):
@@ -57,7 +59,6 @@ class Migration(migrations.Migration):
             name="phase",
             field=models.ForeignKey(
                 blank=True,
-                default=infraohjelmointi_api.models.Project.get_default_projectPhase,
                 null=True,
                 on_delete=django.db.models.deletion.DO_NOTHING,
                 to="infraohjelmointi_api.projectphase",
@@ -84,3 +85,4 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(update_altered_field_to_new_defaults),
     ]
+

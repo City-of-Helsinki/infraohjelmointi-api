@@ -1,12 +1,11 @@
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from .CachedLookupViewSet import CachedLookupViewSet
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import ProjectProgrammerSerializer
 from infraohjelmointi_api.models import ProjectProgrammer
 
 
-class ProjectProgrammerViewSet(ReadOnlyModelViewSet):
+class ProjectProgrammerViewSet(CachedLookupViewSet):
     """
-    API endpoint that allows Project Programmers to be viewed.
-    Read-only - programmers are managed through admin interface.
+    API endpoint that allows Project Programmers to be viewed or edited.
     """
     queryset = ProjectProgrammer.objects.all()
     serializer_class = ProjectProgrammerSerializer

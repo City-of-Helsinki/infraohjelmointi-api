@@ -1,7 +1,9 @@
 import uuid
 from django.db import models
+from .OrderedLookupModel import OrderedLookupModel
 
-class ProjectProgrammer(models.Model):
+
+class ProjectProgrammer(OrderedLookupModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     firstName = models.CharField(max_length=200)
     lastName = models.CharField(max_length=200)
