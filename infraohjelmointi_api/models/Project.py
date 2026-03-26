@@ -31,12 +31,6 @@ from overrides import override
 
 
 class Project(models.Model):
-    def get_default_projectPhase():
-        try:
-            return ProjectPhase.objects.get(value="proposal")
-        except ProjectPhase.DoesNotExist:
-            return None
-
     def get_default_projectPriority():
         try:
             return ProjectPriority.objects.get(value__iexact="medium")
@@ -114,7 +108,6 @@ class Project(models.Model):
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
-        default=get_default_projectPhase,
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", blank=True
