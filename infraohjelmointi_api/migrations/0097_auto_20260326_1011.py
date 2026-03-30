@@ -41,6 +41,8 @@ def reverse_update_construction_procurement_method_value(apps, schema_editor):
         "directProcurement",
     ]
 
+    ConstructionProcurementMethod.objects.get_or_create(value="Puitesopimus")
+
     qs = ConstructionProcurementMethod.objects.filter(value__in=values_to_remove)
     Project.objects.filter(constructionProcurementMethod__in=qs).update(constructionProcurementMethod=None)
     qs.delete()
