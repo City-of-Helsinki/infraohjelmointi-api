@@ -14,7 +14,7 @@ def update_construction_procurement_method_value(apps, schema_editor):
         removable_value_puitesopimus = None
 
     if removable_value_puitesopimus:
-        Project.objects.filter(constructionProcurementMethod=removable_value_puitesopimus).update(constructionProcurementMethod="")
+        Project.objects.filter(constructionProcurementMethod=removable_value_puitesopimus).update(constructionProcurementMethod=None)
         removable_value_puitesopimus.delete()
 
     new_values = [
@@ -31,18 +31,19 @@ def update_construction_procurement_method_value(apps, schema_editor):
 
 def reverse_update_construction_procurement_method_value(apps, schema_editor):
     ConstructionProcurementMethod = apps.get_model("infraohjelmointi_api", "ConstructionProcurementMethod")
+    Project = apps.get_model("infraohjelmointi_api", "Project")
 
-    ConstructionProcurementMethod.objects.get_or_create(value="Puitesopimus")
+    values_to_remove = [
+        "frameAgreementMidSized",
+        "frameAgreementSmall",
+        "frameAgreementGreenery",
+        "frameAgreementSportSite",
+        "directProcurement",
+    ]
 
-    ConstructionProcurementMethod.objects.filter(
-        value__in=[
-            "frameAgreementMidSized",
-            "frameAgreementSmall",
-            "frameAgreementGreenery",
-            "frameAgreementSportSite",
-            "directProcurement",
-        ]
-    ).delete()
+    qs = ConstructionProcurementMethod.objects.filter(value__in=values_to_remove)
+    Project.objects.filter(constructionProcurementMethod__in=qs).update(constructionProcurementMethod=None)
+    qs.delete()
 
 
 class Migration(migrations.Migration):
