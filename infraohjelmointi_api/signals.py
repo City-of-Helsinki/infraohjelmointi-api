@@ -468,28 +468,38 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
 
 @receiver(pre_save, sender=Project)
 def on_project_phase_change(sender, instance, **kwargs):
-    """
-    Update category to K1 if phase is changed to construction
-    """
-    # Only act if target phase is construction
-    if not instance.phase or instance.phase.value != "construction":
+    """K1 on construction; suspension fields when entering/leaving suspended."""
+    if not instance.phase:
         return
 
-    try:
-        # Check if this is an update and the phase was already construction
-        if instance.id:
-            try:
-                old_instance = Project.objects.get(pk=instance.id)
-                if old_instance.phase and old_instance.phase.value == "construction":
-                    return
-            except Project.DoesNotExist:
-                pass
+    old_phase_value = None
+    if instance.pk:
+        try:
+            old_instance = Project.objects.get(pk=instance.pk)
+            old_phase_value = old_instance.phase.value if old_instance.phase else None
+        except Project.DoesNotExist:
+            pass
 
-        # Apply K1 category
-        instance.category = ProjectCategory.objects.get(value="K1")
+    new_phase_value = instance.phase.value
 
-    except Exception as e:
-        logger.error(f"Error in on_project_phase_change: {e}")
+    if old_phase_value == new_phase_value:
+        return
+
+    if new_phase_value == "construction":
+        try:
+            instance.category = ProjectCategory.objects.get(value="K1")
+        except ProjectCategory.DoesNotExist:
+            logger.error("ProjectCategory 'K1' does not exist, cannot set category on construction phase change")
+
+    if new_phase_value == "suspended":
+        instance.suspendedDate = date.today()
+        if old_phase_value:
+            instance.suspendedFromPhase = ProjectPhase.objects.filter(
+                value=old_phase_value
+            ).first()
+    elif old_phase_value == "suspended":
+        instance.suspendedDate = None
+        instance.suspendedFromPhase = None
 
 
 def _is_valid_sap_project(value: str | None) -> bool:

@@ -41,7 +41,7 @@ class NoteTestCase(TestCase):
             description="description of the test project",
             phase=None,
             programmed=True,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             category=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",

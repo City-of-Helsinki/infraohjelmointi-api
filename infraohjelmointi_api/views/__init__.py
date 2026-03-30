@@ -14,7 +14,7 @@ from .ProjectViewSet import *
 from .TaskStatusViewSet import *
 from .ProjectTypeViewSet import *
 from .ProjectTypeQualifierViewSet import *
-from .ConstructionPhaseDetailViewSet import *
+from .ProjectPhaseDetailViewSet import *
 from .ConstructionProcurementMethodViewSet import *
 from .StaraProcurementReasonViewSet import *
 from .ProjectCategoryViewSet import *
