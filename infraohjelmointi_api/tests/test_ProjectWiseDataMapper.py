@@ -91,6 +91,34 @@ class ProjectWiseDataMapperTestCase(TestCase):
         self.assertEqual(result['PROJECT_Hankkeen_suunnittelu_alkaa'], '')
         self.assertEqual(result['PROJECT_Hankkeen_rakentaminen_pttyy'], '')
 
+    @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
+    def test_phase_detail_mapping_uses_new_siirretty_value(self, mock_get_by_id):
+        mapper = ProjectWiseDataMapper()
+        mock_get_by_id.return_value = Mock(value="movedToConstruction")
+
+        result = mapper.convert_to_pw_data({"phaseDetail": "dummy-id"}, None)
+
+        self.assertEqual(
+            result["PROJECT_Rakentamisvaiheen_tarkenne"],
+            "Siirretty rakentamiseen",
+        )
+
+    @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
+    def test_phase_detail_mapping_skips_unmapped_values_with_debug_log(self, mock_get_by_id):
+        mapper = ProjectWiseDataMapper()
+        mock_get_by_id.return_value = Mock(value="waitingPlanningStart")
+
+        with self.assertLogs(
+            "infraohjelmointi_api.services.utils.ProjectWiseDataMapper",
+            level="DEBUG",
+        ) as logs:
+            result = mapper.convert_to_pw_data({"phaseDetail": "dummy-id"}, None)
+
+        self.assertNotIn("PROJECT_Rakentamisvaiheen_tarkenne", result)
+        self.assertTrue(
+            any("No ProjectWise mapping for phaseDetail='waitingPlanningStart'" in msg for msg in logs.output)
+        )
+
 
 class ProjectWisePhaseAssignmentTestCase(TestCase):
     """

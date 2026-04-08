@@ -3500,6 +3500,22 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
+        data = {
+            "programmed": False,
+            "phase": ProjectPhase.objects.get(value="suspended").id,
+            "phaseDetail": None,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
         data = {"programmed": True}
         response = self.client.patch(
             "/projects/{}/".format(createdId),
