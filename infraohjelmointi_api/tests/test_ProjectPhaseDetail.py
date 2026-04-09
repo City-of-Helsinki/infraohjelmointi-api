@@ -9,6 +9,9 @@ from infraohjelmointi_api.models import (
     ProjectType,
 )
 from infraohjelmointi_api.services.ProjectPhaseDetailService import ProjectPhaseDetailService
+from infraohjelmointi_api.serializers.ProjectPhaseDetailSerializer import (
+    ProjectPhaseDetailSerializer,
+)
 from infraohjelmointi_api.validators.ProjectValidators.ProjectPhaseDetailValidator import (
     ProjectPhaseDetailValidator,
 )
@@ -58,6 +61,11 @@ class ProjectPhaseDetailServiceTestCase(TestCase):
             phase_value="programming",
         )
         self.assertIsNone(not_found_with_wrong_phase)
+
+    def test_phase_detail_serializer_includes_value_and_project_phase(self):
+        data = ProjectPhaseDetailSerializer(self.detail_waiting).data
+        self.assertEqual(data["value"], "waitingPlanningStart")
+        self.assertEqual(data["projectPhase"]["value"], "programming")
 
 
 class ProjectPhaseDetailValidatorTestCase(TestCase):
@@ -116,6 +124,15 @@ class ProjectPhaseDetailValidatorTestCase(TestCase):
         fields = {
             "phaseDetail": self.construction_detail,
             "phase": self.phase_construction,
+        }
+        serializer = _SerializerStub(instance=self.project)
+        self.validator(fields, serializer=serializer)
+
+    def test_accepts_phase_detail_when_phase_omitted_uses_project_phase(self):
+        """phase is resolved from the project when not in the payload (validator lines 28–30)."""
+        fields = {
+            "projectId": self.project.id,
+            "phaseDetail": self.programming_detail,
         }
         serializer = _SerializerStub(instance=self.project)
         self.validator(fields, serializer=serializer)

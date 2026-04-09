@@ -108,10 +108,8 @@ class ProjectWiseDataMapperTestCase(TestCase):
         mapper = ProjectWiseDataMapper()
         mock_get_by_id.return_value = Mock(value="waitingPlanningStart")
 
-        with self.assertLogs(
-            "infraohjelmointi_api.services.utils.ProjectWiseDataMapper",
-            level="DEBUG",
-        ) as logs:
+        # Logger is getLogger("infraohjelmointi_api") in ProjectWiseDataMapper.py
+        with self.assertLogs("infraohjelmointi_api", level="DEBUG") as logs:
             result = mapper.convert_to_pw_data({"phaseDetail": "dummy-id"}, None)
 
         self.assertNotIn("PROJECT_Rakentamisvaiheen_tarkenne", result)
@@ -463,6 +461,50 @@ class ProjectWiseDataMapperComprehensiveDataTestCase(TestCase):
         self.assertEqual(result['name'], "Minimal Project")
         self.assertEqual(result['description'], "Minimal description")
         self.assertEqual(result['programmed'], True)
+
+    def test_create_comprehensive_project_data_includes_phase_and_phase_detail_ids(self):
+        """IO-389: phase and phaseDetail ids are included for PW sync."""
+        phase_id = uuid.uuid4()
+        detail_id = uuid.uuid4()
+        mock_phase = Mock()
+        mock_phase.id = phase_id
+        mock_detail = Mock()
+        mock_detail.id = detail_id
+
+        mock_project = Mock()
+        mock_project.name = "PW sync ids"
+        mock_project.description = "d"
+        mock_project.address = None
+        mock_project.entityName = None
+        mock_project.phase = mock_phase
+        mock_project.type = None
+        mock_project.projectClass = None
+        mock_project.projectDistrict = None
+        mock_project.area = None
+        mock_project.responsibleZone = None
+        mock_project.phaseDetail = mock_detail
+        mock_project.programmed = True
+        mock_project.estPlanningStart = None
+        mock_project.estPlanningEnd = None
+        mock_project.estConstructionStart = None
+        mock_project.estConstructionEnd = None
+        mock_project.presenceStart = None
+        mock_project.presenceEnd = None
+        mock_project.visibilityStart = None
+        mock_project.visibilityEnd = None
+        mock_project.planningStartYear = None
+        mock_project.constructionEndYear = None
+        mock_project.gravel = False
+        mock_project.louhi = False
+        mock_project.masterPlanAreaNumber = None
+        mock_project.trafficPlanNumber = None
+        mock_project.bridgeNumber = None
+        mock_project.personPlanning = None
+        mock_project.personConstruction = None
+
+        result = create_comprehensive_project_data(mock_project)
+        self.assertEqual(result["phase"], str(phase_id))
+        self.assertEqual(result["phaseDetail"], str(detail_id))
 
     def test_create_comprehensive_project_data_return_type(self):
         """Test that create_comprehensive_project_data returns a dict"""
