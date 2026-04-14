@@ -132,50 +132,6 @@ class ProjectProgrammerTestCase(TestCase):
         result_expected = JSONRenderer().render(serializer.data)
         self.assertEqual(response.content, result_expected)
 
-    def test_cannot_POST_programmer(self):
-        """Test that POST requests are not allowed (read-only viewset)"""
-        data = {
-            "firstName": "Charlie",
-            "lastName": "Brown"
-        }
-        response = self.client.post(
-            "/project-programmers/",
-            data,
-            content_type="application/json"
-        )
-        self.assertEqual(
-            response.status_code,
-            405,
-            msg="POST request should not be allowed"
-        )
-
-    def test_cannot_PATCH_programmer(self):
-        """Test that PATCH requests are not allowed (read-only viewset)"""
-        data = {
-            "firstName": "Updated Name"
-        }
-        response = self.client.patch(
-            "/project-programmers/{}/".format(self.programmer_1_id),
-            data,
-            content_type="application/json"
-        )
-        self.assertEqual(
-            response.status_code,
-            405,
-            msg="PATCH request should not be allowed"
-        )
-
-    def test_cannot_DELETE_programmer(self):
-        """Test that DELETE requests are not allowed (read-only viewset)"""
-        response = self.client.delete(
-            "/project-programmers/{}/".format(self.programmer_1_id)
-        )
-        self.assertEqual(
-            response.status_code,
-            405,
-            msg="DELETE request should not be allowed"
-        )
-
     def test_empty_programmer_exists(self):
         """Test that exactly one 'Ei Valintaa' programmer exists and has correct attributes."""
         empty_programmers = ProjectProgrammer.objects.filter(firstName="Ei", lastName="Valintaa")

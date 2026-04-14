@@ -14,6 +14,7 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .ConstructionPhaseDetail import ConstructionPhaseDetail
 from .ConstructionProcurementMethod import ConstructionProcurementMethod
+from .StaraProcurementReason import StaraProcurementReason
 from .ProjectCategory import ProjectCategory
 from .ProjectRisk import ProjectRisk
 from .ProjectQualityLevel import ProjectQualityLevel
@@ -30,12 +31,6 @@ from overrides import override
 
 
 class Project(models.Model):
-    def get_default_projectPhase():
-        try:
-            return ProjectPhase.objects.get(value="proposal")
-        except ProjectPhase.DoesNotExist:
-            return None
-
     def get_default_projectPriority():
         try:
             return ProjectPriority.objects.get(value__iexact="medium")
@@ -113,7 +108,6 @@ class Project(models.Model):
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
-        default=get_default_projectPhase,
     )
     favPersons = models.ManyToManyField(
         Person, related_name="favourite", blank=True
@@ -124,6 +118,9 @@ class Project(models.Model):
     )
     constructionProcurementMethod = models.ForeignKey(
         ConstructionProcurementMethod, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    staraProcurementReason = models.ForeignKey(
+        StaraProcurementReason, on_delete=models.DO_NOTHING, null=True, blank=True
     )
     planningStartYear = models.PositiveIntegerField(
         blank=True,
