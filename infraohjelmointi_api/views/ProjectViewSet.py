@@ -251,7 +251,7 @@ class ProjectViewSet(BaseViewSet):
 
                     if update_finances:
                         ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
-                
+
                 # Invalidate cache for all affected projects (bulk operations bypass signals)
                 affected_project_ids = {f.project_id for f in finance_instances}
                 for project_id in affected_project_ids:
@@ -271,7 +271,7 @@ class ProjectViewSet(BaseViewSet):
                             instance_id=affected_project.projectGroup.id,
                             instance_type='ProjectGroup'
                         )
-                
+
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
                 post_save.send(
@@ -836,7 +836,7 @@ class ProjectViewSet(BaseViewSet):
             "for_coordinator": for_coordinator,
             "forcedToFrame": forFrameView,
             "projects_to_finances": projects_to_finances,
-            "sap_values_by_project": projects_to_sap_values
+            "projects_to_sap_values": projects_to_sap_values,
         }
 
         if page is not None:
@@ -1422,7 +1422,7 @@ class ProjectViewSet(BaseViewSet):
                     default=len(projectIds),
                 )
                 qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
-                
+
                 # IO-775: Capture original hkrId values BEFORE update for PW sync detection
                 original_hkr_ids = {str(p.id): p.hkrId for p in qs}
                 # Also capture which projects are getting hkrId in this request
@@ -1431,7 +1431,7 @@ class ProjectViewSet(BaseViewSet):
                     for projectData in data
                     if "hkrId" in projectData.get("data", {})
                 }
-                
+
                 financesData = [
                     {
                         "project": projectData["id"],
@@ -1490,28 +1490,28 @@ class ProjectViewSet(BaseViewSet):
                 )
                 serializer.is_valid(raise_exception=True)
                 updated_projects = serializer.save()
-                
+
                 # IO-775: Trigger PW sync for projects with hkrId (either newly added or existing)
                 pw_sync_errors = []
                 for updated_project in updated_projects:
                     project_id_str = str(updated_project.id)
                     original_hkr_id = original_hkr_ids.get(project_id_str)
                     new_hkr_id = hkr_ids_in_request.get(project_id_str)
-                    
+
                     # Check if hkrId was added for the first time
                     hkr_id_added_first_time = (
                         new_hkr_id and
                         (not original_hkr_id or str(original_hkr_id).strip() == "")
                     )
-                    
+
                     # Check if project has hkrId (either newly added or already existed)
                     has_hkr_id = bool(updated_project.hkrId and str(updated_project.hkrId).strip())
-                    
+
                     # IO-396/IO-775: Sync whenever the updated project has an hkrId
                     # IO-396 requirement: Only sync programmed projects
                     # This ensures that changes to phase, responsible person, dates, etc. sync to PW
                     should_sync = has_hkr_id and updated_project.programmed
-                    
+
                     if should_sync:
                         sync_reason = "HKR ID added for first time" if hkr_id_added_first_time else "updating existing PW project"
                         logger.info(f"BULK UPDATE: PW sync triggered for project '{updated_project.name}' (HKR ID: {updated_project.hkrId}) - {sync_reason}")
@@ -1528,7 +1528,7 @@ class ProjectViewSet(BaseViewSet):
                                 "hkrId": updated_project.hkrId,
                                 "error": str(e)
                             })
-                
+
                 response_data = serializer.data
                 if pw_sync_errors:
                     # Include PW sync errors in response but don't fail the request
@@ -1537,7 +1537,7 @@ class ProjectViewSet(BaseViewSet):
                         "pw_sync_errors": pw_sync_errors,
                         "message": f"Projects updated successfully but {len(pw_sync_errors)} PW sync(s) failed"
                     }
-                
+
                 return Response(data=response_data, status=200)
             else:
                 return Response(
@@ -1765,7 +1765,7 @@ class ProjectViewSet(BaseViewSet):
         hkr_id_value = request_data.get('hkrId')
         original_had_hkr_id = bool(original_project.hkrId and str(original_project.hkrId).strip())
         updated_has_hkr_id = bool(updated_project.hkrId and str(updated_project.hkrId).strip())
-        
+
         logger.debug(
             f"PW SYNC CHECK for '{updated_project.name}': "
             f"hkrId_in_request={hkr_id_in_request}, "
@@ -1774,21 +1774,21 @@ class ProjectViewSet(BaseViewSet):
             f"original_had_hkr_id={original_had_hkr_id}, "
             f"updated_has_hkr_id={updated_has_hkr_id}"
         )
-        
+
         # Check if hkrId is being added for the first time (automatic update)
         hkr_id_added_first_time = (
             hkr_id_in_request and
             hkr_id_value and
             not original_had_hkr_id
         )
-        
+
         # IO-396/IO-775: Sync whenever the updated project has an hkrId
         # This ensures that:
         # 1. When hkrId is added for the first time, we sync (initial sync)
         # 2. When a project with existing hkrId is updated (phase, responsible person, dates, etc.), we sync
         # IO-396 requirement: Only sync programmed projects
         should_sync = updated_has_hkr_id and updated_project.programmed
-        
+
         if not should_sync:
             if not updated_has_hkr_id:
                 logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': Project has no hkrId")
@@ -1811,9 +1811,9 @@ class ProjectViewSet(BaseViewSet):
             self.projectWiseService.sync_project_to_pw(
                 data=automatic_update_data, project=updated_project
             )
-            
+
             logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
-            
+
         except Exception as e:
             # Log detailed error but don't break the update
             logger.error(f"Automatic PW sync failed for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
