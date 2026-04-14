@@ -4,6 +4,7 @@ from django.db.models import Max
 
 class OrderedLookupModel(models.Model):
     order = models.IntegerField(null=True, blank=True)
+    deleted = models.BooleanField(default=False)
 
     class Meta:
         abstract = True

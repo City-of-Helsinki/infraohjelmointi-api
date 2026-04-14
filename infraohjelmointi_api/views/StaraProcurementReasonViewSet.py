@@ -7,5 +7,6 @@ class StaraProcurementReasonViewSet(CachedLookupViewSet):
     """API endpoint for stara procurement reasons (cached)."""
 
     serializer_class = StaraProcurementReasonSerializer
+    project_field = 'staraProcurementReason'
 
 

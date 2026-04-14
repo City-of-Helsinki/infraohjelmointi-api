@@ -24,6 +24,9 @@ from infraohjelmointi_api.models import (
     ProjectPhase,
     ProjectProgrammer,
     ProjectType,
+    ProjectCategory,
+    ConstructionPhase,
+    ConstructionPhaseDetail,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
@@ -975,6 +978,324 @@ class CacheServiceEdgeCasesTest(TestCase):
             result = CacheService._is_cache_disabled()
             self.assertFalse(result)
             self.assertEqual(CacheService._cache_failures, 0)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupDeletionModificationTest(TestCase):
+    """Tests for lookup item deletion and modification with project status logic."""
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(username='testuser_lookup', password='testpass')
+        coord_group = ADGroup.objects.create(
+            name='sg_kymp_sso_io_koordinaattorit_lookup',
+            display_name='Coordinators'
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+        
+        # Create phases
+        self.phase_completed = ProjectPhase.objects.create(value='completed')
+        self.phase_warranty = ProjectPhase.objects.create(value='warrantyPeriod')
+        self.phase_planning = ProjectPhase.objects.create(value='planning')
+        
+        # Create programmer
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName="Test",
+            lastName="Programmer"
+        )
+        
+        # Create project class
+        self.proj_class = ProjectClass.objects.create(
+            name="Test Class",
+            path="TestClass",
+            defaultProgrammer=self.programmer
+        )
+
+    def test_update_value_completed_project_preserves_old_value(self):
+        """Test that updating a lookup value used by a completed project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category A')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Category A')
+        
+        # Update category value
+        response = self.client.put(
+            f'/project-categories/{category.id}/',
+            {'value': 'Category A Updated'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Category A')
+        
+        # Check that a new hidden item was created with old value
+        old_items = ProjectCategory.objects.filter(value='Category A', deleted=True)
+        self.assertEqual(old_items.count(), 1)
+
+    def test_update_value_warranty_project_preserves_old_value(self):
+        """Test that updating a lookup value used by a warranty period project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category B')
+        
+        # Create warranty period project with this category
+        project = Project.objects.create(
+            name="Warranty Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_warranty,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Category B')
+        
+        # Update category value
+        response = self.client.put(
+            f'/project-categories/{category.id}/',
+            {'value': 'Category B Updated'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Category B')
+
+    def test_update_value_planning_project_gets_new_value(self):
+        """Test that updating a lookup value used by a non-completed project updates the value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category C')
+        
+        # Create planning project with this category
+        project = Project.objects.create(
+            name="Planning Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Category C')
+        
+        # Update category value
+        response = self.client.put(
+            f'/project-categories/{category.id}/',
+            {'value': 'Category C Updated'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that it was updated
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Category C Updated')
+
+    def test_delete_value_completed_project_preserves_old_value(self):
+        """Test that deleting a lookup value used by a completed project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category D')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        self.assertEqual(project.category.value, 'Category D')
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Reload project and check that it still has a category with the old value
+        project.refresh_from_db()
+        self.assertIsNotNone(project.category)
+        self.assertEqual(project.category.value, 'Category D')
+        
+        # The original category should be deleted, but a hidden one should exist
+        self.assertFalse(ProjectCategory.objects.filter(id=category_id, deleted=False).exists())
+        hidden_items = ProjectCategory.objects.filter(value='Category D', deleted=True)
+        self.assertEqual(hidden_items.count(), 1)
+        
+        # Hidden item should not appear in the lookup list
+        response = self.client.get('/project-categories/')
+        self.assertEqual(response.status_code, 200)
+        categories_list = response.json()
+        for cat in categories_list:
+            self.assertNotEqual(cat['value'], 'Category D')
+
+    def test_delete_value_planning_project_clears_value(self):
+        """Test that deleting a lookup value used by a non-completed project clears the field."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category E')
+        
+        # Create planning project with this category
+        project = Project.objects.create(
+            name="Planning Project Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        self.assertEqual(project.category.value, 'Category E')
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Reload project and check that category is None
+        project.refresh_from_db()
+        self.assertIsNone(project.category)
+
+    def test_multiple_projects_with_different_phases_on_update(self):
+        """Test updating a value when multiple projects use it with different phases."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category F')
+        
+        # Create completed project with this category
+        completed_proj = Project.objects.create(
+            name="Completed Project Multi",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Create planning project with same category
+        planning_proj = Project.objects.create(
+            name="Planning Project Multi",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Update category
+        response = self.client.put(
+            f'/project-categories/{category.id}/',
+            {'value': 'Category F Updated'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Completed project should have old value preserved
+        completed_proj.refresh_from_db()
+        self.assertEqual(completed_proj.category.value, 'Category F')
+        
+        # Planning project should have new value
+        planning_proj.refresh_from_db()
+        self.assertEqual(planning_proj.category.value, 'Category F Updated')
+
+    def test_multiple_projects_with_different_phases_on_delete(self):
+        """Test deleting a value when multiple projects use it with different phases."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category G')
+        
+        # Create completed project with this category
+        completed_proj = Project.objects.create(
+            name="Completed Project Multi Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Create planning project with same category
+        planning_proj = Project.objects.create(
+            name="Planning Project Multi Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Completed project should have value preserved
+        completed_proj.refresh_from_db()
+        self.assertIsNotNone(completed_proj.category)
+        self.assertEqual(completed_proj.category.value, 'Category G')
+        
+        # Planning project should have value cleared
+        planning_proj.refresh_from_db()
+        self.assertIsNone(planning_proj.category)
+
+    def test_deleted_items_excluded_from_lookup_list(self):
+        """Test that deleted lookup items are not included in the list response."""
+        # Create categories
+        cat_visible = ProjectCategory.objects.create(value='Visible')
+        cat_hidden = ProjectCategory.objects.create(value='Hidden', deleted=True)
+        
+        # Get categories list
+        response = self.client.get('/project-categories/')
+        self.assertEqual(response.status_code, 200)
+        categories = response.json()
+        
+        # Check that visible category is in list
+        values = [c['value'] for c in categories]
+        self.assertIn('Visible', values)
+        
+        # Check that hidden category is not in list
+        self.assertNotIn('Hidden', values)
+
+    def test_partial_update_preserves_completed_project_value(self):
+        """Test that partial update (PATCH) also preserves completed project values."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Category H')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project Patch",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Category H')
+        
+        # Patch category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Category H Patched'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Category H')
 
 
 class ViewSetImportTest(TestCase):

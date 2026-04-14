@@ -7,3 +7,4 @@ class ProjectTypeViewSet(CachedLookupViewSet):
     """API endpoint for project types (cached)."""
 
     serializer_class = ProjectTypeSerializer
+    project_field = 'type'
