@@ -18,8 +18,8 @@ from infraohjelmointi_api.serializers import (
 )
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import ProjectProgrammerSerializer
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
-from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
-    ConstructionPhaseDetailSerializer,
+from infraohjelmointi_api.serializers.ProjectPhaseDetailSerializer import (
+    ProjectPhaseDetailSerializer,
 )
 from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
     ConstructionProcurementMethodSerializer,
@@ -73,6 +73,7 @@ from infraohjelmointi_api.validators.ProjectValidators import (
     ProgrammedValidator,
     ProjectClassValidator,
     ProjectLocationValidator,
+    ProjectPhaseDetailValidator,
     ProjectPhaseValidator,
     VisibilityEndValidator,
     VisibilityStartValidator,
@@ -206,7 +207,6 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     class Meta(BaseMeta):
         model = Project
         list_serializer_class = UpdateListSerializer
-        # removed constructionPhaseDetail validator due to inconsistencies in imported data
         validators = [
             EstPlanningStartValidator(),
             EstPlanningEndValidator(),
@@ -220,6 +220,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             ProjectClassValidator(),
             ProjectLocationValidator(),
             ProjectPhaseValidator(),
+            ProjectPhaseDetailValidator(),
             ConstructionEndYearValidator(),
             PlanningStartYearValidator(),
             ProgrammedValidator(),
@@ -351,7 +352,8 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         rep["otherPersons"] = self._serialize_optional_field(instance.otherPersons, PersonSerializer, many=True)
         rep["category"] = self._serialize_optional_field(instance.category, ProjectCategorySerializer)
         rep["riskAssessment"] = self._serialize_optional_field(instance.riskAssessment, ProjectRiskSerializer)
-        rep["constructionPhaseDetail"] = self._serialize_optional_field(instance.constructionPhaseDetail, ConstructionPhaseDetailSerializer)
+        rep["phaseDetail"] = self._serialize_optional_field(instance.phaseDetail, ProjectPhaseDetailSerializer)
+        rep["suspendedFromPhase"] = self._serialize_optional_field(instance.suspendedFromPhase, ProjectPhaseSerializer)
         rep["constructionProcurementMethod"] = self._serialize_optional_field(instance.constructionProcurementMethod, ConstructionProcurementMethodSerializer)
         rep["staraProcurementReason"] = self._serialize_optional_field(instance.staraProcurementReason, StaraProcurementReasonSerializer)
         rep["constructionPhase"] = self._serialize_optional_field(instance.constructionPhase, ConstructionPhaseSerializer)

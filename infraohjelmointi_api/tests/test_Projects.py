@@ -19,7 +19,7 @@ from ..models import (
     ProjectPhase,
     ProjectPriority,
     ProjectCategory,
-    ConstructionPhaseDetail,
+    ProjectPhaseDetail,
     Note,
     ProjectQualityLevel,
     PlanningPhase,
@@ -255,8 +255,11 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_1_Id, value="preConstruction"
+        self.constructionProjectPhase = ProjectPhase.objects.get(value="construction")
+        self.conPhaseDetail = ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_1_Id,
+            value="preConstruction",
+            projectPhase=self.constructionProjectPhase,
         )
         self.person_3 = Person.objects.create(
             id=self.person_3_Id,
@@ -318,7 +321,7 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=False,
             category=self.projectCategory,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -465,7 +468,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(self.conPhaseDetail.project_set.all()),
             0,
-            msg="No foreign key should exist for constructionPhaseDetail in Project with id {}".format(
+            msg="No foreign key should exist for phaseDetail in Project with id {}".format(
                 self.project_1_Id
             ),
         )
@@ -547,7 +550,7 @@ class ProjectTestCase(TestCase):
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -669,7 +672,7 @@ class ProjectTestCase(TestCase):
             "personProgramming": None,
             "personConstruction": None,
             "category": None,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
             "estPlanningStart": None,
             "estPlanningEnd": None,
             "estConstructionStart": None,
@@ -3201,8 +3204,11 @@ class ProjectTestCase(TestCase):
         self.projectPhase_6_Id = ProjectPhase.objects.get(
             value="warrantyPeriod"
         ).id.__str__()
-        ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_2_Id, value="preConstruction"
+        construction_phase = ProjectPhase.objects.get(value="construction")
+        ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_2_Id,
+            value="preConstruction",
+            projectPhase=construction_phase,
         )
         data = {
             "name": "Testing fields",
@@ -3444,7 +3450,7 @@ class ProjectTestCase(TestCase):
         )
 
         data = {
-            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
+            "phaseDetail": self.conPhaseDetail_2_Id,
             "phase": self.projectPhase_5_Id,
             "programmed": False,
         }
@@ -3454,12 +3460,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        # Projects value programmed is `false` and phase `Warrantyperiod`
-        # If programmed value is false, phase must be set to `proposal` or `design`
+        # programmed False + warrantyPeriod is invalid (allowed phases for False: proposal, design, completed, suspended)
         self.assertEqual(
             response.status_code,
             400,
-            msg="Status code != 400 , Error: {}".format("phase must be set to `proposal` or `design` if programmed is `False`"),
+            msg="Status code != 400 , Error: {}".format(response.json()),
         )
 
         data = {"programmed": False}
@@ -3475,14 +3480,30 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "phase must be set to `proposal`, `design`, or `completed` if programmed is `False`",
+            "phase must be set to `proposal`, `design`, `completed` or `suspended` if programmed is `False`",
             response.json()["programmed"][0],
         )
         # Getting proposal phase from the data that is populated when tests run the migrations
         data = {
             "programmed": False,
             "phase": ProjectPhase.objects.get(value="proposal").id,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {
+            "programmed": False,
+            "phase": ProjectPhase.objects.get(value="suspended").id,
+            "phaseDetail": None,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
@@ -3717,20 +3738,13 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
-    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
-    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
-    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class):
-        # Mock both serializers' ProjectWise service classes
+    @patch('infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService')
+    def test_pw_folder_project(self, mock_pw_class):
         def mock_get_pw_response(id):
             return {"instanceId": f"instance-{id}"}
 
-        # Mock the CreateSerializer's service instance
-        mock_create_instance = mock_pw_create_class.return_value
-        mock_create_instance.get_project_from_pw.side_effect = mock_get_pw_response
-
-        # Mock the GetSerializer's service instance
-        mock_get_instance = mock_pw_get_class.return_value
-        mock_get_instance.get_project_from_pw.side_effect = mock_get_pw_response
+        mock_instance = mock_pw_class.return_value
+        mock_instance.get_project_from_pw.side_effect = mock_get_pw_response
 
         data = {
             "name": "Test Project for PW folder",

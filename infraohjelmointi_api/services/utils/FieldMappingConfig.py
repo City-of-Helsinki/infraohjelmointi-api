@@ -129,7 +129,7 @@ class FieldMappingConfig:
             field="PROJECT_Alue_rakennusviraston_vastuujaon_mukaan",
             mapper="responsible_zone_map"
         ),
-        "constructionPhaseDetail": ListValueFieldConfig(
+        "phaseDetail": ListValueFieldConfig(
             field="PROJECT_Rakentamisvaiheen_tarkenne",
             mapper="construction_phase_details_map"
         ),

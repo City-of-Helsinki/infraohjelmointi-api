@@ -286,6 +286,55 @@ class ProjectWiseServiceTestCase(TestCase):
         }
         self.assertEqual(service.HIERARCHICAL_FIELDS, expected_fields)
 
+    def test_proceed_with_pw_project_sets_phase_detail_from_pw_property(self):
+        """IO-389: PROJECT_Rakentamisvaiheen_tarkenne maps to Project.phaseDetail via find_by_value."""
+        project = Project.objects.create(
+            id=uuid.uuid4(),
+            name="PW phase detail import",
+            description="d",
+            hkrId=99110022,
+            programmed=True,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+        self.assertIsNone(project.phaseDetail)
+
+        properties = {
+            "PROJECT_Hankkeen_kuvaus": "",
+            "PROJECT_Kadun_tai_puiston_nimi": "",
+            "PROJECT_Hankkeen_vaihe": "",
+            "PROJECT_Louheen": "",
+            "PROJECT_Sorakatu": "",
+            "PROJECT_Projektialue": "",
+            "PROJECT_Aluekokonaisuuden_nimi": "",
+            "PROJECT_Ohjelmoitu": "",
+            "PROJECT_Rakentamisvaiheen_tarkenne": "movedToConstruction",
+            "PROJECT_Toimiala": "",
+            "PROJECT_Alue_rakennusviraston_vastuujaon_mukaan": "",
+            "PROJECT_Louhi__hankkeen_aloitusvuosi": "",
+            "PROJECT_Louhi__hankkeen_valmistumisvuosi": "",
+            "PROJECT_Vastuuhenkil": "",
+            "PROJECT_Vastuuhenkiln_titteli": "",
+            "PROJECT_Vastuuhenkiln_puhelinnumero": "",
+            "PROJECT_Vastuuhenkiln_shkpostiosoite": "",
+            "PROJECT_Vastuuhenkil_rakennuttaminen": "",
+            "PROJECT_Muut_vastuuhenkilt": "",
+        }
+        pw_project = {
+            "relationshipInstances": [
+                {"relatedInstance": {"instanceId": "x", "properties": properties}}
+            ]
+        }
+
+        service = ProjectWiseService()
+        service._ProjectWiseService__proceed_with_pw_project(pw_project, project)
+
+        project.refresh_from_db()
+        self.assertIsNotNone(project.phaseDetail)
+        self.assertEqual(project.phaseDetail.value, "movedToConstruction")
+
 
 class ProjectWiseServiceEdgeCaseTestCase(TestCase):
     """

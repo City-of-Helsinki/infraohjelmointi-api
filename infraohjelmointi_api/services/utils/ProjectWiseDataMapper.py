@@ -8,7 +8,7 @@ from ..ProjectAreaService import ProjectAreaService
 from ..ProjectPhaseService import ProjectPhaseService
 from ..ResponsibleZoneService import ResponsibleZoneService
 from ..ProjectTypeService import ProjectTypeService
-from ..ConstructionPhaseDetailService import ConstructionPhaseDetailService
+from ..ProjectPhaseDetailService import ProjectPhaseDetailService
 from ..ProjectClassService import ProjectClassService
 from ..PersonService import PersonService
 
@@ -138,7 +138,13 @@ class ProjectWiseDataMapper:
 
         # Map to PW value
         pw_value = field_mapper.get(service_value)
-        return {config.field: pw_value} if pw_value else {}
+        if not pw_value:
+            logger.debug(
+                f"No ProjectWise mapping for {field_name}='{service_value}', "
+                f"skipping in PW sync."
+            )
+            return {}
+        return {config.field: pw_value}
 
     def _map_enum_field(self, field_name: str, value: Any, project: Project) -> Dict[str, Any]:
         """Map enum fields that map to multiple PW fields."""
@@ -170,8 +176,8 @@ class ProjectWiseDataMapper:
                 return ProjectAreaService.get_by_id(value).value if value else None
             elif field_name == "responsibleZone":
                 return ResponsibleZoneService.get_by_id(value).value if value else None
-            elif field_name == "constructionPhaseDetail":
-                return ConstructionPhaseDetailService.get_by_id(value).value if value else None
+            elif field_name == "phaseDetail":
+                return ProjectPhaseDetailService.get_by_id(value).value if value else None
             else:
                 return None
         except Exception as e:
@@ -297,8 +303,8 @@ def create_comprehensive_project_data(project: Project) -> dict:
         data['area'] = str(project.area.id) if hasattr(project.area, 'id') else str(project.area)
     if project.responsibleZone is not None:
         data['responsibleZone'] = str(project.responsibleZone.id) if hasattr(project.responsibleZone, 'id') else str(project.responsibleZone)
-    if project.constructionPhaseDetail is not None:
-        data['constructionPhaseDetail'] = str(project.constructionPhaseDetail.id) if hasattr(project.constructionPhaseDetail, 'id') else str(project.constructionPhaseDetail)
+    if project.phaseDetail is not None:
+        data['phaseDetail'] = str(project.phaseDetail.id) if hasattr(project.phaseDetail, 'id') else str(project.phaseDetail)
 
     # Enum fields
     if project.projectDistrict is not None:

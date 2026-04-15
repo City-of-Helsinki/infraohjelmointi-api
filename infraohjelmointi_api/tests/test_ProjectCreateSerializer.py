@@ -1,7 +1,15 @@
 from unittest.mock import Mock, patch
 from django.test import TestCase
 
-from ..models import ProjectClass, ProjectType, ProjectPhase, ProjectCategory, Person
+from ..models import (
+    Project,
+    ProjectClass,
+    ProjectType,
+    ProjectPhase,
+    ProjectCategory,
+    ProjectPhaseDetail,
+    Person,
+)
 from ..serializers import ProjectCreateSerializer
 
 
@@ -308,3 +316,40 @@ class ClassificationFieldsRetryLogicTestCase(TestCase):
             with self.subTest(field=field):
                 is_classification = field in classification_fields
                 self.assertEqual(is_classification, expected, f"Field '{field}' classification status incorrect")
+
+
+class ProjectCreateSerializerIo389RepresentationTestCase(TestCase):
+    """Cover IO-389 nested fields in ProjectCreateSerializer.to_representation."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="IO-389 Serializer Class",
+            defaults={"path": "IO/389/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.category, _ = ProjectCategory.objects.get_or_create(value="basic")
+        self.phase_programming, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.phase_suspended, _ = ProjectPhase.objects.get_or_create(value="suspended")
+        self.phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="waitingPlanningStart",
+            projectPhase=self.phase_programming,
+        )
+
+    def test_to_representation_includes_phase_detail_and_suspended_from_phase(self):
+        project = Project.objects.create(
+            name="IO-389 representation",
+            description="d",
+            type=self.project_type,
+            phase=self.phase_suspended,
+            category=self.category,
+            projectClass=self.project_class,
+            phaseDetail=self.phase_detail,
+            suspendedFromPhase=self.phase_programming,
+            planningStartYear=2024,
+            constructionEndYear=2025,
+        )
+        data = ProjectCreateSerializer(instance=project).data
+        self.assertIsNotNone(data.get("phaseDetail"))
+        self.assertEqual(data["phaseDetail"]["value"], "waitingPlanningStart")
+        self.assertIsNotNone(data.get("suspendedFromPhase"))
+        self.assertEqual(data["suspendedFromPhase"]["value"], "programming")

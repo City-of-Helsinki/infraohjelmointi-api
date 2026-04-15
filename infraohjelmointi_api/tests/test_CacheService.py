@@ -759,11 +759,11 @@ class AllLookupViewSetsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(CacheService.get_lookup('ConstructionPhase'))
 
-    def test_construction_phase_detail_viewset(self):
-        """Test ConstructionPhaseDetailViewSet is cached."""
-        response = self.client.get('/construction-phase-details/')
+    def test_project_phase_detail_viewset(self):
+        """Test ProjectPhaseDetailViewSet is cached."""
+        response = self.client.get('/project-phase-details/')
         self.assertEqual(response.status_code, 200)
-        self.assertIsNotNone(CacheService.get_lookup('ConstructionPhaseDetail'))
+        self.assertIsNotNone(CacheService.get_lookup('ProjectPhaseDetail'))
 
     def test_planning_phase_viewset(self):
         """Test PlanningPhaseViewSet is cached."""
@@ -941,7 +941,7 @@ class ViewSetImportTest(TestCase):
             ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
             ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
             ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
-            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ProjectPhaseDetailViewSet,
             PlanningPhaseViewSet,
         )
 
@@ -949,7 +949,7 @@ class ViewSetImportTest(TestCase):
             ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
             ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
             ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
-            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ProjectPhaseDetailViewSet,
             PlanningPhaseViewSet,
         ]
 
