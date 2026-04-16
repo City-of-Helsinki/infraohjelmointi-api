@@ -23,15 +23,10 @@ class Migration(migrations.Migration):
             field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
-            model_name='constructionphasedetail',
-            name='deleted',
-            field=models.BooleanField(blank=True, default=False, null=True),
-        ),
-        migrations.AddField(
             model_name='constructionprocurementmethod',
             name='deleted',
             field=models.BooleanField(blank=True, default=False, null=True),
-        ),
+        ),        
         migrations.AddField(
             model_name='planningphase',
             name='deleted',
@@ -47,6 +42,11 @@ class Migration(migrations.Migration):
             name='deleted',
             field=models.BooleanField(blank=True, default=False, null=True),
         ),
+        migrations.AddField(
+            model_name='projectphasedetail',
+            name='deleted',
+            field=models.BooleanField(blank=True, default=False, null=True),
+        ),     
         migrations.AddField(
             model_name='projectprogrammer',
             name='deleted',

@@ -26,7 +26,6 @@ from infraohjelmointi_api.models import (
     ProjectType,
     ProjectCategory,
     ConstructionPhase,
-    ConstructionPhaseDetail,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
