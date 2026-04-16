@@ -483,34 +483,26 @@ class IsClassProgrammer(permissions.BasePermission):
             or "sg_kymp_sso_io_admin" in ad_groups
         )
 
-    def get_user_assigned_classes(self, request):
-        """Get project classes assigned to this user."""
-        assigned_classes_ids = set()
+    def get_user_assigned_classes_paths(self, request):
+        """Get project class paths assigned to this user."""
+        assigned_paths = set()
 
         # 1. Primary: Direct ClassProgrammerAssignment lookup
-        direct_assignments = ClassProgrammerAssignment.objects.filter(user=request.user)
-        assigned_classes_ids.update(direct_assignments.values_list('project_class__id', flat=True))
+        assigned_paths.update(
+            ClassProgrammerAssignment.objects.filter(user=request.user)
+            .values_list('project_class__path', flat=True)
+        )
 
         # 2. Fallback: Legacy email -> name matching
-        # Extract name from email with robust parsing
         user_email = request.user.email
         if user_email and '@' in user_email:
-            # Get username part before @
             username = user_email.split('@')[0]
-
-            # Handle various email formats
             if '.' in username:
-                # Split by dots and clean up
                 parts = [part.strip() for part in username.split('.') if part.strip()]
-
                 if len(parts) >= 2:
-                    # Take first two non-empty parts
                     first_name = parts[0].capitalize()
                     last_name = parts[1].capitalize()
-
-                    # Validate names are not empty
                     if first_name and last_name:
-                        # Find ProjectProgrammer by name matching (case-insensitive)
                         programmer = ProjectProgrammer.objects.filter(
                             firstName__iexact=first_name,
                             lastName__iexact=last_name
@@ -519,13 +511,9 @@ class IsClassProgrammer(permissions.BasePermission):
                         if programmer:
                             # Get classes where this programmer is the default
                             legacy_assigned_classes = ProjectClass.objects.filter(defaultProgrammer=programmer)
-                            assigned_classes_ids.update(legacy_assigned_classes.values_list('id', flat=True))
+                            assigned_paths.update(legacy_assigned_classes.values_list('path', flat=True))
 
-        return list(assigned_classes_ids)
-
-    def project_has_class(self, obj):
-        """Check if project has a projectClass assigned"""
-        return obj.projectClass is not None
+        return [p for p in assigned_paths if p]
 
     def has_permission(self, request, view):
         """Check if user has permission for the action"""
@@ -542,7 +530,16 @@ class IsClassProgrammer(permissions.BasePermission):
             return False
 
         # Allow read actions
-        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+        if view.action in [
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *PROJECT_ALL_GET_ACTIONS,
+            *PROJECT_CLASS_ALL_GET_ACTIONS,
+            *PROJECT_LOCATION_ALL_GET_ACTIONS,
+            *PROJECT_FINANCES_ALL_GET_ACTIONS,
+            *PROJECT_GROUP_ALL_GET_ACTIONS,
+            *SAP_COST_ALL_GET_ACTIONS,
+            *PROJECT_NOTE_ALL_GET_ACTIONS,
+        ]:
             return True
 
         # Allow edit actions (will be checked at object level)
@@ -558,29 +555,39 @@ class IsClassProgrammer(permissions.BasePermission):
         """Check if user has permission for this specific object"""
         _type = obj._meta.model.__name__
 
-        # Only apply to Project objects
-        if _type != "Project":
-            return False
-
         # Coordinators and admins bypass restrictions
         if self.user_is_coordinator_or_admin(request):
             return True
 
-        # Allow read actions for all projects
+        # Allow read actions for all objects (lists/retrievals)
         if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
             return True
 
-        # For edit actions, check if project has a class
-        if not self.project_has_class(obj):
-            return False  # No class assigned, deny
+        # For edit actions, identify the relevant class path
+        target_class_path = None
 
-        # Check if user has assignment for this specific class
-        assigned_class_ids = self.get_user_assigned_classes(request)
-        if not assigned_class_ids:
-            return False  # No assignments, deny
+        if _type == "Project":
+            target_class_path = obj.projectClass.path if obj.projectClass else None
+        elif _type == "Note":
+            target_project = obj.project
+            target_class_path = target_project.projectClass.path if target_project and target_project.projectClass else None
+        elif _type == "ProjectGroup":
+            # For groups, we check the classRelation
+            target_class_path = obj.classRelation.path if obj.classRelation else None
+        
+        # If we couldn't find a target class path to validate against, deny edit
+        if not target_class_path:
+            return False
 
-        # Check if project's class is in user's assignments
-        if obj.projectClass_id in assigned_class_ids:
-            return True
+        # Get all class paths assigned to user
+        assigned_paths = self.get_user_assigned_classes_paths(request)
+        if not assigned_paths:
+            return False
+
+        # Check if target class matches or is a child of any assigned path.
+        # Child paths are separated by "/", so we check exact match or prefix + "/".
+        for path in assigned_paths:
+            if target_class_path == path or target_class_path.startswith(path + "/"):
+                return True
 
         return False
