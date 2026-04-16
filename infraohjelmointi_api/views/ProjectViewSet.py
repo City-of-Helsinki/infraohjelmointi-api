@@ -1423,8 +1423,9 @@ class ProjectViewSet(BaseViewSet):
                 )
                 qs = self.get_queryset().filter(id__in=projectIds).order_by(preserved)
 
-                # IO-775: Capture original hkrId values BEFORE update for PW sync detection
+                # IO-775: Capture original values BEFORE update for PW sync detection
                 original_hkr_ids = {str(p.id): p.hkrId for p in qs}
+                original_programmed = {str(p.id): p.programmed for p in qs}
                 # Also capture which projects are getting hkrId in this request
                 hkr_ids_in_request = {
                     projectData["id"]: projectData["data"].get("hkrId")
@@ -1509,8 +1510,10 @@ class ProjectViewSet(BaseViewSet):
 
                     # IO-396/IO-775: Sync whenever the updated project has an hkrId
                     # IO-396 requirement: Only sync programmed projects
-                    # This ensures that changes to phase, responsible person, dates, etc. sync to PW
-                    should_sync = has_hkr_id and updated_project.programmed
+                    # Also sync when project WAS programmed (transitioning programmed→unprogrammed)
+                    # so PW receives the updated phase/status
+                    was_programmed = original_programmed.get(project_id_str, False)
+                    should_sync = has_hkr_id and (updated_project.programmed or was_programmed)
 
                     if should_sync:
                         sync_reason = "HKR ID added for first time" if hkr_id_added_first_time else "updating existing PW project"
@@ -1782,18 +1785,18 @@ class ProjectViewSet(BaseViewSet):
             not original_had_hkr_id
         )
 
-        # IO-396/IO-775: Sync whenever the updated project has an hkrId
-        # This ensures that:
-        # 1. When hkrId is added for the first time, we sync (initial sync)
-        # 2. When a project with existing hkrId is updated (phase, responsible person, dates, etc.), we sync
-        # IO-396 requirement: Only sync programmed projects
-        should_sync = updated_has_hkr_id and updated_project.programmed
+        # IO-396/IO-775: Sync when the updated project has an hkrId AND
+        # 1. is programmed (initial sync or regular update of programmed project), OR
+        # 2. was programmed before this update (transition programmed→unprogrammed,
+        #    so PW receives the final phase/status before we stop syncing it).
+        original_was_programmed = bool(original_project.programmed)
+        should_sync = updated_has_hkr_id and (updated_project.programmed or original_was_programmed)
 
         if not should_sync:
             if not updated_has_hkr_id:
                 logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': Project has no hkrId")
-            elif not updated_project.programmed:
-                logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': Project is not programmed")
+            elif not updated_project.programmed and not original_was_programmed:
+                logger.debug(f"PW SYNC SKIPPED for '{updated_project.name}': Project is not and was not programmed")
             return
 
         if hkr_id_added_first_time:
