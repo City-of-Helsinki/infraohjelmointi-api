@@ -737,6 +737,51 @@ class CachedLookupViewSetTest(TestCase):
 
         self.assertIsNone(CacheService.get_lookup('ProjectType'))
 
+    def test_reorder_with_permission_returns_200(self):
+        """User with correct permissions can reorder."""
+        admin_group = ADGroup.objects.create(
+            name='sg_kymp_sso_io_admin',
+            display_name='Admins'
+        )
+        self.user.ad_groups.add(admin_group)
+
+        obj1 = ProjectType.objects.create(value='reorder_test')
+        obj2 = ProjectType.objects.create(value='reorder_test')
+
+        payload = [
+            {"id": obj1.id, "order": 2},
+            {"id": obj2.id, "order": 1},
+        ]
+
+        response = self.client.put(
+            '/project-types/reorder/',
+            payload,
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_reorder_without_permission_returns_403(self):
+        """User without correct permissions cannot reorder."""
+        # Remove permission group
+        self.user.ad_groups.clear()
+
+        obj1 = ProjectType.objects.create(value='reorder_fail_test')
+        obj2 = ProjectType.objects.create(value='reorder_fail_test')
+
+        payload = [
+            {"id": obj1.id, "order": 2},
+            {"id": obj2.id, "order": 1},
+        ]
+
+        response = self.client.put(
+            '/project-types/reorder/',
+            payload,
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 403)
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class AllLookupViewSetsTest(TestCase):
