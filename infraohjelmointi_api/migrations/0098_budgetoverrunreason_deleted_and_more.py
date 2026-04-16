@@ -9,60 +9,63 @@ class Migration(migrations.Migration):
         ('infraohjelmointi_api', '0097_auto_20260326_1011'),
     ]
 
+    # These AddField operations are reversible by Django, so the migration
+    # can be rolled back if needed.
     operations = [
         migrations.AddField(
             model_name='budgetoverrunreason',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='constructionphase',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='constructionphasedetail',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='constructionprocurementmethod',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='planningphase',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='projectcategory',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='projectphase',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='projectprogrammer',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='projectqualitylevel',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='projecttype',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
         migrations.AddField(
             model_name='responsiblezone',
             name='deleted',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, default=False, null=True),
         ),
     ]
+

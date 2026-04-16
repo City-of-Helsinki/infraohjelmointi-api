@@ -23,7 +23,7 @@ class CachedLookupViewSet(BaseViewSet):
         queryset = super().get_queryset()
         model = self.get_serializer_class().Meta.model
         if hasattr(model, "deleted"):
-            queryset = queryset.filter(deleted=False)
+            queryset = queryset.exclude(deleted=True)
         return queryset
 
     def list(self, request, *args, **kwargs):
