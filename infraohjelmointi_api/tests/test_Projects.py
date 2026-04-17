@@ -839,6 +839,17 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["preliminaryCurrentYearPlus3"], "0.00")
 
     @mock_projectwise_create_service
+    def test_PATCH_project_with_null_city_and_postal_code(self):
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            {"city": None, "postalCode": None},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertEqual(response.json()["city"], "")
+        self.assertEqual(response.json()["postalCode"], "")
+
+    @mock_projectwise_create_service
     def test_PATCH_project_other_persons_replace_and_clear(self):
         replace_data = {
             "otherPersons": [

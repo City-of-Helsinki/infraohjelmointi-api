@@ -95,6 +95,8 @@ if path.exists(".env"):
 
 class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     projectReadiness = serializers.SerializerMethodField()
+    postalCode = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     estPlanningStart = serializers.DateField(
         format="%d.%m.%Y",
         input_formats=["%d.%m.%Y", "iso-8601"],

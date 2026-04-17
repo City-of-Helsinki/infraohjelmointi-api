@@ -122,6 +122,29 @@ class ProjectCreationPWIntegrationTestCase(TestCase):
         serializer = ProjectCreateSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid(), "Invalid data should fail validation")
 
+    def test_create_project_with_null_city_and_postal_code(self):
+        """Test that project creation accepts null city and postalCode values."""
+        project_data = {
+            "name": "Test Project Null City PostalCode",
+            "description": "Test description",
+            "programmed": True,
+            "projectClass": str(self.project_class.id),
+            "type": str(self.project_type.id),
+            "phase": str(self.project_phase.id),
+            "category": str(self.project_category.id),
+            "planningStartYear": 2024,
+            "constructionEndYear": 2025,
+            "city": None,
+            "postalCode": None,
+        }
+
+        serializer = ProjectCreateSerializer(data=project_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer validation failed: {serializer.errors}")
+
+        project = serializer.save()
+        self.assertEqual(project.city, "")
+        self.assertEqual(project.postalCode, "")
+
 
 class ProjectCreateSerializerCreateMethodTestCase(TestCase):
     """
