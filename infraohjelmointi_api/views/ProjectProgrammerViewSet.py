@@ -10,4 +10,3 @@ class ProjectProgrammerViewSet(CachedLookupViewSet):
     queryset = ProjectProgrammer.objects.all()
     serializer_class = ProjectProgrammerSerializer
     project_field = 'personProgramming'
-    serializer_class = ProjectProgrammerSerializer

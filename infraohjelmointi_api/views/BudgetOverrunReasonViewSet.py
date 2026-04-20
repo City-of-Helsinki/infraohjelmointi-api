@@ -10,5 +10,3 @@ class BudgetOverrunReasonViewSet(CachedLookupViewSet):
     serializer_class = BudgetOverrunReasonSerializer
     project_field = 'budgetOverrunReason'
 
-    serializer_class = BudgetOverrunReasonSerializer
-

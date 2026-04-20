@@ -15,6 +15,8 @@ class CachedLookupViewSet(BaseViewSet):
     
     # Subclasses can override this to specify the field name in Project model
     project_field = None
+
+    PRESERVED_PHASES = ('completed', 'warrantyPeriod')
     
     def get_cache_key_name(self) -> str:
         return self.get_serializer_class().Meta.model.__name__
@@ -53,7 +55,7 @@ class CachedLookupViewSet(BaseViewSet):
             old_value = instance.value
             completed_project_ids = list(Project.objects.filter(
                 **{self.project_field: instance},
-                phase__value__in=['completed', 'warrantyPeriod']
+                phase__value__in=self.PRESERVED_PHASES
             ).values_list('id', flat=True))
         response = super().update(request, *args, **kwargs)
         if response.status_code == 200 and self.project_field and completed_project_ids:
@@ -75,7 +77,7 @@ class CachedLookupViewSet(BaseViewSet):
             old_value = instance.value
             completed_project_ids = list(Project.objects.filter(
                 **{self.project_field: instance},
-                phase__value__in=['completed', 'warrantyPeriod']
+                phase__value__in=self.PRESERVED_PHASES
             ).values_list('id', flat=True))
         response = super().partial_update(request, *args, **kwargs)
         if response.status_code == 200 and self.project_field and completed_project_ids:
@@ -99,7 +101,7 @@ class CachedLookupViewSet(BaseViewSet):
             model = self.get_queryset().model
             project_ids_to_preserve = list(Project.objects.filter(
                 **{self.project_field: instance},
-                phase__value__in=['completed', 'warrantyPeriod']
+                phase__value__in=self.PRESERVED_PHASES
             ).values_list('id', flat=True))
             
             # Handle preservation before deletion
@@ -158,4 +160,3 @@ class CachedLookupViewSet(BaseViewSet):
             {"status": "order updated"},
             status=status.HTTP_200_OK
         )
-        return response
