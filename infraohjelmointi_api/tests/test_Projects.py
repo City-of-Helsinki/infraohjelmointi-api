@@ -3750,12 +3750,23 @@ class ProjectTestCase(TestCase):
         )
 
     @patch('infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService')
-    def test_pw_folder_project(self, mock_pw_class):
+    @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class, mock_pw_utils_class):
+        # Mock both serializers' ProjectWise service classes
         def mock_get_pw_response(id):
             return {"instanceId": f"instance-{id}"}
 
-        mock_instance = mock_pw_class.return_value
-        mock_instance.get_project_from_pw.side_effect = mock_get_pw_response
+        # Mock the CreateSerializer's service instance
+        mock_create_instance = mock_pw_create_class.return_value
+        mock_create_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
+        # Mock the GetSerializer's ProjectWise class (if constructed on serializer)
+        mock_get_instance = mock_pw_get_class.return_value
+        mock_get_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
+        mock_utils_instance = mock_pw_utils_class.return_value
+        mock_utils_instance.get_project_from_pw.side_effect = mock_get_pw_response
 
         data = {
             "name": "Test Project for PW folder",

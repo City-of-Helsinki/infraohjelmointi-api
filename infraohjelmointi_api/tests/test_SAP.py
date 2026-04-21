@@ -7,6 +7,7 @@ from django.test import TestCase
 from overrides import override
 
 from infraohjelmointi_api.models import Project, ProjectGroup, ProjectPhase, SapCurrentYear
+from infraohjelmointi_api.serializers import ProjectGetSerializer
 from infraohjelmointi_api.services.SapApiService import SapApiService, SapAuthenticationError
 from infraohjelmointi_api.views import BaseViewSet, SapCurrentYearViewSet
 
@@ -481,6 +482,9 @@ class TestSAPService(TestCase):
 
         # Planning: 1000 + 2000 = 3000
         self.assertEqual(result['project_task'], Decimal('3000.00'))
+        # Construction: 3000 + 4000 = 7000
+        self.assertEqual(result['production_task'], Decimal('7000.00'))
+
     def test_calculate_values_consistency_edge_case(self):
         """
         Regression test for consistency between dot and concat formats.
@@ -543,4 +547,26 @@ class TestSAPService(TestCase):
 
         with self.assertRaises(SapAuthenticationError):
             self.sap_service.sync_all_projects_from_sap(for_financial_statement=True, sap_year=datetime.now().year)
+
+    def test_get_currentYearsSapValue_bulk_context_keys_io796(self):
+        """Planning list used sap_values_by_project; serializer expected projects_to_sap_values (IO-796)."""
+        year = datetime.now().year
+        scy = SapCurrentYear.objects.create(
+            project=self.project,
+            year=year,
+            sap_id=self.sapProjectId,
+            project_task_costs=Decimal("11.000"),
+            production_task_costs=Decimal("22.000"),
+            project_task_commitments=Decimal("0.000"),
+            production_task_commitments=Decimal("0.000"),
+        )
+        bulk_row = [scy]
+
+        for ctx_key in ("projects_to_sap_values", "sap_values_by_project"):
+            serializer = ProjectGetSerializer(context={ctx_key: {self.project.id: bulk_row}})
+            out = serializer.get_currentYearsSapValue(self.project)
+            self.assertEqual(len(out), 1)
+            self.assertEqual(out[0]["year"], year)
+            self.assertEqual(Decimal(str(out[0]["project_task_costs"])), Decimal("11.000"))
+            self.assertEqual(Decimal(str(out[0]["production_task_costs"])), Decimal("22.000"))
 

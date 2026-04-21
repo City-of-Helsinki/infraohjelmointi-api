@@ -150,7 +150,12 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         return project.projectReadiness()
 
     def get_currentYearsSapValue(self, project: Project):
-        projects_to_sap_values = self.context.get('projects_to_sap_values', {})
+        # Prefer canonical key; sap_values_by_project was a typo in planning list context (IO-796).
+        projects_to_sap_values = self.context.get("projects_to_sap_values") or self.context.get(
+            "sap_values_by_project", {}
+        )
+        if not isinstance(projects_to_sap_values, dict):
+            projects_to_sap_values = {}
         sap_values = projects_to_sap_values.get(project.id)
         
         if not sap_values:
