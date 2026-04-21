@@ -27,7 +27,15 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
         """Default is programmer view with optimized prefetching"""
         return (
             ProjectLocationService.list_all()
-            .select_related('coordinatorLocation', 'parent', 'parentClass')
+            # Pre-load the full parent chain (district → division → subDivision)
+            # so computedDefaultProgrammer doesn't issue per-row queries (IO-411).
+            .select_related(
+                'coordinatorLocation',
+                'parent',
+                'parent__parent',
+                'parent__parent__parent',
+                'parentClass',
+            )
             .prefetch_related(
                 'coordinatorLocation__finances',
                 Prefetch(
