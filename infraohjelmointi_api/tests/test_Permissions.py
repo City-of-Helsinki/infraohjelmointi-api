@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory
 from helusers.models import ADGroup
 from infraohjelmointi_api.models import (
-    ProjectProgrammer, ProjectClass, Project, ProjectPhase, ClassProgrammerAssignment
+    ProjectProgrammer, ProjectClass, Project, ProjectPhase, ClassProgrammerAssignment, Note, ProjectGroup
 )
 from infraohjelmointi_api.permissions import IsClassProgrammer
 from infraohjelmointi_api.views import BaseViewSet
@@ -374,3 +374,98 @@ class RestrictedProgrammerPermissionsTestCase(TestCase):
         self.assertFalse(
             permission.has_object_permission(request, view, bridge_project)
         )
+
+    def test_has_permission_allows_custom_get_actions(self):
+        """IO-756: Test that custom project lists and search are allowed"""
+        factory = APIRequestFactory()
+        permission = IsClassProgrammer()
+        view = Mock()
+        
+        # Test a few critical custom actions
+        for action in ['get_projects_by_financial_year', 'get_search_results', 'get_coordinator_classes']:
+            request = factory.get(f'/projects/{action}/')
+            request.user = self.programmer_user
+            view.action = action
+            self.assertTrue(permission.has_permission(request, view), f"Action {action} should be allowed")
+
+    def test_hierarchical_class_access(self):
+        """IO-756: Test that assignment to parent class grants access to sub-classes"""
+        # Create a sub-class of bridge_class
+        sub_bridge_class = ProjectClass.objects.create(
+            name='B Siltojen erikoiskorjaukset',
+            parent=self.bridge_class,
+            path=f"{self.bridge_class.path}/B Siltojen erikoiskorjaukset"
+        )
+        sub_bridge_project = Project.objects.create(
+            name='Sub Bridge Project',
+            description='Sub bridge project description',
+            hkrId=12345,
+            projectClass=sub_bridge_class,
+            phase=self.bridge_project.phase
+        )
+
+        # Assign user to PARENT bridge_class
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user,
+            project_class=self.bridge_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch(f'/projects/{sub_bridge_project.id}/', {})
+        request.user = self.programmer_user
+        request.data = {}
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # Should have access because sub-class path starts with parent class path
+        self.assertTrue(permission.has_object_permission(request, view, sub_bridge_project))
+
+    def test_note_edit_permission(self):
+        """IO-756: Test that restricted programmer can edit notes for their projects"""
+        # Assign user to bridge_class
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user,
+            project_class=self.bridge_class
+        )
+        
+        test_note = Note.objects.create(
+            content="Test note content",
+            project=self.bridge_project,
+            updatedBy=self.programmer_user
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch(f'/notes/{test_note.id}/', {})
+        request.user = self.programmer_user
+        request.data = {}
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # Should be able to edit note because associated project is in an assigned class
+        self.assertTrue(permission.has_object_permission(request, view, test_note))
+
+    def test_project_group_edit_permission(self):
+        """IO-756: Test that restricted programmer can edit project groups for their classes"""
+        # Assign user to bridge_class
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user,
+            project_class=self.bridge_class
+        )
+        
+        test_group = ProjectGroup.objects.create(
+            name="Test Group",
+            classRelation=self.bridge_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch(f'/project-groups/{test_group.id}/', {})
+        request.user = self.programmer_user
+        request.data = {}
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'partial_update'
+
+        # Should be able to edit group because its classRelation is assigned to user
+        self.assertTrue(permission.has_object_permission(request, view, test_group))
