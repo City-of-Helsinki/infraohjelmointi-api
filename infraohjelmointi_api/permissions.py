@@ -551,43 +551,44 @@ class IsClassProgrammer(permissions.BasePermission):
 
         return False
 
+    def _get_target_class_path_for_restricted_edit(self, obj):
+        """Resolve project class path for restricted programmer object checks."""
+        _type = obj._meta.model.__name__
+        if _type == "Project":
+            return obj.projectClass.path if obj.projectClass else None
+        if _type == "Note":
+            target_project = obj.project
+            if target_project and target_project.projectClass:
+                return target_project.projectClass.path
+            return None
+        if _type == "ProjectGroup":
+            return obj.classRelation.path if obj.classRelation else None
+        return None
+
+    @staticmethod
+    def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
+        """True if target equals or is a child of an assigned path (paths use '/')."""
+        for path in assigned_paths:
+            if target_class_path == path or target_class_path.startswith(path + "/"):
+                return True
+        return False
+
     def has_object_permission(self, request, view, obj):
         """Check if user has permission for this specific object"""
-        _type = obj._meta.model.__name__
-
-        # Coordinators and admins bypass restrictions
         if self.user_is_coordinator_or_admin(request):
             return True
 
-        # Allow read actions for all objects (lists/retrievals)
         if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
             return True
 
-        # For edit actions, identify the relevant class path
-        target_class_path = None
-
-        if _type == "Project":
-            target_class_path = obj.projectClass.path if obj.projectClass else None
-        elif _type == "Note":
-            target_project = obj.project
-            target_class_path = target_project.projectClass.path if target_project and target_project.projectClass else None
-        elif _type == "ProjectGroup":
-            # For groups, we check the classRelation
-            target_class_path = obj.classRelation.path if obj.classRelation else None
-        
-        # If we couldn't find a target class path to validate against, deny edit
+        target_class_path = self._get_target_class_path_for_restricted_edit(obj)
         if not target_class_path:
             return False
 
-        # Get all class paths assigned to user
         assigned_paths = self.get_user_assigned_classes_paths(request)
         if not assigned_paths:
             return False
 
-        # Check if target class matches or is a child of any assigned path.
-        # Child paths are separated by "/", so we check exact match or prefix + "/".
-        for path in assigned_paths:
-            if target_class_path == path or target_class_path.startswith(path + "/"):
-                return True
-
-        return False
+        return self._target_path_matches_assigned_paths(
+            target_class_path, assigned_paths
+        )
