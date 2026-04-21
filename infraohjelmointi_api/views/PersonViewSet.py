@@ -8,3 +8,4 @@ class PersonViewSet(BaseViewSet):
     """
 
     serializer_class = PersonSerializer
+    preserved_fields = ['firstName', 'lastName', 'email', 'phone', 'title']
