@@ -171,6 +171,30 @@ class ProjectViewSetPWIntegrationTestCase(TestCase):
         )
         self.assertFalse(hkr_id_added_first_time, "Should not detect HKR ID addition for regular update")
 
+    def test_sync_on_programmed_to_unprogrammed_transition(self):
+        """
+        IO-775: When a project with hkrId transitions from programmed=True → False,
+        we must still sync once so PW receives the final phase/status before we stop
+        syncing it. Regression test for the Kehä I / Myllypuro case.
+        """
+        # Replicates the should_sync condition in
+        # ProjectViewSet._sync_project_to_projectwise (single PATCH path) and
+        # ProjectViewSet.patch_bulk_projects (bulk path).
+        # (was_programmed, updated_programmed, has_hkr_id, expected_should_sync, description)
+        cases = [
+            (True, True, True, True, "Regular update of programmed project with hkrId"),
+            (True, False, True, True, "programmed → unprogrammed transition (IO-775 fix)"),
+            (False, True, True, True, "unprogrammed → programmed transition (initial sync)"),
+            (False, False, True, False, "Project never programmed: do not sync (IO-396)"),
+            (True, False, False, False, "Transitioning out but no hkrId: nothing to sync"),
+            (True, True, False, False, "Programmed but no hkrId: nothing to sync"),
+        ]
+
+        for was_programmed, updated_programmed, has_hkr_id, expected, description in cases:
+            with self.subTest(case=description):
+                should_sync = has_hkr_id and (updated_programmed or was_programmed)
+                self.assertEqual(should_sync, expected, description)
+
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
     @patch('infraohjelmointi_api.services.ProjectWiseService.requests.Session.post')
     def test_automatic_sync_error_handling(self, mock_post, mock_get_pw):
