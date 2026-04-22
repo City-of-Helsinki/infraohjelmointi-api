@@ -15,8 +15,8 @@ SPECIALTY_STRUCTURES_QUALIFIER = "spesialtyStructures"
 
 # Mirrors ProjectClassSerializer name transformation behavior for migration-safe matching.
 SUFFIX_PATTERN = re.compile(
-    r",\s*(?:Kylkn|kylkn|Kaupunkiymparistolautakunnan|kaupunkiymparistolautakunnan|"
-    r"KHN|Khn|khn|Kaupunginhallituksen|kaupunginhallituksen)\s+kaytettavaksi"
+    r",\s*(?:Kylkn|kylkn|Kaupunkiympäristölautakunnan|kaupunkiympäristölautakunnan|"
+    r"KHN|Khn|khn|Kaupunginhallituksen|kaupunginhallituksen)\s+käytettäväksi"
 )
 NUMBERING_PATTERN = re.compile(r"^(\d+\s+\d+(?:\s+\d+){0,2})")
 LEADING_CODE_PATTERN = re.compile(r"^(?:\d+\s*){1,4}\s*")
