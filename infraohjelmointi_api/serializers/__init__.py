@@ -8,6 +8,7 @@ from .DynamicFieldsModelSerializer import DynamicFieldsModelSerializer
 from .NoteCreateSerializer import NoteCreateSerializer
 from .NoteGetSerializer import NoteGetSerializer
 from .NoteHistorySerializer import NoteHistorySerializer
+from .NoteImageSerializer import NoteImageSerializer
 from .NotePersonSerializer import NotePersonSerializer
 from .NoteUpdateSerializer import NoteUpdateSerializer
 from .CoordinatorNoteSerializer import CoordinatorNoteSerializer

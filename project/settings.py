@@ -42,6 +42,9 @@ env = environ.Env(
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
+    MEDIA_ROOT=(str, str(BASE_DIR / "media")),
+    MEDIA_URL=(str, "/media/"),
+    NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
     DJANGO_LOG_LEVEL=(str, "INFO"),
     HELSINKI_TUNNISTUS_ISSUER=(
         str,
@@ -244,6 +247,18 @@ USE_TZ = True
 
 STATIC_URL = env("STATIC_URL")
 STATIC_ROOT = env("STATIC_ROOT")
+
+# Media (user-uploaded files). IO-812 phase 1 uses local FileSystemStorage.
+# Azure Blob backend lands in a follow-up PR once Platta provisions the SAS/container.
+MEDIA_URL = env("MEDIA_URL")
+MEDIA_ROOT = env("MEDIA_ROOT")
+
+# IO-812: note image upload constraints. Limit is env-overridable so product can
+# tighten it (Figma copy says 500 KB; default here matches the older internal spec
+# of 10 MB). Allowed types are intentionally hard-coded - widening them is a
+# product/security decision, not a config change.
+NOTE_IMAGE_MAX_BYTES = env.int("NOTE_IMAGE_MAX_BYTES")
+NOTE_IMAGE_ALLOWED_TYPES = ("image/jpeg", "image/png")
 
 
 # Default primary key field type
