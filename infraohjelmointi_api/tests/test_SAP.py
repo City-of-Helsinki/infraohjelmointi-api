@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import MagicMock, patch
 
+from django.core.management import call_command
 from django.test import TestCase
 from overrides import override
 
@@ -278,12 +280,12 @@ class TestSAPService(TestCase):
         self.assertEqual(group_entry.group_combined_commitments, Decimal("110.000"))
 
     def test_calculate_values_with_dotted_format(self):
-        """Test that old dotted format (e.g., 2814I03976.01) is correctly categorized"""
-        sap_id = "2814I03976"
+        """Test that old dotted format (e.g., 2814I90003.01) is correctly categorized"""
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I03976.01", "Wkgbtr": "1000.000"},  # Planning task
-            {"Posid": "2814I03976.02", "Wkgbtr": "2000.000"},  # Construction task
-            {"Posid": "2814I03976.06", "Wkgbtr": "3000.000"},  # Construction task
+            {"Posid": "2814I90003.01", "Wkgbtr": "1000.000"},  # Planning task
+            {"Posid": "2814I90003.02", "Wkgbtr": "2000.000"},  # Construction task
+            {"Posid": "2814I90003.06", "Wkgbtr": "3000.000"},  # Construction task
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
@@ -291,12 +293,12 @@ class TestSAPService(TestCase):
         self.assertEqual(result['production_task'], Decimal('5000.000'))
 
     def test_calculate_values_with_concatenated_format(self):
-        """Test that new concatenated format (e.g., 2814I0397600101) is correctly categorized"""
-        sap_id = "2814I03976"
+        """Test that new concatenated format (e.g., 2814I9000300101) is correctly categorized"""
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I0397600101", "Wkgbtr": "1500.000"},  # Planning task (Phase 001)
-            {"Posid": "2814I0397600106", "Wkgbtr": "2500.000"},  # Planning task (Phase 001)
-            {"Posid": "2814I0397600199", "Wkgbtr": "3500.000"},  # Planning task (Phase 001)
+            {"Posid": "2814I9000300101", "Wkgbtr": "1500.000"},  # Planning task (Phase 001)
+            {"Posid": "2814I9000300106", "Wkgbtr": "2500.000"},  # Planning task (Phase 001)
+            {"Posid": "2814I9000300199", "Wkgbtr": "3500.000"},  # Planning task (Phase 001)
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
@@ -305,12 +307,12 @@ class TestSAPService(TestCase):
 
     def test_calculate_values_with_mixed_formats(self):
         """Test that both old and new formats work together"""
-        sap_id = "2814I03976"
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I03976.01", "Wkgbtr": "1000.000"},     # Old format - planning
-            {"Posid": "2814I0397600101", "Wkgbtr": "1500.000"},   # New format - planning
-            {"Posid": "2814I03976.06", "Wkgbtr": "2000.000"},     # Old format - construction
-            {"Posid": "2814I0397600106", "Wkgbtr": "2500.000"},   # New format - planning (Phase 001)
+            {"Posid": "2814I90003.01", "Wkgbtr": "1000.000"},     # Old format - planning
+            {"Posid": "2814I9000300101", "Wkgbtr": "1500.000"},   # New format - planning
+            {"Posid": "2814I90003.06", "Wkgbtr": "2000.000"},     # Old format - construction
+            {"Posid": "2814I9000300106", "Wkgbtr": "2500.000"},   # New format - planning (Phase 001)
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
@@ -319,16 +321,16 @@ class TestSAPService(TestCase):
 
     def test_calculate_values_edge_case_sap_id_ending_in_01(self):
         """
-        Test edge case: SAP ID itself ends in '01' (e.g., 2814I03901)
+        Test edge case: SAP ID itself ends in '01' (e.g., 2814I90001)
         Bare SAP ID should be categorized as construction, not planning
         """
-        sap_id = "2814I03901"
+        sap_id = "2814I90001"
         costs = [
-            {"Posid": "2814I03901", "Wkgbtr": "1000.000"},         # Bare SAP ID - construction
-            {"Posid": "2814I03901.01", "Wkgbtr": "1500.000"},      # Planning task (old format)
-            {"Posid": "2814I0390100101", "Wkgbtr": "2000.000"},    # Planning task (new format)
-            {"Posid": "2814I03901.02", "Wkgbtr": "2500.000"},      # Construction task (old format)
-            {"Posid": "2814I0390100106", "Wkgbtr": "3000.000"},    # Planning task (new format, Phase 001)
+            {"Posid": "2814I90001", "Wkgbtr": "1000.000"},         # Bare SAP ID - construction
+            {"Posid": "2814I90001.01", "Wkgbtr": "1500.000"},      # Planning task (old format)
+            {"Posid": "2814I9000100101", "Wkgbtr": "2000.000"},    # Planning task (new format)
+            {"Posid": "2814I90001.02", "Wkgbtr": "2500.000"},      # Construction task (old format)
+            {"Posid": "2814I9000100106", "Wkgbtr": "3000.000"},    # Planning task (new format, Phase 001)
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
@@ -343,12 +345,12 @@ class TestSAPService(TestCase):
         Phase 001 -> Planning.
         Phase 001 but Task 06? -> Planning (Phase overrides Task)
         """
-        sap_id = "2814I03976"
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I03976", "Wkgbtr": "37.490"},           # Bare SAP ID -> construction (default)
-            {"Posid": "2814I0397600101", "Wkgbtr": "6000.000"},    # Planning (Phase 001)
-            {"Posid": "2814I0397600106", "Wkgbtr": "180000.000"},  # Planning (Phase 001)
-            {"Posid": "2814I0397600199", "Wkgbtr": "30000.000"},   # Planning (Phase 001)
+            {"Posid": "2814I90003", "Wkgbtr": "37.490"},           # Bare SAP ID -> construction (default)
+            {"Posid": "2814I9000300101", "Wkgbtr": "6000.000"},    # Planning (Phase 001)
+            {"Posid": "2814I9000300106", "Wkgbtr": "180000.000"},  # Planning (Phase 001)
+            {"Posid": "2814I9000300199", "Wkgbtr": "30000.000"},   # Planning (Phase 001)
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
@@ -357,155 +359,194 @@ class TestSAPService(TestCase):
         # Construction: 37.490
         self.assertEqual(result['production_task'], Decimal('37.490'))
 
-    def test_calculate_values_nested_construction_tasks(self):
+    def test_calculate_values_dotted_construction_first_segment(self):
         """
-        IO-789: Sub-tasks under construction parent were misclassified as planning.
+        IO-789: dotted POSIDs classify by the FIRST non-empty segment after the
+        SAP id (the *group identifier* per the Confluence doc "Infraohjelmointi
+        API -sovellus"): `.01` = Hanketehtävät (planning), `.02/.03/.04` =
+        Tuotantotehtävät (construction). Deeper WBS levels (`.03.01`,
+        `.03.01.05`, …) inherit their parent group and MUST NOT flip the bucket.
 
-        SAP hierarchy for 2814I04749:
-          - PRR 2814I04749.03 (ALRAK = construction parent)
-              - PRR 2814I04749.03.01 -> 811,295.42 (sub-task under construction)
-              - PRR 2814I04749.03.02 -> 1,816.08 (sub-task under construction)
-
-        The bug: old logic `if ".01" in posid` matched 2814I04749.03.01 and
-        wrongly classified it as planning because it CONTAINS ".01".
-
-        The fix: Check the FIRST segment after base SAP ID (.03 = construction),
-        not whether ".01" appears anywhere in the string.
+        Shapes covered: `.03.01`, `.03.02`, `.03.01.03`, `.03.01.05`. The bug
+        was that the multi-level rows landed under planning; they must all
+        land under construction because the first segment is `.03`.
         """
-        sap_id = "2814I04749"
+        sap_id = "2814I90004"
         costs = [
-            {"Posid": "2814I04749.03.01", "Wkgbtr": "811295.42"},  # Sub-task under .03 (construction)
-            {"Posid": "2814I04749.03.02", "Wkgbtr": "1816.08"},    # Sub-task under .03 (construction)
+            {"Posid": "2814I90004.03.01", "Wkgbtr": "811295.42"},  # group .03 -> construction
+            {"Posid": "2814I90004.03.02", "Wkgbtr": "1816.08"},    # group .03 -> construction
+            {"Posid": "2814I90004.03.01.03", "Wkgbtr": "500.00"},  # group .03 -> construction
+            {"Posid": "2814I90004.03.01.05", "Wkgbtr": "250.00"},  # group .03 -> construction
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
-        # BOTH should be construction because first segment is .03 (not .01)
-        self.assertEqual(result['project_task'], Decimal('0'))
-        self.assertEqual(result['production_task'], Decimal('813111.50'))
+        self.assertEqual(result['project_task'], Decimal('0.00'))
+        self.assertEqual(result['production_task'], Decimal('813861.50'))
 
     def test_calculate_values_planning_subtasks(self):
-        """
-        IO-789: Verify that sub-tasks under planning (.01) ARE correctly classified as planning.
+        """Dotted `.01` and any of its subgroups are planning.
 
-        SAP hierarchy example:
-          - PRR 2814I04749.01 (SUUNNITTELU = planning parent)
-              - PRR 2814I04749.01.01 -> planning sub-task
-              - PRR 2814I04749.01.02 -> planning sub-task
+        Per Confluence: subgroup costs are added to the main group they belong
+        to. So `.01.01` and `.01.02` are both subgroups of group `.01`
+        (planning) and inherit that bucket — the trailing `.02` does NOT make
+        the row construction.
         """
-        sap_id = "2814I04749"
+        sap_id = "2814I90004"
         costs = [
-            {"Posid": "2814I04749.01", "Wkgbtr": "100000.00"},     # Planning parent
-            {"Posid": "2814I04749.01.01", "Wkgbtr": "50000.00"},   # Sub-task under planning
-            {"Posid": "2814I04749.01.02", "Wkgbtr": "25000.00"},   # Sub-task under planning
+            {"Posid": "2814I90004.01", "Wkgbtr": "100000.00"},     # group .01 -> planning
+            {"Posid": "2814I90004.01.01", "Wkgbtr": "50000.00"},   # group .01 -> planning
+            {"Posid": "2814I90004.01.02", "Wkgbtr": "25000.00"},   # group .01 -> planning
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
-        # ALL should be planning because first segment is .01
         self.assertEqual(result['project_task'], Decimal('175000.00'))
-        self.assertEqual(result['production_task'], Decimal('0'))
+        self.assertEqual(result['production_task'], Decimal('0.00'))
 
     def test_calculate_values_mixed_hierarchy(self):
-        """
-        IO-789: Test mixed hierarchy with both planning and construction sub-tasks.
-        """
-        sap_id = "2814I04749"
+        """Mixed dotted hierarchy: classification is by the first segment
+        (group identifier); subgroups inherit the parent group's bucket."""
+        sap_id = "2814I90004"
         costs = [
-            # Planning hierarchy (.01)
-            {"Posid": "2814I04749.01", "Wkgbtr": "100000.00"},     # Planning
-            {"Posid": "2814I04749.01.01", "Wkgbtr": "50000.00"},   # Planning sub-task
-            {"Posid": "2814I04749.01.02", "Wkgbtr": "25000.00"},   # Planning sub-task
-            # Construction hierarchy (.03)
-            {"Posid": "2814I04749.03", "Wkgbtr": "200000.00"},     # Construction
-            {"Posid": "2814I04749.03.01", "Wkgbtr": "811295.42"},  # Construction sub-task
-            {"Posid": "2814I04749.03.02", "Wkgbtr": "1816.08"},    # Construction sub-task
+            {"Posid": "2814I90004.01", "Wkgbtr": "100000.00"},     # group .01 -> planning
+            {"Posid": "2814I90004.01.01", "Wkgbtr": "50000.00"},   # group .01 -> planning
+            {"Posid": "2814I90004.01.02", "Wkgbtr": "25000.00"},   # group .01 -> planning
+            {"Posid": "2814I90004.03", "Wkgbtr": "200000.00"},     # group .03 -> construction
+            {"Posid": "2814I90004.03.01", "Wkgbtr": "811295.42"},  # group .03 -> construction (IO-789)
+            {"Posid": "2814I90004.03.02", "Wkgbtr": "1816.08"},    # group .03 -> construction
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
-        # Planning: 100000 + 50000 + 25000 = 175000
+        # Planning: 100000 + 50000 + 25000 = 175000.00
         self.assertEqual(result['project_task'], Decimal('175000.00'))
         # Construction: 200000 + 811295.42 + 1816.08 = 1013111.50
         self.assertEqual(result['production_task'], Decimal('1013111.50'))
 
-    def test_calculate_values_valtimontie_new_format_subtasks(self):
+    def test_calculate_values_concatenated_subproject_rule(self):
+        """Concatenated POSIDs classify by subproject (first 3 chars after SAP ID).
+
+        "001" is SUUNNITTELUVAIHE (planning); "002"+ is construction. The task
+        suffix is NOT consulted in this format — e.g. `...00106` is planning
+        because subproject is "001", not because task ends in "06".
         """
-        IO-789: Valtimontie (2814I00720) uses new concatenated format.
-        
-        Updated logic: Phase 001 (e.g. ...00199) is Planning.
-        Phase 000 (e.g. ...000xxx) falls back to Task ID check.
-        """
-        sap_id = "2814I00720"
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I0072000001", "Wkgbtr": "1000.00"},     # ends with 01 -> PLANNING
-            {"Posid": "2814I00720000101", "Wkgbtr": "24952.82"},   # ends with 01 -> PLANNING
-            {"Posid": "2814I00720000106", "Wkgbtr": "273092.90"},  # ends with 06 -> CONSTR (Phase 000 -> Fallback)
-            {"Posid": "2814I0072000199", "Wkgbtr": "1690.04"},     # Phase 001 -> PLANNING
+            {"Posid": "2814I9000300101", "Wkgbtr": "6000.00"},    # sub 001 -> planning
+            {"Posid": "2814I9000300106", "Wkgbtr": "180000.00"},  # sub 001 -> planning
+            {"Posid": "2814I9000300199", "Wkgbtr": "30000.00"},   # sub 001 -> planning
+            {"Posid": "2814I9000300201", "Wkgbtr": "2004.47"},    # sub 002 -> construction
+            {"Posid": "2814I9000300299", "Wkgbtr": "500.00"},     # sub 002 -> construction
+            {"Posid": "2814I9000300301", "Wkgbtr": "400.00"},     # sub 003 -> construction
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+
+        self.assertEqual(result['project_task'], Decimal('216000.00'))
+        self.assertEqual(result['production_task'], Decimal('2904.47'))
+
+    def test_calculate_values_deep_nested_dotted(self):
+        """Deeply nested dotted POSIDs — first segment (group) always decides;
+        deeper WBS levels never flip the bucket."""
+        sap_id = "2814I90004"
+        costs = [
+            {"Posid": "2814I90004.01.01.01", "Wkgbtr": "1000.00"},  # group .01 -> planning
+            {"Posid": "2814I90004.01.01.02", "Wkgbtr": "2000.00"},  # group .01 -> planning
+            {"Posid": "2814I90004.03.01.01", "Wkgbtr": "3000.00"},  # group .03 -> construction
+            {"Posid": "2814I90004.03.02.99", "Wkgbtr": "4000.00"},  # group .03 -> construction
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+
+        # Planning: 1000 + 2000 = 3000; Construction: 3000 + 4000 = 7000
+        self.assertEqual(result['project_task'], Decimal('3000.00'))
+        self.assertEqual(result['production_task'], Decimal('7000.00'))
+
+    def test_calculate_values_prod_log_shapes(self):
+        """Smoke regression over every POSID shape seen in prod sync logs.
+
+        Covers bare SAP IDs, concatenated subproject 001/002, dotted group
+        `.01` and `.03/.04`, and multi-level dotted `.03.01` (IO-789) plus
+        deeper `.03.01.03`/`.03.01.05`. If any of these drift, classification
+        is off.
+        """
+        sap_id = "2814I90004"
+        costs = [
+            {"Posid": "2814I90004", "Wkgbtr": "10.00"},            # bare -> construction
+            {"Posid": "2814I9000400101", "Wkgbtr": "42598.65"},    # sub 001 -> planning
+            {"Posid": "2814I9000400201", "Wkgbtr": "2004.47"},     # sub 002 -> construction
+            {"Posid": "2814I90004.01", "Wkgbtr": "100.00"},        # group .01 -> planning
+            {"Posid": "2814I90004.03", "Wkgbtr": "200.00"},        # group .03 -> construction
+            {"Posid": "2814I90004.04", "Wkgbtr": "300.00"},        # group .04 -> construction
+            {"Posid": "2814I90004.03.01", "Wkgbtr": "811295.42"},  # group .03 -> construction (IO-789)
+            {"Posid": "2814I90004.03.02", "Wkgbtr": "1816.08"},    # group .03 -> construction
+            {"Posid": "2814I90004.03.01.03", "Wkgbtr": "50.00"},   # group .03 -> construction
+            {"Posid": "2814I90004.03.01.05", "Wkgbtr": "75.00"},   # group .03 -> construction
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+
+        # Planning: 42598.65 + 100.00 = 42698.65
+        self.assertEqual(result['project_task'], Decimal('42698.65'))
+        # Construction: 10 + 2004.47 + 200 + 300 + 811295.42 + 1816.08 + 50 + 75 = 815750.97
+        self.assertEqual(result['production_task'], Decimal('815750.97'))
+
+    def test_calculate_values_concat_subproject_000_fallback(self):
+        """Subproject "000" (root-level bookings, no subproject assigned) falls
+        back to the task suffix: tail `01` = planning, anything else = construction.
+
+        This preserves pre-IO-740 behaviour for root-level bookings. Subprojects
+        other than 001/000 always classify as construction.
+        """
+        sap_id = "2814I90002"
+        costs = [
+            {"Posid": "2814I9000200001", "Wkgbtr": "100.00"},   # sub 000, task 01 -> planning
+            {"Posid": "2814I9000200002", "Wkgbtr": "200.00"},   # sub 000, task 02 -> construction
+            {"Posid": "2814I9000200006", "Wkgbtr": "300.00"},   # sub 000, task 06 -> construction
+            {"Posid": "2814I9000200099", "Wkgbtr": "400.00"},   # sub 000, task 99 -> construction
+            {"Posid": "2814I9000200501", "Wkgbtr": "500.00"},   # sub 005 (unknown) -> construction
+        ]
+        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
+
+        self.assertEqual(result['project_task'], Decimal('100.00'))
+        self.assertEqual(result['production_task'], Decimal('1400.00'))
+
+    def test_calculate_values_concat_sub_000_and_001_mix(self):
+        """IO-789: covers the subproject 000 + 001 concat shapes seen in prod
+        sync logs (bare row, sub 000 task 01 fallback to planning, sub 001
+        rows always planning regardless of task suffix, sub 002+ construction).
+        """
+        sap_id = "2814I90002"
+        costs = [
+            {"Posid": "2814I90002", "Wkgbtr": "5.00"},          # bare -> construction
+            {"Posid": "2814I9000200001", "Wkgbtr": "1000.00"},  # sub 000, task 01 -> planning
+            {"Posid": "2814I9000200101", "Wkgbtr": "24952.82"}, # sub 001 -> planning
+            {"Posid": "2814I9000200199", "Wkgbtr": "1690.04"},  # sub 001 -> planning
+            {"Posid": "2814I9000200201", "Wkgbtr": "273092.90"},# sub 002 -> construction
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
         # Planning: 1000 + 24952.82 + 1690.04 = 27642.86
         self.assertEqual(result['project_task'], Decimal('27642.86'))
-        # Construction: 273092.90
-        self.assertEqual(result['production_task'], Decimal('273092.90'))
+        # Construction: 5 + 273092.90 = 273097.90
+        self.assertEqual(result['production_task'], Decimal('273097.90'))
 
-    def test_calculate_values_new_format_first_level_only(self):
-        """
-        Test new format with first-level tasks only (no sub-tasks).
-        These should be straightforward: check if suffix ends with "01".
-        """
-        sap_id = "2814I00720"
+    def test_calculate_values_concat_sub_001_repeated_rows(self):
+        """IO-740 regression: covers the concat shapes where multiple rows
+        share the same sub 001 POSID (repeated bookings against the same
+        WBS) and must all be summed into planning, not construction."""
+        sap_id = "2814I90003"
         costs = [
-            {"Posid": "2814I0072000001", "Wkgbtr": "10000.00"},    # Planning (ends with 01)
-            {"Posid": "2814I0072000002", "Wkgbtr": "20000.00"},    # Construction (ends with 02)
-            {"Posid": "2814I0072000003", "Wkgbtr": "30000.00"},    # Construction (ends with 03)
-            {"Posid": "2814I0072000006", "Wkgbtr": "40000.00"},    # Construction (ends with 06)
+            {"Posid": "2814I90003", "Wkgbtr": "37.49"},             # bare -> construction
+            {"Posid": "2814I9000300106", "Wkgbtr": "32209.11"},     # sub 001 -> planning
+            {"Posid": "2814I9000300106", "Wkgbtr": "2027.26"},      # sub 001 -> planning
+            {"Posid": "2814I9000300106", "Wkgbtr": "6203.57"},      # sub 001 -> planning
+            {"Posid": "2814I9000300199", "Wkgbtr": "711.11"},       # sub 001 -> planning
+            {"Posid": "2814I9000300199", "Wkgbtr": "1145.86"},      # sub 001 -> planning
+            {"Posid": "2814I9000300199", "Wkgbtr": "301.74"},       # sub 001 -> planning
+            {"Posid": "2814I9000300201", "Wkgbtr": "2004.47"},      # sub 002 -> construction
         ]
         result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
 
-        # Planning: 10000
-        self.assertEqual(result['project_task'], Decimal('10000.00'))
-        # Construction: 20000 + 30000 + 40000 = 90000
-        self.assertEqual(result['production_task'], Decimal('90000.00'))
-
-    def test_calculate_values_deep_nested_dotted(self):
-        """
-        Test deeply nested dotted format (3+ levels).
-        First segment determines category regardless of depth.
-        """
-        sap_id = "2814I04749"
-        costs = [
-            {"Posid": "2814I04749.01.01.01", "Wkgbtr": "1000.00"},  # Planning (first segment .01)
-            {"Posid": "2814I04749.01.01.02", "Wkgbtr": "2000.00"},  # Planning (first segment .01)
-            {"Posid": "2814I04749.03.01.01", "Wkgbtr": "3000.00"},  # Construction (first segment .03)
-            {"Posid": "2814I04749.03.02.99", "Wkgbtr": "4000.00"},  # Construction (first segment .03)
-        ]
-        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
-
-        # Planning: 1000 + 2000 = 3000
-        self.assertEqual(result['project_task'], Decimal('3000.00'))
-        # Construction: 3000 + 4000 = 7000
-        self.assertEqual(result['production_task'], Decimal('7000.00'))
-
-    def test_calculate_values_consistency_edge_case(self):
-        """
-        Regression test for consistency between dot and concat formats.
-        Scenario: Construction sub-project (03) has a task 01.
-        Dot format: 2814I04749.03.01 -> Construction (because parent is .03)
-        Concat format: 2814I0474900301 -> Should also be Construction (because parent is 003)
-        """
-        sap_id = "2814I04749"
-        costs = [
-            # Dot format: .03 is construction
-            {"Posid": "2814I04749.03.01", "Wkgbtr": "100.00"},
-            # Concat format: 003 is construction
-            {"Posid": "2814I0474900301", "Wkgbtr": "200.00"},
-        ]
-        result = self.sap_service._SapApiService__calculate_values(sap_id, costs)
-
-        # Both should be construction.
-        # Total Construction: 100 + 200 = 300
-        # Total Planning: 0
-        self.assertEqual(result['project_task'], Decimal('0.00'))
-        self.assertEqual(result['production_task'], Decimal('300.00'))
+        # Planning: 32209.11 + 2027.26 + 6203.57 + 711.11 + 1145.86 + 301.74 = 42598.65
+        self.assertEqual(result['project_task'], Decimal('42598.65'))
+        # Construction: 37.49 + 2004.47 = 2041.96
+        self.assertEqual(result['production_task'], Decimal('2041.96'))
 
     def test_make_sap_request_401_raises_sap_authentication_error(self):
         """IO-790: 401 response raises SapAuthenticationError and aborts (no hammering SAP)."""
@@ -569,4 +610,43 @@ class TestSAPService(TestCase):
             self.assertEqual(out[0]["year"], year)
             self.assertEqual(Decimal(str(out[0]["project_task_costs"])), Decimal("11.000"))
             self.assertEqual(Decimal(str(out[0]["production_task_costs"])), Decimal("22.000"))
+
+    @patch('infraohjelmointi_api.management.commands.fetchsapdatabyyear.SapApiService')
+    def test_fetchsapdatabyyear_force_refetch_bypasses_freeze(self, mock_service_cls):
+        """IO-740/IO-789: --force-refetch pushes sap_freeze_date to year 9999 so
+        frozen-year rows (IO-790) are re-fetched from SAP instead of echoed from DB.
+        """
+        mock_service = MagicMock()
+        mock_service_cls.return_value = mock_service
+
+        out = StringIO()
+        call_command('fetchsapdatabyyear', year=2025, force_refetch=True, stdout=out)
+
+        self.assertEqual(
+            mock_service.sap_freeze_date,
+            datetime(9999, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+        )
+        mock_service.sync_all_projects_from_sap.assert_called_once_with(
+            for_financial_statement=True, sap_year=2025
+        )
+        self.assertIn("--force-refetch", out.getvalue())
+
+    @patch('infraohjelmointi_api.management.commands.fetchsapdatabyyear.SapApiService')
+    def test_fetchsapdatabyyear_without_force_refetch_preserves_freeze(self, mock_service_cls):
+        """Without --force-refetch the command must NOT touch sap_freeze_date,
+        so the IO-790 freeze continues to short-circuit year 2025 fetches to DB.
+        """
+        sentinel = datetime(2026, 1, 30, 0, 0, 0, tzinfo=timezone.utc)
+        mock_service = MagicMock()
+        mock_service.sap_freeze_date = sentinel
+        mock_service_cls.return_value = mock_service
+
+        out = StringIO()
+        call_command('fetchsapdatabyyear', year=2025, stdout=out)
+
+        self.assertEqual(mock_service.sap_freeze_date, sentinel)
+        mock_service.sync_all_projects_from_sap.assert_called_once_with(
+            for_financial_statement=True, sap_year=2025
+        )
+        self.assertNotIn("--force-refetch", out.getvalue())
 
