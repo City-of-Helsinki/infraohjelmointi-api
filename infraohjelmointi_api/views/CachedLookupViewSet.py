@@ -23,7 +23,7 @@ class CachedLookupViewSet(BaseViewSet):
     """
 
     preserved_fields = ['value']
-    PRESERVED_PHASES = ('completed', 'warranty')
+    PRESERVED_PHASES = ('completed', 'warrantyPeriod')
     project_field = None
 
     def get_cache_key_name(self) -> str:
