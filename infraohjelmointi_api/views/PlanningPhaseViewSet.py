@@ -7,3 +7,4 @@ class PlanningPhaseViewSet(CachedLookupViewSet):
     """API endpoint for planning phases (cached)."""
 
     serializer_class = PlanningPhaseSerializer
+    project_field = 'planningPhase'
