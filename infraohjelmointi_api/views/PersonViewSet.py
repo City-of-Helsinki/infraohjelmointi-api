@@ -1,8 +1,8 @@
-from .BaseViewSet import BaseViewSet
+from .CachedLookupViewSet import CachedLookupViewSet
 from infraohjelmointi_api.serializers.PersonSerializer import PersonSerializer
 
 
-class PersonViewSet(BaseViewSet):
+class PersonViewSet(CachedLookupViewSet):
     """
     API endpoint that allows persons to be viewed or edited.
     """
