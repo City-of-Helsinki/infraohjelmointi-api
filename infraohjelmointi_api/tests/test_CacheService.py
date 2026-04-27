@@ -26,6 +26,7 @@ from infraohjelmointi_api.models import (
     ProjectType,
     ProjectCategory,
     ConstructionPhase,
+    Person,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
@@ -1396,6 +1397,145 @@ class CachedLookupDeletionModificationTest(TestCase):
         project2.refresh_from_db()
         self.assertIsNone(project1.category)
         self.assertIsNone(project2.category)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class PersonMultiFKDeletionTest(TestCase):
+    """Regression tests for IO-833: deleting/updating a Person referenced by
+    Project via more than one FK field (personPlanning, personConstruction).
+
+    Before the fix, PersonViewSet did not declare project_field, so the
+    base-class cleanup was skipped and Postgres rejected the delete with a
+    foreign key violation (`infraohjelmointi_api_personConstruction_..._fk`).
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_person_fk', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.phase_completed, _ = ProjectPhase.objects.get_or_create(value='completed')
+        self.phase_warranty, _ = ProjectPhase.objects.get_or_create(value='warrantyPeriod')
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value='planning')
+
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Test', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Test Class', path='TestClass', defaultProgrammer=self.programmer
+        )
+
+    def _make_person(self, last):
+        return Person.objects.create(
+            firstName='Pat', lastName=last, email=f'{last.lower()}@example.com',
+            title='', phone='',
+        )
+
+    def _make_project(self, name, phase, **person_kwargs):
+        return Project.objects.create(
+            name=name,
+            description='Test',
+            projectClass=self.proj_class,
+            phase=phase,
+            personProgramming=self.programmer,
+            **person_kwargs,
+        )
+
+    def test_delete_person_referenced_as_planning_only_clears_active_projects(self):
+        """DELETE /persons/<id>/ must NULL personPlanning on active projects."""
+        person = self._make_person('Planner')
+        active = self._make_project('Active P', self.phase_planning, personPlanning=person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        active.refresh_from_db()
+        self.assertIsNone(active.personPlanning)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+    def test_delete_person_referenced_as_construction_only_clears_active_projects(self):
+        """DELETE /persons/<id>/ must NULL personConstruction on active projects.
+
+        This is the exact failure mode reported from dev: a Person referenced
+        only via personConstruction caused a Postgres FK violation.
+        """
+        person = self._make_person('Builder')
+        active = self._make_project('Active C', self.phase_planning, personConstruction=person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        active.refresh_from_db()
+        self.assertIsNone(active.personConstruction)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+    def test_delete_person_referenced_via_both_fks_clears_both(self):
+        """A single project may use the same Person for both planning and construction."""
+        person = self._make_person('Both')
+        project = self._make_project(
+            'Active Both', self.phase_planning,
+            personPlanning=person, personConstruction=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        project.refresh_from_db()
+        self.assertIsNone(project.personPlanning)
+        self.assertIsNone(project.personConstruction)
+
+    def test_delete_person_with_completed_project_preserves_via_each_fk(self):
+        """For completed/warranty projects, repoint to a hidden copy on every FK."""
+        person = self._make_person('Veteran')
+        completed_planning = self._make_project(
+            'Completed Plan', self.phase_completed, personPlanning=person
+        )
+        warranty_construction = self._make_project(
+            'Warranty Build', self.phase_warranty, personConstruction=person
+        )
+        active = self._make_project(
+            'Active', self.phase_planning, personConstruction=person
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id, deleted=False).exists())
+
+        completed_planning.refresh_from_db()
+        warranty_construction.refresh_from_db()
+        active.refresh_from_db()
+
+        self.assertIsNotNone(completed_planning.personPlanning)
+        self.assertEqual(completed_planning.personPlanning.lastName, 'Veteran')
+        self.assertTrue(completed_planning.personPlanning.deleted)
+
+        self.assertIsNotNone(warranty_construction.personConstruction)
+        self.assertEqual(warranty_construction.personConstruction.lastName, 'Veteran')
+        self.assertTrue(warranty_construction.personConstruction.deleted)
+
+        self.assertIsNone(active.personConstruction)
+
+        hidden = Person.objects.filter(lastName='Veteran', deleted=True)
+        self.assertEqual(hidden.count(), 1)
+        self.assertEqual(completed_planning.personPlanning_id, warranty_construction.personConstruction_id)
+
+    def test_delete_person_not_referenced_succeeds(self):
+        """Sanity: deleting an unreferenced Person still works."""
+        person = self._make_person('Lonely')
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
 
 
 class ViewSetImportTest(TestCase):

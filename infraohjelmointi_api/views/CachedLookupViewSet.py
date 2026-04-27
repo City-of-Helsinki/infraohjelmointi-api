@@ -13,13 +13,17 @@ class CachedLookupViewSet(BaseViewSet):
     """ViewSet that caches list() responses for lookup tables.
 
     Supports three model shapes via the `preserved_fields` class attribute.
-    When a project_field is set and a referenced item is updated or deleted,
+    When project_field is set and a referenced item is updated or deleted,
     a hidden copy of the old item is created for completed/warranty projects.
 
     Model shapes:
         ['value']                                  — simple lookup (default)
         ['firstName', 'lastName']                  — project programmer model
         ['firstName', 'lastName', 'email', 'phone', 'title']  — person model
+
+    project_field can be either a single string (one Project FK referencing
+    this lookup) or an iterable of strings (multiple FKs, e.g. Person is
+    referenced by both `personPlanning` and `personConstruction`).
     """
 
     preserved_fields = ['value']
@@ -35,6 +39,14 @@ class CachedLookupViewSet(BaseViewSet):
         if hasattr(model, "deleted"):
             queryset = queryset.exclude(deleted=True)
         return queryset
+
+    def _project_field_names(self) -> tuple:
+        """Normalize project_field (str | iterable | None) to a tuple of field names."""
+        if not self.project_field:
+            return ()
+        if isinstance(self.project_field, str):
+            return (self.project_field,)
+        return tuple(self.project_field)
 
     def _snapshot_fields(self, instance) -> dict:
         return {field: getattr(instance, field) for field in self.preserved_fields}
@@ -63,68 +75,86 @@ class CachedLookupViewSet(BaseViewSet):
         return response
 
     def _preserve_for_completed_projects(self, instance):
-        """Return (old_snapshot, completed_project_ids) if project_field is set, else (None, [])."""
-        if not self.project_field:
-            return None, []
-        old_snapshot = self._snapshot_fields(instance)
-        completed_project_ids = list(Project.objects.filter(
-            **{self.project_field: instance},
-            phase__value__in=self.PRESERVED_PHASES
-        ).values_list('id', flat=True))
-        return old_snapshot, completed_project_ids
+        """Return (old_snapshot, ids_by_field) if project_field is set, else (None, {}).
 
-    def _apply_preservation(self, instance, old_snapshot, completed_project_ids):
+        ids_by_field maps each FK field name to the list of completed/warranty
+        project IDs that reference this instance via that field.
+        """
+        fields = self._project_field_names()
+        if not fields:
+            return None, {}
+        old_snapshot = self._snapshot_fields(instance)
+        ids_by_field = {
+            field: list(Project.objects.filter(
+                **{field: instance},
+                phase__value__in=self.PRESERVED_PHASES,
+            ).values_list('id', flat=True))
+            for field in fields
+        }
+        return old_snapshot, ids_by_field
+
+    def _apply_preservation(self, instance, old_snapshot, ids_by_field):
         """Create a hidden copy with old field values and repoint completed projects to it."""
-        if not (self.project_field and completed_project_ids):
+        if not ids_by_field or not any(ids_by_field.values()):
             return
         instance.refresh_from_db()
-        if self._has_changed(old_snapshot, instance):
-            model = self.get_queryset().model
-            new_item = model.objects.create(**old_snapshot, deleted=True)
-            Project.objects.filter(id__in=completed_project_ids).update(
-                **{self.project_field: new_item}
-            )
+        if not self._has_changed(old_snapshot, instance):
+            return
+        model = self.get_queryset().model
+        new_item = model.objects.create(**old_snapshot, deleted=True)
+        for field, project_ids in ids_by_field.items():
+            if project_ids:
+                Project.objects.filter(id__in=project_ids).update(**{field: new_item})
 
     def update(self, request, *args, **kwargs):
-        old_snapshot, completed_project_ids = self._preserve_for_completed_projects(
+        old_snapshot, ids_by_field = self._preserve_for_completed_projects(
             self.get_object()
         )
         response = super().update(request, *args, **kwargs)
         if response.status_code == 200:
-            self._apply_preservation(self.get_object(), old_snapshot, completed_project_ids)
+            self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
 
     def partial_update(self, request, *args, **kwargs):
-        old_snapshot, completed_project_ids = self._preserve_for_completed_projects(
+        old_snapshot, ids_by_field = self._preserve_for_completed_projects(
             self.get_object()
         )
         response = super().partial_update(request, *args, **kwargs)
         if response.status_code == 200:
-            self._apply_preservation(self.get_object(), old_snapshot, completed_project_ids)
+            self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        fields = self._project_field_names()
 
-        if self.project_field:
+        if fields:
             model = self.get_queryset().model
             snapshot = self._snapshot_fields(instance)
-            project_ids_to_preserve = list(Project.objects.filter(
-                **{self.project_field: instance},
-                phase__value__in=self.PRESERVED_PHASES
-            ).values_list('id', flat=True))
+            ids_to_preserve_by_field = {
+                field: list(Project.objects.filter(
+                    **{field: instance},
+                    phase__value__in=self.PRESERVED_PHASES,
+                ).values_list('id', flat=True))
+                for field in fields
+            }
+            any_to_preserve = any(ids_to_preserve_by_field.values())
 
             with transaction.atomic():
-                if project_ids_to_preserve:
-                    new_item = model.objects.create(**snapshot, deleted=True)
-                    Project.objects.filter(
-                        id__in=project_ids_to_preserve
-                    ).update(**{self.project_field: new_item})
-                Project.objects.filter(
-                    **{self.project_field: instance}
-                ).exclude(id__in=project_ids_to_preserve).update(**{self.project_field: None})
+                preserved_copy = (
+                    model.objects.create(**snapshot, deleted=True)
+                    if any_to_preserve else None
+                )
+                for field, preserve_ids in ids_to_preserve_by_field.items():
+                    if preserve_ids:
+                        Project.objects.filter(id__in=preserve_ids).update(
+                            **{field: preserved_copy}
+                        )
+                    Project.objects.filter(**{field: instance}).exclude(
+                        id__in=preserve_ids
+                    ).update(**{field: None})
 
         response = super().destroy(request, *args, **kwargs)
 
