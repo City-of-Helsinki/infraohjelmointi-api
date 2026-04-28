@@ -23,10 +23,14 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectPhase,
     ProjectProgrammer,
+    ProjectLock,
+    ProjectSet,
     ProjectType,
     ProjectCategory,
     ConstructionPhase,
     Person,
+    Task,
+    TalpaProjectOpening,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
@@ -1536,6 +1540,252 @@ class PersonMultiFKDeletionTest(TestCase):
 
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class PersonOtherReverseFKDeletionTest(TestCase):
+    """Regression tests for IO-833 (extended): deleting a Person that is
+    referenced by tables OTHER than Project's planning/construction FKs.
+
+    Background: at the schema level there are 10 FK constraints pointing at
+    `infraohjelmointi_api_person`. Most of them use `on_delete=DO_NOTHING`
+    on a nullable field, and Django's default Postgres FK constraints are
+    DEFERRABLE INITIALLY DEFERRED. That means stray references are only
+    caught at COMMIT, so the DRF view returned 204 while the underlying
+    transaction blew up with a ForeignKeyViolation, surfacing as a 500 in
+    the next request.
+
+    These tests cover every reverse FK to Person that the auto-cleanup in
+    CachedLookupViewSet._clear_other_reverse_fks must NULL out:
+
+      - Task.person                         (DO_NOTHING, null)
+      - ProjectSet.responsiblePerson        (DO_NOTHING, null)
+      - ProjectLock.lockedBy                (DO_NOTHING, null)
+      - TalpaProjectOpening.createdBy       (DO_NOTHING, null)
+      - TalpaProjectOpening.updatedBy       (DO_NOTHING, null)
+      - ProjectProgrammer.person            (SET_NULL,   null)
+
+    Plus the M2M relations (Project.otherPersons, Project.favPersons),
+    which Django itself cleans up via the through-table.
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_person_other_fk', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value='planning')
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Other', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Other Class', path='OtherClass', defaultProgrammer=self.programmer
+        )
+
+    def _make_person(self, last):
+        return Person.objects.create(
+            firstName='Pat', lastName=last, email=f'{last.lower()}@example.com',
+            title='', phone='',
+        )
+
+    def _make_project(self, name='ref-project', **kwargs):
+        return Project.objects.create(
+            name=name,
+            description='Test',
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            personProgramming=self.programmer,
+            **kwargs,
+        )
+
+    def test_delete_person_referenced_by_task_clears_task_fk(self):
+        """Without the cleanup this raises FK violation at commit time."""
+        person = self._make_person('Tasky')
+        project = self._make_project('with-task')
+        task = Task.objects.create(
+            projectId=project,
+            taskType='task',
+            person=person,
+            realizedCost=0,
+            plannedCost=0,
+            riskAssessment='none',
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        task.refresh_from_db()
+        self.assertIsNone(task.person)
+
+    def test_delete_person_referenced_by_projectset_clears_responsible_person(self):
+        person = self._make_person('Setty')
+        pset = ProjectSet.objects.create(
+            name='ps', description='', responsiblePerson=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        pset.refresh_from_db()
+        self.assertIsNone(pset.responsiblePerson)
+
+    def test_delete_person_referenced_by_projectlock_clears_locked_by(self):
+        person = self._make_person('Locker')
+        project = self._make_project('with-lock')
+        lock = ProjectLock.objects.create(
+            project=project, lockType='status_locked', lockedBy=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        lock.refresh_from_db()
+        self.assertIsNone(lock.lockedBy)
+
+    def test_delete_person_referenced_by_talpa_opening_clears_both_audit_fks(self):
+        """TalpaProjectOpening references Person via TWO FKs (createdBy +
+        updatedBy). Both must be cleared."""
+        person = self._make_person('Talpa')
+        project = self._make_project('with-talpa')
+        opening = TalpaProjectOpening.objects.create(
+            project=project,
+            subject='Uusi',
+            createdBy=person,
+            updatedBy=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        opening.refresh_from_db()
+        self.assertIsNone(opening.createdBy)
+        self.assertIsNone(opening.updatedBy)
+
+    def test_delete_person_referenced_by_programmer_clears_programmer_fk(self):
+        """ProjectProgrammer.person uses SET_NULL. Verify the FK is null and
+        the programmer row itself is preserved (it should NOT be deleted
+        cascade-style)."""
+        person = self._make_person('Programmery')
+        prog = ProjectProgrammer.objects.create(
+            firstName='Alex', lastName='Programmery', person=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        prog.refresh_from_db()
+        self.assertIsNone(prog.person)
+
+    def test_delete_person_referenced_via_other_persons_m2m_succeeds(self):
+        """Django auto-cleans the M2M through-table on delete; verify that
+        our extra cleanup doesn't break that path."""
+        person = self._make_person('M2MOther')
+        project = self._make_project('with-other')
+        project.otherPersons.add(person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        project.refresh_from_db()
+        self.assertEqual(project.otherPersons.count(), 0)
+
+    def test_delete_person_referenced_via_fav_persons_m2m_succeeds(self):
+        person = self._make_person('M2MFav')
+        project = self._make_project('with-fav')
+        project.favPersons.add(person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        project.refresh_from_db()
+        self.assertEqual(project.favPersons.count(), 0)
+
+    def test_delete_person_referenced_from_every_relation_simultaneously(self):
+        """End-to-end stress test: a Person referenced from EVERY known
+        relation at once must still delete cleanly. This is the scenario
+        most likely to reproduce the production failure mode where any
+        single missed reverse FK causes a 500."""
+        person = self._make_person('Everywhere')
+
+        # Project FKs (planning + construction) on an active project
+        active = self._make_project(
+            'active-everywhere',
+            personPlanning=person, personConstruction=person,
+        )
+        active.otherPersons.add(person)
+        active.favPersons.add(person)
+
+        # Task on the same project
+        Task.objects.create(
+            projectId=active,
+            taskType='task',
+            person=person,
+            realizedCost=0, plannedCost=0,
+            riskAssessment='none',
+        )
+
+        # ProjectSet
+        ProjectSet.objects.create(
+            name='ps-everywhere', description='', responsiblePerson=person,
+        )
+
+        # ProjectLock on the same project
+        ProjectLock.objects.create(
+            project=active, lockType='status_locked', lockedBy=person,
+        )
+
+        # TalpaProjectOpening on the same project
+        TalpaProjectOpening.objects.create(
+            project=active, subject='Uusi',
+            createdBy=person, updatedBy=person,
+        )
+
+        # ProjectProgrammer pointing at this Person
+        prog = ProjectProgrammer.objects.create(
+            firstName='Sam', lastName='Everywhere', person=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+        # All references must be cleared
+        active.refresh_from_db()
+        prog.refresh_from_db()
+        self.assertIsNone(active.personPlanning)
+        self.assertIsNone(active.personConstruction)
+        self.assertEqual(active.otherPersons.count(), 0)
+        self.assertEqual(active.favPersons.count(), 0)
+        self.assertIsNone(prog.person)
+        self.assertEqual(Task.objects.filter(person__isnull=False).count(), 0)
+        self.assertEqual(
+            ProjectSet.objects.filter(responsiblePerson__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            ProjectLock.objects.filter(lockedBy__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            TalpaProjectOpening.objects.filter(createdBy__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            TalpaProjectOpening.objects.filter(updatedBy__isnull=False).count(), 0
+        )
 
 
 class ViewSetImportTest(TestCase):

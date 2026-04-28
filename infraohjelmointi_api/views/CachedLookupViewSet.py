@@ -130,19 +130,19 @@ class CachedLookupViewSet(BaseViewSet):
         instance = self.get_object()
         fields = self._project_field_names()
 
-        if fields:
-            model = self.get_queryset().model
-            snapshot = self._snapshot_fields(instance)
-            ids_to_preserve_by_field = {
-                field: list(Project.objects.filter(
-                    **{field: instance},
-                    phase__value__in=self.PRESERVED_PHASES,
-                ).values_list('id', flat=True))
-                for field in fields
-            }
-            any_to_preserve = any(ids_to_preserve_by_field.values())
+        with transaction.atomic():
+            if fields:
+                model = self.get_queryset().model
+                snapshot = self._snapshot_fields(instance)
+                ids_to_preserve_by_field = {
+                    field: list(Project.objects.filter(
+                        **{field: instance},
+                        phase__value__in=self.PRESERVED_PHASES,
+                    ).values_list('id', flat=True))
+                    for field in fields
+                }
+                any_to_preserve = any(ids_to_preserve_by_field.values())
 
-            with transaction.atomic():
                 preserved_copy = (
                     model.objects.create(**snapshot, deleted=True)
                     if any_to_preserve else None
@@ -156,11 +156,49 @@ class CachedLookupViewSet(BaseViewSet):
                         id__in=preserve_ids
                     ).update(**{field: None})
 
-        response = super().destroy(request, *args, **kwargs)
+            # NULL out any other nullable reverse FKs to this instance
+            # (e.g. Task.person, ProjectLock.lockedBy). Without this, deferred
+            # FK constraints would reject the delete at commit time.
+            self._clear_other_reverse_fks(instance, skip_fields=set(fields))
+
+            response = super().destroy(request, *args, **kwargs)
 
         if response.status_code == 204:
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
+
+    def _clear_other_reverse_fks(self, instance, skip_fields):
+        """NULL out reverse FK references not handled by the project_field
+        preservation logic.
+
+        Walks reverse one-to-many and one-to-one relations to this lookup
+        model. For each nullable FK on a related model that points to
+        ``instance``, runs an UPDATE that sets the FK to NULL. This prevents
+        deferred FK constraint violations at commit time when the instance
+        is deleted (Django's default FK constraints in PostgreSQL are
+        DEFERRABLE INITIALLY DEFERRED, so a stray reference is only caught
+        at COMMIT, manifesting as a 500 from `_commit`).
+
+        Skipped:
+        - many-to-many relations (Django auto-cleans the through-table).
+        - Project FKs in ``skip_fields`` (handled above with hidden-copy
+          preservation for completed/warranty projects).
+        - non-nullable FKs (no safe generic policy; the underlying delete
+          will surface a clear FK violation if such a reference exists).
+        """
+        model = type(instance)
+        for relation in model._meta.get_fields():
+            if not (relation.one_to_many or relation.one_to_one):
+                continue
+            fk_field = relation.field
+            if not fk_field.null:
+                continue
+            related_model = relation.related_model
+            if related_model is Project and fk_field.name in skip_fields:
+                continue
+            related_model._default_manager.filter(
+                **{fk_field.name: instance}
+            ).update(**{fk_field.name: None})
 
     @action(detail=False, methods=["put"], url_path="reorder")
     def reorder(self, request):
