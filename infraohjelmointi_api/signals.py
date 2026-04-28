@@ -518,6 +518,64 @@ def _is_valid_sap_project(value: str | None) -> bool:
     return True
 
 
+def _all_subclasses(cls):
+    """Yield every (transitive) subclass of ``cls``. Used to discover all
+    CachedLookupViewSet subclasses regardless of inheritance depth."""
+    for sub in cls.__subclasses__():
+        yield sub
+        yield from _all_subclasses(sub)
+
+
+def _invalidate_cached_lookup(sender, **kwargs):
+    """Drop the cached list response for ``sender`` after the surrounding
+    transaction commits. Deferring to ``on_commit`` avoids a race where a
+    concurrent request reads the cache between INVALIDATE and COMMIT and
+    re-populates it with the (still-uncommitted, soon-to-be-stale) value.
+    """
+    transaction.on_commit(lambda: CacheService.invalidate_lookup(sender.__name__))
+
+
+def _connect_cached_lookup_invalidation():
+    """Wire post_save/post_delete on every CachedLookupViewSet model so that
+    direct ORM mutations (Django shell, admin, management commands, bulk
+    imports) also invalidate the lookup cache.
+
+    Without this, only ViewSet-driven mutations refresh the cache and
+    out-of-band edits stay invisible until the 12 h TTL expires.
+    Caveat: queryset-level ``.update()`` / ``.delete()`` bypass these signals
+    by design — those callsites must invalidate explicitly.
+    """
+    # Force-import the views package so every CachedLookupViewSet subclass is
+    # registered before we walk subclasses.
+    from infraohjelmointi_api import views  # noqa: F401
+    from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+
+    seen_models = set()
+    for viewset_cls in _all_subclasses(CachedLookupViewSet):
+        try:
+            model = viewset_cls.serializer_class.Meta.model
+        except AttributeError:
+            continue
+        if model in seen_models:
+            continue
+        seen_models.add(model)
+        post_save.connect(
+            _invalidate_cached_lookup,
+            sender=model,
+            dispatch_uid=f"cached_lookup_invalidate_save_{model.__name__}",
+            weak=False,
+        )
+        post_delete.connect(
+            _invalidate_cached_lookup,
+            sender=model,
+            dispatch_uid=f"cached_lookup_invalidate_delete_{model.__name__}",
+            weak=False,
+        )
+
+
+_connect_cached_lookup_invalidation()
+
+
 @receiver(pre_save, sender=Project)
 def capture_old_sap_project(sender, instance, **kwargs):
     """

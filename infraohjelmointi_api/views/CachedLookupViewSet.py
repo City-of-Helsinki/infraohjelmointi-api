@@ -13,13 +13,17 @@ class CachedLookupViewSet(BaseViewSet):
     """ViewSet that caches list() responses for lookup tables.
 
     Supports three model shapes via the `preserved_fields` class attribute.
-    When a project_field is set and a referenced item is updated or deleted,
+    When project_field is set and a referenced item is updated or deleted,
     a hidden copy of the old item is created for completed/warranty projects.
 
     Model shapes:
         ['value']                                  — simple lookup (default)
         ['firstName', 'lastName']                  — project programmer model
         ['firstName', 'lastName', 'email', 'phone', 'title']  — person model
+
+    project_field can be either a single string (one Project FK referencing
+    this lookup) or an iterable of strings (multiple FKs, e.g. Person is
+    referenced by both `personPlanning` and `personConstruction`).
     """
 
     preserved_fields = ['value']
@@ -35,6 +39,14 @@ class CachedLookupViewSet(BaseViewSet):
         if hasattr(model, "deleted"):
             queryset = queryset.exclude(deleted=True)
         return queryset
+
+    def _project_field_names(self) -> list:
+        """Normalize project_field (str | iterable | None) to a list of field names."""
+        if not self.project_field:
+            return []
+        if isinstance(self.project_field, str):
+            return [self.project_field]
+        return list(self.project_field)
 
     def _snapshot_fields(self, instance) -> dict:
         return {field: getattr(instance, field) for field in self.preserved_fields}
@@ -63,74 +75,143 @@ class CachedLookupViewSet(BaseViewSet):
         return response
 
     def _preserve_for_completed_projects(self, instance):
-        """Return (old_snapshot, completed_project_ids) if project_field is set, else (None, [])."""
-        if not self.project_field:
-            return None, []
-        old_snapshot = self._snapshot_fields(instance)
-        completed_project_ids = list(Project.objects.filter(
-            **{self.project_field: instance},
-            phase__value__in=self.PRESERVED_PHASES
-        ).values_list('id', flat=True))
-        return old_snapshot, completed_project_ids
+        """Return (old_snapshot, ids_by_field) if project_field is set, else (None, {}).
 
-    def _apply_preservation(self, instance, old_snapshot, completed_project_ids):
-        """Create a hidden copy with old field values and repoint completed projects to it."""
-        if not (self.project_field and completed_project_ids):
+        ids_by_field maps each FK field name to the list of completed/warranty
+        project IDs that reference this instance via that field.
+        """
+        fields = self._project_field_names()
+        if not fields:
+            return None, {}
+        old_snapshot = self._snapshot_fields(instance)
+        ids_by_field = {
+            field: list(Project.objects.filter(
+                **{field: instance},
+                phase__value__in=self.PRESERVED_PHASES,
+            ).values_list('id', flat=True))
+            for field in fields
+        }
+        return old_snapshot, ids_by_field
+
+    def _apply_preservation(self, instance, old_snapshot, ids_by_field):
+        """Create a hidden copy with old field values and repoint completed projects to it.
+
+        Assumes ``preserved_fields`` are not part of any unique constraint on
+        the model — otherwise the hidden copy will fail to insert. Holds for
+        Person and the simple ``['value']`` lookups; ``ProjectProgrammer`` has
+        ``unique_together=[['firstName', 'lastName']]`` and would clash here
+        on rename, but in practice rename of a ProjectProgrammer is gated by
+        the unique check at validation time.
+        """
+        if not ids_by_field or not any(ids_by_field.values()):
             return
         instance.refresh_from_db()
-        if self._has_changed(old_snapshot, instance):
-            model = self.get_queryset().model
-            new_item = model.objects.create(**old_snapshot, deleted=True)
-            Project.objects.filter(id__in=completed_project_ids).update(
-                **{self.project_field: new_item}
-            )
+        if not self._has_changed(old_snapshot, instance):
+            return
+        model = self.get_queryset().model
+        new_item = model.objects.create(**old_snapshot, deleted=True)
+        for field, project_ids in ids_by_field.items():
+            if project_ids:
+                Project.objects.filter(id__in=project_ids).update(**{field: new_item})
 
     def update(self, request, *args, **kwargs):
-        old_snapshot, completed_project_ids = self._preserve_for_completed_projects(
+        old_snapshot, ids_by_field = self._preserve_for_completed_projects(
             self.get_object()
         )
         response = super().update(request, *args, **kwargs)
         if response.status_code == 200:
-            self._apply_preservation(self.get_object(), old_snapshot, completed_project_ids)
+            self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
 
     def partial_update(self, request, *args, **kwargs):
-        old_snapshot, completed_project_ids = self._preserve_for_completed_projects(
+        old_snapshot, ids_by_field = self._preserve_for_completed_projects(
             self.get_object()
         )
         response = super().partial_update(request, *args, **kwargs)
         if response.status_code == 200:
-            self._apply_preservation(self.get_object(), old_snapshot, completed_project_ids)
+            self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        fields = self._project_field_names()
 
-        if self.project_field:
-            model = self.get_queryset().model
-            snapshot = self._snapshot_fields(instance)
-            project_ids_to_preserve = list(Project.objects.filter(
-                **{self.project_field: instance},
-                phase__value__in=self.PRESERVED_PHASES
-            ).values_list('id', flat=True))
+        with transaction.atomic():
+            if fields:
+                model = self.get_queryset().model
+                snapshot = self._snapshot_fields(instance)
+                ids_to_preserve_by_field = {
+                    field: list(Project.objects.filter(
+                        **{field: instance},
+                        phase__value__in=self.PRESERVED_PHASES,
+                    ).values_list('id', flat=True))
+                    for field in fields
+                }
+                any_to_preserve = any(ids_to_preserve_by_field.values())
 
-            with transaction.atomic():
-                if project_ids_to_preserve:
-                    new_item = model.objects.create(**snapshot, deleted=True)
-                    Project.objects.filter(
-                        id__in=project_ids_to_preserve
-                    ).update(**{self.project_field: new_item})
-                Project.objects.filter(
-                    **{self.project_field: instance}
-                ).exclude(id__in=project_ids_to_preserve).update(**{self.project_field: None})
+                preserved_copy = (
+                    model.objects.create(**snapshot, deleted=True)
+                    if any_to_preserve else None
+                )
+                for field, preserve_ids in ids_to_preserve_by_field.items():
+                    if preserve_ids:
+                        Project.objects.filter(id__in=preserve_ids).update(
+                            **{field: preserved_copy}
+                        )
+                    Project.objects.filter(**{field: instance}).exclude(
+                        id__in=preserve_ids
+                    ).update(**{field: None})
 
-        response = super().destroy(request, *args, **kwargs)
+            # NULL out any other nullable reverse FKs to this instance
+            # (e.g. Task.person, ProjectLock.lockedBy). Without this, deferred
+            # FK constraints would reject the delete at commit time.
+            self._clear_other_reverse_fks(instance, skip_fields=set(fields))
+
+            response = super().destroy(request, *args, **kwargs)
 
         if response.status_code == 204:
             CacheService.invalidate_lookup(self.get_cache_key_name())
         return response
+
+    def _clear_other_reverse_fks(self, instance, skip_fields):
+        """NULL out reverse FK references not handled by the project_field
+        preservation logic.
+
+        Walks reverse one-to-many and one-to-one relations to this lookup
+        model. For each nullable FK on a related model that points to
+        ``instance``, runs an UPDATE that sets the FK to NULL. This prevents
+        deferred FK constraint violations at commit time when the instance
+        is deleted (Django's default FK constraints in PostgreSQL are
+        DEFERRABLE INITIALLY DEFERRED, so a stray reference is only caught
+        at COMMIT, manifesting as a 500 from `_commit`).
+
+        Skipped:
+        - many-to-many relations (Django auto-cleans the through-table).
+        - Project FKs in ``skip_fields`` (handled above with hidden-copy
+          preservation for completed/warranty projects).
+        - non-nullable FKs (no safe generic policy; the underlying delete
+          will surface a clear FK violation if such a reference exists).
+
+        Note: this runs for every CachedLookupViewSet subclass, not only
+        Person. For other lookups (ProjectPhase, etc.) this means stray
+        references on nullable FKs that previously surfaced as deferred FK
+        violations at COMMIT (HTTP 500) are now silently NULLed instead.
+        """
+        model = type(instance)
+        for relation in model._meta.get_fields():
+            if not (relation.one_to_many or relation.one_to_one):
+                continue
+            fk_field = relation.field
+            if not fk_field.null:
+                continue
+            related_model = relation.related_model
+            if related_model is Project and fk_field.name in skip_fields:
+                continue
+            related_model._default_manager.filter(
+                **{fk_field.name: instance}
+            ).update(**{fk_field.name: None})
 
     @action(detail=False, methods=["put"], url_path="reorder")
     def reorder(self, request):
