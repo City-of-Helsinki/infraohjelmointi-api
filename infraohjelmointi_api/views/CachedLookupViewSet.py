@@ -40,13 +40,13 @@ class CachedLookupViewSet(BaseViewSet):
             queryset = queryset.exclude(deleted=True)
         return queryset
 
-    def _project_field_names(self) -> tuple:
-        """Normalize project_field (str | iterable | None) to a tuple of field names."""
+    def _project_field_names(self) -> list:
+        """Normalize project_field (str | iterable | None) to a list of field names."""
         if not self.project_field:
-            return ()
+            return []
         if isinstance(self.project_field, str):
-            return (self.project_field,)
-        return tuple(self.project_field)
+            return [self.project_field]
+        return list(self.project_field)
 
     def _snapshot_fields(self, instance) -> dict:
         return {field: getattr(instance, field) for field in self.preserved_fields}
@@ -94,7 +94,15 @@ class CachedLookupViewSet(BaseViewSet):
         return old_snapshot, ids_by_field
 
     def _apply_preservation(self, instance, old_snapshot, ids_by_field):
-        """Create a hidden copy with old field values and repoint completed projects to it."""
+        """Create a hidden copy with old field values and repoint completed projects to it.
+
+        Assumes ``preserved_fields`` are not part of any unique constraint on
+        the model — otherwise the hidden copy will fail to insert. Holds for
+        Person and the simple ``['value']`` lookups; ``ProjectProgrammer`` has
+        ``unique_together=[['firstName', 'lastName']]`` and would clash here
+        on rename, but in practice rename of a ProjectProgrammer is gated by
+        the unique check at validation time.
+        """
         if not ids_by_field or not any(ids_by_field.values()):
             return
         instance.refresh_from_db()
@@ -185,6 +193,11 @@ class CachedLookupViewSet(BaseViewSet):
           preservation for completed/warranty projects).
         - non-nullable FKs (no safe generic policy; the underlying delete
           will surface a clear FK violation if such a reference exists).
+
+        Note: this runs for every CachedLookupViewSet subclass, not only
+        Person. For other lookups (ProjectPhase, etc.) this means stray
+        references on nullable FKs that previously surfaced as deferred FK
+        violations at COMMIT (HTTP 500) are now silently NULLed instead.
         """
         model = type(instance)
         for relation in model._meta.get_fields():

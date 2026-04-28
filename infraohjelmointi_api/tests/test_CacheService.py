@@ -1405,12 +1405,13 @@ class CachedLookupDeletionModificationTest(TestCase):
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class PersonMultiFKDeletionTest(TestCase):
-    """Regression tests for IO-833: deleting/updating a Person referenced by
-    Project via more than one FK field (personPlanning, personConstruction).
+    """Tests that deleting/updating a Person referenced by Project via
+    multiple FK fields (`personPlanning`, `personConstruction`) cleans up
+    all references. Both FKs use `on_delete=DO_NOTHING` with deferred
+    Postgres FK constraints, so a missed reference only surfaces as a 500
+    at COMMIT rather than at the DELETE statement.
 
-    Before the fix, PersonViewSet did not declare project_field, so the
-    base-class cleanup was skipped and Postgres rejected the delete with a
-    foreign key violation (`infraohjelmointi_api_personConstruction_..._fk`).
+    See IO-833.
     """
 
     def setUp(self):
@@ -1541,22 +1542,46 @@ class PersonMultiFKDeletionTest(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Person.objects.filter(id=person.id).exists())
 
+    def test_delete_person_completed_project_both_fks_same_hidden_copy(self):
+        """One completed project with the same Person on both FKs gets a single
+        shared hidden copy and BOTH FKs repointed to it.
+
+        Catches the multiplication of the multi-FK preservation: only one
+        ``preserved_copy`` should be created per delete, regardless of how
+        many FKs land on it.
+        """
+        person = self._make_person('Twofer')
+        completed = self._make_project(
+            'completed-twofer', self.phase_completed,
+            personPlanning=person, personConstruction=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        completed.refresh_from_db()
+        self.assertIsNotNone(completed.personPlanning)
+        self.assertEqual(
+            completed.personPlanning_id, completed.personConstruction_id,
+            'Both FKs must point to the same hidden copy',
+        )
+        self.assertTrue(completed.personPlanning.deleted)
+        self.assertEqual(
+            Person.objects.filter(lastName='Twofer', deleted=True).count(), 1,
+            'Exactly one hidden copy should exist',
+        )
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class PersonOtherReverseFKDeletionTest(TestCase):
-    """Regression tests for IO-833 (extended): deleting a Person that is
-    referenced by tables OTHER than Project's planning/construction FKs.
+    """Tests that deleting a Person cleans up references from tables other
+    than Project's planning/construction FKs.
 
-    Background: at the schema level there are 10 FK constraints pointing at
-    `infraohjelmointi_api_person`. Most of them use `on_delete=DO_NOTHING`
-    on a nullable field, and Django's default Postgres FK constraints are
-    DEFERRABLE INITIALLY DEFERRED. That means stray references are only
-    caught at COMMIT, so the DRF view returned 204 while the underlying
-    transaction blew up with a ForeignKeyViolation, surfacing as a 500 in
-    the next request.
-
-    These tests cover every reverse FK to Person that the auto-cleanup in
-    CachedLookupViewSet._clear_other_reverse_fks must NULL out:
+    There are 10 FK constraints pointing at `infraohjelmointi_api_person`.
+    Most use `on_delete=DO_NOTHING` on a nullable field with DEFERRABLE
+    INITIALLY DEFERRED constraints, so a missed reference only surfaces as
+    a 500 at COMMIT. `CachedLookupViewSet._clear_other_reverse_fks` NULLs
+    these automatically; these tests cover every relation it must handle:
 
       - Task.person                         (DO_NOTHING, null)
       - ProjectSet.responsiblePerson        (DO_NOTHING, null)
@@ -1567,6 +1592,8 @@ class PersonOtherReverseFKDeletionTest(TestCase):
 
     Plus the M2M relations (Project.otherPersons, Project.favPersons),
     which Django itself cleans up via the through-table.
+
+    See IO-833.
     """
 
     def setUp(self):
@@ -1785,6 +1812,151 @@ class PersonOtherReverseFKDeletionTest(TestCase):
         )
         self.assertEqual(
             TalpaProjectOpening.objects.filter(updatedBy__isnull=False).count(), 0
+        )
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupClearOtherReverseFKsBroaderImpactTest(TestCase):
+    """Regression tests confirming ``_clear_other_reverse_fks`` runs for ALL
+    CachedLookupViewSet subclasses (not just Person) and behaves sanely.
+
+    Without these, a future change might inadvertently break unrelated lookup
+    deletions, since the helper runs on every destroy() in the base class.
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_other_lookup', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Other', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Other Class', path='OtherClass', defaultProgrammer=self.programmer
+        )
+
+    def test_delete_project_phase_nulls_suspended_from_phase_reference(self):
+        """Deleting a ProjectPhase referenced by Project.suspendedFromPhase
+        (an FK NOT covered by ProjectPhaseViewSet.project_field='phase')
+        used to deferred-FK-fail at COMMIT. ``_clear_other_reverse_fks``
+        now NULLs it automatically.
+        """
+        phase_active, _ = ProjectPhase.objects.get_or_create(value='planning')
+        phase_to_delete = ProjectPhase.objects.create(value='temp_phase_to_delete')
+
+        project = Project.objects.create(
+            name='suspended-project',
+            description='Test',
+            projectClass=self.proj_class,
+            phase=phase_active,
+            suspendedFromPhase=phase_to_delete,
+            personProgramming=self.programmer,
+        )
+
+        response = self.client.delete(f'/project-phases/{phase_to_delete.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ProjectPhase.objects.filter(id=phase_to_delete.id).exists())
+        project.refresh_from_db()
+        self.assertIsNone(project.suspendedFromPhase)
+        self.assertEqual(project.phase, phase_active)
+
+    def test_delete_project_phase_nulls_projectset_phase_reference(self):
+        """ProjectSet.phase is a nullable FK to ProjectPhase outside
+        ``project_field`` — should be auto-NULLed on phase delete."""
+        phase_to_delete = ProjectPhase.objects.create(value='temp_set_phase')
+
+        pset = ProjectSet.objects.create(
+            name='set-with-phase', description='', phase=phase_to_delete,
+        )
+
+        response = self.client.delete(f'/project-phases/{phase_to_delete.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        pset.refresh_from_db()
+        self.assertIsNone(pset.phase)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupOrmInvalidationTest(TestCase):
+    """Regression tests for cache invalidation on direct ORM mutations.
+
+    Reported case (Slack 2026-04-27): ``ProjectProgrammer.objects.get(...).delete()``
+    in the OpenShift Django shell removed the row from the DB but the prod
+    list endpoint kept returning it for ~12 h until the cache TTL expired.
+    Root cause: only ``CachedLookupViewSet.destroy()`` invalidated the cache;
+    direct ORM ``.delete()`` bypassed it. Now wired via post_save/post_delete
+    signals connected at app ready, deferred to ``transaction.on_commit``
+    so a concurrent reader can't repopulate the cache from an uncommitted
+    snapshot.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def _populate_lookup_cache(self, model_name, payload):
+        CacheService.set_lookup(model_name, payload)
+        self.assertEqual(CacheService.get_lookup(model_name), payload)
+
+    def test_orm_save_invalidates_lookup_cache(self):
+        self._populate_lookup_cache('ProjectProgrammer', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            ProjectProgrammer.objects.create(firstName='New', lastName='Programmer')
+
+        self.assertIsNone(CacheService.get_lookup('ProjectProgrammer'))
+
+    def test_orm_delete_invalidates_lookup_cache(self):
+        """The exact scenario Sari hit: shell-driven delete should drop cache."""
+        programmer = ProjectProgrammer.objects.create(
+            firstName='Going', lastName='Away'
+        )
+        self._populate_lookup_cache('ProjectProgrammer', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            programmer.delete()
+
+        self.assertIsNone(CacheService.get_lookup('ProjectProgrammer'))
+
+    def test_orm_save_invalidates_person_lookup_cache(self):
+        """Same wiring covers Person (and every other CachedLookupViewSet model)."""
+        person = Person.objects.create(
+            firstName='ORM', lastName='Person', email='orm@example.com',
+        )
+        self._populate_lookup_cache('Person', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person.firstName = 'Renamed'
+            person.save()
+
+        self.assertIsNone(CacheService.get_lookup('Person'))
+
+    def test_invalidation_deferred_until_transaction_commits(self):
+        """If a transaction rolls back, the cache must NOT be invalidated.
+
+        Without the on_commit guard, an aborted transaction would still
+        evict valid cached data, wasting the next request's read on a DB
+        round-trip for no reason.
+        """
+        self._populate_lookup_cache('ProjectProgrammer', [{'still': 'valid'}])
+
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            ProjectProgrammer.objects.create(firstName='Rolled', lastName='Back')
+
+        self.assertEqual(len(callbacks), 1, 'invalidation should be queued, not run')
+        self.assertEqual(
+            CacheService.get_lookup('ProjectProgrammer'),
+            [{'still': 'valid'}],
+            'cache must remain populated until transaction commits',
         )
 
 
