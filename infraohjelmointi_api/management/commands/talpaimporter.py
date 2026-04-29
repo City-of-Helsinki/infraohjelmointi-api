@@ -615,9 +615,9 @@ class Command(BaseCommand):
                 'area': current_area,
                 'unit': unit,
                 'isActive': True,
-            }
+            }, current_budget_account, current_area
         except Exception:
-            return None
+            return None, current_budget_account, current_area
 
     def _parse_sap_range_row(self, row):
         """Parse a row from SAP_Projektinumerovälit.xlsx format"""
@@ -789,7 +789,6 @@ class Command(BaseCommand):
         self.stdout.write("Importing Project Number Ranges...")
 
         ranges_wb = options.get('_ranges_wb') if options else None
-        preconstruction_wb = options.get('_preconstruction_wb') if options else None
 
         # Import from SAP ranges file (2814I)
         if ranges_wb:
@@ -819,9 +818,9 @@ class Command(BaseCommand):
         if not ranges_wb and sheets.get('2814I'):
             self.stdout.write("  Importing 2814I from main file...")
             sheet = sheets['2814I']
-            for row in list(sheet.iter_rows(values_only=True))[1:]:        
+            for row in list(sheet.rows)[1:]:        
                 data = self._parse_2814I_range_row(row)
-                if data:                    
+                if data:
                     data['groupLabel'] = self._compute_group_label(data)
                     obj, created = TalpaProjectNumberRange.objects.update_or_create(
                         projectTypePrefix=data['projectTypePrefix'],
@@ -837,13 +836,15 @@ class Command(BaseCommand):
         # Import 2814E from main file
         if sheets.get('2814E'):
             self.stdout.write("  Importing 2814E from main file...")
-            sheet = sheets['2814E']
+            sheet = sheets['2814E']               
+            current_budget_account = None
+            current_area = None
             for row in list(sheet.iter_rows(values_only=True))[1:]:        
-                data = self._parse_2814E_range_row(row)
-                if data:
-                    print("data1",data)
+                data = self._parse_2814E_range_row(row)                
+                result = self._parse_2814E_range_row(row, current_budget_account, current_area)
+                if result[0]:  # result is (data, budget_account, area)
+                    data, current_budget_account, current_area = result
                     data['groupLabel'] = self._compute_group_label(data)
-                    print("data['groupLabel']",data['groupLabel'])
 
                     obj, created = TalpaProjectNumberRange.objects.update_or_create(
                         projectTypePrefix=data['projectTypePrefix'],
@@ -855,6 +856,11 @@ class Command(BaseCommand):
                         stats['ranges_created'] += 1
                     else:
                         stats['ranges_updated'] += 1
+
+                else:
+                    # Update context even if no data returned
+                    _, current_budget_account, current_area = result
+
 
         self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
 
