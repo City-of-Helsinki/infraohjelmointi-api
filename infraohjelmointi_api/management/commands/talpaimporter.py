@@ -500,65 +500,31 @@ class Command(BaseCommand):
             }
         except Exception:
             return None
+            
 
-    def _parse_2814E_legacy_range_row(self, row):
-        """Parse a row from the 2814E project number range sheet (legacy format from main file)"""
-        try:
-            cell_value = str(row[0].value).strip() if row[0].value else None
-            if not cell_value:
-                return None
+    def _get_col(self, row, index):
+        return str(row[index]).strip() if len(row) > index and row[index] else None
 
-            if 'projektinumero' in cell_value.lower() or '2814e-' in cell_value.lower():
-                return None
+    def _is_header(self, col_a):
+        return col_a and '2814E-Projektinumerovälit' in col_a.lower()
 
-            parts = cell_value.split()
-            if len(parts) < 2:
-                return None
+    def _is_valid_range(self, col_d):
+        return col_d and col_d.startswith('2814E')
 
-            range_part = parts[0]
-            range_start = range_part.strip()
-            range_end = range_start
+    def _update_budget_account(self, col_a, current_account):
+        if col_a and col_a.startswith('8 '):
+            return col_a
+        return current_account
 
-            for i, part in enumerate(parts):
-                if part == '-' and i + 1 < len(parts):
-                    range_end = parts[i + 1].strip()
-                    break
-                elif '-' in part and part != range_start:
-                    range_split = part.split('-')
-                    if len(range_split) == 2:
-                        range_end = range_split[1].strip()
-                    break
+    def _update_area(self, col_b, current_area):
+        if col_b and col_b not in ['', 'None']:
+            return col_b
+        return current_area
 
-            budget_account = None
-            budget_account_number = None
-            budget_match = re.search(r'\(?(8\s*\d{2}\s*\d{2}\s*\d{2})\)?', cell_value)
-            if budget_match:
-                budget_account = budget_match.group(1).strip()
-                budget_account_number = budget_account.replace(' ', '')
+    def _validate_unit(self, col_c):
+        valid_units = {'Tontit', 'Mao', 'Geo', 'Toiminnanohjaus', 'Tilat'}
+        return col_c if col_c in valid_units else None
 
-            area = None
-            area_patterns = [
-                'Kalasatama', 'Länsisatama', 'Pasila', 'Kruunuvuorenranta',
-                'Kuninkaankolmio', 'Malmi', 'Malminkartano', 'Mellunkylä',
-                'Meri-Rastila', 'Läntinen bulevardikaupunki', 'Makasiiniranta'
-            ]
-            for area_name in area_patterns:
-                if area_name.lower() in cell_value.lower():
-                    area = area_name
-                    break
-
-            return {
-                'projectTypePrefix': '2814E',
-                'budgetAccount': budget_account,
-                'budgetAccountNumber': budget_account_number,
-                'rangeStart': range_start,
-                'rangeEnd': range_end,
-                'area': area,
-                'unit': None,  # Legacy format doesn't have unit column
-                'isActive': True,
-            }
-        except Exception:
-            return None
 
     def _parse_2814E_range_row(self, row, current_budget_account=None, current_area=None):
         """
@@ -572,39 +538,30 @@ class Command(BaseCommand):
 
         try:
             # Column A (0): TA-kohta / Budget Account (may be empty for continuation rows)
-            col_a = str(row[0]).strip() if row[0] else None
+            col_a = self._get_col(row, 0)
             # Column B (1): Area name (may be empty for continuation rows)
-            col_b = str(row[1]).strip() if len(row) > 1 and row[1] else None
+            col_b = self._get_col(row, 1)
             # Column C (2): Yksikkö / Unit - "Tontit", "Mao", "Geo", "Toiminnanohjaus" or "Tilat"
-            col_c = str(row[2]).strip() if len(row) > 2 and row[2] else None
+            col_c = self._get_col(row, 2)
             # Column D (3): Range Start - e.g., "2814E22001"
-            col_d = str(row[3]).strip() if len(row) > 3 and row[3] else None
+            col_d = self._get_col(row, 3)
             # Column E (4): Range End - e.g., "2814E22099"
-            col_e = str(row[4]).strip() if len(row) > 4 and row[4] else None
+            col_e = self._get_col(row, 4)
 
             # Skip header rows
-            if col_a and ('2814E-Projektinumerovälit' in col_a.lower()):
+            if self._is_header(col_a):
                 return None, current_budget_account, current_area
 
             # Skip rows without valid range data
-            if not col_d or not col_d.startswith('2814E'):
+            if not self._is_valid_range(col_d):
                 return None, current_budget_account, current_area
 
             # Update current context if this row has TA-kohta or Area
-            if col_a and col_a.startswith('8 '):
-                current_budget_account = col_a
-            if col_b and col_b not in ['', 'None']:
-                # Allow overriding area names with cleaner versions
-                replacements = {
-                    'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
-                    'Malmi (kenttä)': 'Malminkenttä',
-                    'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.'
-                }
-                current_area = replacements.get(col_b, col_b)
+            current_budget_account = self._update_budget_account(col_a, current_budget_account)
+            current_area = self._update_area(col_b, current_area)
 
             # Validate unit
-            valid_units = ['Tontit', 'Mao', 'Geo', 'Toiminnanohjaus', 'Tilat']
-            unit = col_c if col_c in valid_units else None
+            unit = self._validate_unit(col_c)
 
             return {
                 'projectTypePrefix': '2814E',
@@ -618,6 +575,7 @@ class Command(BaseCommand):
             }, current_budget_account, current_area
         except Exception:
             return None, current_budget_account, current_area
+
 
     def _parse_sap_range_row(self, row):
         """Parse a row from SAP_Projektinumerovälit.xlsx format"""
@@ -733,7 +691,7 @@ class Command(BaseCommand):
                     if prefix == '2814I':
                         data = self._parse_2814I_range_row(row)
                     else:
-                        data = self._parse_2814E_legacy_range_row(row)
+                        data = self._parse_2814E_range_row(row)
 
                     if data:
                         count += 1
@@ -840,7 +798,6 @@ class Command(BaseCommand):
             current_budget_account = None
             current_area = None
             for row in list(sheet.iter_rows(values_only=True))[1:]:        
-                data = self._parse_2814E_range_row(row)                
                 result = self._parse_2814E_range_row(row, current_budget_account, current_area)
                 if result[0]:  # result is (data, budget_account, area)
                     data, current_budget_account, current_area = result
