@@ -1568,7 +1568,7 @@ class ProjectViewSet(BaseViewSet):
         except ValueError:
             return False
 
-    def _enforce_restricted_bulk_update_access(self, request, projectIds):
+    def _enforce_restricted_bulk_update_access(self, request, project_ids):
         """Return a 403 Response if a restricted programmer is bulk-updating
         projects outside their assigned classes, otherwise None (IO-756)."""
         if not user_in_restricted_programmer_group(request):
@@ -1588,7 +1588,7 @@ class ProjectViewSet(BaseViewSet):
 
         unauthorized_ids = []
         projects = (
-            Project.objects.filter(id__in=projectIds)
+            Project.objects.filter(id__in=project_ids)
             .select_related("projectClass")
             .only("id", "projectClass__path")
         )
@@ -1602,7 +1602,7 @@ class ProjectViewSet(BaseViewSet):
                 unauthorized_ids.append(str(project.id))
 
         # Treat unknown ids the same as out-of-class — deny by default.
-        missing_ids = [pid for pid in projectIds if pid not in found_ids]
+        missing_ids = [pid for pid in project_ids if pid not in found_ids]
         if missing_ids:
             unauthorized_ids.extend(missing_ids)
 

@@ -24,37 +24,37 @@ def user_in_restricted_programmer_group(request):
     )
 
 
+def _get_legacy_class_paths_from_email(user_email):
+    """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
+    if not user_email or "@" not in user_email:
+        return set()
+    parts = [p.strip() for p in user_email.split("@")[0].split(".") if p.strip()]
+    if len(parts) < 2:
+        return set()
+    first_name, last_name = parts[0].capitalize(), parts[1].capitalize()
+    if not first_name or not last_name:
+        return set()
+    programmer = ProjectProgrammer.objects.filter(
+        firstName__iexact=first_name,
+        lastName__iexact=last_name,
+    ).first()
+    if not programmer:
+        return set()
+    return set(
+        ProjectClass.objects.filter(defaultProgrammer=programmer)
+        .values_list("path", flat=True)
+    )
+
+
 def get_restricted_user_assigned_class_paths(user):
     """Project-class paths the restricted programmer is allowed to edit."""
-    assigned_paths = set()
-
     # 1. Primary: direct ClassProgrammerAssignment rows
-    assigned_paths.update(
+    assigned_paths = set(
         ClassProgrammerAssignment.objects.filter(user=user)
         .values_list("project_class__path", flat=True)
     )
-
     # 2. Fallback: legacy email -> name matching onto ProjectClass.defaultProgrammer
-    user_email = getattr(user, "email", None)
-    if user_email and "@" in user_email:
-        username = user_email.split("@")[0]
-        if "." in username:
-            parts = [part.strip() for part in username.split(".") if part.strip()]
-            if len(parts) >= 2:
-                first_name = parts[0].capitalize()
-                last_name = parts[1].capitalize()
-                if first_name and last_name:
-                    programmer = ProjectProgrammer.objects.filter(
-                        firstName__iexact=first_name,
-                        lastName__iexact=last_name,
-                    ).first()
-                    if programmer:
-                        assigned_paths.update(
-                            ProjectClass.objects.filter(
-                                defaultProgrammer=programmer
-                            ).values_list("path", flat=True)
-                        )
-
+    assigned_paths.update(_get_legacy_class_paths_from_email(getattr(user, "email", None)))
     return [p for p in assigned_paths if p]
 
 
