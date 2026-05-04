@@ -5,6 +5,68 @@ from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssign
 from rest_framework import permissions
 from django.conf import settings
 
+
+def get_restricted_programmer_group_name():
+    """AD group name used for restricted programmers (IO-756)."""
+    return getattr(
+        settings,
+        "RESTRICTED_PROGRAMMER_AD_GROUP",
+        "sg_kymp_sso_io_rajoitetut_ohjelmoijat",
+    )
+
+
+def user_in_restricted_programmer_group(request):
+    """True if the authenticated user is in the restricted programmer AD group."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    return get_restricted_programmer_group_name() in request.user.ad_groups.all().values_list(
+        "name", flat=True
+    )
+
+
+def _get_legacy_class_paths_from_email(user_email):
+    """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
+    if not user_email or "@" not in user_email:
+        return set()
+    parts = [p.strip() for p in user_email.split("@")[0].split(".") if p.strip()]
+    if len(parts) < 2:
+        return set()
+    first_name, last_name = parts[0].capitalize(), parts[1].capitalize()
+    if not first_name or not last_name:
+        return set()
+    programmer = ProjectProgrammer.objects.filter(
+        firstName__iexact=first_name,
+        lastName__iexact=last_name,
+    ).first()
+    if not programmer:
+        return set()
+    return set(
+        ProjectClass.objects.filter(defaultProgrammer=programmer)
+        .values_list("path", flat=True)
+    )
+
+
+def get_restricted_user_assigned_class_paths(user):
+    """Project-class paths the restricted programmer is allowed to edit."""
+    # 1. Primary: direct ClassProgrammerAssignment rows
+    assigned_paths = set(
+        ClassProgrammerAssignment.objects.filter(user=user)
+        .values_list("project_class__path", flat=True)
+    )
+    # 2. Fallback: legacy email -> name matching onto ProjectClass.defaultProgrammer
+    assigned_paths.update(_get_legacy_class_paths_from_email(getattr(user, "email", None)))
+    return [p for p in assigned_paths if p]
+
+
+def target_path_matches_assigned_paths(target_class_path, assigned_paths):
+    """True if target equals or is a descendant of an assigned path (paths use '/')."""
+    if not target_class_path:
+        return False
+    for path in assigned_paths:
+        if target_class_path == path or target_class_path.startswith(path + "/"):
+            return True
+    return False
+
 GET = "GET"
 POST = "POST"
 PATCH = "PATCH"
@@ -248,6 +310,10 @@ class IsPlanner(permissions.BasePermission):
             return True
 
     def has_permission(self, request, view):
+        # IO-756: restricted programmers must not inherit broader rights
+        # via overlapping AD memberships; let IsClassProgrammer decide.
+        if user_in_restricted_programmer_group(request):
+            return False
         if (
             request.user.is_authenticated
             and self.user_in_planner_group(request=request)
@@ -270,6 +336,8 @@ class IsPlanner(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        if user_in_restricted_programmer_group(request):
+            return False
         # Planners can edit and perform all operations so return true for all model instance actions
         return True
 
@@ -282,6 +350,8 @@ class IsProjectManager(permissions.BasePermission):
             return True
 
     def has_permission(self, request, view):
+        if user_in_restricted_programmer_group(request):
+            return False
         # has edit permissions for projects and notes
         # and read permissions
         if (
@@ -306,6 +376,8 @@ class IsProjectManager(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        if user_in_restricted_programmer_group(request):
+            return False
         # has edit permissions for projects nad notes only
         # and only specific project fields
         _type = obj._meta.model.__name__
@@ -364,6 +436,8 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
             return True
 
     def has_permission(self, request, view):
+        if user_in_restricted_programmer_group(request):
+            return False
         if (
             request.user.is_authenticated
             and self.user_in_project_area_planner_group(request=request)
@@ -388,6 +462,8 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
         return False
 
     def has_object_permission(self, request, view, obj):
+        if user_in_restricted_programmer_group(request):
+            return False
         _type = obj._meta.model.__name__
 
         if view.action in [
@@ -470,10 +546,7 @@ class IsClassProgrammer(permissions.BasePermission):
 
     def user_in_restricted_programmer_group(self, request):
         """Check if user is in restricted programmer AD group"""
-        restricted_group_name = getattr(settings, 'RESTRICTED_PROGRAMMER_AD_GROUP', 'sg_kymp_sso_io_rajoitetut_ohjelmoijat')
-        return restricted_group_name in request.user.ad_groups.all().values_list(
-            "name", flat=True
-        )
+        return user_in_restricted_programmer_group(request)
 
     def user_is_coordinator_or_admin(self, request):
         """Check if user is coordinator or admin (bypass restrictions)"""
@@ -485,35 +558,7 @@ class IsClassProgrammer(permissions.BasePermission):
 
     def get_user_assigned_classes_paths(self, request):
         """Get project class paths assigned to this user."""
-        assigned_paths = set()
-
-        # 1. Primary: Direct ClassProgrammerAssignment lookup
-        assigned_paths.update(
-            ClassProgrammerAssignment.objects.filter(user=request.user)
-            .values_list('project_class__path', flat=True)
-        )
-
-        # 2. Fallback: Legacy email -> name matching
-        user_email = request.user.email
-        if user_email and '@' in user_email:
-            username = user_email.split('@')[0]
-            if '.' in username:
-                parts = [part.strip() for part in username.split('.') if part.strip()]
-                if len(parts) >= 2:
-                    first_name = parts[0].capitalize()
-                    last_name = parts[1].capitalize()
-                    if first_name and last_name:
-                        programmer = ProjectProgrammer.objects.filter(
-                            firstName__iexact=first_name,
-                            lastName__iexact=last_name
-                        ).first()
-
-                        if programmer:
-                            # Get classes where this programmer is the default
-                            legacy_assigned_classes = ProjectClass.objects.filter(defaultProgrammer=programmer)
-                            assigned_paths.update(legacy_assigned_classes.values_list('path', flat=True))
-
-        return [p for p in assigned_paths if p]
+        return get_restricted_user_assigned_class_paths(request.user)
 
     def has_permission(self, request, view):
         """Check if user has permission for the action"""
@@ -542,10 +587,12 @@ class IsClassProgrammer(permissions.BasePermission):
         ]:
             return True
 
-        # Allow edit actions (will be checked at object level)
+        # Allow edit actions (will be checked at object level, except
+        # patch_bulk_projects which is enforced inside the view).
         if view.action in [
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS,
+            "patch_bulk_projects",
         ]:
             return True
 
@@ -568,10 +615,7 @@ class IsClassProgrammer(permissions.BasePermission):
     @staticmethod
     def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
         """True if target equals or is a child of an assigned path (paths use '/')."""
-        for path in assigned_paths:
-            if target_class_path == path or target_class_path.startswith(path + "/"):
-                return True
-        return False
+        return target_path_matches_assigned_paths(target_class_path, assigned_paths)
 
     def has_object_permission(self, request, view, obj):
         """Check if user has permission for this specific object"""
