@@ -35,6 +35,11 @@ from infraohjelmointi_api.services import (
     ProjectClassService,
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
+from infraohjelmointi_api.permissions import (
+    user_in_restricted_programmer_group,
+    get_restricted_user_assigned_class_paths,
+    target_path_matches_assigned_paths,
+)
 import json
 
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
@@ -1416,6 +1421,15 @@ class ProjectViewSet(BaseViewSet):
             data = json.loads(request.body.decode("utf-8"))
             if self._is_bulk_project_update_data_valid(data):
                 projectIds = [projectData["id"] for projectData in data]
+
+                # IO-756: enforce per-project class assignments here; DRF
+                # does not call check_object_permissions for bulk actions.
+                forbidden_response = self._enforce_restricted_bulk_update_access(
+                    request, projectIds
+                )
+                if forbidden_response is not None:
+                    return forbidden_response
+
                 # Building an order by query which makes sure the order is preserved when filtering using __in clause
                 preserved = Case(
                     *[When(id=val, then=pos) for pos, val in enumerate(projectIds)],
@@ -1553,6 +1567,58 @@ class ProjectViewSet(BaseViewSet):
             return True
         except ValueError:
             return False
+
+    def _enforce_restricted_bulk_update_access(self, request, project_ids):
+        """Return a 403 Response if a restricted programmer is bulk-updating
+        projects outside their assigned classes, otherwise None (IO-756)."""
+        if not user_in_restricted_programmer_group(request):
+            return None
+
+        assigned_paths = get_restricted_user_assigned_class_paths(request.user)
+        if not assigned_paths:
+            return Response(
+                data={
+                    "message": (
+                        "User has no class assignments; bulk project updates"
+                        " are not allowed."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        unauthorized_ids = []
+        projects = (
+            Project.objects.filter(id__in=project_ids)
+            .select_related("projectClass")
+            .only("id", "projectClass__path")
+        )
+        found_ids = set()
+        for project in projects:
+            found_ids.add(str(project.id))
+            class_path = (
+                project.projectClass.path if project.projectClass else None
+            )
+            if not target_path_matches_assigned_paths(class_path, assigned_paths):
+                unauthorized_ids.append(str(project.id))
+
+        # Treat unknown ids the same as out-of-class — deny by default.
+        missing_ids = [pid for pid in project_ids if pid not in found_ids]
+        if missing_ids:
+            unauthorized_ids.extend(missing_ids)
+
+        if unauthorized_ids:
+            return Response(
+                data={
+                    "message": (
+                        "Not allowed to bulk-update one or more projects"
+                        " outside your assigned classes."
+                    ),
+                    "unauthorized_project_ids": unauthorized_ids,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return None
 
     def _is_bulk_project_update_data_valid(self, data):
         if type(data) is list and len(data) > 0:
