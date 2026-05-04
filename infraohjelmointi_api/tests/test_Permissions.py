@@ -5,7 +5,12 @@ from helusers.models import ADGroup
 from infraohjelmointi_api.models import (
     ProjectProgrammer, ProjectClass, Project, ProjectPhase, ClassProgrammerAssignment, Note, ProjectGroup
 )
-from infraohjelmointi_api.permissions import IsClassProgrammer
+from infraohjelmointi_api.permissions import (
+    IsClassProgrammer,
+    IsPlanner,
+    IsProjectManager,
+    IsPlannerOfProjectAreas,
+)
 from infraohjelmointi_api.views import BaseViewSet
 from unittest.mock import Mock
 
@@ -469,3 +474,186 @@ class RestrictedProgrammerPermissionsTestCase(TestCase):
 
         # Should be able to edit group because its classRelation is assigned to user
         self.assertTrue(permission.has_object_permission(request, view, test_group))
+
+    # ------------------------------------------------------------------
+    # IO-756 part 2: defensive restrictions for overlapping AD groups and
+    # bulk project updates.
+    # ------------------------------------------------------------------
+
+    def _make_user_with_groups(self, email, group_names):
+        user = User.objects.create_user(username=email, email=email)
+        for name in group_names:
+            group, _ = ADGroup.objects.get_or_create(name=name)
+            user.ad_groups.add(group)
+        return user
+
+    def test_is_planner_denies_when_user_also_in_restricted_group(self):
+        """Restricted programmers in the ohjelmoijat group must not get planner access."""
+        user = self._make_user_with_groups(
+            'overlap.planner@test.fi',
+            ['sg_kymp_sso_io_ohjelmoijat', self.restricted_programmer_group.name],
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.user = user
+        request.data = {}
+        view = Mock()
+        view.action = 'partial_update'
+        view.kwargs = {}
+
+        permission = IsPlanner()
+        self.assertFalse(permission.has_permission(request, view))
+        self.assertFalse(
+            permission.has_object_permission(request, view, self.snow_project)
+        )
+
+    def test_is_project_manager_denies_when_user_also_in_restricted_group(self):
+        user = self._make_user_with_groups(
+            'overlap.pm@test.fi',
+            ['sg_kymp_sso_io_projektipaallikot', self.restricted_programmer_group.name],
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.user = user
+        request.data = {}
+        view = Mock()
+        view.action = 'partial_update'
+
+        permission = IsProjectManager()
+        self.assertFalse(permission.has_permission(request, view))
+        self.assertFalse(
+            permission.has_object_permission(request, view, self.snow_project)
+        )
+
+    def test_is_planner_of_project_areas_denies_when_user_also_in_restricted_group(self):
+        user = self._make_user_with_groups(
+            'overlap.area@test.fi',
+            [
+                'sg_kymp_sso_io_projektialueiden_ohjelmoijat',
+                self.restricted_programmer_group.name,
+            ],
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/1/', {})
+        request.user = user
+        request.data = {}
+        view = Mock()
+        view.action = 'partial_update'
+
+        permission = IsPlannerOfProjectAreas()
+        self.assertFalse(permission.has_permission(request, view))
+        self.assertFalse(
+            permission.has_object_permission(request, view, self.snow_project)
+        )
+
+    def test_is_planner_still_grants_access_without_restricted_group(self):
+        """Regression: plain planners keep working after the defensive check."""
+        user = self._make_user_with_groups(
+            'plain.planner@test.fi',
+            ['sg_kymp_sso_io_ohjelmoijat'],
+        )
+
+        factory = APIRequestFactory()
+        request = factory.get('/projects/')
+        request.user = user
+        view = Mock()
+        view.action = 'list'
+        view.kwargs = {}
+
+        permission = IsPlanner()
+        self.assertTrue(permission.has_permission(request, view))
+        self.assertTrue(
+            permission.has_object_permission(request, view, self.snow_project)
+        )
+
+    def test_is_class_programmer_allows_patch_bulk_projects_action(self):
+        """IO-756 part 2: bulk-update action must be allowed at view level."""
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/bulk-update/', {})
+        request.user = self.programmer_user
+        request.data = {}
+
+        permission = IsClassProgrammer()
+        view = Mock()
+        view.action = 'patch_bulk_projects'
+
+        self.assertTrue(permission.has_permission(request, view))
+
+    def test_bulk_update_helper_allows_projects_in_assigned_classes(self):
+        """IO-756 part 2: restricted programmer may bulk-update within assigned class."""
+        from infraohjelmointi_api.views.ProjectViewSet import ProjectViewSet
+
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user, project_class=self.bridge_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/bulk-update/', {})
+        request.user = self.programmer_user
+
+        viewset = ProjectViewSet()
+        response = viewset._enforce_restricted_bulk_update_access(
+            request, [str(self.bridge_project.id)]
+        )
+        self.assertIsNone(response)
+
+    def test_bulk_update_helper_blocks_project_outside_assigned_classes(self):
+        """IO-756 part 2: restricted programmer can't bulk-update foreign projects."""
+        from infraohjelmointi_api.views.ProjectViewSet import ProjectViewSet
+
+        ClassProgrammerAssignment.objects.create(
+            user=self.programmer_user, project_class=self.bridge_class
+        )
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/bulk-update/', {})
+        request.user = self.programmer_user
+
+        viewset = ProjectViewSet()
+        response = viewset._enforce_restricted_bulk_update_access(
+            request,
+            [str(self.bridge_project.id), str(self.snow_project.id)],
+        )
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 403)
+        self.assertIn(
+            str(self.snow_project.id),
+            response.data.get("unauthorized_project_ids", []),
+        )
+        self.assertNotIn(
+            str(self.bridge_project.id),
+            response.data.get("unauthorized_project_ids", []),
+        )
+
+    def test_bulk_update_helper_noop_for_non_restricted_user(self):
+        """Non-restricted users bypass the bulk-update access check entirely."""
+        from infraohjelmointi_api.views.ProjectViewSet import ProjectViewSet
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/bulk-update/', {})
+        request.user = self.coordinator_user
+
+        viewset = ProjectViewSet()
+        response = viewset._enforce_restricted_bulk_update_access(
+            request,
+            [str(self.bridge_project.id), str(self.snow_project.id)],
+        )
+        self.assertIsNone(response)
+
+    def test_bulk_update_helper_denies_when_no_assignments(self):
+        """Restricted programmer with no assigned classes is denied outright."""
+        from infraohjelmointi_api.views.ProjectViewSet import ProjectViewSet
+
+        factory = APIRequestFactory()
+        request = factory.patch('/projects/bulk-update/', {})
+        request.user = self.other_user  # restricted group, no assignments
+
+        viewset = ProjectViewSet()
+        response = viewset._enforce_restricted_bulk_update_access(
+            request, [str(self.bridge_project.id)]
+        )
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 403)
