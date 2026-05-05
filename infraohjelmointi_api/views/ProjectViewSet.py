@@ -34,6 +34,7 @@ from infraohjelmointi_api.services import (
     ProjectFinancialService,
     ProjectClassService,
 )
+from infraohjelmointi_api.services.ProjectWiseService import PWProjectResponseError
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.permissions import (
     user_in_restricted_programmer_group,
@@ -1879,15 +1880,25 @@ class ProjectViewSet(BaseViewSet):
             )
             
             logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
-            
+
+        except PWProjectResponseError as e:
+            # IO-851: PW outage / non-200 — let the local edit through
+            # instead of rolling it back; re-sync once PW is healthy.
+            logger.warning(
+                f"PW sync skipped for project '{updated_project.name}' "
+                f"(HKR ID: {updated_project.hkrId}): {e}. "
+                f"Local update committed; project is temporarily out of sync with PW."
+            )
+            return
+
         except Exception as e:
-            # Log detailed error but don't break the update
+            # Any other failure: re-raise so @transaction.atomic on
+            # partial_update rolls back the local write and DB stays
+            # consistent with PW.
             logger.error(f"Automatic PW sync failed for project '{updated_project.name}' (HKR ID: {updated_project.hkrId})")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {str(e)}")
-            logger.error(f"Project update succeeded but PW sync failed - data may be out of sync")
-            # Re-raise to make the failure visible in the UI
             raise ValidationError({
-                "hkrId": f"Project updated successfully but failed to sync to ProjectWise: {str(e)}. Please use 'Update to PW' button to retry."
+                "hkrId": f"Project could not be saved because syncing to ProjectWise failed: {str(e)}. Please retry, or use 'Update to PW' once the issue is resolved."
             })
 
