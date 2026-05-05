@@ -148,3 +148,59 @@ class FinancialSumSerializerTestCase(TestCase):
         mock_get_financial_sum.assert_not_called()
         mock_set_financial_sum.assert_not_called()
 
+    def test_planning_masterclass_sums_descendant_projects_across_deep_levels(self):
+        """Regression: masterclass planning sums must include projects deeper than 2 levels."""
+        year = date.today().year
+
+        root_master = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 Projektialueet",
+            path="8 08 Projektialueet",
+        )
+        child_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 02 Kadut",
+            parent=root_master,
+            path="8 08 Projektialueet/8 08 02 Kadut",
+        )
+        sub_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="Lansisatama",
+            parent=child_class,
+            path="8 08 Projektialueet/8 08 02 Kadut/Lansisatama",
+        )
+        deep_sub_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="Hernesaari",
+            parent=sub_class,
+            path="8 08 Projektialueet/8 08 02 Kadut/Lansisatama/Hernesaari",
+        )
+
+        deep_project = Project.objects.create(
+            name="Hernesaari katu",
+            description="Deep hierarchy regression project",
+            projectClass=deep_sub_class,
+            programmed=True,
+        )
+        ProjectFinancial.objects.create(
+            project=deep_project,
+            year=year,
+            value=100,
+            forFrameView=False,
+        )
+
+        serializer = FinancialSumSerializer(
+            context={
+                "finance_year": year,
+                "forcedToFrame": False,
+                "for_coordinator": False,
+                "frame_budgets": defaultdict(lambda: 0),
+            }
+        )
+
+        master_total = serializer.get_finance_sums(root_master)["year0"]["plannedBudget"]
+        class_total = serializer.get_finance_sums(child_class)["year0"]["plannedBudget"]
+
+        self.assertEqual(class_total, 100)
+        self.assertEqual(master_total, class_total)
+
