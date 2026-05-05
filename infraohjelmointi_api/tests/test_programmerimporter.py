@@ -10,7 +10,12 @@ try:
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-from infraohjelmointi_api.models import ProjectClass, ProjectProgrammer, Project
+from infraohjelmointi_api.models import (
+    ProjectClass,
+    ProjectLocation,
+    ProjectProgrammer,
+    Project,
+)
 from infraohjelmointi_api.models.ProjectPhase import ProjectPhase
 
 
@@ -34,7 +39,7 @@ class ProgrammerImporterTestCase(TestCase):
             parent=cls.class_traffic
         )
 
-        cls.programmer_saija = ProjectProgrammer.objects.create(
+        cls.programmer_anna = ProjectProgrammer.objects.create(
             firstName="TestProgrammer",
             lastName="Test"
         )
@@ -87,7 +92,7 @@ class ProgrammerImporterTestCase(TestCase):
             os.unlink(excel_path)
 
     def test_hierarchical_fallback(self):
-        self.class_traffic.defaultProgrammer = self.programmer_saija
+        self.class_traffic.defaultProgrammer = self.programmer_anna
         self.class_traffic.save()
 
         project = Project.objects.create(
@@ -107,5 +112,81 @@ class ProgrammerImporterTestCase(TestCase):
             project.refresh_from_db()
             self.assertIsNotNone(project.personProgramming)
             self.assertEqual(project.personProgramming.firstName, "TestProgrammer")
+        finally:
+            os.unlink(excel_path)
+
+    def test_location_based_backfill(self):
+        """
+        IO-411: a project picks a generic class (e.g. Liikennejärjestelyt)
+        plus a suurpiiri location. The class chain has no programmer, but a
+        programmer-view ProjectClass with the same name as the location does.
+        The importer must backfill via the location chain.
+        """
+        programmer = ProjectProgrammer.objects.create(
+            firstName="Anna", lastName="Esimerkki"
+        )
+        # Programmer-view suurpiiri ProjectClass with default programmer
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=programmer,
+        )
+        # Generic class with no default programmer anywhere up the chain
+        generic_class = ProjectClass.objects.create(name="Liikennejärjestelyt")
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        project = Project.objects.create(
+            name="Test traffic calming project",
+            description="Test",
+            projectClass=generic_class,
+            projectLocation=location,
+            phase=self.phase_proposal,
+        )
+
+        excel_path = self._create_test_excel([
+            ["8 01", "Liikennejärjestelyt", "TestProgrammer Test"]
+        ])
+
+        try:
+            call_command('programmerimporter', '--file', excel_path)
+            project.refresh_from_db()
+            self.assertIsNotNone(project.personProgramming)
+            self.assertEqual(project.personProgramming.firstName, "Anna")
+            self.assertEqual(project.personProgramming.lastName, "Esimerkki")
+        finally:
+            os.unlink(excel_path)
+
+    def test_location_only_backfill_with_no_class(self):
+        """
+        Even when projectClass is null, a project with a suurpiiri location
+        should still get a programmer assigned.
+        """
+        programmer = ProjectProgrammer.objects.create(
+            firstName="Eero", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Läntinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=programmer,
+        )
+        location = ProjectLocation.objects.create(name="Läntinen suurpiiri")
+
+        project = Project.objects.create(
+            name="Some western project",
+            description="Test",
+            projectClass=None,
+            projectLocation=location,
+            phase=self.phase_proposal,
+        )
+
+        excel_path = self._create_test_excel([
+            ["8 01", "Liikennejärjestelyt", "TestProgrammer Test"]
+        ])
+
+        try:
+            call_command('programmerimporter', '--file', excel_path)
+            project.refresh_from_db()
+            self.assertIsNotNone(project.personProgramming)
+            self.assertEqual(project.personProgramming.firstName, "Eero")
         finally:
             os.unlink(excel_path)

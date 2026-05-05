@@ -7,6 +7,7 @@ import os
 import uuid
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 from django.utils import timezone
 
 try:
@@ -14,7 +15,11 @@ try:
 except ImportError:
     raise CommandError("openpyxl is required to read Excel files. Please install it.")
 
-from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
+from infraohjelmointi_api.utils.project_class_utils import (
+    build_location_programmer_lookup,
+    get_default_programmer_for_project,
+    get_programmer_from_hierarchy,
+)
 from infraohjelmointi_api.models import (
     ProjectClass,
     ProjectProgrammer,
@@ -296,6 +301,15 @@ class Command(BaseCommand):
         """
         return get_programmer_from_hierarchy(project_class)
 
+    def _get_programmer_for_project(self, project, name_lookup=None):
+        """Class chain first, then location chain (IO-411). Pass ``name_lookup``
+        to avoid rebuilding it for every project in a backfill loop."""
+        return get_default_programmer_for_project(
+            project.projectClass,
+            project.projectLocation,
+            name_lookup=name_lookup,
+        )
+
     def show_dry_run(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Show what would be imported in dry-run mode"""
         self.stdout.write(self.style.SUCCESS("\n=== DRY RUN MODE ==="))
@@ -305,11 +319,23 @@ class Command(BaseCommand):
             self.stdout.write(f"Would clear {existing_count} existing programmer assignments")
 
         if apply_to_projects:
-            projects_to_update = Project.objects.filter(
-                projectClass__defaultProgrammer__isnull=False,
-                personProgramming__isnull=True
-            ).count()
-            self.stdout.write(f"Would apply default programmers to {projects_to_update} existing projects")
+            # Resolve via the same logic the real run uses so the dry-run
+            # number is exact, not an upper bound.
+            candidates = (
+                Project.objects.filter(personProgramming__isnull=True)
+                .filter(Q(projectClass__isnull=False) | Q(projectLocation__isnull=False))
+                .select_related('projectClass', 'projectLocation')
+            )
+            candidate_count = candidates.count()
+            name_lookup = build_location_programmer_lookup()
+            resolvable = sum(
+                1 for project in candidates.iterator()
+                if self._get_programmer_for_project(project, name_lookup=name_lookup) is not None
+            )
+            self.stdout.write(
+                f"Would apply default programmers to {resolvable} of "
+                f"{candidate_count} programmer-less projects with a class or location"
+            )
 
         # Show specific assignments
         if specific_assignments:
@@ -443,27 +469,30 @@ class Command(BaseCommand):
         if apply_to_projects:
             self.stdout.write(f"\n--- APPLYING DEFAULT PROGRAMMERS TO EXISTING PROJECTS ---")
 
-            # Find all projects that:
-            # 1. Have a projectClass
-            # 2. Don't already have a personProgramming assigned
-            # Note: We use hierarchical fallback in Python to find programmers
-            projects_to_update = Project.objects.filter(
-                personProgramming__isnull=True,
-                projectClass__isnull=False
-            ).select_related('projectClass')
+            # Programmer-less projects with a class OR location we can resolve
+            # a default from (IO-411: suurpiiri often lives on projectLocation).
+            projects_to_update = (
+                Project.objects.filter(personProgramming__isnull=True)
+                .filter(Q(projectClass__isnull=False) | Q(projectLocation__isnull=False))
+                .select_related('projectClass', 'projectLocation')
+            )
 
             projects_count = projects_to_update.count()
             self.stdout.write(f"Found {projects_count} projects without programmers")
 
-            # Use hierarchical fallback to find programmers
-            for project in projects_to_update:
-                programmer = self._get_programmer_with_hierarchy(project.projectClass)
+            name_lookup = build_location_programmer_lookup()
+
+            for project in projects_to_update.iterator():
+                programmer = self._get_programmer_for_project(project, name_lookup=name_lookup)
                 if programmer:
                     project.personProgramming = programmer
                     project.save()
                     projects_updated += 1
 
-            self.stdout.write(f"Updated {projects_updated} projects with default programmers (including hierarchical fallback)")
+            self.stdout.write(
+                f"Updated {projects_updated} projects with default programmers "
+                f"(including class- and location-based hierarchical fallback)"
+            )
 
         # Summary
         self.stdout.write(self.style.SUCCESS(f"\n=== IMPORT SUMMARY ==="))

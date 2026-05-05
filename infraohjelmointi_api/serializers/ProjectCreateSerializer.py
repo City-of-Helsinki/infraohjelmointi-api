@@ -11,7 +11,9 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     ProjectWiseService,
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
-from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
+from infraohjelmointi_api.utils.project_class_utils import (
+    get_default_programmer_for_project,
+)
 from infraohjelmointi_api.serializers import (
     BaseMeta,
     PersonSerializer,
@@ -91,6 +93,12 @@ env.escape_proxy = True
 
 if path.exists(".env"):
     env.read_env(".env")
+
+
+# Distinguishes "key absent from payload" from "key set to None" so an
+# explicit null clear (IO-411) is not silently replaced by the persisted
+# instance value during default-programmer resolution.
+_FIELD_MISSING = object()
 
 
 class ProjectCreateSerializer(ProjectWithFinancesSerializer):
@@ -234,33 +242,65 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
 
     def get_projectReadiness(self, obj: Project) -> int:
         return obj.projectReadiness()
-    def _get_default_programmer_with_fallback(self, project_class):
+
+    def _get_default_programmer_with_fallback(self, project_class, project_location=None):
+        """Walk projectClass parents first, then projectLocation parents (IO-411)."""
+        return get_default_programmer_for_project(project_class, project_location)
+
+    def _resolve_class_and_location_for_programmer(self, data: dict, instance):
         """
-        Get default programmer with hierarchical fallback logic.
-        Uses shared utility with cycle detection.
+        Pick the projectClass / projectLocation values fed into the
+        default-programmer resolver. If a side is in ``data`` (even as
+        ``None``), use it verbatim; otherwise fall back to the persisted
+        instance value so the *other* side's change still has full context.
         """
-        return get_programmer_from_hierarchy(project_class)
+        incoming_class = data.get("projectClass", _FIELD_MISSING)
+        incoming_location = data.get("projectLocation", _FIELD_MISSING)
+
+        if incoming_class is not _FIELD_MISSING:
+            project_class = incoming_class
+        elif instance is not None:
+            project_class = getattr(instance, "projectClass", None)
+        else:
+            project_class = None
+
+        if incoming_location is not _FIELD_MISSING:
+            project_location = incoming_location
+        elif instance is not None:
+            project_location = getattr(instance, "projectLocation", None)
+        else:
+            project_location = None
+
+        return project_class, project_location
 
     def run_pre_create_update_validation(self, data: dict, instance=None):
         # remove projectId as it does not exist on the Project model
         data.pop("projectId", None)
 
-        # Set default programmer from project class if one is selected and no programmer is set
-        # Uses hierarchical fallback: check parent classes if current class has no default
-        project_class = data.get("projectClass", None)
+        # IO-411: only auto-assign personProgramming on create or on an update
+        # that touches projectClass / projectLocation, and only when no
+        # programmer is currently set. Explicit nulls are honoured (see the
+        # resolver above) so the user's clear is never silently undone.
+        request_touches_class_or_location = (
+            instance is None
+            or "projectClass" in data
+            or "projectLocation" in data
+        )
+        project_class, project_location = self._resolve_class_and_location_for_programmer(
+            data, instance
+        )
 
-        # Only set default programmer if:
-        # 1. We have a project class
-        # 2. No programmer is being explicitly set in this request
-        # 3. For updates: the existing project doesn't already have a programmer
         should_set_default = (
-            project_class and
-            not data.get("personProgramming", None) and
-            (instance is None or instance.personProgramming is None)
+            request_touches_class_or_location
+            and (project_class or project_location)
+            and not data.get("personProgramming", None)
+            and (instance is None or instance.personProgramming is None)
         )
 
         if should_set_default:
-            programmer = self._get_default_programmer_with_fallback(project_class)
+            programmer = self._get_default_programmer_with_fallback(
+                project_class, project_location
+            )
             if programmer:
                 data["personProgramming"] = programmer
 
