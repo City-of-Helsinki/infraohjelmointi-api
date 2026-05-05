@@ -236,7 +236,6 @@ class BaseClassLocationViewSet(BaseViewSet):
         """
         try:
             from infraohjelmointi_api.services import AppStateValueService
-            from django.core.exceptions import ObjectDoesNotExist
             from rest_framework.exceptions import ParseError
             import logging
             
@@ -257,11 +256,6 @@ class BaseClassLocationViewSet(BaseViewSet):
             planning_instance_exists = entity_service.instance_exists(id=entity_id, forCoordinatorOnly=False)
             
             if not (coordinator_instance_exists or planning_instance_exists):
-                return False, Response(status=status.HTTP_404_NOT_FOUND)
-            
-            try:
-                instance = entity_service.get_by_id(id=entity_id)
-            except ObjectDoesNotExist:
                 return False, Response(status=status.HTTP_404_NOT_FOUND)
             
             # Check permissions: planner-only users cannot use coordinator endpoint.
@@ -343,7 +337,7 @@ class BaseClassLocationViewSet(BaseViewSet):
                         logger.info(f"Setting {key}={value}")
                         setattr(obj, key, value)
                     obj.save()
-                    logger.info(f"Successfully saved updated financial record")
+                    logger.info("Successfully saved updated financial record")
                     
                     CacheService.invalidate_financial_sum(
                         instance_id=entity_id,
@@ -358,7 +352,7 @@ class BaseClassLocationViewSet(BaseViewSet):
                     )
                         
                 except financial_model.DoesNotExist:
-                    logger.info(f"No existing financial record found, creating new one")
+                    logger.info("No existing financial record found, creating new one")
                     create_kwargs = {
                         **patch_data,
                         "year": year,
@@ -369,11 +363,17 @@ class BaseClassLocationViewSet(BaseViewSet):
                     obj = financial_model(**create_kwargs)
                     try:
                         obj.save()
-                        logger.info(f"Successfully created and saved new financial record: {obj.id}")
+                        logger.info(
+                            "Successfully created and saved new financial record: %s",
+                            obj.id,
+                        )
                     except Exception as save_error:
-                        logger.error(f"Failed to save new financial record: {save_error}")
+                        logger.error(
+                            "Failed to save new financial record: %s",
+                            save_error,
+                        )
                         return False, Response(
-                            data={"message": f"Failed to save financial data: {str(save_error)}"},
+                            data={"message": "Failed to save financial data: " + str(save_error)},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
                     
@@ -389,9 +389,12 @@ class BaseClassLocationViewSet(BaseViewSet):
                         forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
                     )
                 except Exception as update_error:
-                    logger.error(f"Unexpected error processing financial data: {update_error}")
+                    logger.error(
+                        "Unexpected error processing financial data: %s",
+                        update_error,
+                    )
                     return False, Response(
-                        data={"message": f"Failed to update financial data: {str(update_error)}"},
+                        data={"message": "Failed to update financial data: " + str(update_error)},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
             
