@@ -414,7 +414,9 @@ class ProgrammerImporterIntegrationTestCase(TestCase):
         person = Person.objects.create(
             firstName="Satu",
             lastName="Järvinen",
-            email="satu.jarvinen@example.com"
+            email="satu.jarvinen@example.com",
+            title="Planner",
+            phone="0400000003",
         )
         
         try:

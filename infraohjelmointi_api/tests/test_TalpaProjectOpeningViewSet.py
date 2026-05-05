@@ -38,7 +38,9 @@ class TalpaProjectOpeningViewSetTestCase(TestCase):
             id=uuid.UUID("2c6dece3-cf93-45ba-867d-8f1dd14923fc"),
             firstName="Test",
             lastName="User",
-            email="test@example.com"
+            email="test@example.com",
+            title="Manager",
+            phone="0400000000",
         )
 
         # Create test ProjectType
