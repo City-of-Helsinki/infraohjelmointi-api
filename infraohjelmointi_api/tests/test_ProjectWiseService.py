@@ -40,7 +40,11 @@ class ProjectWiseServiceTestCase(TestCase):
         self.person, _ = Person.objects.get_or_create(
             firstName="Test",
             lastName="Person",
-            defaults={'email': "test@example.com"}
+            defaults={
+                'email': "test@example.com",
+                'title': "Manager",
+                'phone': "0400000000",
+            }
         )
 
         # Create test projects
@@ -694,7 +698,11 @@ class ProductionMassUpdateTestCase(TestCase):
         self.person, _ = Person.objects.get_or_create(
             firstName="Production",
             lastName="Tester",
-            defaults={'email': "production@test.com"}
+            defaults={
+                'email': "production@test.com",
+                'title': "Manager",
+                'phone': "0400000001",
+            }
         )
 
         # Create various test projects for comprehensive testing

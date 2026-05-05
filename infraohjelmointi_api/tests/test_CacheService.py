@@ -1931,6 +1931,7 @@ class CachedLookupOrmInvalidationTest(TestCase):
         """Same wiring covers Person (and every other CachedLookupViewSet model)."""
         person = Person.objects.create(
             firstName='ORM', lastName='Person', email='orm@example.com',
+            title='Coordinator', phone='0400000002',
         )
         self._populate_lookup_cache('Person', [{'stale': True}])
 

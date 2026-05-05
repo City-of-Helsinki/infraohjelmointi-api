@@ -31,7 +31,11 @@ class ProjectCreationPWIntegrationTestCase(TestCase):
         self.person, _ = Person.objects.get_or_create(
             firstName="Test",
             lastName="Person",
-            defaults={'email': "test@example.com"}
+            defaults={
+                'email': "test@example.com",
+                'title': "Manager",
+                'phone': "0400000000",
+            }
         )
 
     @patch('infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw')
