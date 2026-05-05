@@ -426,18 +426,31 @@ class SapApiService:
         }
 
     def __calculate_values(self, sap_id: str, values: list) -> dict:
-        """Costs (actual/commitment) must be calculated for groups thus\n
-        result will include two keys separating groups: 01 and others.\n
+        """Group SAP costs/commitments into planning vs construction buckets.
+
+        SAP returns POSIDs in two shapes. The two formats represent different
+        WBS depths and are NOT interchangeable — the same numeric pattern in
+        each format does not mean the same thing in SAP, which is why dotted
+        and concatenated classification rules diverge.
+
+        1. Concatenated (new): SAPID + 3-digit subproject + 2-digit task, e.g.
+           "2814I0397600101". Subproject "001" = SUUNNITTELUVAIHE (planning);
+           "002"+ = construction. Subproject "000" is a root-level booking
+           with no subproject assigned — fall back to the task suffix ("01"
+           tail = planning) to preserve pre-IO-740 behaviour for that shape.
+           See IO-740.
+
+        2. Dotted (legacy / WBS): e.g. "<SAPID>.01", "<SAPID>.03.01",
+           "<SAPID>.03.01.05". The FIRST non-empty segment after the SAP id
+           is the group identifier ("ryhmän tunniste") that defines the bucket:
+           "01" = Hanketehtävät (planning), everything else (typically "02",
+           "03", "04") = Tuotantotehtävät (construction). Deeper segments
+           (".03.01", ".03.01.05", …) are WBS sublevels whose costs roll up
+           into their parent group's bucket — they MUST NOT flip the
+           classification. See IO-789: a multi-hundred-k€ booking under
+           ".03.01" is entirely construction; an earlier "last segment" rule
+           incorrectly routed it to planning.
         """
-        # Costs must be grouped by task type:
-        # 01 = Project task (planning/suunnittelu)
-        # 02, 03, 04, 06, 99 = Production task (construction/rakentaminen)
-        #
-        # SAP returns task IDs in two formats:
-        # 1. OLD FORMAT (with dots): "2814I04749.01", "2814I04749.03.01"
-        #    First segment after base SAP ID determines category (IO-789 fix)
-        # 2. NEW FORMAT (concatenated): "2814I0397600101"
-        #    Suffix ending with "01" indicates planning (IO-740 fix)
         grouped_by_task = {
             "project_task": Decimal(0.000),
             "production_task": Decimal(0.000),
@@ -452,21 +465,14 @@ class SapApiService:
                 suffix = ""
 
             if "." in suffix:
-                segments = suffix.split(".")
-                first_segment = next((s for s in segments if s), None)
-                is_planning = (first_segment == "01")
+                segments = [s for s in suffix.split(".") if s]
+                is_planning = bool(segments) and segments[0] == "01"
             elif len(suffix) >= 3:
-                # Check first 3 digits after SAP ID (which corresponds to the subproject)
-                # 001 = Planning (.01)
                 subproject = suffix[:3]
                 if subproject == "001":
-                     is_planning = True
-                elif subproject in ["002", "003", "004", "005", "006", "099"]:
-                     # Explicit construction phases
-                     is_planning = False
-                else:
-                     # Fallback (e.g. 000): check task suffix
-                     is_planning = suffix.endswith("01")
+                    is_planning = True
+                elif subproject == "000":
+                    is_planning = suffix.endswith("01")
 
             group_id = "project_task" if is_planning else "production_task"
             grouped_by_task[group_id] += Decimal(cost["Wkgbtr"])
