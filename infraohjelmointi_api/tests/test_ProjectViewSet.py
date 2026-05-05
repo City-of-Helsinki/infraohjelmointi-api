@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory
+from ..services.ProjectWiseService import PWProjectResponseError
 from ..views import BaseViewSet
 
 
@@ -260,3 +261,127 @@ class ProjectViewSetPWIntegrationTestCase(TestCase):
         self.assertIn('name', result)
         self.assertIn('description', result)
         self.assertEqual(result['name'], "Project With Nones")
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectViewSetPWOutageTestCase(TestCase):
+    """IO-851: PATCH must commit the local edit when PW is unreachable."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="PW Outage Test Class",
+            defaults={'path': "PW/Outage/Test/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        # planningStartYear / constructionEndYear are required when phase
+        # is 'programming'; set them so PATCH reaches the sync step.
+        self.project_with_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Outage Test Project",
+            description="Original description",
+            hkrId=2493,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+        self.project_without_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Outage Test Project No HKR",
+            description="Original description",
+            hkrId=None,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_with_pw_404_response_error_commits_local_update(self, mock_sync):
+        """Prod scenario: PW maintenance returns 404 for every project."""
+        mock_sync.side_effect = PWProjectResponseError(
+            "PW responded with status code '404' and reason 'Not Found' for given id '2493'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Edited during PW maintenance"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(
+            self.project_with_hkr.description,
+            "Edited during PW maintenance",
+        )
+        mock_sync.assert_called_once()
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_with_pw_503_response_error_commits_local_update(self, mock_sync):
+        """General outage (5xx) — same soft-fail behaviour."""
+        mock_sync.side_effect = PWProjectResponseError(
+            "PW responded with status code '503' and reason 'Service Unavailable' for given id '2493'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Edited during PW outage"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(
+            self.project_with_hkr.description,
+            "Edited during PW outage",
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_with_unexpected_pw_exception_rolls_back(self, mock_sync):
+        """Regression: only PWProjectResponseError is soft-failed; other
+        exceptions still 400 and roll back via @transaction.atomic."""
+        mock_sync.side_effect = RuntimeError("Unexpected PW failure")
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Should be rolled back"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.description, "Original description")
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_without_hkr_id_does_not_call_pw_sync(self, mock_sync):
+        """Regression: projects without hkrId never call PW sync."""
+        response = self.client.patch(
+            f"/projects/{self.project_without_hkr.id}/",
+            {"description": "Edited, no hkr"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        mock_sync.assert_not_called()
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.description, "Edited, no hkr")
