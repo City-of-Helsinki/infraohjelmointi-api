@@ -62,6 +62,7 @@ from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger("infraohjelmointi_api")
+audit_logger = logging.getLogger("audit")
 
 
 class ProjectFilter(django_filters.FilterSet):
@@ -106,6 +107,15 @@ class ProjectViewSet(BaseViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProjectFilter
     serializer_class = ProjectGetSerializer
+
+    @override
+    def initialize_request(self, request, *args, **kwargs):
+        # Capture the X-Request-Id header (set by Plata at the OpenShift route
+        # level) so that audit log entries can be correlated with HTTP traces.
+        # IO-845.
+        drf_request = super().initialize_request(request, *args, **kwargs)
+        drf_request._audit_request_id = request.META.get("HTTP_X_REQUEST_ID")
+        return drf_request
 
     @override
     def destroy(self, request, *args, **kwargs):
@@ -337,6 +347,8 @@ class ProjectViewSet(BaseViewSet):
         return date
 
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
+        # Existing local AuditLog write — kept so /audit-logs/ (used by the
+        # IO-404 admin UI) keeps serving rows. IO-845 dual-write.
         audit_log = AuditLog(
             actor=user if isinstance(user, User) else None,
             operation=operation,
@@ -349,6 +361,40 @@ class ProjectViewSet(BaseViewSet):
             endpoint=url,
         )
         audit_log.save()
+
+        # IO-845: also emit through the "audit" logger so the
+        # ResilientLogHandler queues the entry into ResilientLogEntry, from
+        # where Plata's submit_unsent_entries cron ships it to Elastic Cloud.
+        actor_data = {}
+        if isinstance(user, User):
+            actor_data = {
+                "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                "email": user.email,
+            }
+
+        target_data = {}
+        if project:
+            target_data = {
+                "type": "project",
+                "id": str(project.id),
+                "name": project.name,
+            }
+
+        request_id = getattr(self.request, "_audit_request_id", None)
+
+        audit_logger.info(
+            f"{operation} on {target_data.get('name', 'unknown')}",
+            extra={
+                "actor": actor_data,
+                "operation": operation,
+                "target": target_data,
+                "status": "SUCCESS",
+                "old_values": old_values,
+                "new_values": new_values,
+                "endpoint": url,
+                **({"x_request_id": request_id} if request_id else {}),
+            },
+        )
 
     def create_updated_finance_instances(self, finances, project, forced_to_frame, year):
         finance_instances = []

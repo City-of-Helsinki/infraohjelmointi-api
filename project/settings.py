@@ -124,6 +124,7 @@ INSTALLED_APPS = [
     "django_eventstream",
     "social_django",
     "infraohjelmointi_api",
+    "resilient_logger",
     'drf_yasg',
 ]
 
@@ -263,6 +264,35 @@ REST_FRAMEWORK = {
 
 DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": False}
 
+# IO-845: Audit logs are shipped to Plata's Elastic Cloud via django-resilient-logger.
+# The ResilientLogHandler writes log records to the local ResilientLogEntry table; the
+# `submit_unsent_entries` management command (run by Plata's cron) then pushes them to
+# the Elasticsearch target below. The ES target is registered only when AUDIT_LOG_ES_URL
+# is set, so dev/test/build environments without the env vars (e.g. Dockerfile
+# collectstatic) stay safe.
+RESILIENT_LOGGER = {
+    "origin": "infrahankkeiden_ohjelmointi",
+    "environment": env("AUDIT_LOG_ENV", default="development"),
+    "sources": [
+        {"class": "resilient_logger.sources.ResilientLogSource"},
+    ],
+    "targets": [],
+    "batch_limit": 5000,
+    "chunk_size": 500,
+    "submit_unsent_entries": True,
+    "clear_sent_entries": True,
+}
+
+if env("AUDIT_LOG_ES_URL", default=None):
+    RESILIENT_LOGGER["targets"].append({
+        "class": "resilient_logger.targets.ElasticsearchLogTarget",
+        "es_url": env("AUDIT_LOG_ES_URL"),
+        "es_username": env("AUDIT_LOG_ES_USERNAME"),
+        "es_password": env("AUDIT_LOG_ES_PASSWORD"),
+        "es_index": env("AUDIT_LOG_ES_INDEX"),
+        "required": True,
+    })
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -275,6 +305,7 @@ LOGGING = {
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "console"},
+        "resilient": {"class": "resilient_logger.handlers.ResilientLogHandler"},
     },
     "root": {
         "handlers": ["console"],
@@ -284,6 +315,11 @@ LOGGING = {
         "infraohjelmointi_api": {
             "handlers": ["console"],
             "level": 1,
+            "propagate": False,
+        },
+        "audit": {
+            "handlers": ["resilient"],
+            "level": "DEBUG",
             "propagate": False,
         },
     },
