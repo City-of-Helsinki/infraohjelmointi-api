@@ -3,6 +3,10 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory
+from ..services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
+)
 from ..views import BaseViewSet
 
 
@@ -260,3 +264,108 @@ class ProjectViewSetPWIntegrationTestCase(TestCase):
         self.assertIn('name', result)
         self.assertIn('description', result)
         self.assertEqual(result['name'], "Project With Nones")
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectViewSetPWSyncErrorTestCase(TestCase):
+    """IO-865: PW sync error mapping in the project PATCH endpoint."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="PW Error Test Class",
+            defaults={'path': "PW/Error/Test/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        # planningStartYear/constructionEndYear are required when phase is
+        # `programming`; set them so PATCH gets past serializer validation
+        # and reaches the sync step under test.
+        self.project_with_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="PW Orphan Project",
+            description="Original description",
+            hkrId=2167,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+        self.project_without_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="No HKR Project",
+            description="Original description",
+            hkrId=None,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_returns_pw_project_not_found_code_when_pw_missing(self, mock_sync):
+        mock_sync.side_effect = PWProjectNotFoundError(
+            "No project found from PW with given id '2167'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Edited description"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_PROJECT_NOT_FOUND"]})
+
+        # @transaction.atomic on partial_update must roll back the local save.
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.description, "Original description")
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_returns_generic_error_for_other_pw_failures(self, mock_sync):
+        mock_sync.side_effect = PWProjectResponseError(
+            "PW responded with status code '500' and reason 'Server Error'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Edited description"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        body = response.json()
+        self.assertIn("hkrId", body)
+        hkr_payload = body["hkrId"]
+        if isinstance(hkr_payload, list):
+            self.assertNotIn("PW_PROJECT_NOT_FOUND", hkr_payload)
+        else:
+            self.assertNotEqual(hkr_payload, "PW_PROJECT_NOT_FOUND")
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_without_hkr_id_does_not_call_pw_sync(self, mock_sync):
+        response = self.client.patch(
+            f"/projects/{self.project_without_hkr.id}/",
+            {"description": "Edited description"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        mock_sync.assert_not_called()
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.description, "Edited description")
