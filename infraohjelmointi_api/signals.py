@@ -157,14 +157,16 @@ def get_financial_sums(
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
             instance=instance
         )
+        forFrameView = instance.forFrameView
 
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
                 if classInstance != None:
-                    sums[viewType][classType] = ProjectClassSerializer(
+                    sums[viewType if forFrameView != True else "forcedToFrame"][classType] = ProjectClassSerializer(
                         classInstance,
                         context={
-                            "for_coordinator": viewType == "coordination",
+                            "for_coordinator": viewType == "coordination" or forFrameView,
+                            "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
                         },
                     ).data
@@ -175,23 +177,26 @@ def get_financial_sums(
                 instance=instance
             )
         )
+        forFrameView = instance.forFrameView
 
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
                 if instance != None:
                     if instanceType in ["district"]:
-                        sums[viewType][instanceType] = ProjectLocationSerializer(
+                        sums[viewType if forFrameView != True else "forcedToFrame"][instanceType] = ProjectLocationSerializer(
                             instance,
                             context={
-                                "for_coordinator": viewType == "coordination",
+                                "for_coordinator": viewType == "coordination" or forFrameView,
+                                "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
                             },
                         ).data
                     else:
-                        sums[viewType][instanceType] = ProjectClassSerializer(
+                        sums[viewType if forFrameView != True else "forcedToFrame"][instanceType] = ProjectClassSerializer(
                             instance,
                             context={
-                                "for_coordinator": viewType == "coordination",
+                                "for_coordinator": viewType == "coordination" or forFrameView,
+                                "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
                             },
                         ).data
