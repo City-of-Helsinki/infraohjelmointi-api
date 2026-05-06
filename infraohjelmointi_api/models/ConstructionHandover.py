@@ -1,4 +1,3 @@
-
 import uuid
 from django.db import models
 from .HistoricalModel import HistoricalModel
