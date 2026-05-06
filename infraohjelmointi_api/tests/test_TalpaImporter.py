@@ -228,18 +228,18 @@ class TalpaProjectTypeParsingTestCase(TestCase):
         self.assertEqual(name, 'Uudet puistot')
         self.assertEqual(category, 'Puistot')
 
-    def test_parse_preconstruction_row_valid(self):
+    def test_parse_2814E_range_row_valid(self):
         """Test parsing a valid preconstruction row with unit and range"""
-        # Row: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099|Contact|...
+        # Row: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099
         row = [
-            MagicMock(value="8 08 01 03"),        # A: TA-kohta
-            MagicMock(value="Kalasatama"),        # B: Area
-            MagicMock(value="Tontit"),            # C: Unit
-            MagicMock(value="2814E22001"),        # D: Start
-            MagicMock(value="2814E22099"),        # E: End
+            "8 08 01 03",        # A: TA-kohta
+            "Kalasatama",        # B: Area
+            "Tontit",            # C: Unit
+            "2814E22001",        # D: Start
+            "2814E22099",        # E: End
         ]
 
-        result, budget_acc, area = self.command._parse_preconstruction_row(row, None, None)
+        result, budget_acc, area = self.command._parse_2814E_range_row(row, None, None)
 
         self.assertIsNotNone(result)
         self.assertEqual(result['projectTypePrefix'], '2814E')
@@ -253,22 +253,22 @@ class TalpaProjectTypeParsingTestCase(TestCase):
         self.assertEqual(budget_acc, "8 08 01 03")
         self.assertEqual(area, "Kalasatama")
 
-    def test_parse_preconstruction_row_continuation(self):
+    def test_parse_2814E_range_row_continuation(self):
         """Test parsing a continuation row (inherits context)"""
         # Previous context
         current_budget = "8 08 01 03"
         current_area = "Kalasatama"
 
-        # Row: ||Mao|2814E22100|2814E22199|...
+        # Row: ||Mao|2814E22100|2814E22199
         row = [
-            MagicMock(value=None),                # A: Empty
-            MagicMock(value=None),                # B: Empty
-            MagicMock(value="Mao"),               # C: Unit
-            MagicMock(value="2814E22100"),        # D: Start
-            MagicMock(value="2814E22199"),        # E: End
+            None,                # A: Empty
+            None,                # B: Empty
+            "Mao",               # C: Unit
+            "2814E22100",        # D: Start
+            "2814E22199",        # E: End
         ]
 
-        result, budget_acc, area = self.command._parse_preconstruction_row(row, current_budget, current_area)
+        result, budget_acc, area = self.command._parse_2814E_range_row(row, current_budget, current_area)
 
         self.assertIsNotNone(result)
         self.assertEqual(result['projectTypePrefix'], '2814E')
@@ -281,39 +281,39 @@ class TalpaProjectTypeParsingTestCase(TestCase):
         self.assertEqual(budget_acc, "8 08 01 03")
         self.assertEqual(area, "Kalasatama")
 
-    def test_parse_preconstruction_row_invalid_unit(self):
+    def test_parse_2814E_range_row_invalid_unit(self):
         """Test that invalid unit is set to None"""
         row = [
-            MagicMock(value="8 08 01 03"),
-            MagicMock(value="Kalasatama"),
-            MagicMock(value="InvalidUnit"),       # C: Invalid
-            MagicMock(value="2814E22001"),
-            MagicMock(value="2814E22099"),
+            "8 08 01 03",
+            "Kalasatama",
+            "InvalidUnit",       # C: Invalid
+            "2814E22001",
+            "2814E22099",
         ]
 
-        result, _, _ = self.command._parse_preconstruction_row(row)
+        result, _, _ = self.command._parse_2814E_range_row(row)
         self.assertIsNotNone(result)
         self.assertIsNone(result['unit'])
 
-    def test_parse_preconstruction_row_header(self):
+    def test_parse_2814E_range_row_header(self):
         """Test that header rows are skipped"""
         row = [
-            MagicMock(value="TA-kohta"),
-            MagicMock(value="Yksikkö"),
-            MagicMock(value="..."),
+            "TA-kohta",
+            "Yksikkö",
+            "...",
         ]
-        result, _, _ = self.command._parse_preconstruction_row(row)
+        result, _, _ = self.command._parse_2814E_range_row(row)
         self.assertIsNone(result)
 
-    def test_parse_preconstruction_row_missing_range(self):
+    def test_parse_2814E_range_row_missing_range(self):
         """Test that rows without valid range are skipped"""
         row = [
-            MagicMock(value="8 08 01 03"),
-            MagicMock(value="Kalasatama"),
-            MagicMock(value="Tontit"),
-            MagicMock(value=None),   # Missing range
+            "8 08 01 03",
+            "Kalasatama",
+            "Tontit",
+            None,   # Missing range
         ]
-        result, _, _ = self.command._parse_preconstruction_row(row)
+        result, _, _ = self.command._parse_2814E_range_row(row)
         self.assertIsNone(result)
 
 
@@ -349,9 +349,9 @@ class TalpaImporterIntegrationTestCase(TestCase):
 
         # 4. 2814E Range Sheet
         ws_2814E = wb.create_sheet("Esirakentaminen projektinumerov")
-        ws_2814E.append(["Range info"]) # Header
-        # Row: 2814E01000 - 2814E01500 (8 01 00) Desc
-        ws_2814E.append(["2814E01000 - 2814E01500 (8 01 00) Desc Kalasatama"])
+        ws_2814E.append(["TA-kohta", "Alue", "Yksikkö", "Alku", "Loppu"]) # Header
+        # Row: 8 08 01 03|Kalasatama|Tontit|2814E01000|2814E01500
+        ws_2814E.append(["8 08 01 03", "Kalasatama", "Tontit", "2814E01000", "2814E01500"])
 
         wb.save(self.excel_path)
 
@@ -403,30 +403,4 @@ class TalpaImporterIntegrationTestCase(TestCase):
         self.assertEqual(TalpaProjectNumberRange.objects.count(), 2)
         self.assertFalse(TalpaProjectNumberRange.objects.filter(rangeStart='X').exists())
 
-    def test_preconstruction_file_execution(self):
-        """Test import with --preconstruction-file argument"""
-        # Create a dummy preconstruction file
-        pre_file_path = os.path.join(self.temp_dir, "test_preconstruction.xlsx")
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.append(["TA-kohta", "Alue", "Yksikkö", "Alku", "Loppu"]) # Header
-        # Row: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099
-        ws.append(["8 08 01 03", "Kalasatama", "Tontit", "2814E22001", "2814E22099"])
-        wb.save(pre_file_path)
-
-        # Run command
-        call_command(
-            'talpaimporter',
-            file=self.excel_path,
-            preconstruction_file=pre_file_path,
-            skip_ranges=False
-        )
-
-        # Verify DB content
-        # Should have imported the 2814E range with unit 'Tontit'
-        self.assertTrue(TalpaProjectNumberRange.objects.filter(
-            projectTypePrefix='2814E',
-            rangeStart='2814E22001',
-            unit='Tontit'
-        ).exists())
 

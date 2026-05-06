@@ -157,7 +157,6 @@ python manage.py talpaimporter --file path/to/excel.xlsx --dry-run
 **Additional options**:
 
 - `--clear-existing` - Clear all existing Talpa reference data before importing
-- `--preconstruction-file` - Separate Excel file for 2814E ranges (Ohjelmointityökalu)
 - `--skip-ranges` - Skip importing project number ranges
 - `--skip-services` - Skip importing service classes
 - `--skip-assets` - Skip importing asset classes

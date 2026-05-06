@@ -506,7 +506,7 @@ class Command(BaseCommand):
         return str(row[index]).strip() if len(row) > index and row[index] else None
 
     def _is_header(self, col_a):
-        return col_a and '2814E-Projektinumerovälit' in col_a.lower()
+        return col_a and '2814e-projektinumerovälit' in col_a.lower()
 
     def _is_valid_range(self, col_d):
         return col_d and col_d.startswith('2814E')
@@ -687,16 +687,24 @@ class Command(BaseCommand):
             if sheet:
                 self.stdout.write(f"\n  {prefix} sheet: {sheet.title}")
                 count = 0
-                for row in list(sheet.rows)[1:]:
-                    if prefix == '2814I':
+                if prefix == '2814I':
+                    for row in list(sheet.rows)[1:]:
                         data = self._parse_2814I_range_row(row)
-                    else:
-                        data = self._parse_2814E_range_row(row)
-
-                    if data:
-                        count += 1
-                        if count <= 3:
-                            self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
+                        if data:
+                            count += 1
+                            if count <= 3:
+                                self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
+                else:
+                    current_budget_account = None
+                    current_area = None
+                    for row in list(sheet.iter_rows(values_only=True))[1:]:
+                        data, current_budget_account, current_area = self._parse_2814E_range_row(
+                            row, current_budget_account, current_area
+                        )
+                        if data:
+                            count += 1
+                            if count <= 3:
+                                self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
 
                 self.stdout.write(f"  Total {prefix} ranges: {count}")
                 total += count
