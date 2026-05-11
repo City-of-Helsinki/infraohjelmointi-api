@@ -36,6 +36,12 @@ class ConstructionHandover(HistoricalModel):
     linkDesignDrawings = models.URLField(max_length=500, blank=True, null=True)
     linkCostAllocation = models.URLField(max_length=500, blank=True, null=True)
     linkContractBoundaries = models.URLField(max_length=500, blank=True, null=True)
+    constructionProjectManager = models.ForeignKey(
+        "Person", related_name="handovers_pm", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    previousProjectPhase = models.ForeignKey(
+        "ProjectPhase", related_name="handovers_previous_phase", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
@@ -49,7 +55,8 @@ class ConstructionHandover(HistoricalModel):
     history_fields = [
         "status", "name", "description", "constructionProcurementMethod", "constructionStart",
         "constructionEnd", "otherTimelineNotes", "totalCost", "personPlanning", "personFinancing",
-        "linkDesignDrawings", "linkCostAllocation", "linkContractBoundaries", "_history_user"
+        "linkDesignDrawings", "linkCostAllocation", "linkContractBoundaries", "_history_user",
+        "constructionProjectManager", "previousProjectPhase"
     ]
 
     @property
