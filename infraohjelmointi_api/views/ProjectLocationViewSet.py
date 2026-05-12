@@ -65,7 +65,10 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             request.query_params.get("forcedToFrame", False)
         )
 
-        frame_budgets = self.build_frame_budgets_context(year, for_frame_view=False)
+        frame_budgets = self.build_frame_budgets_context(
+            year,
+            for_frame_view=forcedToFrame,
+        )
 
         serializer = ProjectLocationSerializer(
             ProjectLocationService.list_all_for_coordinator(),
@@ -104,5 +107,6 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
             entity_id=location_id,
             start_year=result["start_year"],
             entity_service=ProjectLocationService,
-            serializer_class=ProjectLocationSerializer
+            serializer_class=ProjectLocationSerializer,
+            forced_to_frame=result["forced_to_frame"],
         )

@@ -844,11 +844,53 @@ class BalkSumTestCase(TestCase):
 
         # Check same finances reflect on the related planning class
         response = self.client.get("/project-classes/{}/".format(self.projectMasterClass_1_Id))
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+
+    def test_PATCH_coordinator_class_finances_forced_to_frame(self):
+        response = self.client.patch(
+            "/project-classes/coordinator/{}/".format(
+                self.projectCoordinatorMasterClass_1_Id.__str__()
+            ),
+            data={
+                "finances": {
+                    "year": date.today().year,
+                    "year0": {"frameBudget": 777, "budgetChange": 33},
+                },
+                "forcedToFrame": True,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 777)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 33)
+
+        forced_response = self.client.get("/project-classes/coordinator/?forcedToFrame=true")
+        self.assertEqual(forced_response.status_code, 200, msg="Status Code != 200")
+
+        forced_master_class = next(
+            x for x in forced_response.json() if x["id"] == self.projectCoordinatorMasterClass_1_Id.__str__()
+        )
+        self.assertEqual(forced_master_class["finances"]["year0"]["frameBudget"], 777)
+        self.assertEqual(forced_master_class["finances"]["year0"]["budgetChange"], 33)
+
+        coordinator_response = self.client.get("/project-classes/coordinator/?forcedToFrame=false")
+        self.assertEqual(coordinator_response.status_code, 200, msg="Status Code != 200")
+
+        coordinator_master_class = next(
+            x for x in coordinator_response.json() if x["id"] == self.projectCoordinatorMasterClass_1_Id.__str__()
+        )
+        self.assertEqual(coordinator_master_class["finances"]["year0"]["frameBudget"], 100)
+        self.assertEqual(coordinator_master_class["finances"]["year0"]["budgetChange"], 100)
+
+        # Check same finances reflect on the related planning class
+        response = self.client.get("/project-classes/{}/".format(self.projectMasterClass_1_Id))
 
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
-        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
-        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 100)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 100)
 
     def test_GET_location_with_sums(self):
         response = self.client.get(
@@ -908,13 +950,55 @@ class BalkSumTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
         self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
 
+        # Check same finances reflect on the related planning district
+        response = self.client.get("/project-locations/{}/".format(self.projectDistrict_1_Id))
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+
+    def test_PATCH_coordinator_location_finances_forced_to_frame(self):
+        response = self.client.patch(
+            "/project-locations/coordinator/{}/".format(
+                self.projectCoordinationDistrict_1_Id.__str__()
+            ),
+            data={
+                "finances": {
+                    "year": date.today().year,
+                    "year0": {"frameBudget": 888, "budgetChange": 44},
+                },
+                "forcedToFrame": True,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg="Status Code != 200")
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 888)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 44)
+
+        forced_response = self.client.get("/project-locations/coordinator/?forcedToFrame=true")
+        self.assertEqual(forced_response.status_code, 200, msg="Status Code != 200")
+
+        forced_district = next(
+            x for x in forced_response.json() if x["id"] == self.projectCoordinationDistrict_1_Id.__str__()
+        )
+        self.assertEqual(forced_district["finances"]["year0"]["frameBudget"], 888)
+        self.assertEqual(forced_district["finances"]["year0"]["budgetChange"], 44)
+
+        coordinator_response = self.client.get("/project-locations/coordinator/?forcedToFrame=false")
+        self.assertEqual(coordinator_response.status_code, 200, msg="Status Code != 200")
+
+        coordinator_district = next(
+            x for x in coordinator_response.json() if x["id"] == self.projectCoordinationDistrict_1_Id.__str__()
+        )
+        self.assertEqual(coordinator_district["finances"]["year0"]["frameBudget"], 200)
+        self.assertEqual(coordinator_district["finances"]["year0"]["budgetChange"], 0)
+
         # Chcek same finances reflect on the related planning district
         response = self.client.get("/project-locations/{}/".format(self.projectDistrict_1_Id))
 
         self.assertEqual(response.status_code, 200, msg="Status Code != 200")
 
-        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 1000)
-        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 50)
+        self.assertEqual(response.json()["finances"]["year0"]["frameBudget"], 200)
+        self.assertEqual(response.json()["finances"]["year0"]["budgetChange"], 0)
 
     def test_GET_group_with_sums(self):
         response = self.client.get("/project-groups/{}/".format(self.projectGroup_1_Id))

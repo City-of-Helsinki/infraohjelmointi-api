@@ -110,7 +110,7 @@ class BaseClassLocationViewSet(BaseViewSet):
             }
             financial_service.update_or_create(**update_kwargs)
 
-    def create_patch_response(self, entity_id, start_year, entity_service, serializer_class):
+    def create_patch_response(self, entity_id, start_year, entity_service, serializer_class, forced_to_frame=False):
         """
         Create standardized response for PATCH finance endpoints.
         
@@ -123,12 +123,24 @@ class BaseClassLocationViewSet(BaseViewSet):
         Returns:
             Response: Standardized PATCH response
         """
+        # Force fresh instance from database to avoid stale data
+        instance = entity_service.get_by_id(id=entity_id)
+        instance.refresh_from_db()
+        
+        # Clear any prefetch cache
+        if hasattr(instance, '_prefetched_objects_cache'):
+            instance._prefetched_objects_cache.clear()
+        
+        # Determine if this is a coordinator instance
+        is_coordinator = getattr(instance, 'forCoordinatorOnly', False)
+        
         return Response(
             serializer_class(
-                entity_service.get_by_id(id=entity_id),
+                instance,
                 context={
                     "finance_year": start_year,
-                    "for_coordinator": True,
+                    "for_coordinator": is_coordinator,
+                    "forcedToFrame": forced_to_frame,
                 },
             ).data
         )
@@ -222,102 +234,170 @@ class BaseClassLocationViewSet(BaseViewSet):
         Returns:
             tuple: (success: bool, response: Response or data dict)
         """
-        from infraohjelmointi_api.services import AppStateValueService
-        
-        forced_to_frame = request.data.get("forcedToFrame")
-        
-        # Validate entity exists
-        if not entity_service.instance_exists(id=entity_id, forCoordinatorOnly=True):
-            return False, Response(status=status.HTTP_404_NOT_FOUND)
-        
-        # Validate patch data format
-        if not self.is_patch_data_valid(request.data):
-            return False, Response(
-                data={"message": "Invalid data format"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
-        finances = request.data.get("finances")
-        start_year = finances.get("year")
-        
-        # Validate year mappings
-        for parameter in finances.keys():
-            if parameter == "year":
-                continue
-            patch_data = finances[parameter]
-            year = financial_service.get_request_field_to_year_mapping(
-                start_year=start_year
-            ).get(parameter, None)
+        try:
+            from infraohjelmointi_api.services import AppStateValueService
+            from rest_framework.exceptions import ParseError
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            try:
+                forced_to_frame = self.parse_forced_to_frame_param(
+                    request.data.get("forcedToFrame", False)
+                )
+            except ParseError:
+                return False, Response(
+                    data={"forcedToFrame": "Value must be a boolean"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             
-            if year is None:
+            # Validate entity exists (check both coordinator and planning classes)
+            coordinator_instance_exists = entity_service.instance_exists(id=entity_id, forCoordinatorOnly=True)
+            planning_instance_exists = entity_service.instance_exists(id=entity_id, forCoordinatorOnly=False)
+            
+            if not (coordinator_instance_exists or planning_instance_exists):
+                return False, Response(status=status.HTTP_404_NOT_FOUND)
+            
+            # Check permissions: planner-only users cannot use coordinator endpoint.
+            # Users with coordinator rights must still be allowed even if planner flag is true.
+            user = getattr(request, "user", None)
+            user_is_project_area_planner = bool(
+                getattr(user, "is_project_area_planner", False)
+            )
+            user_group_names = set()
+            if user is not None and hasattr(user, "ad_groups"):
+                user_group_names = set(
+                    user.ad_groups.all().values_list("name", flat=True)
+                )
+
+            user_has_coordinator_rights = (
+                "sg_kymp_sso_io_koordinaattorit" in user_group_names
+                or "sg_kymp_sso_io_admin" in user_group_names
+            )
+
+            if user_is_project_area_planner and not user_has_coordinator_rights:
+                return False, Response(status=status.HTTP_403_FORBIDDEN)
+            
+            # Validate patch data format
+            if not self.is_patch_data_valid(request.data):
                 return False, Response(
                     data={"message": "Invalid data format"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        
-        forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(
-            name="forcedToFrameStatus"
-        )
-        
-        # Process financial data
-        filter_kwargs = {
-            "year": year,
-            f"{relation_field}_id": entity_id,
-            "forFrameView": forced_to_frame
-        }
-        
-        try:
-            obj = financial_model.objects.get(**filter_kwargs)
-            for key, value in patch_data.items():
-                if value is None:
+            
+            finances = request.data.get("finances")
+            start_year = finances.get("year")
+            
+            # Validate start_year is present and is an integer
+            if start_year is None or not isinstance(start_year, int):
+                return False, Response(
+                    data={"message": "Invalid year format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            forced_to_frame_status, _ = AppStateValueService.get_or_create_by_name(
+                name="forcedToFrameStatus"
+            )
+            
+            # Validate year mappings and process each year
+            for parameter in finances.keys():
+                if parameter == "year":
+                    continue
+                patch_data = finances[parameter]
+                year = financial_service.get_request_field_to_year_mapping(
+                    start_year=start_year
+                ).get(parameter, None)
+                                
+                if year is None:
                     return False, Response(
-                        data={"message": "Invalid value"},
+                        data={"message": "Invalid data format"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                setattr(obj, key, value)
-            obj.finance_year = start_year
-            obj.save()
-            
-            CacheService.invalidate_financial_sum(
-                instance_id=entity_id,
-                instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
-            )
-            for year_offset in range(-10, 1):
-                affected_year = year + year_offset
-                if affected_year >= 2000:
-                    CacheService.invalidate_frame_budgets(year=affected_year)
-            self._update_frame_view_if_needed(
-                forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
-            )
                 
-        except financial_model.DoesNotExist:
-            create_kwargs = {
-                **patch_data,
-                "year": year,
-                f"{relation_field}_id": entity_id,
-                "forFrameView": forced_to_frame
-            }
-            obj = financial_model(**create_kwargs)
-            obj.finance_year = start_year
-            obj.save()
+                # Process financial data for this year
+                filter_kwargs = {
+                    "year": year,
+                    f"{relation_field}_id": entity_id,
+                    "forFrameView": forced_to_frame
+                }
+                                
+                try:
+                    obj = financial_model.objects.get(**filter_kwargs)
+                    for key, value in patch_data.items():
+                        if value is None:
+                            return False, Response(
+                                data={"message": "Invalid value"},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                        setattr(obj, key, value)
+                    obj.save()
+                    
+                    CacheService.invalidate_financial_sum(
+                        instance_id=entity_id,
+                        instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
+                    )
+                    for year_offset in range(-10, 1):
+                        affected_year = year + year_offset
+                        if affected_year >= 2000:
+                            CacheService.invalidate_frame_budgets(year=affected_year)
+                    self._update_frame_view_if_needed(
+                        forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
+                    )
+                        
+                except financial_model.DoesNotExist:
+                    create_kwargs = {
+                        **patch_data,
+                        "year": year,
+                        f"{relation_field}_id": entity_id,
+                        "forFrameView": forced_to_frame
+                    }
+                    obj = financial_model(**create_kwargs)
+                    try:
+                        obj.save()
+                    except Exception as save_error:
+                        logger.error(
+                            "Failed to save new financial record: %s",
+                            save_error,
+                        )
+                        return False, Response(
+                            data={"message": "Failed to save financial data: " + str(save_error)},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    
+                    CacheService.invalidate_financial_sum(
+                        instance_id=entity_id,
+                        instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
+                    )
+                    for year_offset in range(-10, 1):
+                        affected_year = year + year_offset
+                        if affected_year >= 2000:
+                            CacheService.invalidate_frame_budgets(year=affected_year)
+                    self._update_frame_view_if_needed(
+                        forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
+                    )
+                except Exception as update_error:
+                    logger.error(
+                        "Unexpected error processing financial data: %s",
+                        update_error,
+                    )
+                    return False, Response(
+                        data={"message": "Failed to update financial data: " + str(update_error)},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
             
-            CacheService.invalidate_financial_sum(
-                instance_id=entity_id,
-                instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
-            )
-            for year_offset in range(-10, 1):
-                affected_year = year + year_offset
-                if affected_year >= 2000:
-                    CacheService.invalidate_frame_budgets(year=affected_year)
-            self._update_frame_view_if_needed(
-                forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
-            )
+            return True, {
+                "entity_id": entity_id,
+                "start_year": start_year,
+                "obj": obj,
+                "forced_to_frame": forced_to_frame,
+            }
         
-        return True, {
-            "entity_id": entity_id,
-            "start_year": start_year,
-            "obj": obj
-        }
+        except Exception as e:
+            # Catch any unexpected exceptions and return a proper error response
+            return False, Response(
+                data={"message": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @override
     def list(self, request, *args, **kwargs):

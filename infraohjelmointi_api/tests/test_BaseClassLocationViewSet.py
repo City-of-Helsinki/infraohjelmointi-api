@@ -354,3 +354,69 @@ class BaseClassLocationViewSetTestCase(TestCase):
             )
         
         self.assertFalse(success)
+
+    def test_validate_and_process_patch_finances_planner_only_forbidden(self):
+        """Planner-only users should be blocked from coordinator patch endpoint."""
+        from infraohjelmointi_api.models import ClassFinancial
+
+        viewset = BaseClassLocationViewSet()
+        mock_request = Mock()
+        mock_request.data = {
+            "forcedToFrame": False,
+            "invalid": "data",
+        }
+        mock_request.user = Mock()
+        mock_request.user.is_project_area_planner = True
+        mock_request.user.ad_groups.all.return_value.values_list.return_value = [
+            "sg_kymp_sso_io_projektialueiden_ohjelmoijat"
+        ]
+
+        mock_entity_service = Mock()
+        mock_entity_service.instance_exists.return_value = True
+        mock_entity_service.get_by_id.return_value = Mock()
+
+        success, response = viewset.validate_and_process_patch_finances(
+            request=mock_request,
+            entity_id="test-id",
+            entity_service=mock_entity_service,
+            financial_service=Mock(),
+            financial_model=ClassFinancial,
+            relation_field="classRelation",
+        )
+
+        self.assertFalse(success)
+        self.assertEqual(response.status_code, 403)
+
+    def test_validate_and_process_patch_finances_planner_and_coordinator_allowed(self):
+        """Users with coordinator rights should not be blocked by planner flag."""
+        from infraohjelmointi_api.models import ClassFinancial
+
+        viewset = BaseClassLocationViewSet()
+        mock_request = Mock()
+        mock_request.data = {
+            "forcedToFrame": False,
+            "invalid": "data",
+        }
+        mock_request.user = Mock()
+        mock_request.user.is_project_area_planner = True
+        mock_request.user.ad_groups.all.return_value.values_list.return_value = [
+            "sg_kymp_sso_io_projektialueiden_ohjelmoijat",
+            "sg_kymp_sso_io_koordinaattorit",
+        ]
+
+        mock_entity_service = Mock()
+        mock_entity_service.instance_exists.return_value = True
+        mock_entity_service.get_by_id.return_value = Mock()
+
+        success, response = viewset.validate_and_process_patch_finances(
+            request=mock_request,
+            entity_id="test-id",
+            entity_service=mock_entity_service,
+            financial_service=Mock(),
+            financial_model=ClassFinancial,
+            relation_field="classRelation",
+        )
+
+        self.assertFalse(success)
+        # Reaches normal validation path (invalid payload) instead of permission denial
+        self.assertEqual(response.status_code, 400)
