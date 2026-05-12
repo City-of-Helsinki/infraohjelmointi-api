@@ -518,7 +518,12 @@ class Command(BaseCommand):
 
     def _update_area(self, col_b, current_area):
         if col_b and col_b not in ['', 'None']:
-            return col_b
+            replacements = {
+                'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
+                'Malmi (kenttä)': 'Malminkenttä',
+                'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.',
+            }
+            return replacements.get(col_b, col_b)
         return current_area
 
     def _validate_unit(self, col_c):
