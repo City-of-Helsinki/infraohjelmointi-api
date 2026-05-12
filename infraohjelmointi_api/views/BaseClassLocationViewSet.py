@@ -238,9 +238,7 @@ class BaseClassLocationViewSet(BaseViewSet):
             from infraohjelmointi_api.services import AppStateValueService
             from rest_framework.exceptions import ParseError
             import logging
-            
-            logger = logging.getLogger(__name__)
-            
+                        
             try:
                 forced_to_frame = self.parse_forced_to_frame_param(
                     request.data.get("forcedToFrame", False)
@@ -307,9 +305,7 @@ class BaseClassLocationViewSet(BaseViewSet):
                 year = financial_service.get_request_field_to_year_mapping(
                     start_year=start_year
                 ).get(parameter, None)
-                
-                logger.info(f"Processing {parameter}: patch_data={patch_data}, year={year}, entity_id={entity_id}, forced_to_frame={forced_to_frame}")
-                
+                                
                 if year is None:
                     return False, Response(
                         data={"message": "Invalid data format"},
@@ -322,22 +318,17 @@ class BaseClassLocationViewSet(BaseViewSet):
                     f"{relation_field}_id": entity_id,
                     "forFrameView": forced_to_frame
                 }
-                
-                logger.info(f"Filter kwargs: {filter_kwargs}")
-                
+                                
                 try:
                     obj = financial_model.objects.get(**filter_kwargs)
-                    logger.info(f"Found existing financial record: {obj.id}")
                     for key, value in patch_data.items():
                         if value is None:
                             return False, Response(
                                 data={"message": "Invalid value"},
                                 status=status.HTTP_400_BAD_REQUEST,
                             )
-                        logger.info(f"Setting {key}={value}")
                         setattr(obj, key, value)
                     obj.save()
-                    logger.info("Successfully saved updated financial record")
                     
                     CacheService.invalidate_financial_sum(
                         instance_id=entity_id,
@@ -352,21 +343,15 @@ class BaseClassLocationViewSet(BaseViewSet):
                     )
                         
                 except financial_model.DoesNotExist:
-                    logger.info("No existing financial record found, creating new one")
                     create_kwargs = {
                         **patch_data,
                         "year": year,
                         f"{relation_field}_id": entity_id,
                         "forFrameView": forced_to_frame
                     }
-                    logger.info(f"Create kwargs: {create_kwargs}")
                     obj = financial_model(**create_kwargs)
                     try:
                         obj.save()
-                        logger.info(
-                            "Successfully created and saved new financial record: %s",
-                            obj.id,
-                        )
                     except Exception as save_error:
                         logger.error(
                             "Failed to save new financial record: %s",
