@@ -238,7 +238,9 @@ class BaseClassLocationViewSet(BaseViewSet):
             from infraohjelmointi_api.services import AppStateValueService
             from rest_framework.exceptions import ParseError
             import logging
-                        
+
+            logger = logging.getLogger(__name__)
+
             try:
                 forced_to_frame = self.parse_forced_to_frame_param(
                     request.data.get("forcedToFrame", False)
