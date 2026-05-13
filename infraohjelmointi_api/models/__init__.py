@@ -44,3 +44,4 @@ from .TalpaProjectNumberRange import TalpaProjectNumberRange
 from .TalpaProjectOpening import TalpaProjectOpening
 from .ClassProgrammerAssignment import ClassProgrammerAssignment
 from .ConstructionHandover import ConstructionHandover
+from .ConstructionHandoverFinancing import ConstructionHandoverFinancing, FinancingParty
