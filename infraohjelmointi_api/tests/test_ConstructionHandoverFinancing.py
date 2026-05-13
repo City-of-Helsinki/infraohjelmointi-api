@@ -1,16 +1,22 @@
 from django.test import TestCase
+from decimal import Decimal
 
 from infraohjelmointi_api.models import (
     BudgetItem,
     ConstructionHandover,
     ConstructionHandoverFinancing,
+    Project
 )
 from infraohjelmointi_api.models.ConstructionHandoverFinancing import FinancingParty
 
 
 class ConstructionHandoverFinancingModelTestCase(TestCase):
     def setUp(self):
-        self.handover = ConstructionHandover.objects.create()
+        self.project = Project.objects.create(
+            name="Construction handover project",
+            description="Project used for construction handover financing tests",
+        )
+        self.handover = ConstructionHandover.objects.create(project=self.project)
         self.budget_item = BudgetItem.objects.create(need=0)
 
     # ------------------------------------------------------------------
@@ -29,7 +35,7 @@ class ConstructionHandoverFinancingModelTestCase(TestCase):
         self.assertEqual(retrieved.financingParty, FinancingParty.KYMP)
         self.assertEqual(retrieved.budgetItem, self.budget_item)
         self.assertEqual(retrieved.projectNumber, "HEL-2024-001")
-        self.assertEqual(str(retrieved.budget), "150000.00")
+        self.assertEqual(retrieved.budget, Decimal("150000.00"))
         self.assertEqual(retrieved.description, "")
 
     def test_non_kymp_financing_row_is_created(self):
@@ -44,7 +50,7 @@ class ConstructionHandoverFinancingModelTestCase(TestCase):
         self.assertIsNone(retrieved.budgetItem)
         self.assertEqual(retrieved.projectNumber, "")
         self.assertEqual(retrieved.description, "Muu rahoittaja X")
-        self.assertEqual(str(retrieved.budget), "50000.00")
+        self.assertEqual(retrieved.budget, Decimal("50000.00"))
 
     def test_financing_row_without_budget_is_allowed(self):
         financing = ConstructionHandoverFinancing.objects.create(
