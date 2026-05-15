@@ -11,6 +11,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 
 from infraohjelmointi_api.models import Project
@@ -94,7 +95,7 @@ class FindPwOrphansCommandTestCase(TestCase):
         self.assertIn("checked=2 ok=1 orphans=1 pw_errors=0", stderr)
         self.assertEqual(exit_code, 1)
 
-    def test_pw_response_error_is_reported_without_failing(self, mock_pw_cls):
+    def test_pw_response_error_exits_with_code_2(self, mock_pw_cls):
         broken = _make_project("Broken", hkr_id=30)
         mock_pw_cls.return_value.get_project_from_pw.side_effect = (
             PWProjectResponseError("PW returned 500")
@@ -104,8 +105,24 @@ class FindPwOrphansCommandTestCase(TestCase):
 
         self.assertIn(f"{broken.id},Broken,30,pw_response_error", stdout)
         self.assertIn("checked=1 ok=0 orphans=0 pw_errors=1", stderr)
-        # Response errors are reported but should not flip the exit code.
-        self.assertIsNone(exit_code)
+        # 2 = "PW outage" branch of the bitmask, distinct from 1 ("orphans
+        # found") so monitoring can tell an infra outage from a data issue.
+        self.assertEqual(exit_code, 2)
+
+    def test_orphans_plus_pw_errors_exits_with_code_3(self, mock_pw_cls):
+        orphan = _make_project("Orphan", hkr_id=10)
+        broken = _make_project("Broken", hkr_id=20)
+
+        def fake_get(hkr_id):
+            if hkr_id == orphan.hkrId:
+                raise PWProjectNotFoundError("missing")
+            raise PWProjectResponseError("PW 500")
+
+        mock_pw_cls.return_value.get_project_from_pw.side_effect = fake_get
+
+        _, _, exit_code = _run()
+
+        self.assertEqual(exit_code, 3)
 
     def test_limit_option_caps_number_of_checks(self, mock_pw_cls):
         # Names are ordered alphabetically by the command (.order_by("name")),
@@ -122,3 +139,10 @@ class FindPwOrphansCommandTestCase(TestCase):
         )
         mock_pw_cls.return_value.get_project_from_pw.assert_called_with(1)
         self.assertIn("checked=1 ok=1 orphans=0 pw_errors=0", stderr)
+
+    def test_non_positive_limit_is_rejected(self, mock_pw_cls):
+        for value in ("0", "-1"):
+            with self.subTest(value=value):
+                with self.assertRaises(CommandError):
+                    _run(*("--limit", value))
+        mock_pw_cls.return_value.get_project_from_pw.assert_not_called()

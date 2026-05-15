@@ -2,9 +2,19 @@
 
 CSV columns on stdout: id,name,hkrId,reason
 Reason is "not_found" or "pw_response_error".
-Exit code 1 if any orphans were found (so it can drive periodic alerts).
+
+Exit code is a bitmask so monitoring can tell a data issue from a PW outage:
+
+  0  clean
+  1  one or more orphans found (data action needed)
+  2  one or more PW response errors (PW outage / infra alert)
+  3  both of the above
+
+Schedulers can therefore page on "exit_code & 2" for infra and on
+"exit_code & 1" for data-cleanup workflows.
 """
 
+import argparse
 import csv
 import logging
 import sys
@@ -21,18 +31,31 @@ from infraohjelmointi_api.services.ProjectWiseService import (
 logger = logging.getLogger("infraohjelmointi_api")
 
 
+EXIT_ORPHANS_FOUND = 1
+EXIT_PW_ERRORS = 2
+
+
+def _positive_int(value: str) -> int:
+    ivalue = int(value)
+    if ivalue < 1:
+        raise argparse.ArgumentTypeError(
+            f"--limit must be a positive integer (got {ivalue})"
+        )
+    return ivalue
+
+
 class Command(BaseCommand):
     help = (
         "List programmed projects whose hkrId is missing from ProjectWise "
-        "(IO-851)."
+        "(IO-865). Exit code: 1=orphans, 2=PW errors, 3=both."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--limit",
-            type=int,
+            type=_positive_int,
             default=None,
-            help="Only check the first N candidate projects.",
+            help="Only check the first N candidate projects. Must be >= 1.",
         )
 
     def handle(self, *args, **options):
@@ -80,5 +103,10 @@ class Command(BaseCommand):
         )
         self.stderr.write(summary)
 
+        exit_code = 0
         if orphan_count > 0:
-            sys.exit(1)
+            exit_code |= EXIT_ORPHANS_FOUND
+        if error_count > 0:
+            exit_code |= EXIT_PW_ERRORS
+        if exit_code:
+            sys.exit(exit_code)
