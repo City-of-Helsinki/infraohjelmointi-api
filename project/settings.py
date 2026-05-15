@@ -435,29 +435,6 @@ if REDIS_URL:
         }
     }
 
-    # Configure django-eventstream to use Redis for SSE event storage (fixes IO-725)
-    # EVENTSTREAM_REDIS is the correct way to configure Redis for django-eventstream
-    # This enables multi-pod event sharing via Redis
-    # Only configure EVENTSTREAM_REDIS if Redis is actually available at startup
-    # If not available, django-eventstream will fall back to in-memory storage
-    # Note: If Redis goes down after startup, EVENTSTREAM_REDIS will still be set,
-    # but django-eventstream should handle connection failures gracefully by falling back
-    # to in-memory storage (events won't be shared across pods, but app will work)
-    if REDIS_AVAILABLE:
-        redis_config = parse_redis_url(REDIS_URL)
-        EVENTSTREAM_REDIS = {
-            'host': redis_config['host'],
-            'port': redis_config['port'],
-            'db': redis_config['db'],
-        }
-        if 'password' in redis_config:
-            EVENTSTREAM_REDIS['password'] = redis_config['password']
-        logger.info("django-eventstream configured to use Redis for multi-pod event sharing")
-    else:
-        # Don't set EVENTSTREAM_REDIS - django-eventstream will use in-memory storage
-        # This allows the app to work without Redis (events won't be shared across pods, but that's OK)
-        logger.info("Redis not available - django-eventstream will use in-memory storage (single-pod only)")
-    
     safe_url = REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL
     logger.info("Redis cache configured: %s", safe_url)
     if not REDIS_AVAILABLE:
@@ -469,6 +446,20 @@ else:
         }
     }
     logger.info("Redis not configured - cache disabled (development/local)")
+
+# IO-890: django-eventstream 4.5.x does NOT read EVENTSTREAM_REDIS (that
+# setting was introduced in 5.x). On this version the only cross-pod
+# mechanism is persisted storage: ``send_event`` writes a DB row and
+# ``get_events`` lets a reconnecting SSE client replay missed events via the
+# standard ``Last-Event-ID`` header. Without storage, every event the signals
+# fired existed only in the in-process listener queue of the pod that handled
+# the write — which is exactly what IO-725 / IO-890 describe.
+#
+# DjangoModelStorage auto-trims rows older than 24h on every insert (see
+# django_eventstream/storage.py: EVENT_TIMEOUT = 60 * 24). True real-time
+# cross-pod push would require either Pushpin/GRIP or upgrading to
+# django-eventstream >=5; defer that until traffic warrants it.
+EVENTSTREAM_STORAGE_CLASS = "django_eventstream.storage.DjangoModelStorage"
 
 # GRIP proxy configuration (optional - not needed for your scale)
 GRIP_URL = env('GRIP_URL', default=None)

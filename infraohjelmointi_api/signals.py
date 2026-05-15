@@ -228,11 +228,24 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
         logger.debug("Signal Triggered: {} Object was created".format(_type))
     logger.debug("Signal Triggered: {} Object was updated".format(_type))
     year = getattr(instance, "finance_year", date.today().year)
-    send_event(
-        "finance",
-        "finance-update",
-        get_financial_sums(instance=instance, _type=_type, finance_year=year),
-    )
+    instance_id = getattr(instance, "pk", None)
+    try:
+        send_event(
+            "finance",
+            "finance-update",
+            get_financial_sums(instance=instance, _type=_type, finance_year=year),
+        )
+        logger.info(
+            "finance-update event sent (type=%s, id=%s, year=%s)",
+            _type, instance_id, year,
+        )
+    except Exception:
+        # IO-890: surface SSE delivery failures. Without this the event is
+        # silently dropped and the UI never sees the update.
+        logger.exception(
+            "send_event failed for finance-update (type=%s, id=%s, year=%s)",
+            _type, instance_id, year,
+        )
 
 
 @receiver(post_save, sender=Project)
@@ -247,31 +260,46 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         # It gets added to the project instance before .save() is called
         forcedToFrame = getattr(instance, "forcedToFrame", False)
         year = getattr(instance, "finance_year", date.today().year)
-        send_event(
-            "project",
-            "project-update",
-            {
-                "project": ProjectGetSerializer(
-                    instance,
-                    context={
-                        "get_pw_link": True,
-                        "forcedToFrame": forcedToFrame,
-                        "for_coordinator": forcedToFrame == True,
-                        "finance_year": year,
-                    },
-                ).data,
-            },
-        )
+        try:
+            send_event(
+                "project",
+                "project-update",
+                {
+                    "project": ProjectGetSerializer(
+                        instance,
+                        context={
+                            "get_pw_link": True,
+                            "forcedToFrame": forcedToFrame,
+                            "for_coordinator": forcedToFrame == True,
+                            "finance_year": year,
+                        },
+                    ).data,
+                },
+            )
+            logger.info(
+                "project-update event sent (id=%s, year=%s, forcedToFrame=%s)",
+                instance.pk, year, forcedToFrame,
+            )
+        except Exception:
+            # IO-890: surface SSE delivery failures.
+            logger.exception(
+                "send_event failed for project-update (id=%s, year=%s)",
+                instance.pk, year,
+            )
         logger.debug("Signal Triggered: Project was updated")
 
 
 @receiver(post_save, sender=ProjectFinancial)
 @receiver(post_delete, sender=ProjectFinancial)
+@on_transaction_commit
 def invalidate_project_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when ProjectFinancial is saved or deleted
+    Invalidate cache when ProjectFinancial is saved or deleted.
 
-    This ensures that financial calculations are refreshed when data changes.
+    Deferred to ``transaction.on_commit`` to avoid the race where a concurrent
+    request reads (and re-populates) the cache between INVALIDATE and COMMIT,
+    repopulating it with the still-uncommitted, soon-to-be-stale value. This
+    matches the pattern used by ``_invalidate_cached_lookup`` below.
     """
     try:
         project = instance.project
@@ -317,9 +345,13 @@ def invalidate_project_financial_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ClassFinancial)
 @receiver(post_delete, sender=ClassFinancial)
+@on_transaction_commit
 def invalidate_class_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when ClassFinancial is saved or deleted
+    Invalidate cache when ClassFinancial is saved or deleted.
+
+    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
+    between INVALIDATE and COMMIT.
     """
     try:
         class_relation = instance.classRelation
@@ -357,9 +389,13 @@ def invalidate_class_financial_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=LocationFinancial)
 @receiver(post_delete, sender=LocationFinancial)
+@on_transaction_commit
 def invalidate_location_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when LocationFinancial is saved or deleted
+    Invalidate cache when LocationFinancial is saved or deleted.
+
+    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
+    between INVALIDATE and COMMIT.
     """
     try:
         location_relation = instance.locationRelation
@@ -396,9 +432,13 @@ def invalidate_location_financial_cache(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Project)
+@on_transaction_commit
 def invalidate_project_cache(sender, instance, created, **kwargs):
     """
-    Invalidate cache when Project is saved (programmed status or relationships change)
+    Invalidate cache when Project is saved (programmed status or relationships change).
+
+    Deferred to ``transaction.on_commit`` so a concurrent reader cannot
+    repopulate the cache with pre-commit data.
     """
     try:
         # Only invalidate if relevant fields changed

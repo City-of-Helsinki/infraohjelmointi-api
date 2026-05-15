@@ -5,6 +5,7 @@ coordination and programming views after IO-743 consistency fix.
 
 from datetime import date
 from collections import defaultdict
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 from infraohjelmointi_api.models import (
@@ -31,6 +32,11 @@ class BudgetOverlapConsistencyTestCase(TestCase):
 
     def setUp(self):
         """Set up test data with specific budget overlap scenarios"""
+        # IO-890: cache invalidation signals are deferred to transaction.on_commit,
+        # which never fires inside TestCase (transactions are rolled back). Clear
+        # the process-global cache explicitly so stale entries from previous tests
+        # don't leak into this one.
+        cache.clear()
         self.year = date.today().year
         self.user = User.objects.create(
             first_name='Test',
@@ -155,6 +161,8 @@ class ViewEndpointConsistencyTestCase(TestCase):
     """Test that actual API endpoints return consistent data"""
 
     def setUp(self):
+        # IO-890: see BudgetOverlapConsistencyTestCase.setUp for rationale.
+        cache.clear()
         self.user = User.objects.create(
             first_name='Test',
             last_name='User',
@@ -236,7 +244,7 @@ class ViewEndpointConsistencyTestCase(TestCase):
 
 class FrameBudgetsContextTestCase(TestCase):
     """Test the frame_budgets context building logic specifically"""
-    
+
     # Test scenario constants for clarity and DRY
     TSE_2028_PARENT_BUDGET = 58000  # TSE-2028 scenario from IO-743
     TSE_2028_CHILD1_BUDGET = 30000
@@ -247,6 +255,8 @@ class FrameBudgetsContextTestCase(TestCase):
     OVERLAP_CHILD2_BUDGET = 28000   # 30k + 28k = 58k > 50k
 
     def setUp(self):
+        # IO-890: see BudgetOverlapConsistencyTestCase.setUp for rationale.
+        cache.clear()
         self.year = date.today().year
 
         # Create test classes

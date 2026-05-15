@@ -1,4 +1,5 @@
 from datetime import date
+from django.core.cache import cache
 from django.test import TestCase
 from infraohjelmointi_api.models import (
     Project,
@@ -70,6 +71,13 @@ class BalkSumTestCase(TestCase):
     coordinatorCollectiveSubLevel_1_Id = uuid.UUID(
         "b7b88072-d6c7-4831-9c0c-25cd84307a08"
     )
+
+    def setUp(self):
+        # IO-890: cache invalidation signals are deferred to transaction.on_commit,
+        # which never fires inside TestCase (transactions are rolled back). Clear
+        # the process-global cache explicitly so financial-sum entries from earlier
+        # tests in the run don't leak into this one's cache-hit path.
+        cache.clear()
 
     # Helper function to test values
     def runFinancesAssertTests(self, response, index, name, values):
