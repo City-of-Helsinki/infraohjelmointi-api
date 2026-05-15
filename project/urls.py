@@ -200,6 +200,12 @@ router.register(
     basename="talpaProjectRanges"
 )
 
+router.register(
+    r"construction-handovers",
+    views.ConstructionHandoverViewSet,
+    basename="constructionHandovers"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
