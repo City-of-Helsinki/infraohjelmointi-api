@@ -9,6 +9,7 @@ that the cache-invalidation and event-stream signals defined in
 ``signals.py`` fire correctly.
 """
 
+import argparse
 import csv
 import logging
 from dataclasses import dataclass, field
@@ -94,8 +95,13 @@ def _resolve_schedule(project: Project) -> Schedule:
     )
 
 
-def _is_nonzero(value: Decimal | None) -> bool:
-    return value is not None and value != 0
+def _positive_int(value: str) -> int:
+    ivalue = int(value)
+    if ivalue < 1:
+        raise argparse.ArgumentTypeError(
+            f"--limit must be a positive integer (got {ivalue})"
+        )
+    return ivalue
 
 
 class Command(BaseCommand):
@@ -133,9 +139,9 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit",
-            type=int,
+            type=_positive_int,
             default=None,
-            help="Process at most N projects (development aid).",
+            help="Process at most N projects (development aid). Must be >= 1.",
         )
 
     def handle(self, *args, **options):

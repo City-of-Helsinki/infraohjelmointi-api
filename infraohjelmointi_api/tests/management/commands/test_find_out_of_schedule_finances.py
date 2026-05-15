@@ -11,6 +11,7 @@ from decimal import Decimal
 from io import StringIO
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 
 from infraohjelmointi_api.models import Project, ProjectFinancial
@@ -210,6 +211,12 @@ class FindOutOfScheduleFinancesTestCase(TestCase):
             line for line in output.splitlines() if "would_zero" in line
         ]
         self.assertEqual(len(haamuluku_lines), 1)
+
+    def test_non_positive_limit_is_rejected(self) -> None:
+        for value in ("0", "-1"):
+            with self.subTest(value=value):
+                with self.assertRaises(CommandError):
+                    _run("--limit", value)
 
     def test_summary_log_line_emitted_to_stderr(self) -> None:
         project = _create_project()
