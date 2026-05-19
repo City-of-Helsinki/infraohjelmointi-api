@@ -1,11 +1,19 @@
 from unittest.mock import patch
+from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from infraohjelmointi_api.models import ConstructionHandover, Project
+from infraohjelmointi_api.models import (
+    ConstructionHandover,
+    ConstructionHandoverFinancing,
+    ConstructionProcurementMethod,
+    Person,
+    Project,
+    ProjectProgrammer,
+)
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverCreateSerializer,
     ConstructionHandoverGetSerializer,
@@ -22,9 +30,36 @@ User = get_user_model()
 class ConstructionHandoverViewSetTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
+        self.person_planning = Person.objects.create(
+            firstName="Planning",
+            lastName="Person",
+            email="planning@example.com",
+            title="Planner",
+            phone="0100000000",
+        )
+        self.person_construction = Person.objects.create(
+            firstName="Construction",
+            lastName="Manager",
+            email="construction@example.com",
+            title="Construction Manager",
+            phone="0200000000",
+        )
+        self.project_programmer = ProjectProgrammer.objects.create(
+            firstName="Program",
+            lastName="Manager",
+        )
+        self.construction_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Kilpailutus",
+        )
         self.project = Project.objects.create(
             name="Construction handover project",
             description="Project used for construction handover view set tests",
+            estConstructionStart=date(2026, 1, 2),
+            estConstructionEnd=date(2026, 3, 4),
+            personPlanning=self.person_planning,
+            personProgramming=self.project_programmer,
+            personConstruction=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
         )
         self.user_1 = User.objects.create(
             username="handover_user_1",
@@ -73,6 +108,9 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
     def test_create_construction_handover(self):
         self.client.force_authenticate(user=self.user_1)
+        self.project.sapProject = "SAP-123"
+        self.project.costForecast = 123456
+        self.project.save(update_fields=["sapProject", "costForecast"])
 
         response = self.client.post(
             "/construction-handovers/",
@@ -84,6 +122,140 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover = ConstructionHandover.objects.get(id=response.data["id"])
         self.assertEqual(handover.createdBy_id, self.user_1.uuid)
         self.assertEqual(handover.updatedBy_id, self.user_1.uuid)
+        self.assertEqual(handover.name, self.project.name)
+        self.assertEqual(handover.description, self.project.description)
+        self.assertEqual(handover.constructionStart, self.project.estConstructionStart)
+        self.assertEqual(handover.constructionEnd, self.project.estConstructionEnd)
+        self.assertEqual(handover.personPlanning, self.project.personPlanning)
+        self.assertEqual(handover.personFinancing, self.project.personProgramming)
+        self.assertEqual(
+            handover.constructionProcurementMethod,
+            self.project.constructionProcurementMethod,
+        )
+        self.assertEqual(
+            handover.constructionProjectManager,
+            self.project.personConstruction,
+        )
+
+        financing_rows = ConstructionHandoverFinancing.objects.filter(handover=handover)
+        self.assertEqual(financing_rows.count(), 1)
+
+        financing_row = financing_rows.first()
+        self.assertEqual(financing_row.financingParty, "KYMP")
+        self.assertEqual(financing_row.projectNumber, self.project.sapProject)
+        self.assertEqual(financing_row.budget, self.project.costForecast)
+
+    def test_create_construction_handover_sets_null_project_manager_when_project_person_construction_is_null(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        self.project.personConstruction = None
+        self.project.save(update_fields=["personConstruction"])
+
+        response = self.client.post(
+            "/construction-handovers/",
+            {"project": str(self.project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        handover = ConstructionHandover.objects.get(id=response.data["id"])
+        self.assertIsNone(handover.constructionProjectManager)
+
+    def test_project_updates_do_not_update_existing_handover(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        response = self.client.post(
+            "/construction-handovers/",
+            {"project": str(self.project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        handover = ConstructionHandover.objects.get(id=response.data["id"])
+
+        original_name = handover.name
+        original_description = handover.description
+        original_construction_start = handover.constructionStart
+        original_construction_end = handover.constructionEnd
+        original_person_planning_id = handover.personPlanning_id
+        original_person_financing_id = handover.personFinancing_id
+        original_procurement_method_id = handover.constructionProcurementMethod_id
+        original_project_manager_id = handover.constructionProjectManager_id
+
+        updated_planning_person = Person.objects.create(
+            firstName="Updated",
+            lastName="Planner",
+            email="updated-planning@example.com",
+            title="Updated Planner",
+            phone="0300000000",
+        )
+        updated_project_manager = Person.objects.create(
+            firstName="Updated",
+            lastName="Construction Manager",
+            email="updated-construction@example.com",
+            title="Updated Construction Manager",
+            phone="0400000000",
+        )
+        updated_programmer = ProjectProgrammer.objects.create(
+            firstName="Updated",
+            lastName="Programmer",
+        )
+        updated_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+
+        self.project.name = "Updated project name"
+        self.project.description = "Updated project description"
+        self.project.estConstructionStart = date(2027, 5, 6)
+        self.project.estConstructionEnd = date(2027, 8, 9)
+        self.project.personPlanning = updated_planning_person
+        self.project.personProgramming = updated_programmer
+        self.project.constructionProcurementMethod = updated_procurement_method
+        self.project.personConstruction = updated_project_manager
+        self.project.save()
+
+        handover.refresh_from_db()
+
+        self.assertEqual(handover.name, original_name)
+        self.assertEqual(handover.description, original_description)
+        self.assertEqual(handover.constructionStart, original_construction_start)
+        self.assertEqual(handover.constructionEnd, original_construction_end)
+        self.assertEqual(handover.personPlanning_id, original_person_planning_id)
+        self.assertEqual(handover.personFinancing_id, original_person_financing_id)
+        self.assertEqual(
+            handover.constructionProcurementMethod_id,
+            original_procurement_method_id,
+        )
+        self.assertEqual(
+            handover.constructionProjectManager_id,
+            original_project_manager_id,
+        )
+
+        patch_response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"otherTimelineNotes": "Updated from handover"},
+            format="json",
+        )
+
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+
+        handover.refresh_from_db()
+
+        self.assertEqual(handover.otherTimelineNotes, "Updated from handover")
+        self.assertEqual(handover.name, original_name)
+        self.assertEqual(handover.description, original_description)
+        self.assertEqual(handover.constructionStart, original_construction_start)
+        self.assertEqual(handover.constructionEnd, original_construction_end)
+        self.assertEqual(handover.personPlanning_id, original_person_planning_id)
+        self.assertEqual(handover.personFinancing_id, original_person_financing_id)
+        self.assertEqual(
+            handover.constructionProcurementMethod_id,
+            original_procurement_method_id,
+        )
+        self.assertEqual(
+            handover.constructionProjectManager_id,
+            original_project_manager_id,
+        )
 
     def test_partial_update_returns_409_for_non_draft(self):
         handover = ConstructionHandover.objects.create(
