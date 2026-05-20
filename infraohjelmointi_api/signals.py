@@ -228,23 +228,22 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
         logger.debug("Signal Triggered: {} Object was created".format(_type))
     logger.debug("Signal Triggered: {} Object was updated".format(_type))
     year = getattr(instance, "finance_year", date.today().year)
-    instance_id = getattr(instance, "pk", None)
+    # Build the payload outside the try block so serialization bugs in
+    # get_financial_sums raise loudly instead of being silently logged as
+    # "send_event failed"
+    payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
     try:
-        send_event(
-            "finance",
-            "finance-update",
-            get_financial_sums(instance=instance, _type=_type, finance_year=year),
-        )
-        logger.info(
+        send_event("finance", "finance-update", payload)
+        logger.debug(
             "finance-update event sent (type=%s, id=%s, year=%s)",
-            _type, instance_id, year,
+            _type, instance.pk, year,
         )
     except Exception:
         # IO-890: surface SSE delivery failures. Without this the event is
         # silently dropped and the UI never sees the update.
         logger.exception(
             "send_event failed for finance-update (type=%s, id=%s, year=%s)",
-            _type, instance_id, year,
+            _type, instance.pk, year,
         )
 
 
@@ -260,23 +259,20 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         # It gets added to the project instance before .save() is called
         forcedToFrame = getattr(instance, "forcedToFrame", False)
         year = getattr(instance, "finance_year", date.today().year)
-        try:
-            send_event(
-                "project",
-                "project-update",
-                {
-                    "project": ProjectGetSerializer(
-                        instance,
-                        context={
-                            "get_pw_link": True,
-                            "forcedToFrame": forcedToFrame,
-                            "for_coordinator": forcedToFrame == True,
-                            "finance_year": year,
-                        },
-                    ).data,
+        payload = {
+            "project": ProjectGetSerializer(
+                instance,
+                context={
+                    "get_pw_link": True,
+                    "forcedToFrame": forcedToFrame,
+                    "for_coordinator": forcedToFrame == True,
+                    "finance_year": year,
                 },
-            )
-            logger.info(
+            ).data,
+        }
+        try:
+            send_event("project", "project-update", payload)
+            logger.debug(
                 "project-update event sent (id=%s, year=%s, forcedToFrame=%s)",
                 instance.pk, year, forcedToFrame,
             )
@@ -286,7 +282,6 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
                 "send_event failed for project-update (id=%s, year=%s)",
                 instance.pk, year,
             )
-        logger.debug("Signal Triggered: Project was updated")
 
 
 @receiver(post_save, sender=ProjectFinancial)
@@ -550,7 +545,7 @@ def on_project_phase_change(sender, instance, **kwargs):
 def _is_valid_sap_project(value: str | None) -> bool:
     """
     Check if a sapProject value is valid (not empty, null, or "0").
-    
+
     IO-777: Users may set sapProject to "0" as a workaround when they can't delete it.
     We treat "0" as an invalid/empty value.
     """
@@ -625,7 +620,7 @@ _connect_cached_lookup_invalidation()
 def capture_old_sap_project(sender, instance, **kwargs):
     """
     Capture the old sapProject value before save so we can detect changes.
-    
+
     IO-777: This is needed to clean up SAP cost records when sapProject changes.
     """
     if instance.pk:
@@ -642,12 +637,12 @@ def capture_old_sap_project(sender, instance, **kwargs):
 def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs):
     """
     Delete SapCost and SapCurrentYear records when sapProject is changed or removed.
-    
+
     IO-777: When a project's sapProject number is changed, the old SAP cost records
     become stale (they contain data from the old SAP project number) and should be
     deleted. New records will be created on the next SAP sync if the new sapProject
     is valid.
-    
+
     Scenarios handled:
     - sapProject changed from valid value to null/empty/"0" -> delete records
     - sapProject changed from one valid value to another -> delete records
@@ -657,14 +652,14 @@ def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs)
     if created:
         # New project, no old records to clean up
         return
-    
+
     old_sap_project = getattr(instance, '_old_sap_project', None)
     new_sap_project = instance.sapProject
-    
+
     # Check if sapProject actually changed
     old_valid = _is_valid_sap_project(old_sap_project)
     new_valid = _is_valid_sap_project(new_sap_project)
-    
+
     # If old value was valid and either:
     # 1. New value is invalid (removed/cleared)
     # 2. New value is different (changed to another project number)
@@ -672,7 +667,7 @@ def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs)
     if old_valid and (not new_valid or old_sap_project != new_sap_project):
         deleted_sap_cost = SapCost.objects.filter(project=instance).delete()
         deleted_sap_current_year = SapCurrentYear.objects.filter(project=instance).delete()
-        
+
         logger.info(
             f"Cleaned up SAP cost records for project {instance.id} due to sapProject change "
             f"from '{old_sap_project}' to '{new_sap_project}': "

@@ -362,18 +362,6 @@ def check_redis_availability(redis_url: str, max_retries: int = 5, initial_delay
     return False
 
 
-def parse_redis_url(redis_url: str) -> dict:
-    parsed = urlparse(redis_url)
-    config = {
-        'host': parsed.hostname or 'localhost',
-        'port': parsed.port or 6379,
-        'db': int(parsed.path.lstrip('/') or 0) if parsed.path else 0,
-    }
-    if parsed.password:
-        config['password'] = parsed.password
-    return config
-
-
 # Configure Redis if URL is provided
 # Skip Redis check for management commands that don't need it (e.g., makemigrations, migrate)
 _skip_redis_check_commands = ['makemigrations', 'migrate', 'showmigrations', 'sqlmigrate', 'sqlflush', 'inspectdb', 'collectstatic', 'check']

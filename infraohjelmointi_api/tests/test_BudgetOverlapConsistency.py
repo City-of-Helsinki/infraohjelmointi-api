@@ -5,7 +5,6 @@ coordination and programming views after IO-743 consistency fix.
 
 from datetime import date
 from collections import defaultdict
-from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 from infraohjelmointi_api.models import (
@@ -16,9 +15,10 @@ from infraohjelmointi_api.models import (
     User
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 
 
-class BudgetOverlapConsistencyTestCase(TestCase):
+class BudgetOverlapConsistencyTestCase(CacheClearingMixin, TestCase):
     """Test that coordination and programming views show identical budget overlap warnings"""
 
     # Test scenario constants for clarity and DRY
@@ -32,11 +32,7 @@ class BudgetOverlapConsistencyTestCase(TestCase):
 
     def setUp(self):
         """Set up test data with specific budget overlap scenarios"""
-        # IO-890: cache invalidation signals are deferred to transaction.on_commit,
-        # which never fires inside TestCase (transactions are rolled back). Clear
-        # the process-global cache explicitly so stale entries from previous tests
-        # don't leak into this one.
-        cache.clear()
+        super().setUp()
         self.year = date.today().year
         self.user = User.objects.create(
             first_name='Test',
@@ -157,12 +153,11 @@ class BudgetOverlapConsistencyTestCase(TestCase):
         return frame_budgets
 
 
-class ViewEndpointConsistencyTestCase(TestCase):
+class ViewEndpointConsistencyTestCase(CacheClearingMixin, TestCase):
     """Test that actual API endpoints return consistent data"""
 
     def setUp(self):
-        # IO-890: see BudgetOverlapConsistencyTestCase.setUp for rationale.
-        cache.clear()
+        super().setUp()
         self.user = User.objects.create(
             first_name='Test',
             last_name='User',
@@ -242,7 +237,7 @@ class ViewEndpointConsistencyTestCase(TestCase):
         # This confirms the refactored fix is in place
 
 
-class FrameBudgetsContextTestCase(TestCase):
+class FrameBudgetsContextTestCase(CacheClearingMixin, TestCase):
     """Test the frame_budgets context building logic specifically"""
 
     # Test scenario constants for clarity and DRY
@@ -255,8 +250,7 @@ class FrameBudgetsContextTestCase(TestCase):
     OVERLAP_CHILD2_BUDGET = 28000   # 30k + 28k = 58k > 50k
 
     def setUp(self):
-        # IO-890: see BudgetOverlapConsistencyTestCase.setUp for rationale.
-        cache.clear()
+        super().setUp()
         self.year = date.today().year
 
         # Create test classes

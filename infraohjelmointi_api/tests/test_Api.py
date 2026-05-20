@@ -9,6 +9,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer, ProjectHashtagSerializer
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
 from asgiref.sync import sync_to_async
@@ -79,7 +80,7 @@ def perform_shared_api_setup(cls):
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
-class ApiTestCase(TestCase):
+class ApiTestCase(CacheClearingMixin, TestCase):
     project_district_id = uuid.UUID("a729e919-4556-4e2d-866b-dfaba470459e")
     project_id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     project_group_id = uuid.UUID("bbba45f2-b0d4-4297-b0e2-4e60f8fa8412")
@@ -235,7 +236,7 @@ class ApiTestCase(TestCase):
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
-class AsyncApiTestCase(TestCase):
+class AsyncApiTestCase(CacheClearingMixin, TestCase):
     client_class = AsyncClient
 
     @classmethod

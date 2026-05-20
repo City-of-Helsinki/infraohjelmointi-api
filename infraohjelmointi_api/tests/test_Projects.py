@@ -38,6 +38,7 @@ from ..serializers import (
     ProjectCreateSerializer,
 )
 
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
 
 
@@ -72,7 +73,7 @@ def mock_projectwise_create_service(func):
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
-class ProjectTestCase(TestCase):
+class ProjectTestCase(CacheClearingMixin, TestCase):
     project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     project_3_Id = uuid.UUID("fdc89f56-b631-4109-a137-45b950de6b10")
@@ -4082,7 +4083,7 @@ class ProjectTestCase(TestCase):
         )
 
 
-class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
+class ProjectCreateSerializerHierarchicalProgrammerTestCase(CacheClearingMixin, TestCase):
     """Test hierarchical programmer fallback in project creation/update (IO-411)"""
 
     @classmethod
