@@ -15,9 +15,10 @@ from infraohjelmointi_api.models import (
     User
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 
 
-class BudgetOverlapConsistencyTestCase(TestCase):
+class BudgetOverlapConsistencyTestCase(CacheClearingMixin, TestCase):
     """Test that coordination and programming views show identical budget overlap warnings"""
 
     # Test scenario constants for clarity and DRY
@@ -31,6 +32,7 @@ class BudgetOverlapConsistencyTestCase(TestCase):
 
     def setUp(self):
         """Set up test data with specific budget overlap scenarios"""
+        super().setUp()
         self.year = date.today().year
         self.user = User.objects.create(
             first_name='Test',
@@ -151,10 +153,11 @@ class BudgetOverlapConsistencyTestCase(TestCase):
         return frame_budgets
 
 
-class ViewEndpointConsistencyTestCase(TestCase):
+class ViewEndpointConsistencyTestCase(CacheClearingMixin, TestCase):
     """Test that actual API endpoints return consistent data"""
 
     def setUp(self):
+        super().setUp()
         self.user = User.objects.create(
             first_name='Test',
             last_name='User',
@@ -234,9 +237,9 @@ class ViewEndpointConsistencyTestCase(TestCase):
         # This confirms the refactored fix is in place
 
 
-class FrameBudgetsContextTestCase(TestCase):
+class FrameBudgetsContextTestCase(CacheClearingMixin, TestCase):
     """Test the frame_budgets context building logic specifically"""
-    
+
     # Test scenario constants for clarity and DRY
     TSE_2028_PARENT_BUDGET = 58000  # TSE-2028 scenario from IO-743
     TSE_2028_CHILD1_BUDGET = 30000
@@ -247,6 +250,7 @@ class FrameBudgetsContextTestCase(TestCase):
     OVERLAP_CHILD2_BUDGET = 28000   # 30k + 28k = 58k > 50k
 
     def setUp(self):
+        super().setUp()
         self.year = date.today().year
 
         # Create test classes

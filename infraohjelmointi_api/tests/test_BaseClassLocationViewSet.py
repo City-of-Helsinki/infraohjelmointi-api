@@ -10,20 +10,22 @@ from rest_framework.request import Request
 from unittest.mock import Mock, patch
 
 from infraohjelmointi_api.models import (
-    ProjectClass, 
+    ProjectClass,
     ProjectLocation,
     ClassFinancial,
     LocationFinancial,
     User
 )
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
 
 
-class BaseClassLocationViewSetTestCase(TestCase):
+class BaseClassLocationViewSetTestCase(CacheClearingMixin, TestCase):
     """Test BaseClassLocationViewSet methods"""
-    
+
     def setUp(self):
         """Set up test data"""
+        super().setUp()
         self.year = date.today().year
         self.user = User.objects.create(
             first_name='Test', 

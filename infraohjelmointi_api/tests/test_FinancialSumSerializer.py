@@ -12,13 +12,15 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
 )
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 
 
-class FinancialSumSerializerTestCase(TestCase):
+class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
     """Test cases for FinancialSumSerializer budget overlap calculation consistency"""
 
     def setUp(self):
         """Set up test data that reproduces the TSE 2028 issue"""
+        super().setUp()
         # Create coordinator classes hierarchy: TSE -> TSE 2028
         self.tse_master = ProjectClass.objects.create(
             id=uuid.uuid4(),

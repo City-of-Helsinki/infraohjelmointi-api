@@ -10,6 +10,7 @@ from infraohjelmointi_api.models import (
 
 import uuid
 from infraohjelmointi_api.models.AppStateValueModel import AppStateValue
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from overrides import override
 
 from infraohjelmointi_api.views import BaseViewSet
@@ -18,7 +19,7 @@ from unittest.mock import patch
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
-class BalkSumTestCase(TestCase):
+class BalkSumTestCase(CacheClearingMixin, TestCase):
     project_1_Id = uuid.UUID("d6e03aa6-1ffa-4603-86ff-0d22dccf702d")
     project_2_Id = uuid.UUID("d27bbbcc-22de-48c6-b96a-899d8cf3e3da")
     project_3_Id = uuid.UUID("fee7ce1c-ac73-474f-95d6-3b021c7c267d")
