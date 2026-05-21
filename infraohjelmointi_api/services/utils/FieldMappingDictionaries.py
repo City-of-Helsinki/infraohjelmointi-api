@@ -10,9 +10,11 @@ PHASE_MAP_FOR_PW = {
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
     "constructionWait": "6. Odottaa rakentamista",
+    "constructionPreparation": "6.5 Rakentamisen valmistelu",
     "construction": "7. Rakentaminen",
     "warrantyPeriod": "8. Takuuaika",
     "completed": "9. Valmis / ylläpidossa",
+    "suspended": "10. Keskeytetty toistaiseksi",
 }
 
 PHASE_MAP_FOR_INFRATOOL = {
@@ -23,9 +25,11 @@ PHASE_MAP_FOR_INFRATOOL = {
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
     "constructionWait": "6. Odottaa rakentamista",
+    "constructionPreparation": "6.5 Rakentamisen valmistelu",
     "construction": "7. Rakentaminen",
     "warrantyPeriod": "8. Takuuaika",
     "completed": "9. Valmis / ylläpidossa",
+    "suspended": "10. Keskeytetty toistaiseksi",
 }
 
 # === PROJECT AREA MAPPINGS ===
@@ -69,12 +73,14 @@ PROJECT_TYPE_MAP = {
     "preConstruction": "esirakentaminen",
 }
 
-# === CONSTRUCTION PHASE DETAIL MAPPINGS ===
-CONSTRUCTION_PHASE_DETAILS_MAP = {
+# === PROJECT PHASE DETAIL MAPPINGS (values that exist in ProjectWise) ===
+PHASE_DETAILS_MAP_FOR_PW = {
     "preConstruction": "1. Esirakentaminen",
     "firstPhase": "2. Ensimmäinen vaihe",
     "firstPhaseComplete": "3. Ensimmäinen vaihe valmis",
     "secondPhase": "4. Toinen vaihe / viimeistely",
+    "movedToConstruction": "Siirretty rakentamiseen",
+    "contractPreparation": "Urakan valmistelu",
 }
 
 # === FIELD MAPPER LOOKUP ===
@@ -83,5 +89,5 @@ FIELD_MAPPER_LOOKUP = {
     "project_type_map": PROJECT_TYPE_MAP,
     "project_area_map": PROJECT_AREA_MAP,
     "responsible_zone_map": RESPONSIBLE_ZONE_MAP,
-    "construction_phase_details_map": CONSTRUCTION_PHASE_DETAILS_MAP,
+    "construction_phase_details_map": PHASE_DETAILS_MAP_FOR_PW,
 }

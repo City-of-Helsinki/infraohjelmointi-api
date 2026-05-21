@@ -7,5 +7,6 @@ class ConstructionProcurementMethodViewSet(CachedLookupViewSet):
     """API endpoint for construction procurement methods (cached)."""
 
     serializer_class = ConstructionProcurementMethodSerializer
+    project_field = 'constructionProcurementMethod'
 
 

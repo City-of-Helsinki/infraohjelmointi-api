@@ -22,7 +22,7 @@ from .ProjectPhaseService import ProjectPhaseService
 from .ProjectAreaService import ProjectAreaService
 from .ProjectTypeService import ProjectTypeService
 from .ResponsibleZoneService import ResponsibleZoneService
-from .ConstructionPhaseDetailService import ConstructionPhaseDetailService
+from .ProjectPhaseDetailService import ProjectPhaseDetailService
 
 from .utils import (
     ProjectWiseDataMapper,
@@ -836,7 +836,7 @@ class ProjectWiseService:
         if project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]:
             try:
                 detail_value = project_properties["PROJECT_Rakentamisvaiheen_tarkenne"]
-                project.constructionPhaseDetail = ConstructionPhaseDetailService.find_by_value(detail_value)
+                project.phaseDetail = ProjectPhaseDetailService.find_by_value(detail_value)
             except Exception as e:
                 logger.warning(f"Failed to find construction phase detail for value '{detail_value}': {e}")
 

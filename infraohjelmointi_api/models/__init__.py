@@ -10,7 +10,7 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
-from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ProjectPhaseDetail import ProjectPhaseDetail
 from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .StaraProcurementReason import StaraProcurementReason
 from .ProjectCategory import ProjectCategory
@@ -43,3 +43,5 @@ from .TalpaAssetClass import TalpaAssetClass
 from .TalpaProjectNumberRange import TalpaProjectNumberRange
 from .TalpaProjectOpening import TalpaProjectOpening
 from .ClassProgrammerAssignment import ClassProgrammerAssignment
+from .ConstructionHandover import ConstructionHandover
+from .ConstructionHandoverFinancing import ConstructionHandoverFinancing, FinancingParty

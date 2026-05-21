@@ -54,12 +54,6 @@ class Command(BaseCommand):
             help='Path to SAP_Projektinumerovälit.xlsx for 2814I project number ranges'
         )
         parser.add_argument(
-            '--preconstruction-file',
-            type=str,
-            required=False,
-            help='Path to Ohjelmointityökalu_projektinumerovälit.xlsx for 2814E ranges with unit data'
-        )
-        parser.add_argument(
             '--dry-run',
             action='store_true',
             help='Show what would be imported without making changes'
@@ -93,7 +87,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         file_path = options['file']
         ranges_file_path = options.get('ranges_file')
-        preconstruction_file_path = options.get('preconstruction_file')
         dry_run = options['dry_run']
         clear_existing = options['clear_existing']
 
@@ -125,18 +118,6 @@ class Command(BaseCommand):
             except Exception as e:
                 raise CommandError(f"Error reading ranges Excel file: {e}")
 
-        # Load preconstruction file if provided (for 2814E with unit data)
-        preconstruction_wb = None
-        if preconstruction_file_path:
-            if not os.path.exists(preconstruction_file_path):
-                raise CommandError(f"Preconstruction Excel file not found: {preconstruction_file_path}")
-            try:
-                preconstruction_wb = openpyxl.load_workbook(preconstruction_file_path, data_only=True, read_only=True)
-                self.stdout.write(f"Opened preconstruction file: {preconstruction_file_path}")
-                self.stdout.write(f"Preconstruction worksheets: {preconstruction_wb.sheetnames}\n")
-            except Exception as e:
-                raise CommandError(f"Error reading preconstruction Excel file: {e}")
-
         stats = {
             'ranges_created': 0,
             'ranges_updated': 0,
@@ -151,7 +132,6 @@ class Command(BaseCommand):
 
         # Pass workbooks to import functions
         options['_ranges_wb'] = ranges_wb
-        options['_preconstruction_wb'] = preconstruction_wb
 
         if dry_run:
             self._dry_run_import(wb, options, stats)
@@ -520,110 +500,73 @@ class Command(BaseCommand):
             }
         except Exception:
             return None
+            
 
-    def _parse_2814E_range_row(self, row):
-        """Parse a row from the 2814E project number range sheet (legacy format from main file)"""
-        try:
-            cell_value = str(row[0].value).strip() if row[0].value else None
-            if not cell_value:
-                return None
+    def _get_col(self, row, index):
+        return str(row[index]).strip() if len(row) > index and row[index] else None
 
-            if 'projektinumero' in cell_value.lower() or '2814e-' in cell_value.lower():
-                return None
+    def _is_header(self, col_a):
+        return col_a and '2814e-projektinumerovälit' in col_a.lower()
 
-            parts = cell_value.split()
-            if len(parts) < 2:
-                return None
+    def _is_valid_range(self, col_d):
+        return col_d and col_d.startswith('2814E')
 
-            range_part = parts[0]
-            range_start = range_part.strip()
-            range_end = range_start
+    def _update_budget_account(self, col_a, current_account):
+        if col_a and col_a.startswith('8 '):
+            return col_a
+        return current_account
 
-            for i, part in enumerate(parts):
-                if part == '-' and i + 1 < len(parts):
-                    range_end = parts[i + 1].strip()
-                    break
-                elif '-' in part and part != range_start:
-                    range_split = part.split('-')
-                    if len(range_split) == 2:
-                        range_end = range_split[1].strip()
-                    break
-
-            budget_account = None
-            budget_account_number = None
-            budget_match = re.search(r'\(?(8\s*\d{2}\s*\d{2}\s*\d{2})\)?', cell_value)
-            if budget_match:
-                budget_account = budget_match.group(1).strip()
-                budget_account_number = budget_account.replace(' ', '')
-
-            area = None
-            area_patterns = [
-                'Kalasatama', 'Länsisatama', 'Pasila', 'Kruunuvuorenranta',
-                'Kuninkaankolmio', 'Malmi', 'Malminkartano', 'Mellunkylä',
-                'Meri-Rastila', 'Läntinen bulevardikaupunki', 'Makasiiniranta'
-            ]
-            for area_name in area_patterns:
-                if area_name.lower() in cell_value.lower():
-                    area = area_name
-                    break
-
-            return {
-                'projectTypePrefix': '2814E',
-                'budgetAccount': budget_account,
-                'budgetAccountNumber': budget_account_number,
-                'rangeStart': range_start,
-                'rangeEnd': range_end,
-                'area': area,
-                'unit': None,  # Legacy format doesn't have unit column
-                'isActive': True,
+    def _update_area(self, col_b, current_area):
+        if col_b and col_b not in ['', 'None']:
+            replacements = {
+                'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
+                'Malmi (kenttä)': 'Malminkenttä',
+                'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.',
             }
-        except Exception:
-            return None
+            return replacements.get(col_b, col_b)
+        return current_area
 
-    def _parse_preconstruction_row(self, row, current_budget_account=None, current_area=None):
+    def _validate_unit(self, col_c):
+        valid_units = {'Tontit', 'Mao', 'Geo', 'Toiminnanohjaus', 'Tilat'}
+        return col_c if col_c in valid_units else None
+
+
+    def _parse_2814E_range_row(self, row, current_budget_account=None, current_area=None):
         """
-        Parse a row from Ohjelmointityökalu_projektinumerovälit.xlsx format.
+        Parse a row from Esirakentaminen projektinumerov sheet format.
 
-        Format: TA-kohta | Area | Yksikkö | RangeStart | RangeEnd | ContactPerson | | Email
-        Example: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099|Satu Järvinen||Satu.Jarvinen@hel.fi
+        Format: TA-kohta | Area | Yksikkö | RangeStart | RangeEnd | Full name
+        Example: 8 08 01 03|Kalasatama|Tontit|2814E22001|2814E22099|2814E01000 - 2814E01599 (8 01 03 01 Muu esirakentaminen, Maaomaisuuden kehittäminen ja tontit, TONTIT)
 
         Note: Some rows are continuations where TA-kohta and Area are empty but Unit/Range are filled.
         """
+
         try:
             # Column A (0): TA-kohta / Budget Account (may be empty for continuation rows)
-            col_a = str(row[0].value).strip() if row[0].value else None
+            col_a = self._get_col(row, 0)
             # Column B (1): Area name (may be empty for continuation rows)
-            col_b = str(row[1].value).strip() if len(row) > 1 and row[1].value else None
-            # Column C (2): Yksikkö / Unit - "Tontit", "Mao", or "Geo"
-            col_c = str(row[2].value).strip() if len(row) > 2 and row[2].value else None
+            col_b = self._get_col(row, 1)
+            # Column C (2): Yksikkö / Unit - "Tontit", "Mao", "Geo", "Toiminnanohjaus" or "Tilat"
+            col_c = self._get_col(row, 2)
             # Column D (3): Range Start - e.g., "2814E22001"
-            col_d = str(row[3].value).strip() if len(row) > 3 and row[3].value else None
+            col_d = self._get_col(row, 3)
             # Column E (4): Range End - e.g., "2814E22099"
-            col_e = str(row[4].value).strip() if len(row) > 4 and row[4].value else None
+            col_e = self._get_col(row, 4)
 
             # Skip header rows
-            if col_a and ('ta-kohta' in col_a.lower() or 'make-palvelu' in col_a.lower()):
+            if self._is_header(col_a):
                 return None, current_budget_account, current_area
 
             # Skip rows without valid range data
-            if not col_d or not col_d.startswith('2814E'):
+            if not self._is_valid_range(col_d):
                 return None, current_budget_account, current_area
 
             # Update current context if this row has TA-kohta or Area
-            if col_a and col_a.startswith('8 '):
-                current_budget_account = col_a
-            if col_b and col_b not in ['', 'None']:
-                # Allow overriding area names with cleaner versions
-                replacements = {
-                    'Muu esirakentaminen (MuuEsir.)': 'Muu esirakentaminen',
-                    'Malmi (kenttä)': 'Malminkenttä',
-                    'LHR, liittyvä esirakentaminen': 'Länsiratikat, liittyvä esir.'
-                }
-                current_area = replacements.get(col_b, col_b)
+            current_budget_account = self._update_budget_account(col_a, current_budget_account)
+            current_area = self._update_area(col_b, current_area)
 
             # Validate unit
-            valid_units = ['Tontit', 'Mao', 'Geo']
-            unit = col_c if col_c in valid_units else None
+            unit = self._validate_unit(col_c)
 
             return {
                 'projectTypePrefix': '2814E',
@@ -637,6 +580,7 @@ class Command(BaseCommand):
             }, current_budget_account, current_area
         except Exception:
             return None, current_budget_account, current_area
+
 
     def _parse_sap_range_row(self, row):
         """Parse a row from SAP_Projektinumerovälit.xlsx format"""
@@ -748,16 +692,24 @@ class Command(BaseCommand):
             if sheet:
                 self.stdout.write(f"\n  {prefix} sheet: {sheet.title}")
                 count = 0
-                for row in list(sheet.rows)[1:]:
-                    if prefix == '2814I':
+                if prefix == '2814I':
+                    for row in list(sheet.rows)[1:]:
                         data = self._parse_2814I_range_row(row)
-                    else:
-                        data = self._parse_2814E_range_row(row)
-
-                    if data:
-                        count += 1
-                        if count <= 3:
-                            self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
+                        if data:
+                            count += 1
+                            if count <= 3:
+                                self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
+                else:
+                    current_budget_account = None
+                    current_area = None
+                    for row in list(sheet.iter_rows(values_only=True))[1:]:
+                        data, current_budget_account, current_area = self._parse_2814E_range_row(
+                            row, current_budget_account, current_area
+                        )
+                        if data:
+                            count += 1
+                            if count <= 3:
+                                self.stdout.write(f"    {data['rangeStart']} - {data['rangeEnd']}")
 
                 self.stdout.write(f"  Total {prefix} ranges: {count}")
                 total += count
@@ -773,6 +725,7 @@ class Command(BaseCommand):
         For 2814I: Use budgetAccount + class name from notes (e.g., "8 03 01 01 Katujen uudisrakentaminen")
         For 2814E: Use "{budgetAccount} {area}" format
         """
+
         project_type_prefix = data.get('projectTypePrefix')
         budget_account = (data.get('budgetAccount') or '').strip()
         area = (data.get('area') or '').strip()
@@ -807,7 +760,6 @@ class Command(BaseCommand):
         self.stdout.write("Importing Project Number Ranges...")
 
         ranges_wb = options.get('_ranges_wb') if options else None
-        preconstruction_wb = options.get('_preconstruction_wb') if options else None
 
         # Import from SAP ranges file (2814I)
         if ranges_wb:
@@ -830,33 +782,6 @@ class Command(BaseCommand):
                         else:
                             stats['ranges_updated'] += 1
 
-        # Import from preconstruction file (2814E with proper unit values)
-        if preconstruction_wb:
-            self.stdout.write("  Using Ohjelmointityökalu file for 2814E with unit values...")
-            for sheet_name in preconstruction_wb.sheetnames:
-                sheet = preconstruction_wb[sheet_name]
-                current_budget_account = None
-                current_area = None
-                for row in list(sheet.rows)[1:]:  # Skip header row
-                    result = self._parse_preconstruction_row(row, current_budget_account, current_area)
-                    if result[0]:  # result is (data, budget_account, area)
-                        data, current_budget_account, current_area = result
-                        # Compute groupLabel
-                        data['groupLabel'] = self._compute_group_label(data)
-                        obj, created = TalpaProjectNumberRange.objects.update_or_create(
-                            projectTypePrefix=data['projectTypePrefix'],
-                            rangeStart=data['rangeStart'],
-                            rangeEnd=data['rangeEnd'],
-                            defaults=data
-                        )
-                        if created:
-                            stats['ranges_created'] += 1
-                        else:
-                            stats['ranges_updated'] += 1
-                    else:
-                        # Update context even if no data returned
-                        _, current_budget_account, current_area = result
-
         # Import from main file sheets for any prefix not covered by separate files
         sheets = self._find_project_range_sheets(wb)
 
@@ -864,7 +789,7 @@ class Command(BaseCommand):
         if not ranges_wb and sheets.get('2814I'):
             self.stdout.write("  Importing 2814I from main file...")
             sheet = sheets['2814I']
-            for row in list(sheet.rows)[1:]:
+            for row in list(sheet.rows)[1:]:        
                 data = self._parse_2814I_range_row(row)
                 if data:
                     data['groupLabel'] = self._compute_group_label(data)
@@ -879,14 +804,18 @@ class Command(BaseCommand):
                     else:
                         stats['ranges_updated'] += 1
 
-        # Import 2814E from main file if --preconstruction-file not provided
-        if not preconstruction_wb and sheets.get('2814E'):
+        # Import 2814E from main file
+        if sheets.get('2814E'):
             self.stdout.write("  Importing 2814E from main file...")
-            sheet = sheets['2814E']
-            for row in list(sheet.rows)[1:]:
-                data = self._parse_2814E_range_row(row)
-                if data:
+            sheet = sheets['2814E']               
+            current_budget_account = None
+            current_area = None
+            for row in list(sheet.iter_rows(values_only=True))[1:]:        
+                result = self._parse_2814E_range_row(row, current_budget_account, current_area)
+                if result[0]:  # result is (data, budget_account, area)
+                    data, current_budget_account, current_area = result
                     data['groupLabel'] = self._compute_group_label(data)
+
                     obj, created = TalpaProjectNumberRange.objects.update_or_create(
                         projectTypePrefix=data['projectTypePrefix'],
                         rangeStart=data['rangeStart'],
@@ -897,6 +826,11 @@ class Command(BaseCommand):
                         stats['ranges_created'] += 1
                     else:
                         stats['ranges_updated'] += 1
+
+                else:
+                    # Update context even if no data returned
+                    _, current_budget_account, current_area = result
+
 
         self.stdout.write(f"  Created: {stats['ranges_created']}, Updated: {stats['ranges_updated']}")
 

@@ -27,7 +27,14 @@ class ResponsiblePersonsCommandTestCase(TestCase):
     @classmethod
     @override
     def setUpTestData(cls):
-        Person.objects.create(id=cls._uuid, firstName=cls.firstname, lastName=cls.lastname, email=cls.email)
+        Person.objects.create(
+            id=cls._uuid,
+            firstName=cls.firstname,
+            lastName=cls.lastname,
+            email=cls.email,
+            title="Manager",
+            phone="0400000000",
+        )
 
     def test_get_or_create_by_last_name(self):
         lastname = "Smith"
@@ -100,7 +107,13 @@ class ResponsiblePersonsCommandTestCase(TestCase):
         self.assertEqual(person.lastName, self.lastname, "The last name of the person should match the query")
 
         # Create duplicate Person with the same name
-        Person.objects.create(firstName=self.firstname, lastName=self.lastname)
+        Person.objects.create(
+            firstName=self.firstname,
+            lastName=self.lastname,
+            email="duplicate@example.com",
+            title="Coordinator",
+            phone="0400000001",
+        )
         persons = PersonService.get_by_name(firstName=self.firstname, lastName=self.lastname)
         self.assertEqual(isinstance(persons, list), True, "Returned Person should be a list of multiple Persons")
         self.assertEqual(len(persons), 2, "Returned persons list length should be 2")

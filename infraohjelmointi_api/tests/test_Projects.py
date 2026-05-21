@@ -19,7 +19,7 @@ from ..models import (
     ProjectPhase,
     ProjectPriority,
     ProjectCategory,
-    ConstructionPhaseDetail,
+    ProjectPhaseDetail,
     Note,
     ProjectQualityLevel,
     PlanningPhase,
@@ -38,6 +38,7 @@ from ..serializers import (
     ProjectCreateSerializer,
 )
 
+from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
 
 
@@ -72,7 +73,7 @@ def mock_projectwise_create_service(func):
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
-class ProjectTestCase(TestCase):
+class ProjectTestCase(CacheClearingMixin, TestCase):
     project_1_Id = uuid.UUID("33814e76-7bdc-47c2-bf08-7ed43a96e042")
     project_2_Id = uuid.UUID("5d82c31b-4dee-4e48-be7c-b417e6c5bb9e")
     project_3_Id = uuid.UUID("fdc89f56-b631-4109-a137-45b950de6b10")
@@ -255,8 +256,11 @@ class ProjectTestCase(TestCase):
             title="CEO",
             phone="0414853275",
         )
-        self.conPhaseDetail = ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_1_Id, value="preConstruction"
+        self.constructionProjectPhase = ProjectPhase.objects.get(value="construction")
+        self.conPhaseDetail = ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_1_Id,
+            value="preConstruction",
+            projectPhase=self.constructionProjectPhase,
         )
         self.person_3 = Person.objects.create(
             id=self.person_3_Id,
@@ -318,7 +322,7 @@ class ProjectTestCase(TestCase):
             phase=self.projectPhase,
             programmed=False,
             category=self.projectCategory,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -465,7 +469,7 @@ class ProjectTestCase(TestCase):
         self.assertEqual(
             len(self.conPhaseDetail.project_set.all()),
             0,
-            msg="No foreign key should exist for constructionPhaseDetail in Project with id {}".format(
+            msg="No foreign key should exist for phaseDetail in Project with id {}".format(
                 self.project_1_Id
             ),
         )
@@ -547,7 +551,7 @@ class ProjectTestCase(TestCase):
             personConstruction=self.person_3,
             phase=self.projectPhase,
             programmed=True,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",
@@ -669,7 +673,7 @@ class ProjectTestCase(TestCase):
             "personProgramming": None,
             "personConstruction": None,
             "category": None,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
             "estPlanningStart": None,
             "estPlanningEnd": None,
             "estConstructionStart": None,
@@ -834,6 +838,17 @@ class ProjectTestCase(TestCase):
         self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus1"], "600.00")
         self.assertEqual(response.json()["finances"]["budgetProposalCurrentYearPlus2"], None)
         self.assertEqual(response.json()["finances"]["preliminaryCurrentYearPlus3"], "0.00")
+
+    @mock_projectwise_create_service
+    def test_PATCH_project_with_null_city_and_postal_code(self):
+        response = self.client.patch(
+            "/projects/{}/".format(self.project_1_Id),
+            {"city": None, "postalCode": None},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+        self.assertEqual(response.json()["city"], "")
+        self.assertEqual(response.json()["postalCode"], "")
 
     @mock_projectwise_create_service
     def test_PATCH_project_other_persons_replace_and_clear(self):
@@ -3201,8 +3216,11 @@ class ProjectTestCase(TestCase):
         self.projectPhase_6_Id = ProjectPhase.objects.get(
             value="warrantyPeriod"
         ).id.__str__()
-        ConstructionPhaseDetail.objects.create(
-            id=self.conPhaseDetail_2_Id, value="preConstruction"
+        construction_phase = ProjectPhase.objects.get(value="construction")
+        ProjectPhaseDetail.objects.create(
+            id=self.conPhaseDetail_2_Id,
+            value="preConstruction",
+            projectPhase=construction_phase,
         )
         data = {
             "name": "Testing fields",
@@ -3444,7 +3462,7 @@ class ProjectTestCase(TestCase):
         )
 
         data = {
-            "constructionPhaseDetail": self.conPhaseDetail_2_Id,
+            "phaseDetail": self.conPhaseDetail_2_Id,
             "phase": self.projectPhase_5_Id,
             "programmed": False,
         }
@@ -3454,12 +3472,11 @@ class ProjectTestCase(TestCase):
             content_type="application/json",
         )
 
-        # Projects value programmed is `false` and phase `Warrantyperiod`
-        # If programmed value is false, phase must be set to `proposal` or `design`
+        # programmed False + warrantyPeriod is invalid (allowed phases for False: proposal, design, completed, suspended)
         self.assertEqual(
             response.status_code,
             400,
-            msg="Status code != 400 , Error: {}".format("phase must be set to `proposal` or `design` if programmed is `False`"),
+            msg="Status code != 400 , Error: {}".format(response.json()),
         )
 
         data = {"programmed": False}
@@ -3475,14 +3492,30 @@ class ProjectTestCase(TestCase):
         )
 
         self.assertEqual(
-            "phase must be set to `proposal`, `design`, or `completed` if programmed is `False`",
+            "phase must be set to `proposal`, `design`, `completed` or `suspended` if programmed is `False`",
             response.json()["programmed"][0],
         )
         # Getting proposal phase from the data that is populated when tests run the migrations
         data = {
             "programmed": False,
             "phase": ProjectPhase.objects.get(value="proposal").id,
-            "constructionPhaseDetail": None,
+            "phaseDetail": None,
+        }
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        data = {
+            "programmed": False,
+            "phase": ProjectPhase.objects.get(value="suspended").id,
+            "phaseDetail": None,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
@@ -3717,9 +3750,10 @@ class ProjectTestCase(TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
+    @patch('infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService')
     @patch('infraohjelmointi_api.serializers.ProjectGetSerializer.ProjectWiseService')
     @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
-    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class):
+    def test_pw_folder_project(self, mock_pw_create_class, mock_pw_get_class, mock_pw_utils_class):
         # Mock both serializers' ProjectWise service classes
         def mock_get_pw_response(id):
             return {"instanceId": f"instance-{id}"}
@@ -3728,9 +3762,12 @@ class ProjectTestCase(TestCase):
         mock_create_instance = mock_pw_create_class.return_value
         mock_create_instance.get_project_from_pw.side_effect = mock_get_pw_response
 
-        # Mock the GetSerializer's service instance
+        # Mock the GetSerializer's ProjectWise class (if constructed on serializer)
         mock_get_instance = mock_pw_get_class.return_value
         mock_get_instance.get_project_from_pw.side_effect = mock_get_pw_response
+
+        mock_utils_instance = mock_pw_utils_class.return_value
+        mock_utils_instance.get_project_from_pw.side_effect = mock_get_pw_response
 
         data = {
             "name": "Test Project for PW folder",
@@ -4046,7 +4083,7 @@ class ProjectTestCase(TestCase):
         )
 
 
-class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
+class ProjectCreateSerializerHierarchicalProgrammerTestCase(CacheClearingMixin, TestCase):
     """Test hierarchical programmer fallback in project creation/update (IO-411)"""
 
     @classmethod
@@ -4237,8 +4274,9 @@ class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
         self.assertEqual(updated_project.personProgramming, existing_programmer)
 
     @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
-    def test_saija_case_simulation(self, mock_pw_service):
-        """Test the specific Saija case from Jira: creating project under traffic arrangements"""
+    def test_traffic_arrangements_case_from_jira(self, mock_pw_service):
+        """IO-411: creating a project under traffic arrangements where the
+        suurpiiri lives on projectLocation rather than projectClass."""
         itainen_suurpiiri = ProjectClass.objects.create(
             name="Itäinen suurpiiri",
             path="8 03 Kadut ja liikenneväylät/Itäinen suurpiiri",
@@ -4255,7 +4293,7 @@ class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
         )
 
         serializer = ProjectCreateSerializer(data={
-            'name': 'Turunlinnantien hidastejärjestelyt',
+            'name': 'Test traffic calming project',
             'description': 'Test traffic arrangements',
             'projectClass': traffic_class.id,
         })
@@ -4281,6 +4319,214 @@ class ProjectCreateSerializerHierarchicalProgrammerTestCase(TestCase):
         serializer = ProjectCreateSerializer()
         programmer = serializer._get_default_programmer_with_fallback(self.orphan_class)
         self.assertIsNone(programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_location_based_programmer(self, mock_pw_service):
+        """
+        IO-411: when projectClass has no programmer in its parent chain, the
+        serializer must fall back to the projectLocation chain. This mirrors
+        the prod case where the suurpiiri lives only on projectLocation.
+        """
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Anna", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Test traffic calming project',
+            'description': 'Test traffic arrangements',
+            'projectClass': self.orphan_class.id,
+            'projectLocation': location.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, district_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_class_chain_wins_over_location(self, mock_pw_service):
+        """When the class chain resolves a programmer, the location chain
+        is not consulted (IO-411: avoid changing behavior for projects whose
+        class already has a default)."""
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Different", lastName="Person"
+        )
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Class wins',
+            'description': 'Test',
+            'projectClass': self.child_class_with_programmer.id,
+            'projectLocation': location.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, self.programmer_child)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_create_project_with_only_location(self, mock_pw_service):
+        """A project created with no class but with a suurpiiri location
+        should still get the district programmer (IO-411)."""
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Eero", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Läntinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Läntinen suurpiiri")
+
+        serializer = ProjectCreateSerializer(data={
+            'name': 'Western project',
+            'description': 'Test',
+            'projectLocation': location.id,
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save()
+        self.assertEqual(project.personProgramming, district_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_update_project_location_triggers_location_fallback(self, mock_pw_service):
+        """Updating a programmer-less project's location should pick up the
+        district programmer when neither the existing nor incoming class
+        resolves one."""
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Anna", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        project = Project.objects.create(
+            name="Existing programmer-less project",
+            description="Test",
+            projectClass=self.orphan_class,
+        )
+        self.assertIsNone(project.personProgramming)
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={
+                'name': project.name,
+                'projectLocation': location.id,
+            },
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated_project = serializer.save()
+        self.assertEqual(updated_project.personProgramming, district_programmer)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_explicit_null_class_clear_does_not_resurrect_old_programmer(self, mock_pw_service):
+        """
+        IO-411 regression: PATCHing `projectClass: null` on a programmer-less
+        project must NOT silently fall back to the persisted projectClass and
+        auto-assign its default programmer. The user is clearing the class
+        on purpose.
+        """
+        project = Project.objects.create(
+            name="Clear class",
+            description="Test",
+            projectClass=self.child_class_with_programmer,
+        )
+        # Sanity: starts with no programmer despite the class having one
+        # (Project.objects.create bypasses the serializer).
+        self.assertIsNone(project.personProgramming)
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={'projectClass': None},
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.save()
+        self.assertIsNone(updated.personProgramming)
+        self.assertIsNone(updated.projectClass)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_explicit_null_location_clear_does_not_resurrect_old_programmer(self, mock_pw_service):
+        """
+        IO-411 regression: same as the class case but for projectLocation.
+        Clearing the location must not auto-assign a programmer derived from
+        the old persisted location.
+        """
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Anna", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        project = Project.objects.create(
+            name="Clear location",
+            description="Test",
+            projectClass=self.orphan_class,
+            projectLocation=location,
+        )
+        self.assertIsNone(project.personProgramming)
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={'projectLocation': None},
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.save()
+        self.assertIsNone(updated.personProgramming)
+        self.assertIsNone(updated.projectLocation)
+
+    @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
+    def test_clearing_one_side_consults_persisted_other_side(self, mock_pw_service):
+        """
+        IO-411: clearing projectClass on a project that has a resolvable
+        projectLocation should still let the location chain resolve a
+        programmer — the *other* side's persisted value is still in play.
+        """
+        district_programmer = ProjectProgrammer.objects.create(
+            firstName="Anna", lastName="Esimerkki"
+        )
+        ProjectClass.objects.create(
+            name="Itäinen suurpiiri",
+            forCoordinatorOnly=False,
+            defaultProgrammer=district_programmer,
+        )
+        location = ProjectLocation.objects.create(name="Itäinen suurpiiri")
+
+        project = Project.objects.create(
+            name="Clear only class",
+            description="Test",
+            projectClass=self.child_class_with_programmer,
+            projectLocation=location,
+        )
+        self.assertIsNone(project.personProgramming)
+
+        serializer = ProjectCreateSerializer(
+            project,
+            data={'projectClass': None},
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.save()
+        self.assertEqual(updated.personProgramming, district_programmer)
 
     @patch('infraohjelmointi_api.serializers.ProjectCreateSerializer.ProjectWiseService')
     def test_completed_phase_with_current_year_budget_sets_programmed_true(self, mock_pw_service):

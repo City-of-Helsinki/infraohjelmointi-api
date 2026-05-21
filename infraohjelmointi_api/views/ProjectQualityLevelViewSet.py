@@ -7,3 +7,4 @@ class ProjectQualityLevelViewSet(CachedLookupViewSet):
     """API endpoint for project quality levels (cached)."""
 
     serializer_class = ProjectQualityLevelSerializer
+    project_field = 'projectQualityLevel'

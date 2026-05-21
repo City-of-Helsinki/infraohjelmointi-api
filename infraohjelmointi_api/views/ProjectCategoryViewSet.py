@@ -7,4 +7,5 @@ class ProjectCategoryViewSet(CachedLookupViewSet):
     """API endpoint for project categories (cached)."""
 
     serializer_class = ProjectCategorySerializer
+    project_field = 'category'
 

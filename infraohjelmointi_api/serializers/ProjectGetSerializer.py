@@ -14,8 +14,8 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectResponseError,
 )
 from infraohjelmointi_api.serializers.BudgetItemSerializer import BudgetItemSerializer
-from infraohjelmointi_api.serializers.ConstructionPhaseDetailSerializer import (
-    ConstructionPhaseDetailSerializer,
+from infraohjelmointi_api.serializers.ProjectPhaseDetailSerializer import (
+    ProjectPhaseDetailSerializer,
 )
 from infraohjelmointi_api.serializers.ConstructionProcurementMethodSerializer import (
     ConstructionProcurementMethodSerializer,
@@ -88,7 +88,8 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
     frameEstPlanningStart = serializers.DateField(format="%d.%m.%Y")
     frameEstPlanningEnd = serializers.DateField(format="%d.%m.%Y")
     category = ProjectCategorySerializer(read_only=True)
-    constructionPhaseDetail = ConstructionPhaseDetailSerializer(read_only=True)
+    phaseDetail = ProjectPhaseDetailSerializer(read_only=True)
+    suspendedFromPhase = ProjectPhaseSerializer(read_only=True)
     constructionProcurementMethod = ConstructionProcurementMethodSerializer(read_only=True)
     staraProcurementReason = StaraProcurementReasonSerializer(read_only=True)
     riskAssessment = ProjectRiskSerializer(read_only=True)
@@ -149,7 +150,12 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         return project.projectReadiness()
 
     def get_currentYearsSapValue(self, project: Project):
-        projects_to_sap_values = self.context.get('projects_to_sap_values', {})
+        # Prefer canonical key; sap_values_by_project was a typo in planning list context (IO-796).
+        projects_to_sap_values = self.context.get("projects_to_sap_values") or self.context.get(
+            "sap_values_by_project", {}
+        )
+        if not isinstance(projects_to_sap_values, dict):
+            projects_to_sap_values = {}
         sap_values = projects_to_sap_values.get(project.id)
         
         if not sap_values:

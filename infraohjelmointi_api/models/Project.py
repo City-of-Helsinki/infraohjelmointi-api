@@ -12,7 +12,7 @@ from .ProjectType import ProjectType
 from .ProjectTypeQualifier import ProjectTypeQualifier
 from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
-from .ConstructionPhaseDetail import ConstructionPhaseDetail
+from .ProjectPhaseDetail import ProjectPhaseDetail
 from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .StaraProcurementReason import StaraProcurementReason
 from .ProjectCategory import ProjectCategory
@@ -113,8 +113,16 @@ class Project(models.Model):
         Person, related_name="favourite", blank=True
     )
     programmed = models.BooleanField(default=False)
-    constructionPhaseDetail = models.ForeignKey(
-        ConstructionPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    phaseDetail = models.ForeignKey(
+        ProjectPhaseDetail, on_delete=models.DO_NOTHING, null=True, blank=True
+    )
+    suspendedDate = models.DateField(null=True, blank=True)
+    suspendedFromPhase = models.ForeignKey(
+        ProjectPhase,
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        related_name="suspended_projects",
     )
     constructionProcurementMethod = models.ForeignKey(
         ConstructionProcurementMethod, on_delete=models.DO_NOTHING, null=True, blank=True

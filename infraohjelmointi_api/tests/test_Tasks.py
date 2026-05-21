@@ -53,7 +53,7 @@ class TaskTestCase(TestCase):
             description="description of the test project",
             phase=None,
             programmed=True,
-            constructionPhaseDetail=None,
+            phaseDetail=None,
             estPlanningStart="2022-11-20",
             estPlanningEnd="2022-11-30",
             estConstructionStart="2022-11-20",

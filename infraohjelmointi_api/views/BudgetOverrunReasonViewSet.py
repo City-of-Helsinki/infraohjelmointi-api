@@ -7,6 +7,6 @@ class BudgetOverrunReasonViewSet(CachedLookupViewSet):
     """
     API endpoint that allows budget overrun reasons to be viewed or edited.
     """
-
     serializer_class = BudgetOverrunReasonSerializer
+    project_field = 'budgetOverrunReason'
 

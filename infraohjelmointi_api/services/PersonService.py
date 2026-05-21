@@ -23,10 +23,19 @@ class PersonService:
         lastName: str,
         email: str = None,
     ) -> Person:
-        if email == None:
-            return Person.objects.get_or_create(firstName=firstName, lastName=lastName)
-        else:
-            return Person.objects.get_or_create(firstName=firstName, lastName=lastName, email=email)
+        if email is None:
+            return Person.objects.get_or_create(
+                firstName=firstName,
+                lastName=lastName,
+                defaults={"email": "", "title": "", "phone": ""},
+            )
+
+        return Person.objects.get_or_create(
+            firstName=firstName,
+            lastName=lastName,
+            email=email,
+            defaults={"title": "", "phone": ""},
+        )
 
     @staticmethod
     def get_by_email(
@@ -53,9 +62,17 @@ class PersonService:
     def create_by_name(
         firstName: str,
         lastName: str,
-        email: str
+        email: str,
+        title: str = "",
+        phone: str = "",
     ) -> Person:
-        return Person.objects.create(firstName=firstName, lastName=lastName, email=email)
+        return Person.objects.create(
+            firstName=firstName,
+            lastName=lastName,
+            email=email,
+            title=title,
+            phone=phone,
+        )
 
     @staticmethod
     def get_by_id(

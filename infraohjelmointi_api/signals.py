@@ -157,14 +157,16 @@ def get_financial_sums(
         classRelations = ClassFinancialService.get_coordinator_class_and_related_class(
             instance=instance
         )
+        forFrameView = instance.forFrameView
 
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
                 if classInstance != None:
-                    sums[viewType][classType] = ProjectClassSerializer(
+                    sums[viewType if forFrameView != True else "forcedToFrame"][classType] = ProjectClassSerializer(
                         classInstance,
                         context={
-                            "for_coordinator": viewType == "coordination",
+                            "for_coordinator": viewType == "coordination" or forFrameView,
+                            "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
                         },
                     ).data
@@ -175,23 +177,26 @@ def get_financial_sums(
                 instance=instance
             )
         )
+        forFrameView = instance.forFrameView
 
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
                 if instance != None:
                     if instanceType in ["district"]:
-                        sums[viewType][instanceType] = ProjectLocationSerializer(
+                        sums[viewType if forFrameView != True else "forcedToFrame"][instanceType] = ProjectLocationSerializer(
                             instance,
                             context={
-                                "for_coordinator": viewType == "coordination",
+                                "for_coordinator": viewType == "coordination" or forFrameView,
+                                "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
                             },
                         ).data
                     else:
-                        sums[viewType][instanceType] = ProjectClassSerializer(
+                        sums[viewType if forFrameView != True else "forcedToFrame"][instanceType] = ProjectClassSerializer(
                             instance,
                             context={
-                                "for_coordinator": viewType == "coordination",
+                                "for_coordinator": viewType == "coordination" or forFrameView,
+                                "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
                             },
                         ).data
@@ -223,11 +228,23 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
         logger.debug("Signal Triggered: {} Object was created".format(_type))
     logger.debug("Signal Triggered: {} Object was updated".format(_type))
     year = getattr(instance, "finance_year", date.today().year)
-    send_event(
-        "finance",
-        "finance-update",
-        get_financial_sums(instance=instance, _type=_type, finance_year=year),
-    )
+    # Build the payload outside the try block so serialization bugs in
+    # get_financial_sums raise loudly instead of being silently logged as
+    # "send_event failed"
+    payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
+    try:
+        send_event("finance", "finance-update", payload)
+        logger.debug(
+            "finance-update event sent (type=%s, id=%s, year=%s)",
+            _type, instance.pk, year,
+        )
+    except Exception:
+        # IO-890: surface SSE delivery failures. Without this the event is
+        # silently dropped and the UI never sees the update.
+        logger.exception(
+            "send_event failed for finance-update (type=%s, id=%s, year=%s)",
+            _type, instance.pk, year,
+        )
 
 
 @receiver(post_save, sender=Project)
@@ -242,31 +259,42 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
         # It gets added to the project instance before .save() is called
         forcedToFrame = getattr(instance, "forcedToFrame", False)
         year = getattr(instance, "finance_year", date.today().year)
-        send_event(
-            "project",
-            "project-update",
-            {
-                "project": ProjectGetSerializer(
-                    instance,
-                    context={
-                        "get_pw_link": True,
-                        "forcedToFrame": forcedToFrame,
-                        "for_coordinator": forcedToFrame == True,
-                        "finance_year": year,
-                    },
-                ).data,
-            },
-        )
-        logger.debug("Signal Triggered: Project was updated")
+        payload = {
+            "project": ProjectGetSerializer(
+                instance,
+                context={
+                    "get_pw_link": True,
+                    "forcedToFrame": forcedToFrame,
+                    "for_coordinator": forcedToFrame == True,
+                    "finance_year": year,
+                },
+            ).data,
+        }
+        try:
+            send_event("project", "project-update", payload)
+            logger.debug(
+                "project-update event sent (id=%s, year=%s, forcedToFrame=%s)",
+                instance.pk, year, forcedToFrame,
+            )
+        except Exception:
+            # IO-890: surface SSE delivery failures.
+            logger.exception(
+                "send_event failed for project-update (id=%s, year=%s)",
+                instance.pk, year,
+            )
 
 
 @receiver(post_save, sender=ProjectFinancial)
 @receiver(post_delete, sender=ProjectFinancial)
+@on_transaction_commit
 def invalidate_project_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when ProjectFinancial is saved or deleted
+    Invalidate cache when ProjectFinancial is saved or deleted.
 
-    This ensures that financial calculations are refreshed when data changes.
+    Deferred to ``transaction.on_commit`` to avoid the race where a concurrent
+    request reads (and re-populates) the cache between INVALIDATE and COMMIT,
+    repopulating it with the still-uncommitted, soon-to-be-stale value. This
+    matches the pattern used by ``_invalidate_cached_lookup`` below.
     """
     try:
         project = instance.project
@@ -312,9 +340,13 @@ def invalidate_project_financial_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ClassFinancial)
 @receiver(post_delete, sender=ClassFinancial)
+@on_transaction_commit
 def invalidate_class_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when ClassFinancial is saved or deleted
+    Invalidate cache when ClassFinancial is saved or deleted.
+
+    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
+    between INVALIDATE and COMMIT.
     """
     try:
         class_relation = instance.classRelation
@@ -352,9 +384,13 @@ def invalidate_class_financial_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=LocationFinancial)
 @receiver(post_delete, sender=LocationFinancial)
+@on_transaction_commit
 def invalidate_location_financial_cache(sender, instance, **kwargs):
     """
-    Invalidate cache when LocationFinancial is saved or deleted
+    Invalidate cache when LocationFinancial is saved or deleted.
+
+    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
+    between INVALIDATE and COMMIT.
     """
     try:
         location_relation = instance.locationRelation
@@ -391,9 +427,13 @@ def invalidate_location_financial_cache(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Project)
+@on_transaction_commit
 def invalidate_project_cache(sender, instance, created, **kwargs):
     """
-    Invalidate cache when Project is saved (programmed status or relationships change)
+    Invalidate cache when Project is saved (programmed status or relationships change).
+
+    Deferred to ``transaction.on_commit`` so a concurrent reader cannot
+    repopulate the cache with pre-commit data.
     """
     try:
         # Only invalidate if relevant fields changed
@@ -468,34 +508,44 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
 
 @receiver(pre_save, sender=Project)
 def on_project_phase_change(sender, instance, **kwargs):
-    """
-    Update category to K1 if phase is changed to construction
-    """
-    # Only act if target phase is construction
-    if not instance.phase or instance.phase.value != "construction":
+    """K1 on construction; suspension fields when entering/leaving suspended."""
+    if not instance.phase:
         return
 
-    try:
-        # Check if this is an update and the phase was already construction
-        if instance.id:
-            try:
-                old_instance = Project.objects.get(pk=instance.id)
-                if old_instance.phase and old_instance.phase.value == "construction":
-                    return
-            except Project.DoesNotExist:
-                pass
+    old_phase_value = None
+    if instance.pk:
+        try:
+            old_instance = Project.objects.get(pk=instance.pk)
+            old_phase_value = old_instance.phase.value if old_instance.phase else None
+        except Project.DoesNotExist:
+            pass
 
-        # Apply K1 category
-        instance.category = ProjectCategory.objects.get(value="K1")
+    new_phase_value = instance.phase.value
 
-    except Exception as e:
-        logger.error(f"Error in on_project_phase_change: {e}")
+    if old_phase_value == new_phase_value:
+        return
+
+    if new_phase_value == "construction":
+        try:
+            instance.category = ProjectCategory.objects.get(value="K1")
+        except ProjectCategory.DoesNotExist:
+            logger.error("ProjectCategory 'K1' does not exist, cannot set category on construction phase change")
+
+    if new_phase_value == "suspended":
+        instance.suspendedDate = date.today()
+        if old_phase_value:
+            instance.suspendedFromPhase = ProjectPhase.objects.filter(
+                value=old_phase_value
+            ).first()
+    elif old_phase_value == "suspended":
+        instance.suspendedDate = None
+        instance.suspendedFromPhase = None
 
 
 def _is_valid_sap_project(value: str | None) -> bool:
     """
     Check if a sapProject value is valid (not empty, null, or "0").
-    
+
     IO-777: Users may set sapProject to "0" as a workaround when they can't delete it.
     We treat "0" as an invalid/empty value.
     """
@@ -508,11 +558,69 @@ def _is_valid_sap_project(value: str | None) -> bool:
     return True
 
 
+def _all_subclasses(cls):
+    """Yield every (transitive) subclass of ``cls``. Used to discover all
+    CachedLookupViewSet subclasses regardless of inheritance depth."""
+    for sub in cls.__subclasses__():
+        yield sub
+        yield from _all_subclasses(sub)
+
+
+def _invalidate_cached_lookup(sender, **kwargs):
+    """Drop the cached list response for ``sender`` after the surrounding
+    transaction commits. Deferring to ``on_commit`` avoids a race where a
+    concurrent request reads the cache between INVALIDATE and COMMIT and
+    re-populates it with the (still-uncommitted, soon-to-be-stale) value.
+    """
+    transaction.on_commit(lambda: CacheService.invalidate_lookup(sender.__name__))
+
+
+def _connect_cached_lookup_invalidation():
+    """Wire post_save/post_delete on every CachedLookupViewSet model so that
+    direct ORM mutations (Django shell, admin, management commands, bulk
+    imports) also invalidate the lookup cache.
+
+    Without this, only ViewSet-driven mutations refresh the cache and
+    out-of-band edits stay invisible until the 12 h TTL expires.
+    Caveat: queryset-level ``.update()`` / ``.delete()`` bypass these signals
+    by design — those callsites must invalidate explicitly.
+    """
+    # Force-import the views package so every CachedLookupViewSet subclass is
+    # registered before we walk subclasses.
+    from infraohjelmointi_api import views  # noqa: F401
+    from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+
+    seen_models = set()
+    for viewset_cls in _all_subclasses(CachedLookupViewSet):
+        try:
+            model = viewset_cls.serializer_class.Meta.model
+        except AttributeError:
+            continue
+        if model in seen_models:
+            continue
+        seen_models.add(model)
+        post_save.connect(
+            _invalidate_cached_lookup,
+            sender=model,
+            dispatch_uid=f"cached_lookup_invalidate_save_{model.__name__}",
+            weak=False,
+        )
+        post_delete.connect(
+            _invalidate_cached_lookup,
+            sender=model,
+            dispatch_uid=f"cached_lookup_invalidate_delete_{model.__name__}",
+            weak=False,
+        )
+
+
+_connect_cached_lookup_invalidation()
+
+
 @receiver(pre_save, sender=Project)
 def capture_old_sap_project(sender, instance, **kwargs):
     """
     Capture the old sapProject value before save so we can detect changes.
-    
+
     IO-777: This is needed to clean up SAP cost records when sapProject changes.
     """
     if instance.pk:
@@ -529,12 +637,12 @@ def capture_old_sap_project(sender, instance, **kwargs):
 def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs):
     """
     Delete SapCost and SapCurrentYear records when sapProject is changed or removed.
-    
+
     IO-777: When a project's sapProject number is changed, the old SAP cost records
     become stale (they contain data from the old SAP project number) and should be
     deleted. New records will be created on the next SAP sync if the new sapProject
     is valid.
-    
+
     Scenarios handled:
     - sapProject changed from valid value to null/empty/"0" -> delete records
     - sapProject changed from one valid value to another -> delete records
@@ -544,14 +652,14 @@ def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs)
     if created:
         # New project, no old records to clean up
         return
-    
+
     old_sap_project = getattr(instance, '_old_sap_project', None)
     new_sap_project = instance.sapProject
-    
+
     # Check if sapProject actually changed
     old_valid = _is_valid_sap_project(old_sap_project)
     new_valid = _is_valid_sap_project(new_sap_project)
-    
+
     # If old value was valid and either:
     # 1. New value is invalid (removed/cleared)
     # 2. New value is different (changed to another project number)
@@ -559,7 +667,7 @@ def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs)
     if old_valid and (not new_valid or old_sap_project != new_sap_project):
         deleted_sap_cost = SapCost.objects.filter(project=instance).delete()
         deleted_sap_current_year = SapCurrentYear.objects.filter(project=instance).delete()
-        
+
         logger.info(
             f"Cleaned up SAP cost records for project {instance.id} due to sapProject change "
             f"from '{old_sap_project}' to '{new_sap_project}': "

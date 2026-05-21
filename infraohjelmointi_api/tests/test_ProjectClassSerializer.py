@@ -956,7 +956,7 @@ class ComputedDefaultProgrammerTestCase(TestCase):
             forCoordinatorOnly=False
         )
 
-        # Level 3 - no default programmer (Saija's case)
+        # Level 3 - no default programmer
         cls.level3_class = ProjectClass.objects.create(
             name="E Liikennejärjestelyt",
             path="8 03 Kadut ja liikenneväylät/8 03 01 Uudisrakentaminen ja perusparantaminen/8 03 01 02 Perusparantaminen ja liikennejärjestelyt/E Liikennejärjestelyt",
@@ -1067,18 +1067,18 @@ class ComputedDefaultProgrammerTestCase(TestCase):
         self.assertIn('lastName', computed)
         self.assertIn('person', computed)
 
-    def test_saija_case_simulation(self):
-        """Test the specific case mentioned in Jira: Saija's traffic arrangements"""
-        # This simulates the exact scenario from the Jira ticket
+    def test_traffic_arrangements_case_simulation(self):
+        """Test the specific case mentioned in Jira: traffic arrangements
+        under suurpiiri inherits the suurpiiri's default programmer."""
+        # Simulates the prod hierarchy:
         # "Katujen perusparantamiseen liikennejärjestelyjen alle itäiseen suurpiiriin"
 
-        # Create the specific hierarchy mentioned
         itainen_suurpiiri = ProjectClass.objects.create(
             name="Itäinen suurpiiri",
             path="8 03 Kadut ja liikenneväylät/Uudisrakentaminen/Itäinen suurpiiri",
             parent=self.root_class,
             forCoordinatorOnly=False,
-            defaultProgrammer=self.programmer_1  # Saija Vihervaara
+            defaultProgrammer=self.programmer_1
         )
 
         # Test that the traffic class inherits from suurpiiri

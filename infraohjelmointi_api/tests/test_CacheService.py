@@ -23,7 +23,14 @@ from infraohjelmointi_api.models import (
     ProjectGroup,
     ProjectPhase,
     ProjectProgrammer,
+    ProjectLock,
+    ProjectSet,
     ProjectType,
+    ProjectCategory,
+    ConstructionPhase,
+    Person,
+    Task,
+    TalpaProjectOpening,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
@@ -737,6 +744,51 @@ class CachedLookupViewSetTest(TestCase):
 
         self.assertIsNone(CacheService.get_lookup('ProjectType'))
 
+    def test_reorder_with_permission_returns_200(self):
+        """User with correct permissions can reorder."""
+        admin_group = ADGroup.objects.create(
+            name='sg_kymp_sso_io_admin',
+            display_name='Admins'
+        )
+        self.user.ad_groups.add(admin_group)
+
+        obj1 = ProjectType.objects.create(value='reorder_test')
+        obj2 = ProjectType.objects.create(value='reorder_test')
+
+        payload = [
+            {"id": obj1.id, "order": 2},
+            {"id": obj2.id, "order": 1},
+        ]
+
+        response = self.client.put(
+            '/project-types/reorder/',
+            payload,
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_reorder_without_permission_returns_403(self):
+        """User without correct permissions cannot reorder."""
+        # Remove permission group
+        self.user.ad_groups.clear()
+
+        obj1 = ProjectType.objects.create(value='reorder_fail_test')
+        obj2 = ProjectType.objects.create(value='reorder_fail_test')
+
+        payload = [
+            {"id": obj1.id, "order": 2},
+            {"id": obj2.id, "order": 1},
+        ]
+
+        response = self.client.put(
+            '/project-types/reorder/',
+            payload,
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 403)
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
 class AllLookupViewSetsTest(TestCase):
@@ -759,11 +811,11 @@ class AllLookupViewSetsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(CacheService.get_lookup('ConstructionPhase'))
 
-    def test_construction_phase_detail_viewset(self):
-        """Test ConstructionPhaseDetailViewSet is cached."""
-        response = self.client.get('/construction-phase-details/')
+    def test_project_phase_detail_viewset(self):
+        """Test ProjectPhaseDetailViewSet is cached."""
+        response = self.client.get('/project-phase-details/')
         self.assertEqual(response.status_code, 200)
-        self.assertIsNotNone(CacheService.get_lookup('ConstructionPhaseDetail'))
+        self.assertIsNotNone(CacheService.get_lookup('ProjectPhaseDetail'))
 
     def test_planning_phase_viewset(self):
         """Test PlanningPhaseViewSet is cached."""
@@ -932,6 +984,983 @@ class CacheServiceEdgeCasesTest(TestCase):
             self.assertEqual(CacheService._cache_failures, 0)
 
 
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupDeletionModificationTest(TestCase):
+    """Tests for lookup item deletion and modification with project status logic."""
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(username='testuser_lookup', password='testpass')
+        coord_group = ADGroup.objects.create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            display_name='Coordinators'
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+        
+        # Create phases
+        self.phase_completed, _ = ProjectPhase.objects.get_or_create(value='completed')
+        self.phase_warranty, _ = ProjectPhase.objects.get_or_create(value='warrantyPeriod')
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value='planning')
+        
+        # Create programmer
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName="Test",
+            lastName="Programmer"
+        )
+        
+        # Create project class
+        self.proj_class = ProjectClass.objects.create(
+            name="Test Class",
+            path="TestClass",
+            defaultProgrammer=self.programmer
+        )
+
+    def test_update_value_completed_project_preserves_old_value(self):
+        """Test that updating a lookup value used by a completed project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat A')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Cat A')
+        
+        # Update category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat AA'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Cat A')
+        
+        # Check that a new hidden item was created with old value
+        old_items = ProjectCategory.objects.filter(value='Cat A', deleted=True)
+        self.assertGreaterEqual(old_items.count(), 1)
+
+    def test_update_value_warranty_project_preserves_old_value(self):
+        """Test that updating a lookup value used by a warranty period project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat B')
+        
+        # Create warranty period project with this category
+        project = Project.objects.create(
+            name="Warranty Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_warranty,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Cat B')
+        
+        # Update category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat BB'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Cat B')
+
+    def test_update_value_planning_project_gets_new_value(self):
+        """Test that updating a lookup value used by a non-completed project updates the value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat C')
+        
+        # Create planning project with this category
+        project = Project.objects.create(
+            name="Planning Project",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Cat C')
+        
+        # Update category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat CC'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that it was updated
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Cat CC')
+
+    def test_delete_value_completed_project_preserves_old_value(self):
+        """Test that deleting a lookup value used by a completed project preserves the old value."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat D')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        self.assertEqual(project.category.value, 'Cat D')
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Reload project and check that it still has a category with the old value
+        project.refresh_from_db()
+        self.assertIsNotNone(project.category)
+        self.assertEqual(project.category.value, 'Cat D')
+        
+        # The original category should be deleted, but a hidden one should exist
+        self.assertFalse(ProjectCategory.objects.filter(id=category_id, deleted=False).exists())
+        hidden_items = ProjectCategory.objects.filter(value='Cat D', deleted=True)
+        self.assertEqual(hidden_items.count(), 1)
+        
+        # Hidden item should not appear in the lookup list
+        response = self.client.get('/project-categories/')
+        self.assertEqual(response.status_code, 200)
+        categories_list = response.json()
+        for cat in categories_list:
+            self.assertNotEqual(cat['value'], 'Cat D')
+
+    def test_delete_value_planning_project_clears_value(self):
+        """Test that deleting a lookup value used by a non-completed project clears the field."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat E')
+        
+        # Create planning project with this category
+        project = Project.objects.create(
+            name="Planning Project Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        self.assertEqual(project.category.value, 'Cat E')
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Reload project and check that category is None
+        project.refresh_from_db()
+        self.assertIsNone(project.category)
+
+    def test_multiple_projects_with_different_phases_on_update(self):
+        """Test updating a value when multiple projects use it with different phases."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat F')
+        
+        # Create completed project with this category
+        completed_proj = Project.objects.create(
+            name="Completed Project Multi",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Create planning project with same category
+        planning_proj = Project.objects.create(
+            name="Planning Project Multi",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Update category
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat FF'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Completed project should have old value preserved
+        completed_proj.refresh_from_db()
+        self.assertEqual(completed_proj.category.value, 'Cat F')
+        
+        # Planning project should have new value
+        planning_proj.refresh_from_db()
+        self.assertEqual(planning_proj.category.value, 'Cat FF')
+
+    def test_multiple_projects_with_different_phases_on_delete(self):
+        """Test deleting a value when multiple projects use it with different phases."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat G')
+        
+        # Create completed project with this category
+        completed_proj = Project.objects.create(
+            name="Completed Project Multi Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Create planning project with same category
+        planning_proj = Project.objects.create(
+            name="Planning Project Multi Delete",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Completed project should have value preserved
+        completed_proj.refresh_from_db()
+        self.assertIsNotNone(completed_proj.category)
+        self.assertEqual(completed_proj.category.value, 'Cat G')
+        
+        # Planning project should have value cleared
+        planning_proj.refresh_from_db()
+        self.assertIsNone(planning_proj.category)
+
+    def test_deleted_items_excluded_from_lookup_list(self):
+        """Test that deleted lookup items are not included in the list response."""
+        # Create categories
+        cat_visible = ProjectCategory.objects.create(value='Visible')
+        cat_hidden = ProjectCategory.objects.create(value='Hidden', deleted=True)
+        
+        # Get categories list
+        response = self.client.get('/project-categories/')
+        self.assertEqual(response.status_code, 200)
+        categories = response.json()
+        
+        # Check that visible category is in list
+        values = [c['value'] for c in categories]
+        self.assertIn('Visible', values)
+        
+        # Check that hidden category is not in list
+        self.assertNotIn('Hidden', values)
+
+    def test_partial_update_preserves_completed_project_value(self):
+        """Test that partial update (PATCH) also preserves completed project values."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat H')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project Patch",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        self.assertEqual(project.category.value, 'Cat H')
+        
+        # Patch category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat HH'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Reload project and check that category value stayed the same
+        project.refresh_from_db()
+        self.assertEqual(project.category.value, 'Cat H')
+
+    def test_update_value_no_change_does_not_create_hidden_item(self):
+        """Test that updating a lookup value to the same value does not create hidden items."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat I')
+        
+        # Create completed project with this category
+        project = Project.objects.create(
+            name="Completed Project No Change",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_completed,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        initial_hidden_count = ProjectCategory.objects.filter(deleted=True).count()
+        
+        # Update category to same value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat I'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # No new hidden items should be created
+        final_hidden_count = ProjectCategory.objects.filter(deleted=True).count()
+        self.assertEqual(final_hidden_count, initial_hidden_count)
+
+    def test_update_value_no_completed_projects_updates_all(self):
+        """Test that updating a lookup value when no completed projects use it updates all projects."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat J')
+        
+        # Create planning projects with this category
+        project1 = Project.objects.create(
+            name="Planning Project 1",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        project2 = Project.objects.create(
+            name="Planning Project 2",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        # Update category value
+        response = self.client.patch(
+            f'/project-categories/{category.id}/',
+            {'value': 'Cat JJ'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # Both projects should have new value
+        project1.refresh_from_db()
+        project2.refresh_from_db()
+        self.assertEqual(project1.category.value, 'Cat JJ')
+        self.assertEqual(project2.category.value, 'Cat JJ')
+
+    def test_delete_value_no_completed_projects_clears_all(self):
+        """Test that deleting a lookup value when no completed projects use it clears all projects."""
+        # Create category
+        category = ProjectCategory.objects.create(value='Cat K')
+        
+        # Create planning projects with this category
+        project1 = Project.objects.create(
+            name="Planning Project Delete 1",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        project2 = Project.objects.create(
+            name="Planning Project Delete 2",
+            description="Test",
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            category=category,
+            personProgramming=self.programmer
+        )
+        
+        category_id = category.id
+        
+        # Delete category
+        response = self.client.delete(f'/project-categories/{category_id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        # Both projects should have category cleared
+        project1.refresh_from_db()
+        project2.refresh_from_db()
+        self.assertIsNone(project1.category)
+        self.assertIsNone(project2.category)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class PersonMultiFKDeletionTest(TestCase):
+    """Tests that deleting/updating a Person referenced by Project via
+    multiple FK fields (`personPlanning`, `personConstruction`) cleans up
+    all references. Both FKs use `on_delete=DO_NOTHING` with deferred
+    Postgres FK constraints, so a missed reference only surfaces as a 500
+    at COMMIT rather than at the DELETE statement.
+
+    See IO-833.
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_person_fk', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.phase_completed, _ = ProjectPhase.objects.get_or_create(value='completed')
+        self.phase_warranty, _ = ProjectPhase.objects.get_or_create(value='warrantyPeriod')
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value='planning')
+
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Test', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Test Class', path='TestClass', defaultProgrammer=self.programmer
+        )
+
+    def _make_person(self, last):
+        return Person.objects.create(
+            firstName='Pat', lastName=last, email=f'{last.lower()}@example.com',
+            title='', phone='',
+        )
+
+    def _make_project(self, name, phase, **person_kwargs):
+        return Project.objects.create(
+            name=name,
+            description='Test',
+            projectClass=self.proj_class,
+            phase=phase,
+            personProgramming=self.programmer,
+            **person_kwargs,
+        )
+
+    def test_delete_person_referenced_as_planning_only_clears_active_projects(self):
+        """DELETE /persons/<id>/ must NULL personPlanning on active projects."""
+        person = self._make_person('Planner')
+        active = self._make_project('Active P', self.phase_planning, personPlanning=person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        active.refresh_from_db()
+        self.assertIsNone(active.personPlanning)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+    def test_delete_person_referenced_as_construction_only_clears_active_projects(self):
+        """DELETE /persons/<id>/ must NULL personConstruction on active projects.
+
+        This is the exact failure mode reported from dev: a Person referenced
+        only via personConstruction caused a Postgres FK violation.
+        """
+        person = self._make_person('Builder')
+        active = self._make_project('Active C', self.phase_planning, personConstruction=person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        active.refresh_from_db()
+        self.assertIsNone(active.personConstruction)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+    def test_delete_person_referenced_via_both_fks_clears_both(self):
+        """A single project may use the same Person for both planning and construction."""
+        person = self._make_person('Both')
+        project = self._make_project(
+            'Active Both', self.phase_planning,
+            personPlanning=person, personConstruction=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        project.refresh_from_db()
+        self.assertIsNone(project.personPlanning)
+        self.assertIsNone(project.personConstruction)
+
+    def test_delete_person_with_completed_project_preserves_via_each_fk(self):
+        """For completed/warranty projects, repoint to a hidden copy on every FK."""
+        person = self._make_person('Veteran')
+        completed_planning = self._make_project(
+            'Completed Plan', self.phase_completed, personPlanning=person
+        )
+        warranty_construction = self._make_project(
+            'Warranty Build', self.phase_warranty, personConstruction=person
+        )
+        active = self._make_project(
+            'Active', self.phase_planning, personConstruction=person
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id, deleted=False).exists())
+
+        completed_planning.refresh_from_db()
+        warranty_construction.refresh_from_db()
+        active.refresh_from_db()
+
+        self.assertIsNotNone(completed_planning.personPlanning)
+        self.assertEqual(completed_planning.personPlanning.lastName, 'Veteran')
+        self.assertTrue(completed_planning.personPlanning.deleted)
+
+        self.assertIsNotNone(warranty_construction.personConstruction)
+        self.assertEqual(warranty_construction.personConstruction.lastName, 'Veteran')
+        self.assertTrue(warranty_construction.personConstruction.deleted)
+
+        self.assertIsNone(active.personConstruction)
+
+        hidden = Person.objects.filter(lastName='Veteran', deleted=True)
+        self.assertEqual(hidden.count(), 1)
+        self.assertEqual(completed_planning.personPlanning_id, warranty_construction.personConstruction_id)
+
+    def test_delete_person_not_referenced_succeeds(self):
+        """Sanity: deleting an unreferenced Person still works."""
+        person = self._make_person('Lonely')
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+    def test_delete_person_completed_project_both_fks_same_hidden_copy(self):
+        """One completed project with the same Person on both FKs gets a single
+        shared hidden copy and BOTH FKs repointed to it.
+
+        Catches the multiplication of the multi-FK preservation: only one
+        ``preserved_copy`` should be created per delete, regardless of how
+        many FKs land on it.
+        """
+        person = self._make_person('Twofer')
+        completed = self._make_project(
+            'completed-twofer', self.phase_completed,
+            personPlanning=person, personConstruction=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        completed.refresh_from_db()
+        self.assertIsNotNone(completed.personPlanning)
+        self.assertEqual(
+            completed.personPlanning_id, completed.personConstruction_id,
+            'Both FKs must point to the same hidden copy',
+        )
+        self.assertTrue(completed.personPlanning.deleted)
+        self.assertEqual(
+            Person.objects.filter(lastName='Twofer', deleted=True).count(), 1,
+            'Exactly one hidden copy should exist',
+        )
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class PersonOtherReverseFKDeletionTest(TestCase):
+    """Tests that deleting a Person cleans up references from tables other
+    than Project's planning/construction FKs.
+
+    There are 10 FK constraints pointing at `infraohjelmointi_api_person`.
+    Most use `on_delete=DO_NOTHING` on a nullable field with DEFERRABLE
+    INITIALLY DEFERRED constraints, so a missed reference only surfaces as
+    a 500 at COMMIT. `CachedLookupViewSet._clear_other_reverse_fks` NULLs
+    these automatically; these tests cover every relation it must handle:
+
+      - Task.person                         (DO_NOTHING, null)
+      - ProjectSet.responsiblePerson        (DO_NOTHING, null)
+      - ProjectLock.lockedBy                (DO_NOTHING, null)
+      - TalpaProjectOpening.createdBy       (DO_NOTHING, null)
+      - TalpaProjectOpening.updatedBy       (DO_NOTHING, null)
+      - ProjectProgrammer.person            (SET_NULL,   null)
+
+    Plus the M2M relations (Project.otherPersons, Project.favPersons),
+    which Django itself cleans up via the through-table.
+
+    See IO-833.
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_person_other_fk', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value='planning')
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Other', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Other Class', path='OtherClass', defaultProgrammer=self.programmer
+        )
+
+    def _make_person(self, last):
+        return Person.objects.create(
+            firstName='Pat', lastName=last, email=f'{last.lower()}@example.com',
+            title='', phone='',
+        )
+
+    def _make_project(self, name='ref-project', **kwargs):
+        return Project.objects.create(
+            name=name,
+            description='Test',
+            projectClass=self.proj_class,
+            phase=self.phase_planning,
+            personProgramming=self.programmer,
+            **kwargs,
+        )
+
+    def test_delete_person_referenced_by_task_clears_task_fk(self):
+        """Without the cleanup this raises FK violation at commit time."""
+        person = self._make_person('Tasky')
+        project = self._make_project('with-task')
+        task = Task.objects.create(
+            projectId=project,
+            taskType='task',
+            person=person,
+            realizedCost=0,
+            plannedCost=0,
+            riskAssessment='none',
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        task.refresh_from_db()
+        self.assertIsNone(task.person)
+
+    def test_delete_person_referenced_by_projectset_clears_responsible_person(self):
+        person = self._make_person('Setty')
+        pset = ProjectSet.objects.create(
+            name='ps', description='', responsiblePerson=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        pset.refresh_from_db()
+        self.assertIsNone(pset.responsiblePerson)
+
+    def test_delete_person_referenced_by_projectlock_clears_locked_by(self):
+        person = self._make_person('Locker')
+        project = self._make_project('with-lock')
+        lock = ProjectLock.objects.create(
+            project=project, lockType='status_locked', lockedBy=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        lock.refresh_from_db()
+        self.assertIsNone(lock.lockedBy)
+
+    def test_delete_person_referenced_by_talpa_opening_clears_both_audit_fks(self):
+        """TalpaProjectOpening references Person via TWO FKs (createdBy +
+        updatedBy). Both must be cleared."""
+        person = self._make_person('Talpa')
+        project = self._make_project('with-talpa')
+        opening = TalpaProjectOpening.objects.create(
+            project=project,
+            subject='Uusi',
+            createdBy=person,
+            updatedBy=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        opening.refresh_from_db()
+        self.assertIsNone(opening.createdBy)
+        self.assertIsNone(opening.updatedBy)
+
+    def test_delete_person_referenced_by_programmer_clears_programmer_fk(self):
+        """ProjectProgrammer.person uses SET_NULL. Verify the FK is null and
+        the programmer row itself is preserved (it should NOT be deleted
+        cascade-style)."""
+        person = self._make_person('Programmery')
+        prog = ProjectProgrammer.objects.create(
+            firstName='Alex', lastName='Programmery', person=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        prog.refresh_from_db()
+        self.assertIsNone(prog.person)
+
+    def test_delete_person_referenced_via_other_persons_m2m_succeeds(self):
+        """Django auto-cleans the M2M through-table on delete; verify that
+        our extra cleanup doesn't break that path."""
+        person = self._make_person('M2MOther')
+        project = self._make_project('with-other')
+        project.otherPersons.add(person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        project.refresh_from_db()
+        self.assertEqual(project.otherPersons.count(), 0)
+
+    def test_delete_person_referenced_via_fav_persons_m2m_succeeds(self):
+        person = self._make_person('M2MFav')
+        project = self._make_project('with-fav')
+        project.favPersons.add(person)
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+        project.refresh_from_db()
+        self.assertEqual(project.favPersons.count(), 0)
+
+    def test_delete_person_referenced_from_every_relation_simultaneously(self):
+        """End-to-end stress test: a Person referenced from EVERY known
+        relation at once must still delete cleanly. This is the scenario
+        most likely to reproduce the production failure mode where any
+        single missed reverse FK causes a 500."""
+        person = self._make_person('Everywhere')
+
+        # Project FKs (planning + construction) on an active project
+        active = self._make_project(
+            'active-everywhere',
+            personPlanning=person, personConstruction=person,
+        )
+        active.otherPersons.add(person)
+        active.favPersons.add(person)
+
+        # Task on the same project
+        Task.objects.create(
+            projectId=active,
+            taskType='task',
+            person=person,
+            realizedCost=0, plannedCost=0,
+            riskAssessment='none',
+        )
+
+        # ProjectSet
+        ProjectSet.objects.create(
+            name='ps-everywhere', description='', responsiblePerson=person,
+        )
+
+        # ProjectLock on the same project
+        ProjectLock.objects.create(
+            project=active, lockType='status_locked', lockedBy=person,
+        )
+
+        # TalpaProjectOpening on the same project
+        TalpaProjectOpening.objects.create(
+            project=active, subject='Uusi',
+            createdBy=person, updatedBy=person,
+        )
+
+        # ProjectProgrammer pointing at this Person
+        prog = ProjectProgrammer.objects.create(
+            firstName='Sam', lastName='Everywhere', person=person,
+        )
+
+        response = self.client.delete(f'/persons/{person.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Person.objects.filter(id=person.id).exists())
+
+        # All references must be cleared
+        active.refresh_from_db()
+        prog.refresh_from_db()
+        self.assertIsNone(active.personPlanning)
+        self.assertIsNone(active.personConstruction)
+        self.assertEqual(active.otherPersons.count(), 0)
+        self.assertEqual(active.favPersons.count(), 0)
+        self.assertIsNone(prog.person)
+        self.assertEqual(Task.objects.filter(person__isnull=False).count(), 0)
+        self.assertEqual(
+            ProjectSet.objects.filter(responsiblePerson__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            ProjectLock.objects.filter(lockedBy__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            TalpaProjectOpening.objects.filter(createdBy__isnull=False).count(), 0
+        )
+        self.assertEqual(
+            TalpaProjectOpening.objects.filter(updatedBy__isnull=False).count(), 0
+        )
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupClearOtherReverseFKsBroaderImpactTest(TestCase):
+    """Regression tests confirming ``_clear_other_reverse_fks`` runs for ALL
+    CachedLookupViewSet subclasses (not just Person) and behaves sanely.
+
+    Without these, a future change might inadvertently break unrelated lookup
+    deletions, since the helper runs on every destroy() in the base class.
+    """
+
+    def setUp(self):
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='testuser_other_lookup', password='testpass'
+        )
+        coord_group, _ = ADGroup.objects.get_or_create(
+            name='sg_kymp_sso_io_koordinaattorit',
+            defaults={'display_name': 'Coordinators'},
+        )
+        self.user.ad_groups.add(coord_group)
+        self.client.force_login(self.user)
+
+        self.programmer = ProjectProgrammer.objects.create(
+            firstName='Other', lastName='Programmer'
+        )
+        self.proj_class = ProjectClass.objects.create(
+            name='Other Class', path='OtherClass', defaultProgrammer=self.programmer
+        )
+
+    def test_delete_project_phase_nulls_suspended_from_phase_reference(self):
+        """Deleting a ProjectPhase referenced by Project.suspendedFromPhase
+        (an FK NOT covered by ProjectPhaseViewSet.project_field='phase')
+        used to deferred-FK-fail at COMMIT. ``_clear_other_reverse_fks``
+        now NULLs it automatically.
+        """
+        phase_active, _ = ProjectPhase.objects.get_or_create(value='planning')
+        phase_to_delete = ProjectPhase.objects.create(value='temp_phase_to_delete')
+
+        project = Project.objects.create(
+            name='suspended-project',
+            description='Test',
+            projectClass=self.proj_class,
+            phase=phase_active,
+            suspendedFromPhase=phase_to_delete,
+            personProgramming=self.programmer,
+        )
+
+        response = self.client.delete(f'/project-phases/{phase_to_delete.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ProjectPhase.objects.filter(id=phase_to_delete.id).exists())
+        project.refresh_from_db()
+        self.assertIsNone(project.suspendedFromPhase)
+        self.assertEqual(project.phase, phase_active)
+
+    def test_delete_project_phase_nulls_projectset_phase_reference(self):
+        """ProjectSet.phase is a nullable FK to ProjectPhase outside
+        ``project_field`` — should be auto-NULLed on phase delete."""
+        phase_to_delete = ProjectPhase.objects.create(value='temp_set_phase')
+
+        pset = ProjectSet.objects.create(
+            name='set-with-phase', description='', phase=phase_to_delete,
+        )
+
+        response = self.client.delete(f'/project-phases/{phase_to_delete.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        pset.refresh_from_db()
+        self.assertIsNone(pset.phase)
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+class CachedLookupOrmInvalidationTest(TestCase):
+    """Regression tests for cache invalidation on direct ORM mutations.
+
+    Reported case (Slack 2026-04-27): ``ProjectProgrammer.objects.get(...).delete()``
+    in the OpenShift Django shell removed the row from the DB but the prod
+    list endpoint kept returning it for ~12 h until the cache TTL expired.
+    Root cause: only ``CachedLookupViewSet.destroy()`` invalidated the cache;
+    direct ORM ``.delete()`` bypassed it. Now wired via post_save/post_delete
+    signals connected at app ready, deferred to ``transaction.on_commit``
+    so a concurrent reader can't repopulate the cache from an uncommitted
+    snapshot.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def _populate_lookup_cache(self, model_name, payload):
+        CacheService.set_lookup(model_name, payload)
+        self.assertEqual(CacheService.get_lookup(model_name), payload)
+
+    def test_orm_save_invalidates_lookup_cache(self):
+        self._populate_lookup_cache('ProjectProgrammer', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            ProjectProgrammer.objects.create(firstName='New', lastName='Programmer')
+
+        self.assertIsNone(CacheService.get_lookup('ProjectProgrammer'))
+
+    def test_orm_delete_invalidates_lookup_cache(self):
+        """The exact scenario Sari hit: shell-driven delete should drop cache."""
+        programmer = ProjectProgrammer.objects.create(
+            firstName='Going', lastName='Away'
+        )
+        self._populate_lookup_cache('ProjectProgrammer', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            programmer.delete()
+
+        self.assertIsNone(CacheService.get_lookup('ProjectProgrammer'))
+
+    def test_orm_save_invalidates_person_lookup_cache(self):
+        """Same wiring covers Person (and every other CachedLookupViewSet model)."""
+        person = Person.objects.create(
+            firstName='ORM', lastName='Person', email='orm@example.com',
+            title='Coordinator', phone='0400000002',
+        )
+        self._populate_lookup_cache('Person', [{'stale': True}])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person.firstName = 'Renamed'
+            person.save()
+
+        self.assertIsNone(CacheService.get_lookup('Person'))
+
+    def test_invalidation_deferred_until_transaction_commits(self):
+        """If a transaction rolls back, the cache must NOT be invalidated.
+
+        Without the on_commit guard, an aborted transaction would still
+        evict valid cached data, wasting the next request's read on a DB
+        round-trip for no reason.
+        """
+        self._populate_lookup_cache('ProjectProgrammer', [{'still': 'valid'}])
+
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            ProjectProgrammer.objects.create(firstName='Rolled', lastName='Back')
+
+        self.assertEqual(len(callbacks), 1, 'invalidation should be queued, not run')
+        self.assertEqual(
+            CacheService.get_lookup('ProjectProgrammer'),
+            [{'still': 'valid'}],
+            'cache must remain populated until transaction commits',
+        )
+
+
 class ViewSetImportTest(TestCase):
     """Tests that verify ViewSet classes are properly defined."""
 
@@ -941,7 +1970,7 @@ class ViewSetImportTest(TestCase):
             ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
             ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
             ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
-            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ProjectPhaseDetailViewSet,
             PlanningPhaseViewSet,
         )
 
@@ -949,7 +1978,7 @@ class ViewSetImportTest(TestCase):
             ProjectTypeViewSet, ProjectPhaseViewSet, ProjectAreaViewSet,
             ProjectCategoryViewSet, ProjectPriorityViewSet, ProjectQualityLevelViewSet,
             ProjectRiskViewSet, ProjectDistrictViewSet, ProjectResponsibleZoneViewSet,
-            TaskStatusViewSet, ConstructionPhaseViewSet, ConstructionPhaseDetailViewSet,
+            TaskStatusViewSet, ConstructionPhaseViewSet, ProjectPhaseDetailViewSet,
             PlanningPhaseViewSet,
         ]
 

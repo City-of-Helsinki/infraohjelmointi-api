@@ -7,3 +7,4 @@ class ProjectResponsibleZoneViewSet(CachedLookupViewSet):
     """API endpoint for responsible zones (cached)."""
 
     serializer_class = ProjectResponsibleZoneSerializer
+    project_field = 'responsibleZone'
