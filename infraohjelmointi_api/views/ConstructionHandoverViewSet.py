@@ -2,6 +2,8 @@ from overrides import override
 from rest_framework.response import Response
 from rest_framework import status
 
+from infraohjelmointi_api.models import ConstructionHandover
+
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
@@ -39,6 +41,21 @@ class ConstructionHandoverViewSet(BaseViewSet):
             serializer.save(createdBy=user, updatedBy=user)
             return
         serializer.save()
+
+    @override
+    def create(self, request, *args, **kwargs):  
+        project_id = request.data.get("project")
+        # Check if there's an active handover for the project
+        # (excluding MOVED_TO_CONSTRUCTION_PREPARATION status)
+        # before allowing creation of a new one
+        if project_id and ConstructionHandover.objects.filter(  
+            project_id=project_id,  
+        ).exclude(status="MOVED_TO_CONSTRUCTION_PREPARATION").exists():  
+            return Response(  
+                {"detail": "An active construction handover already exists for this project."},  
+                status=status.HTTP_409_CONFLICT,  
+            )  
+        return super().create(request, *args, **kwargs)  
 
     @override
     def perform_update(self, serializer):

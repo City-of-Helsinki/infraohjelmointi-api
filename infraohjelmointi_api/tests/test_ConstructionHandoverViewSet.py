@@ -85,6 +85,29 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.createdBy_id, self.user_1.uuid)
         self.assertEqual(handover.updatedBy_id, self.user_1.uuid)
 
+    def test_create_returns_409_when_active_handover_exists(self):
+        ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Existing handover",
+        )
+
+        response = self.client.post(
+            "/construction-handovers/",
+            {"project": str(self.project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "An active construction handover already exists for this project.",
+        )
+        self.assertEqual(
+            ConstructionHandover.objects.filter(project=self.project).count(),
+            1,
+        )
+
     def test_partial_update_returns_409_for_non_draft(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
