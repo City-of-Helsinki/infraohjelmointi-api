@@ -14,6 +14,7 @@ from infraohjelmointi_api.serializers import (
     ProjectWithFinancesSerializer,
     SearchResultSerializer,
     ProjectNoteGetSerializer,
+    ConstructionHandoverGetSerializer,
 )
 from infraohjelmointi_api.models import (
     AuditLog,
@@ -1904,4 +1905,38 @@ class ProjectViewSet(BaseViewSet):
             raise ValidationError({
                 "hkrId": f"Project could not be saved because syncing to ProjectWise failed: {str(e)}. Please retry, or use 'Update to PW' once the issue is resolved."
             })
+        
+    @action(methods=["get"], detail=True, url_path=r"construction-handovers", name="get_construction_handovers")
+    def get_construction_handovers(self, request, pk):
+        """
+        Custom action to get construction handovers related to a project
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Usage
+            ----------
+
+            projects/<project_id>/construction-handovers/
+
+            Returns
+            -------
+
+            JSON
+                List of ConstructionHandover instances
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = ConstructionHandoverGetSerializer(
+                instance.constructionhandover_set.all(),
+                many=True
+            ).data
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
 

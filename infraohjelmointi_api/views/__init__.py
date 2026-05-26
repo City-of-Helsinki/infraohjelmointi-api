@@ -51,3 +51,4 @@ from .TalpaProjectTypeViewSet import *
 from .TalpaServiceClassViewSet import *
 from .TalpaAssetClassViewSet import *
 from .TalpaProjectNumberRangeViewSet import *
+from .ConstructionHandoverViewSet import *
