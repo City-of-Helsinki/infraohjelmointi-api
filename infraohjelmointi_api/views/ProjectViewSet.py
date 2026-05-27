@@ -35,7 +35,10 @@ from infraohjelmointi_api.services import (
     ProjectFinancialService,
     ProjectClassService,
 )
-from infraohjelmointi_api.services.ProjectWiseService import PWProjectResponseError
+from infraohjelmointi_api.services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
+)
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.permissions import (
     user_in_restricted_programmer_group,
@@ -1884,6 +1887,16 @@ class ProjectViewSet(BaseViewSet):
             )
 
             logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
+
+        except PWProjectNotFoundError:
+            # IO-865: stable error code so the UI can show a targeted toast.
+            # The PATCH is rolled back by @transaction.atomic on partial_update,
+            # so the user can fix or remove the hkrId and retry.
+            logger.warning(
+                f"PW sync blocked for project '{updated_project.name}' "
+                f"(HKR ID: {updated_project.hkrId}): PW project not found"
+            )
+            raise ValidationError({"hkrId": ["PW_PROJECT_NOT_FOUND"]})
 
         except PWProjectResponseError as e:
             # IO-851: PW outage / non-200 — let the local edit through

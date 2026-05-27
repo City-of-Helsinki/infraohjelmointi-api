@@ -4,3 +4,4 @@ from .management.commands.test_managehierarchies import ManageHierarchiesCommand
 from .management.commands.test_responsiblepersons import ResponsiblePersonsCommandTestCase
 from .management.commands.test_programmerimporter import ProgrammerImporterCommandTestCase
 from .management.commands.test_find_out_of_schedule_finances import FindOutOfScheduleFinancesTestCase
+from .management.commands.test_find_pw_orphans import FindPwOrphansCommandTestCase
