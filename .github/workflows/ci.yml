@@ -16,7 +16,7 @@ jobs:
       postgres-major-version: 17
       extra-commands: |
         echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> $GITHUB_ENV
-        cp .env.example .env
+        cp .env.template .env
         sed -i '/DATABASE_URL/d' .env
 
         coverage run --source='.' manage.py test
