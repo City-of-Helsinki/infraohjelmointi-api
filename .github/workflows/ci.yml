@@ -15,6 +15,13 @@ jobs:
       python-version: 3.11
       postgres-major-version: 17
       extra-commands: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+        sudo apt-get install -y gdal-bin
+        python3 -m pip install --upgrade pip setuptools
+
+        python3 -m pip install -r requirements.txt
+
         echo "APP_NAME=infraohjelmointi" >> $GITHUB_ENV
         echo "DEBUG=True" >> $GITHUB_ENV
         echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> $GITHUB_ENV
@@ -22,7 +29,7 @@ jobs:
         export APP_NAME=infraohjelmointi
         export DEBUG=True
         export DJANGO_SECRET_KEY=$SECRET_KEY
-        
+
         coverage run --source='.' manage.py test
         coverage report
         coverage xml
