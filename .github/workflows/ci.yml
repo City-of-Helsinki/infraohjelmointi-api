@@ -15,4 +15,11 @@ jobs:
       python-version: 3.11
       postgres-major-version: 17
       extra-commands: |
+        echo "APP_NAME=infraohjelmointi" >> $GITHUB_ENV
+        echo "DEBUG=True" >> $GITHUB_ENV
         echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> $GITHUB_ENV
+        
+        coverage run --source='.' manage.py test
+        coverage report
+        coverage xml
+
