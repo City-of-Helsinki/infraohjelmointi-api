@@ -14,3 +14,5 @@ jobs:
     with:
       python-version: 3.11
       postgres-major-version: 17
+      extra-commands: |
+        echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> $GITHUB_ENV
