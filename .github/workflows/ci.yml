@@ -19,6 +19,10 @@ jobs:
         echo "DEBUG=True" >> $GITHUB_ENV
         echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> $GITHUB_ENV
         
+        export APP_NAME=infraohjelmointi
+        export DEBUG=True
+        export DJANGO_SECRET_KEY=$SECRET_KEY
+        
         coverage run --source='.' manage.py test
         coverage report
         coverage xml
