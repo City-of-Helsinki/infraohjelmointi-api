@@ -19,6 +19,9 @@ jobs:
         cp .env.template .env
         sed -i '/DATABASE_URL/d' .env
 
+        sudo locale-gen fi_FI.UTF-8
+        mkdir static
+        
         coverage run --source='.' manage.py test
         coverage report
         coverage xml
