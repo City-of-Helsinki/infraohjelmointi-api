@@ -476,3 +476,54 @@ class ProjectViewSetPWOutageTestCase(TestCase):
         mock_sync.assert_not_called()
         self.project_without_hkr.refresh_from_db()
         self.assertEqual(self.project_without_hkr.description, "Edited, no hkr")
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectViewSetPWSyncErrorTestCase(TestCase):
+    """IO-897 / IO-865: orphan hkrId (PW has no project for this HKR id) must
+    hard-fail with a stable error code and roll the local edit back."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="PW Orphan Test Class",
+            defaults={'path': "PW/Orphan/Test/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        self.project_with_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Orphan Test Project",
+            description="Original description",
+            hkrId=4040,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_with_orphan_hkr_id_returns_stable_error_and_rolls_back(self, mock_sync):
+        """Orphan hkrId -> 400 {"hkrId": ["PW_PROJECT_NOT_FOUND"]}, edit reverted."""
+        mock_sync.side_effect = PWProjectNotFoundError(
+            "No project found from PW with given id '4040'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Should be rolled back"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_PROJECT_NOT_FOUND"]})
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.description, "Original description")
+        mock_sync.assert_called_once()

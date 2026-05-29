@@ -1889,9 +1889,10 @@ class ProjectViewSet(BaseViewSet):
             logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
 
         except PWProjectNotFoundError:
-            # IO-865: stable error code so the UI can show a targeted toast.
-            # The PATCH is rolled back by @transaction.atomic on partial_update,
-            # so the user can fix or remove the hkrId and retry.
+            # IO-897 / IO-865: orphan hkrId — PW is reachable but has no project
+            # for this HKR id. Roll back (via @transaction.atomic) and return a
+            # stable error code so the UI can tell the user to fix or remove the
+            # hkrId, after which the save succeeds.
             logger.warning(
                 f"PW sync blocked for project '{updated_project.name}' "
                 f"(HKR ID: {updated_project.hkrId}): PW project not found"
@@ -1918,7 +1919,7 @@ class ProjectViewSet(BaseViewSet):
             raise ValidationError({
                 "hkrId": f"Project could not be saved because syncing to ProjectWise failed: {str(e)}. Please retry, or use 'Update to PW' once the issue is resolved."
             })
-        
+
     @action(methods=["get"], detail=True, url_path=r"construction-handovers", name="get_construction_handovers")
     def get_construction_handovers(self, request, pk):
         """
