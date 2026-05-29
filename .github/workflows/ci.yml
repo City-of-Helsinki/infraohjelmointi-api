@@ -19,6 +19,10 @@ jobs:
         cp .env.template .env
         sed -i '/DATABASE_URL/d' .env
 
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+        sudo apt-get install -y gdal-bin
+        python3 -m pip install --upgrade pip setuptools
         sudo locale-gen fi_FI.UTF-8
         mkdir static
         
