@@ -59,7 +59,7 @@ class ProjectPhaseValidator(BaseValidator):
                     code="programming_phase_missing_category",
                 )
 
-        if phase.value == "draftInitiation":
+        if phase.value == "designPlanning":
             estPlanningStart = allFields.get("estPlanningStart", None)
             estPlanningEnd = allFields.get("estPlanningEnd", None)
             personPlanning = allFields.get("personPlanning", None)
@@ -86,9 +86,9 @@ class ProjectPhaseValidator(BaseValidator):
             if estPlanningStart is None or estPlanningEnd is None:
                 raise ValidationError(
                     detail={
-                        "phase": "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`"
+                        "phase": "estPlanningStart and estPlanningEnd must be populated if phase is `designPlanning`"
                     },
-                    code="draftInitiation_phase_missing_dates",
+                    code="planning_phase_missing_dates",
                 )
 
         if phase.value == "construction":
