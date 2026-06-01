@@ -106,7 +106,9 @@ class ProjectWiseDataMapperTestCase(TestCase):
     @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
     def test_phase_detail_mapping_skips_unmapped_values_with_debug_log(self, mock_get_by_id):
         mapper = ProjectWiseDataMapper()
-        mock_get_by_id.return_value = Mock(value="waitingPlanningStart")
+        # IO-863: ``waitingPlanningStart`` is now mapped, so use a still-unmapped
+        # value (the streetParkPlanDraft mirror detail isn't in PHASE_DETAILS_MAP_FOR_PW).
+        mock_get_by_id.return_value = Mock(value="streetParkPlanDraft")
 
         # Logger is getLogger("infraohjelmointi_api") in ProjectWiseDataMapper.py
         with self.assertLogs("infraohjelmointi_api", level="DEBUG") as logs:
@@ -114,8 +116,26 @@ class ProjectWiseDataMapperTestCase(TestCase):
 
         self.assertNotIn("PROJECT_Rakentamisvaiheen_tarkenne", result)
         self.assertTrue(
-            any("No ProjectWise mapping for phaseDetail='waitingPlanningStart'" in msg for msg in logs.output)
+            any("No ProjectWise mapping for phaseDetail='streetParkPlanDraft'" in msg for msg in logs.output)
         )
+
+    @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
+    def test_phase_detail_mapping_handles_io863_programming_details(self, mock_get_by_id):
+        """IO-863 added three new programming-phase details to PW mapping; verify they round-trip."""
+        mapper = ProjectWiseDataMapper()
+
+        for detail_value, expected_pw_label in [
+            ("programming", "Ohjelmointi"),
+            ("waitingProjectManager", "Odottaa suunnittelun projektipäällikön nimeämistä"),
+            ("waitingPlanningStart", "Odottaa suunnittelun käynnistämistä, projektipäällikkö nimetty"),
+        ]:
+            mock_get_by_id.return_value = Mock(value=detail_value)
+            result = mapper.convert_to_pw_data({"phaseDetail": "dummy-id"}, None)
+            self.assertEqual(
+                result["PROJECT_Rakentamisvaiheen_tarkenne"],
+                expected_pw_label,
+                msg=f"PW label mismatch for detail value '{detail_value}'",
+            )
 
 
 class ProjectWisePhaseAssignmentTestCase(TestCase):
