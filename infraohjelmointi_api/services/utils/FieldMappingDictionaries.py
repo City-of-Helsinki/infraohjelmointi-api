@@ -3,6 +3,13 @@ PHASE_MAP_FOR_PW = {
     "proposal": "1. Hanke-ehdotus",
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
+    # IO-863: draftInitiation/draftApproval/constructionPlan were merged into one
+    # `planning` ("Suunnittelu") phase (migration 0108). These keys are kept on
+    # purpose: no project references them post-migration (so the outbound mapper
+    # never hits them) and the reverse map is still used by tests. A live
+    # `planning` -> PW label mapping is DEFERRED until PW admins create the value
+    # on the PW side; an unmapped `planning` phase safely DEBUG-skips meanwhile.
+    # "planning": "<PW label TBD>",
     "draftInitiation": [
         "3. Suunnittelun aloitus / Suunnitelmaluonnos",
         "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
@@ -21,6 +28,8 @@ PHASE_MAP_FOR_INFRATOOL = {
     "proposal": "1. Hanke-ehdotus",
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
+    # IO-863: merged into `planning`; kept for the reverse map. See PHASE_MAP_FOR_PW.
+    # "planning": "<PW label TBD>",
     "draftInitiation": "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
@@ -74,6 +83,20 @@ PROJECT_TYPE_MAP = {
 }
 
 # === PROJECT PHASE DETAIL MAPPINGS (values that exist in ProjectWise) ===
+# IO-863: the three "programming" entries below require ProjectWise admins to
+# create the corresponding values on the PW side. Until then the sync layer
+# debug-skips unmapped values (see ProjectWiseDataMapper).
+#
+# DEFERRED pending PW admins (left unmapped, so they DEBUG-skip until PW has them):
+# firstPhaseCompleteOrIncomplete ("Ensimmäinen vaihe valmis/keskeneräinen"),
+# otherReason ("Muu syy"), constructionStage ("Rakentaminen"), warranty ("Takuuaika"),
+# warrantyIncomplete ("Takuuaika/keskeneräinen").
+#
+# movedToConstruction: IO-863 relabels it "Siirretty rakennuttamiseen" (UI) and moves
+# it under "Odottaa rakentamista". The PW label here is kept as the existing
+# "Siirretty rakentamiseen" so sync keeps working; once PW renames it (and confirms it
+# valid under "Odottaa rakentamista"), update this value. firstPhaseComplete is dead
+# after migration 0108 (harmless).
 PHASE_DETAILS_MAP_FOR_PW = {
     "preConstruction": "1. Esirakentaminen",
     "firstPhase": "2. Ensimmäinen vaihe",
@@ -81,6 +104,9 @@ PHASE_DETAILS_MAP_FOR_PW = {
     "secondPhase": "4. Toinen vaihe / viimeistely",
     "movedToConstruction": "Siirretty rakentamiseen",
     "contractPreparation": "Urakan valmistelu",
+    "programming": "Ohjelmointi",
+    "waitingProjectManager": "Odottaa suunnittelun projektipäällikön nimeämistä",
+    "waitingPlanningStart": "Odottaa suunnittelun käynnistämistä, projektipäällikkö nimetty",
 }
 
 # === FIELD MAPPER LOOKUP ===

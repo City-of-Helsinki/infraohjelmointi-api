@@ -3208,7 +3208,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             value="completed"
         ).id.__str__()
         self.projectPhase_4_Id = ProjectPhase.objects.get(
-            value="draftInitiation"
+            value="designPlanning"
         ).id.__str__()
         self.projectPhase_5_Id = ProjectPhase.objects.get(
             value="construction"
@@ -3325,7 +3325,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
+            "estPlanningStart and estPlanningEnd must be populated if phase is `designPlanning`",
             response.json()["phase"][0],
         )
 
