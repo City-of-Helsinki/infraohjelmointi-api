@@ -15,6 +15,7 @@ from infraohjelmointi_api.models import (
     ConstructionProcurementMethod,
     Person,
     Project,
+    ProjectPhase,
     ProjectProgrammer,
     ProjectTypeQualifier,
 )
@@ -493,7 +494,9 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         handover.refresh_from_db()
+        self.project.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+        self.assertEqual(self.project.phase_id, construction_phase.id)
 
     def test_transitions_denies_submitted_to_construction_for_non_programmer(self):
         self.client.force_authenticate(user=self.user_1)
@@ -520,6 +523,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             project=self.project,
             status="SUBMITTED_TO_CONSTRUCTION",
             constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
         )
 
         response = self.client.post(
@@ -530,7 +534,13 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         handover.refresh_from_db()
+        self.project.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+        self.assertEqual(self.project.personConstruction_id, self.person_construction.id)
+        self.assertEqual(
+            self.project.constructionProcurementMethod_id,
+            self.construction_procurement_method.id,
+        )
 
     def test_transitions_denies_project_manager_named_for_non_construction_management_lead(self):
         self.client.force_authenticate(user=self.user_1)
@@ -577,6 +587,12 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
     def test_transitions_allows_moved_to_construction_preparation_for_matching_project_manager(self):
         self.client.force_authenticate(user=self.user_3)
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        self.project.phase = proposal_phase
+        self.project.save(update_fields=["phase"])
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
@@ -592,7 +608,9 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         handover.refresh_from_db()
+        self.project.refresh_from_db()
         self.assertEqual(handover.status, "MOVED_TO_CONSTRUCTION_PREPARATION")
+        self.assertEqual(self.project.phase_id, construction_preparation_phase.id)
 
     def test_transitions_denies_moved_to_construction_preparation_for_non_matching_project_manager(self):
         self.client.force_authenticate(user=self.user_2)
@@ -679,6 +697,9 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             constructionProjectManager=self.person_construction,
             constructionProcurementMethod=self.construction_procurement_method,
         )
+        self.project.personConstruction = self.person_construction
+        self.project.constructionProcurementMethod = self.construction_procurement_method
+        self.project.save(update_fields=["personConstruction", "constructionProcurementMethod"])
 
         response = self.client.patch(
             f"/construction-handovers/{handover.id}/",
@@ -692,6 +713,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         handover.refresh_from_db()
+        self.project.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
         self.assertEqual(handover.constructionProjectManager_id, self.person_planning.id)
 
@@ -700,6 +722,11 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         updated_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Yhteistoiminnalliset",
+        )
+        self.assertEqual(self.project.personConstruction_id, self.person_planning.id)
+        self.assertEqual(
+            self.project.constructionProcurementMethod_id,
+            updated_procurement_method.id,
         )
 
         handover = ConstructionHandover.objects.create(
@@ -753,6 +780,12 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
     def test_partial_update_auto_transitions_to_moved_to_construction_preparation_when_only_procurement_method_is_updated(self):
         self.client.force_authenticate(user=self.user_3)
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        self.project.phase = proposal_phase
+        self.project.save(update_fields=["phase"])
 
         updated_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Kilpailutus",
@@ -773,11 +806,65 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         handover.refresh_from_db()
+        self.project.refresh_from_db()
         self.assertEqual(handover.status, "MOVED_TO_CONSTRUCTION_PREPARATION")
         self.assertEqual(
             handover.constructionProcurementMethod_id,
             updated_procurement_method.id,
         )
+        self.assertEqual(self.project.phase_id, construction_preparation_phase.id)
+
+    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsPlanner.user_in_planner_group", return_value=True)
+    def test_transitions_submitted_to_construction_succeeds_when_phase_row_is_missing(self, _mock_is_programmer):
+        self.client.force_authenticate(user=self.user_1)
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        self.project.phase = proposal_phase
+        self.project.save(update_fields=["phase"])
+        ProjectPhase.objects.filter(value="construction").delete()
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_CONSTRUCTION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+
+    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsPlanner.user_in_planner_group", return_value=True)
+    @patch(
+        "infraohjelmointi_api.views.ConstructionHandoverViewSet.ConstructionHandoverViewSet._sync_project_fields_for_transition",
+        side_effect=RuntimeError("forced sync failure"),
+    )
+    def test_transitions_manual_status_rollback_when_project_sync_fails(
+        self,
+        _mock_sync,
+        _mock_is_programmer,
+    ):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        with self.assertRaises(RuntimeError):
+            self.client.post(
+                f"/construction-handovers/{handover.id}/transitions/",
+                {"to": "SUBMITTED_TO_CONSTRUCTION"},
+                format="json",
+            )
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
 
     def test_partial_update_does_not_auto_transition_to_moved_to_construction_preparation_when_extra_fields_are_present(self):
         self.client.force_authenticate(user=self.user_3)

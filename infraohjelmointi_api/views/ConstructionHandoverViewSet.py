@@ -1,3 +1,5 @@
+import logging
+
 from overrides import override
 from django.db import transaction
 from rest_framework.response import Response
@@ -7,15 +9,20 @@ from rest_framework.decorators import action
 from infraohjelmointi_api.models import ConstructionHandover
 
 from .BaseViewSet import BaseViewSet
+from ..models import ProjectPhase
 from ..permissions import IsConstructionManagementLead, IsPlanner, IsProjectManager
 from ..services.ConstructionHandoverTransitionPermissionService import (
     ConstructionHandoverTransitionPermissionService,
 )
+from ..services.ProjectPhaseService import ProjectPhaseService
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
     ConstructionHandoverCreateSerializer,
     ConstructionHandoverUpdateSerializer
 )
+
+
+logger = logging.getLogger(__name__)
 
 class ConstructionHandoverViewSet(BaseViewSet):
     ALLOWED_STATUS_TRANSITIONS = {
@@ -176,6 +183,65 @@ class ConstructionHandoverViewSet(BaseViewSet):
         incoming_fields = self._get_incoming_patch_fields(request)
         return incoming_fields == {"constructionProcurementMethod"}
 
+    def _get_project_phase_or_none(self, phase_value):
+        try:
+            return ProjectPhaseService.get_by_value(value=phase_value)
+        except ProjectPhase.DoesNotExist:
+            logger.warning(
+                "Skipping project phase sync for missing ProjectPhase value '%s'.",
+                phase_value,
+            )
+            return None
+
+    def _sync_project_fields_for_transition(self, instance, requested_status):
+        project = instance.project
+        update_fields = []
+
+        def _update_procurement_method():
+            if (
+                project.constructionProcurementMethod_id
+                != instance.constructionProcurementMethod_id
+            ):
+                project.constructionProcurementMethod = instance.constructionProcurementMethod
+                update_fields.append("constructionProcurementMethod")
+
+        if requested_status == "SUBMITTED_TO_CONSTRUCTION":
+            # TODO: Vaiheen synkronoinnin kysymys:
+            # Miten tehdään kun hankkeella on vaihe ja vaiheen tarkenne?
+            # Ja miten hankkeen vaiheen palautuksen kanssa? 
+            # (Vaiheen tarkenne ei välity construction handoverlle,
+            # joten palautettaessa vaihe pitää hakea ilman tarkennetta)
+
+            # TODO: Puuttuu vielä previousProjectPhase asettaminen
+            # ja vaiheen palautus jos siirretään takaisin DRAFTtiin
+            construction_phase = self._get_project_phase_or_none("construction")
+            if construction_phase and project.phase_id != construction_phase.id:
+                project.phase = construction_phase
+                update_fields.append("phase")
+
+        if requested_status == "PROJECT_MANAGER_NAMED":
+            if project.personConstruction_id != instance.constructionProjectManager_id:
+                project.personConstruction = instance.constructionProjectManager
+                update_fields.append("personConstruction")
+
+            _update_procurement_method()
+
+        if requested_status == "MOVED_TO_CONSTRUCTION_PREPARATION":
+            construction_preparation_phase = self._get_project_phase_or_none(
+                "constructionPreparation"
+            )
+            if (
+                construction_preparation_phase
+                and project.phase_id != construction_preparation_phase.id
+            ):
+                project.phase = construction_preparation_phase
+                update_fields.append("phase")
+
+            _update_procurement_method()
+
+        if update_fields:
+            project.save(update_fields=update_fields)
+
     def _transition_to_status(self, request, instance, requested_status):
         possible_statuses = self._get_possible_status_transitions(instance.status)
 
@@ -244,10 +310,15 @@ class ConstructionHandoverViewSet(BaseViewSet):
             )
 
         user = self._get_authenticated_user(request)
-        instance.status = requested_status
-        if user:
-            instance.updatedBy = user
-        instance.save()
+        with transaction.atomic():
+            instance.status = requested_status
+            if user:
+                instance.updatedBy = user
+            instance.save()
+            self._sync_project_fields_for_transition(
+                instance=instance,
+                requested_status=requested_status,
+            )
 
         return None
     
