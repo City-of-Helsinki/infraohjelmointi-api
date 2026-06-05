@@ -24,19 +24,6 @@ jobs:
       - name: Run commitlint
         uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed  # v6.2.1
 
-  # pre-commit:
-  #   name: Run pre-commit hooks
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Checkout
-  #     uses: actions/checkout@v4
-  #   - name: Setup Python ${{ env.python-version }}
-  #     uses: actions/setup-python@v5
-  #     with:
-  #       python-version: ${{ env.python-version }}
-  #   - name: Run pre-commit
-  #     uses: pre-commit/action@v3.0.1
-
   tests:
     name: Run tests
     runs-on: ubuntu-latest
