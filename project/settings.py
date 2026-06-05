@@ -38,6 +38,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["*"]),
     DATABASE_URL=(str, "sqlite:////tmp/my-tmp-sqlite.db"),
+    DATABASE_PASSWORD=(str, ""),
     DJANGO_ADMIN_LANGUAGE=(str, "fi"),
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
@@ -186,6 +187,9 @@ WSGI_APPLICATION = "project.wsgi.application"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {"default": dj_database_url.parse(env("DATABASE_URL"))}
+
+if env("DATABASE_PASSWORD"):
+    DATABASES["default"]["PASSWORD"] = env("DATABASE_PASSWORD")
 
 HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED = env("HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED")
 
