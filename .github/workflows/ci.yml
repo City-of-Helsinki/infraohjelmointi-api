@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  DJANGO_SECRET_KEY: topsecret123
+  DATABASE_URL: postgres://test_user:test_password@localhost/test_db
+  REDIS_URL: ""
+  python-version: 3.11
+
+jobs:
+  commitlint:
+    name: Check commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run commitlint
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed  # v6.2.1
+
+  tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # The workflow supports only the PostgreSQL and PostGIS versions used in Platta
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        # Needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Set up locale
+        run: |
+          sudo locale-gen fi_FI.UTF-8
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev gettext
+      - name: Install system packages for PostGIS
+        run: |
+          sudo apt-get install -y gdal-bin
+      - name: Setup Python ${{ env['python-version'] }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env['python-version'] }}
+          cache: pip
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-pip-modules
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Environment variables from template
+        run: |
+          cp .env.template .env
+          sed -i '/DATABASE_URL/d' .env
+
+      - name: Compile translations
+        run: |
+          if find . -name "*.po" | grep -q .; then
+            python manage.py compilemessages
+          fi
+      - name: Check migrations
+        run: |
+          python manage.py makemigrations --dry-run --check
+      - name: Run tests
+        run: |
+          mkdir static
+          set +e
+          
+          coverage run --source='.' manage.py test
+          coverage report
+          coverage xml
+
+      - name: Store coverage.xml
+        uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
+        with:
+          path: coverage.xml
+          key: cache-${{ github.run_id }}-${{ github.run_attempt }}
+
+  sonarcloud:
+    name: Run SonarQube Cloud Scan
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - uses: actions/checkout@v4
+        # Required by SonarQube Cloud for blame information
+        with:
+          fetch-depth: 0
+      - name: Restore coverage.xml
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
+        with:
+          path: coverage.xml
+          key: cache-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: true
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          projectBaseDir: .
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
