@@ -206,6 +206,12 @@ router.register(
     basename="constructionHandovers"
 )
 
+router.register(
+    r"financing-parties",
+    views.FinancingPartyViewSet,
+    basename="financingParties"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
