@@ -306,6 +306,41 @@ The Redis deployment is handled by the pipeline (`devops/redis-deployment.yml`).
 - A circuit breaker disables cache operations after repeated failures to prevent cascading issues
 - Cache is automatically re-enabled when Redis becomes available again
 
+## Audit logging
+
+Changes to project cards (field edits, financial figure edits, and project
+deletions) are recorded as audit log entries. Each event is written in two
+places (dual-write):
+
+- the local `AuditLog` table, served by the `/audit-logs/` endpoint (the IO-404
+  admin UI)
+- a `ResilientLogEntry` queue (from
+  [django-resilient-logger](https://github.com/City-of-Helsinki/django-resilient-logger))
+  that a Platta cron job ships to their Elastic Cloud audit index
+
+### Local development
+
+No configuration needed. Without the `AUDIT_LOG_ES_*` variables the Elastic
+target is not registered, so entries simply queue locally in `ResilientLogEntry`
+and are never shipped — this is expected and harmless.
+
+### Production
+
+The Elastic Cloud target is enabled by these variables (added to the Azure
+DevOps pipeline by Platta's automation):
+
+| Variable | Notes |
+|----------|-------|
+| `AUDIT_LOG_ENV` | environment name, e.g. `production` |
+| `AUDIT_LOG_ES_URL` | Elastic Cloud endpoint |
+| `AUDIT_LOG_ES_INDEX` | per-app, per-env index |
+| `AUDIT_LOG_ES_USERNAME` | logger user |
+| `AUDIT_LOG_ES_PASSWORD` | from Azure Key Vault (`AUDIT-LOG-ES-PASSWORD`) |
+
+The `X-Request-Id` request header is captured into each entry for traceability.
+
+More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Logitus).
+
 ## External data sources
 
 Infra tool project data and financial data can be imported from external sources.
