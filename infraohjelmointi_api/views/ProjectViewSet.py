@@ -15,6 +15,7 @@ from infraohjelmointi_api.serializers import (
     SearchResultSerializer,
     ProjectNoteGetSerializer,
     ConstructionHandoverGetSerializer,
+    AuditLogSerializer,
 )
 from infraohjelmointi_api.models import (
     AuditLog,
@@ -157,8 +158,10 @@ class ProjectViewSet(BaseViewSet):
             "category",
             "projectClass",
             "name",
+            "description",
             "phase",
             "phaseDetail",
+            "constructionProcurementMethod",
             "planningStartYear",
             "constructionEndYear",
             "estPlanningStart",
@@ -1953,4 +1956,86 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(methods=["get"], detail=True, url_path=r"history", name="get_project_history")
+    def get_project_history(self, request, pk):
+        """
+        Custom action returning the change history (audit log) of a single
+        project, powering the "Muutoshistoria" UI (IO-879).
+
+        Unlike the admin-only /audit-logs/ endpoint, this is scoped to one
+        project, so it is available to any user allowed to view that project
+        (the same role-based permissions as the rest of ProjectViewSet).
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Query Parameters
+            ----------
+
+            year : keep only entries whose old/new values touch that year.
+                   Financial figures are stored keyed by year, so this narrows
+                   the history to a single budget cell (IO-880).
+            field : keep only entries whose old/new values touch that field
+                    name. Form fields are stored keyed by field name, so this
+                    narrows the history to a single form field (IO-882).
+            operation : CREATE / UPDATE / DELETE passthrough filter.
+
+            Usage
+            ----------
+
+            projects/<project_id>/history/
+
+            Returns
+            -------
+
+            JSON
+                Paginated list of AuditLog entries for the project, newest first
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        project = Project.objects.filter(pk=pk).first()
+        if project is None:
+            return Response(
+                data={"message": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        queryset = (
+            AuditLog.objects.select_related("actor")
+            .filter(project=project)
+            .order_by("-createdDate")
+        )
+
+        operation = request.query_params.get("operation")
+        if operation:
+            queryset = queryset.filter(operation=operation)
+
+        # Financial figures and form fields are both stored as JSON objects in
+        # old_values / new_values - financial ones keyed by year ("2026"), form
+        # ones keyed by field name ("phase"). A JSONB key-existence match on
+        # either side narrows the history to a single budget cell or a single
+        # form field without unpacking the JSON in Python.
+        year = request.query_params.get("year")
+        if year:
+            queryset = queryset.filter(
+                Q(old_values__has_key=year) | Q(new_values__has_key=year)
+            )
+
+        field = request.query_params.get("field")
+        if field:
+            queryset = queryset.filter(
+                Q(old_values__has_key=field) | Q(new_values__has_key=field)
+            )
+
+        page = self.paginate_queryset(queryset)
+        serializer = AuditLogSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
