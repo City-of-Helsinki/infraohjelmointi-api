@@ -1,8 +1,10 @@
 from datetime import date
+from decimal import Decimal
 import logging
 from django.db.models.signals import post_save
 from django.db import transaction
 from infraohjelmointi_api.models import Project, ClassFinancial, LocationFinancial, ProjectClass, ProjectLocation, TalpaProjectOpening, SapCost, SapCurrentYear
+from infraohjelmointi_api.utils.schedule import resolve_schedule
 from infraohjelmointi_api.serializers import (
     ProjectClassSerializer,
     ProjectGetSerializer,
@@ -674,3 +676,84 @@ def cleanup_sap_costs_on_sap_project_change(sender, instance, created, **kwargs)
             f"deleted {deleted_sap_cost[0]} SapCost records, "
             f"{deleted_sap_current_year[0]} SapCurrentYear records"
         )
+
+
+@receiver(pre_save, sender=Project)
+def reconcile_finances_on_schedule_change(sender, instance, **kwargs):
+    """Move out-of-schedule budgets into the nearest in-schedule year when a
+    project's planning/construction schedule tightens past existing money.
+
+    Server-side backstop for the UI's form-only prevention (IO-826/IO-894):
+    it fires on every ``Project.save()`` — the project card, the programming
+    view timeline drag, bulk edits, Excel import and direct ORM writes — and
+    works straight on the DB rows, so it also rescues rows the form skips
+    because they fall outside its 11-year window (the documented gap that
+    keeps regenerating haamuluvut).
+
+    Behaviour mirrors the UI's ``moveBudget*`` helpers: the orphaned value is
+    moved into the nearest in-schedule year (later year wins on a tie) and the
+    source row is zeroed. Frame-view rows are out of scope, matching IO-826
+    and the IO-841 cleanup command.
+    """
+    if instance.pk is None:
+        return
+
+    try:
+        old = Project.objects.only(
+            "planningStartYear",
+            "estPlanningEnd",
+            "estConstructionStart",
+            "constructionEndYear",
+        ).get(pk=instance.pk)
+    except Project.DoesNotExist:
+        return
+
+    old_schedule = resolve_schedule(old)
+    new_schedule = resolve_schedule(instance)
+
+    if old_schedule == new_schedule:
+        return
+
+    # Conservative stance shared with IO-841: without a fully defined schedule
+    # we cannot decide what is in range, so leave every row untouched.
+    if not new_schedule.is_complete:
+        return
+
+    with transaction.atomic():
+        affected = (
+            ProjectFinancial.objects.select_for_update()
+            .filter(project_id=instance.pk, forFrameView=False)
+            .exclude(value=0)
+            .exclude(value__isnull=True)
+            .order_by("year")
+        )
+
+        moved_rows = 0
+        for fin in affected:
+            if new_schedule.contains(fin.year):
+                continue
+
+            target_year = new_schedule.nearest_in_schedule_year(fin.year)
+            # No in-schedule year exists (e.g. every phase inverted): don't
+            # destroy money on an unusable schedule, leave it for review.
+            if target_year is None or target_year == fin.year:
+                continue
+
+            target, _ = ProjectFinancial.objects.get_or_create(
+                project_id=instance.pk,
+                year=target_year,
+                forFrameView=False,
+                defaults={"value": Decimal("0")},
+            )
+            target.value = (target.value or Decimal("0")) + fin.value
+            target.save(update_fields=["value", "updatedDate"])
+
+            fin.value = Decimal("0")
+            fin.save(update_fields=["value", "updatedDate"])
+            moved_rows += 1
+
+        if moved_rows:
+            logger.info(
+                f"Reconciled {moved_rows} out-of-schedule finance row(s) for "
+                f"project {instance.pk} after a schedule change."
+            )
