@@ -148,7 +148,11 @@ class SapApiService:
             frozen_commitments = {"project_task": Decimal(0.000), "production_task": Decimal(0.000)}
             
             db_sap_costs = SapCostService.get_by_sap_id(id)
-            frozen_entry = next((item for item in db_sap_costs if item.year == self.sap_freeze_year), None)
+            frozen_entry = self.__select_frozen_entry_with_highest_cost(
+                db_sap_costs=db_sap_costs,
+                year=self.sap_freeze_year,
+                sap_id=id,
+            )
             
             if frozen_entry:
                 frozen_costs["project_task"] = frozen_entry.project_task_costs
@@ -222,9 +226,11 @@ class SapApiService:
             
             # 2. Get frozen 2025 costs from DB
             db_sap_costs = SapCostService.get_by_sap_id(id)
-            # Find the entry for the freeze year (2025)
-            # Note: DB might have multiple entries if grouped, but valid ones should have same amounts
-            frozen_entry = next((item for item in db_sap_costs if item.year == self.sap_freeze_year), None)
+            frozen_entry = self.__select_frozen_entry_with_highest_cost(
+                db_sap_costs=db_sap_costs,
+                year=self.sap_freeze_year,
+                sap_id=id,
+            )
             
             if frozen_entry:
                 frozen_costs["project_task"] = frozen_entry.project_task_costs
@@ -249,6 +255,28 @@ class SapApiService:
             grouped_costs_and_commitments_all["costs"]["production_task"] += frozen_costs["production_task"]
 
         return grouped_costs_and_commitments_all
+
+    def __select_frozen_entry_with_highest_cost(self, db_sap_costs, year: int, sap_id: str):
+        """Pick deterministic frozen DB row for a SAP id and year.
+
+        SAP ID can have multiple DB rows (project + group rows). We use the
+        year-matching row with the highest total costs to avoid selecting a
+        group row that may have incorrect project/production task costs.
+        """
+        year_entries = [item for item in db_sap_costs if item.year == year]
+        if not year_entries:
+            return None
+
+        selected = max(
+            year_entries,
+            key=lambda item: (item.project_task_costs + item.production_task_costs),
+        )
+        selected_total = selected.project_task_costs + selected.production_task_costs
+        logger.debug(
+            f"Selected frozen entry for {sap_id}/{year} with highest total costs={selected_total} "
+            f"(project_task={selected.project_task_costs}, production_task={selected.production_task_costs})"
+        )
+        return selected
 
     def __fetch_costs_and_commitments_from_sap(
             self,
