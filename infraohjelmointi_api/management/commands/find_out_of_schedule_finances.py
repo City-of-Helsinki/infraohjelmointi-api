@@ -21,6 +21,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from infraohjelmointi_api.models import Project, ProjectFinancial
+from infraohjelmointi_api.utils.schedule import Schedule, resolve_schedule
 
 
 logger = logging.getLogger("infraohjelmointi_api")
@@ -42,57 +43,6 @@ CSV_HEADER = [
     "value",
     "action",
 ]
-
-
-@dataclass(frozen=True)
-class Schedule:
-    """Resolved planning + construction year range for a project.
-
-    A range with ``start > end`` is treated as empty so that data with
-    inverted dates (e.g. ``estPlanningEnd < planningStartYear``) does not
-    silently mark every year as in-schedule.
-    """
-
-    planning_start: int | None
-    planning_end: int | None
-    construction_start: int | None
-    construction_end: int | None
-
-    @property
-    def is_complete(self) -> bool:
-        return all(
-            v is not None
-            for v in (
-                self.planning_start,
-                self.planning_end,
-                self.construction_start,
-                self.construction_end,
-            )
-        )
-
-    def contains(self, year: int) -> bool:
-        in_planning = (
-            self.planning_start is not None
-            and self.planning_end is not None
-            and self.planning_start <= year <= self.planning_end
-        )
-        in_construction = (
-            self.construction_start is not None
-            and self.construction_end is not None
-            and self.construction_start <= year <= self.construction_end
-        )
-        return in_planning or in_construction
-
-
-def _resolve_schedule(project: Project) -> Schedule:
-    return Schedule(
-        planning_start=project.planningStartYear,
-        planning_end=project.estPlanningEnd.year if project.estPlanningEnd else None,
-        construction_start=(
-            project.estConstructionStart.year if project.estConstructionStart else None
-        ),
-        construction_end=project.constructionEndYear,
-    )
 
 
 def _positive_int(value: str) -> int:
@@ -165,7 +115,7 @@ class Command(BaseCommand):
         report = _Report()
 
         for project in projects_qs.iterator():
-            schedule = _resolve_schedule(project)
+            schedule = resolve_schedule(project)
 
             if not schedule.is_complete:
                 self._emit_skip_row(writer, project, schedule)
