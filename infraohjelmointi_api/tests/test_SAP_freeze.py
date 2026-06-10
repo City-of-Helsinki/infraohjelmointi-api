@@ -63,7 +63,9 @@ class TestSAPServiceFreeze(TestCase):
         
         # 1. Setup Frozen Data in DB (2025)
         # Note: In real app, SapCost stores exact values.
-        frozen_sap_cost = SapCost(
+        # There might be multiple rows for same SAP ID (project vs group rows).
+        # We want to ensure the service selects the correct one.
+        frozen_sap_cost_lower = SapCost(
             year=2025,
             sap_id=self.sapProjectId,
             project_task_costs=Decimal('500.000'), # Frozen cost
@@ -71,10 +73,19 @@ class TestSAPServiceFreeze(TestCase):
             project_task_commitments=Decimal('0.000'), 
             production_task_commitments=Decimal('0.000')
         )
-        mock_get_by_sap_id.return_value = [frozen_sap_cost]
+        frozen_sap_cost_higher = SapCost(
+            year=2025,
+            sap_id=self.sapProjectId,
+            project_task_costs=Decimal('600.000'),
+            production_task_costs=Decimal('100.000'),
+            project_task_commitments=Decimal('30.000'),
+            production_task_commitments=Decimal('20.000')
+        )
+        mock_get_by_sap_id.return_value = [frozen_sap_cost_lower, frozen_sap_cost_higher]
         
         # 2. Setup New SAP Data (2026)
         # This is what __fetch... returns. It simulates fetching ONLY 2026 data.
+        # 2026 data should be combined with frozen highest-cost row.
         mock_fetch.return_value = {
             "costs": [{"Posid": f"{self.sapProjectId}.01", "Wkgbtr": Decimal('100.000')}], # New cost
             "commitments": [{"Posid": f"{self.sapProjectId}.01", "Wkgbtr": Decimal('50.000')}] # All commitments
@@ -93,8 +104,8 @@ class TestSAPServiceFreeze(TestCase):
         self.assertEqual(kwargs['budat_start_commitments'].year, 2017)
         
         # 4. Verify Final Result Summing
-        # Should be Frozen(500) + New(100) = 600
-        self.assertEqual(result['costs']['project_task'], Decimal('600.000'))
+        # Should be Frozen(600) + New(100) = 700
+        self.assertEqual(result['costs']['project_task'], Decimal('700.000'))
         self.assertEqual(result['commitments']['project_task'], Decimal('50.000'))
 
     @patch('infraohjelmointi_api.services.SapCostService.SapCostService.get_by_sap_id')
