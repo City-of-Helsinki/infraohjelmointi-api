@@ -989,6 +989,65 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_patch_bulk_forced_to_frame_skips_current_year_project_finances(self):
+        current_year = date.today().year
+        next_year = current_year + 1
+
+        # Keep this test deterministic regardless of other test data.
+        ProjectFinancial.objects.filter(
+            project_id=self.project_1_Id,
+            year__in=[current_year, next_year],
+        ).delete()
+
+        # Planning view source values.
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=current_year,
+            value=111,
+            forFrameView=False,
+        )
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=next_year,
+            value=222,
+            forFrameView=False,
+        )
+
+        # Existing frame view values that action may update.
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=current_year,
+            value=999,
+            forFrameView=True,
+        )
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=next_year,
+            value=1,
+            forFrameView=True,
+        )
+
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            [],
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        current_year_frame = ProjectFinancial.objects.get(
+            project_id=self.project_1_Id,
+            year=current_year,
+            forFrameView=True,
+        )
+        next_year_frame = ProjectFinancial.objects.get(
+            project_id=self.project_1_Id,
+            year=next_year,
+            forFrameView=True,
+        )
+
+        self.assertEqual(current_year_frame.value, 999)
+        self.assertEqual(next_year_frame.value, 222)
+
 
     def test_notes_project(self):
         Note.objects.create(
