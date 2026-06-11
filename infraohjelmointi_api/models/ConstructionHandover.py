@@ -65,3 +65,8 @@ class ConstructionHandover(HistoricalModel):
     @_history_user.setter
     def _history_user(self, value):
         self.updatedBy = value
+
+    @property
+    def is_locked(self):
+        """The handover is locked if it's not in DRAFT status"""
+        return self.status != "DRAFT"

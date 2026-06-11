@@ -193,6 +193,9 @@ PROJECT_GROUP_ALL_GET_ACTIONS = [
 ]
 PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 
+#### Construction handover custom actions ####
+CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
+
 LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER = [
     "finances",
     "name", #* Kohde/hanke Ei (No) # name
@@ -293,7 +296,8 @@ class IsCoordinator(permissions.BasePermission):
                 *PROJECT_ALL_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
-                ]
+                *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+            ]
         ):
             return True
         return False
@@ -330,7 +334,8 @@ class IsPlanner(permissions.BasePermission):
                 *PROJECT_ALL_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
-                ]
+                *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+            ]
         ):
             return True
         return False
@@ -369,6 +374,7 @@ class IsProjectManager(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
+                *CONSTRUCTION_HANDOVER_GET_ACTIONS,
             ]
         ):
             return True
@@ -385,7 +391,8 @@ class IsProjectManager(permissions.BasePermission):
         if view.action in [
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *DJANGO_BASE_READ_ONLY_ACTIONS,
-            *PROJECT_NOTE_ALL_ACTIONS] and _type in [
+            *PROJECT_NOTE_ALL_ACTIONS,
+            *CONSTRUCTION_HANDOVER_GET_ACTIONS] and _type in [
             "Project", "Note"
         ]:
             if _type == "Project" and any(
@@ -520,6 +527,7 @@ class IsAdmin(permissions.BasePermission):
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_FORCED_TO_FRAME_PATCH,
+                *CONSTRUCTION_HANDOVER_GET_ACTIONS,
             ]
         ):
             return True

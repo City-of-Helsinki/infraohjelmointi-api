@@ -14,6 +14,7 @@ from infraohjelmointi_api.serializers import (
     ProjectWithFinancesSerializer,
     SearchResultSerializer,
     ProjectNoteGetSerializer,
+    ConstructionHandoverGetSerializer,
 )
 from infraohjelmointi_api.models import (
     AuditLog,
@@ -34,7 +35,10 @@ from infraohjelmointi_api.services import (
     ProjectFinancialService,
     ProjectClassService,
 )
-from infraohjelmointi_api.services.ProjectWiseService import PWProjectResponseError
+from infraohjelmointi_api.services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
+)
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.permissions import (
     user_in_restricted_programmer_group,
@@ -1884,6 +1888,17 @@ class ProjectViewSet(BaseViewSet):
 
             logger.info(f"Automatic PW sync completed successfully for project '{updated_project.name}'")
 
+        except PWProjectNotFoundError:
+            # IO-897 / IO-865: orphan hkrId — PW is reachable but has no project
+            # for this HKR id. Roll back (via @transaction.atomic) and return a
+            # stable error code so the UI can tell the user to fix or remove the
+            # hkrId, after which the save succeeds.
+            logger.warning(
+                f"PW sync blocked for project '{updated_project.name}' "
+                f"(HKR ID: {updated_project.hkrId}): PW project not found"
+            )
+            raise ValidationError({"hkrId": ["PW_PROJECT_NOT_FOUND"]})
+
         except PWProjectResponseError as e:
             # IO-851: PW outage / non-200 — let the local edit through
             # instead of rolling it back; re-sync once PW is healthy.
@@ -1904,4 +1919,38 @@ class ProjectViewSet(BaseViewSet):
             raise ValidationError({
                 "hkrId": f"Project could not be saved because syncing to ProjectWise failed: {str(e)}. Please retry, or use 'Update to PW' once the issue is resolved."
             })
+
+    @action(methods=["get"], detail=True, url_path=r"construction-handovers", name="get_construction_handovers")
+    def get_construction_handovers(self, request, pk):
+        """
+        Custom action to get construction handovers related to a project
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Usage
+            ----------
+
+            projects/<project_id>/construction-handovers/
+
+            Returns
+            -------
+
+            JSON
+                List of ConstructionHandover instances
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+            instance = self.get_object()
+            qs = ConstructionHandoverGetSerializer(
+                instance.constructionhandover_set.all(),
+                many=True
+            ).data
+            return Response(qs)
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
 

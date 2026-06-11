@@ -3,7 +3,10 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from ..models import Project, ProjectClass, ProjectType, ProjectPhase, ProjectCategory
-from ..services.ProjectWiseService import PWProjectResponseError
+from ..services.ProjectWiseService import (
+    PWProjectNotFoundError,
+    PWProjectResponseError,
+)
 from ..views import BaseViewSet
 
 
@@ -265,6 +268,94 @@ class ProjectViewSetPWIntegrationTestCase(TestCase):
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectViewSetPWSyncErrorTestCase(TestCase):
+    """IO-865: PW sync error mapping in the project PATCH endpoint."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="PW Error Test Class",
+            defaults={'path': "PW/Error/Test/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        # planningStartYear/constructionEndYear are required when phase is
+        # `programming`; set them so PATCH gets past serializer validation
+        # and reaches the sync step under test.
+        self.project_with_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="PW Orphan Project",
+            description="Original description",
+            hkrId=2167,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+        self.project_without_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="No HKR Project",
+            description="Original description",
+            hkrId=None,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_returns_pw_project_not_found_code_when_pw_missing(self, mock_sync):
+        mock_sync.side_effect = PWProjectNotFoundError(
+            "No project found from PW with given id '2167'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Edited description"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_PROJECT_NOT_FOUND"]})
+
+        # @transaction.atomic on partial_update must roll back the local save.
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.description, "Original description")
+
+    # NOTE: an earlier draft of IO-865 also asserted that a PWProjectResponseError
+    # returns 400 with a non-PW_PROJECT_NOT_FOUND body. After merging IO-851's
+    # soft-fail behaviour, PWProjectResponseError commits the local edit and
+    # returns 200 instead, so that assertion is no longer correct. The soft-fail
+    # path is covered by ProjectViewSetPWOutageTestCase below.
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_without_hkr_id_does_not_call_pw_sync(self, mock_sync):
+        response = self.client.patch(
+            f"/projects/{self.project_without_hkr.id}/",
+            {"description": "Edited description"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        mock_sync.assert_not_called()
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.description, "Edited description")
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
 class ProjectViewSetPWOutageTestCase(TestCase):
     """IO-851: PATCH must commit the local edit when PW is unreachable."""
 
@@ -385,3 +476,54 @@ class ProjectViewSetPWOutageTestCase(TestCase):
         mock_sync.assert_not_called()
         self.project_without_hkr.refresh_from_db()
         self.assertEqual(self.project_without_hkr.description, "Edited, no hkr")
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectViewSetPWSyncErrorTestCase(TestCase):
+    """IO-897 / IO-865: orphan hkrId (PW has no project for this HKR id) must
+    hard-fail with a stable error code and roll the local edit back."""
+
+    def setUp(self):
+        self.project_class, _ = ProjectClass.objects.get_or_create(
+            name="PW Orphan Test Class",
+            defaults={'path': "PW/Orphan/Test/Class"},
+        )
+        self.project_type, _ = ProjectType.objects.get_or_create(value="park")
+        self.project_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        self.project_category, _ = ProjectCategory.objects.get_or_create(value="basic")
+
+        self.project_with_hkr = Project.objects.create(
+            id=uuid.uuid4(),
+            name="Orphan Test Project",
+            description="Original description",
+            hkrId=4040,
+            programmed=True,
+            planningStartYear=2024,
+            constructionEndYear=2030,
+            projectClass=self.project_class,
+            type=self.project_type,
+            phase=self.project_phase,
+            category=self.project_category,
+        )
+
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.sync_project_to_pw"
+    )
+    def test_patch_with_orphan_hkr_id_returns_stable_error_and_rolls_back(self, mock_sync):
+        """Orphan hkrId -> 400 {"hkrId": ["PW_PROJECT_NOT_FOUND"]}, edit reverted."""
+        mock_sync.side_effect = PWProjectNotFoundError(
+            "No project found from PW with given id '4040'"
+        )
+
+        response = self.client.patch(
+            f"/projects/{self.project_with_hkr.id}/",
+            {"description": "Should be rolled back"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_PROJECT_NOT_FOUND"]})
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.description, "Original description")
+        mock_sync.assert_called_once()
