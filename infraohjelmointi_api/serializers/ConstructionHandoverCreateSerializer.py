@@ -45,7 +45,7 @@ class ConstructionHandoverCreateSerializer(serializers.ModelSerializer):
                 financingParty=FinancingParty.KYMP,
                 projectNumber=project.sapProject if project.sapProject else "",
                 budget=project.costForecast,
-                # TODO: budgetItem specification still unclear, will be added later when clarified
+                budgetItem=project.typeQualifier,
             )
 
         return handover

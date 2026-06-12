@@ -207,6 +207,12 @@ router.register(
 )
 
 router.register(
+    r"construction-handover-financings",
+    views.ConstructionHandoverFinancingViewSet,
+    basename="constructionHandoverFinancings"
+)
+
+router.register(
     r"financing-parties",
     views.FinancingPartyViewSet,
     basename="financingParties"

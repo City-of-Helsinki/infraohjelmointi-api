@@ -31,6 +31,13 @@ class ConstructionHandoverViewSet(BaseViewSet):
     """
 
     @override
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action in ["list", "retrieve"]:
+            return queryset.prefetch_related("financing", "financing__budgetItem")
+        return queryset
+
+    @override
     def get_serializer_class(self):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
