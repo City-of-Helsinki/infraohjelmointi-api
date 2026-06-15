@@ -114,7 +114,7 @@ class ProjectViewSet(BaseViewSet):
 
     @override
     def initialize_request(self, request, *args, **kwargs):
-        # Capture the X-Request-Id header (set by Plata at the OpenShift route
+        # Capture the X-Request-Id header (set by Platta at the OpenShift route
         # level) so that audit log entries can be correlated with HTTP traces.
         # IO-845.
         drf_request = super().initialize_request(request, *args, **kwargs)
@@ -368,7 +368,7 @@ class ProjectViewSet(BaseViewSet):
 
         # IO-845: also emit through the "audit" logger so the
         # ResilientLogHandler queues the entry into ResilientLogEntry, from
-        # where Plata's submit_unsent_entries cron ships it to Elastic Cloud.
+        # where Platta's submit_unsent_entries cron ships it to Elastic Cloud.
         actor_data = {}
         if isinstance(user, User):
             actor_data = {

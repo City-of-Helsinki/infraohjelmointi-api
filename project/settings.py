@@ -268,9 +268,9 @@ REST_FRAMEWORK = {
 
 DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": False}
 
-# IO-845: Audit logs are shipped to Plata's Elastic Cloud via django-resilient-logger.
+# IO-845: Audit logs are shipped to Platta's Elastic Cloud via django-resilient-logger.
 # The ResilientLogHandler writes log records to the local ResilientLogEntry table; the
-# `submit_unsent_entries` management command (run by Plata's cron) then pushes them to
+# `submit_unsent_entries` management command (run by Platta's cron) then pushes them to
 # the Elasticsearch target below. The ES target is registered only when AUDIT_LOG_ES_URL
 # is set, so dev/test/build environments without the env vars (e.g. Dockerfile
 # collectstatic) stay safe.

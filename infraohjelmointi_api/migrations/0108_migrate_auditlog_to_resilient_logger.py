@@ -1,6 +1,6 @@
 """IO-845 — copy historical AuditLog rows into ResilientLogEntry.
 
-Once Plata's submit_unsent_entries cron runs, this backfilled history will be
+Once Platta's submit_unsent_entries cron runs, this backfilled history will be
 shipped to Elastic Cloud alongside fresh entries written by ProjectViewSet's
 dual-write. The context shape mirrors the live emit so historical and live
 entries are indistinguishable in Elastic, except that migrated rows carry
