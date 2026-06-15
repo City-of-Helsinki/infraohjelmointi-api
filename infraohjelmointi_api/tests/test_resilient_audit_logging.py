@@ -3,12 +3,12 @@
 Covers:
 - The ``audit_log_project_card_changes`` helper writes a row to *both*
   ``AuditLog`` (legacy local table that powers /audit-logs/) and
-  ``ResilientLogEntry`` (queue picked up by Plata's submit_unsent_entries
+  ``ResilientLogEntry`` (queue picked up by Platta's submit_unsent_entries
   cron and shipped to Elastic Cloud).
 - The X-Request-Id header captured in ``initialize_request`` flows through
   to the resilient log entry's context as ``x_request_id``, and is omitted
   when the header is absent.
-- The 0105 data migration callable copies historical AuditLog rows into
+- The 0108 data migration callable copies historical AuditLog rows into
   ResilientLogEntry with the same context shape used by live writes.
 """
 import importlib
@@ -193,7 +193,7 @@ class AuditLogDualWriteTestCase(TestCase):
 
 
 class AuditLogDataMigrationTestCase(TestCase):
-    """The 0105 migration callable backfills ResilientLogEntry from AuditLog."""
+    """The 0108 migration callable backfills ResilientLogEntry from AuditLog."""
 
     def setUp(self):
         self.user = User.objects.create(
