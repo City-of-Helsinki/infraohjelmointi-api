@@ -2,6 +2,7 @@ from unittest.mock import patch
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -84,8 +85,32 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             name="sg_kymp_sso_io_projektipaallikot",
             display_name="Project Managers",
         )
+        self.programmer_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_ohjelmoijat",
+            display_name="Programmers",
+        )
+        self.construction_management_lead_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_rakennuttamisen_esihenkilot",
+            display_name="Construction Management Leads",
+        )
         self.user_2.ad_groups.add(self.project_manager_group)
         self.user_3.ad_groups.add(self.project_manager_group)
+
+        self.user_4 = User.objects.create(
+            username="handover_user_4",
+            first_name="Handover",
+            last_name="User Four",
+            email="handover4@example.com",
+        )
+        self.user_4.ad_groups.add(self.programmer_group)
+
+        self.user_5 = User.objects.create(
+            username="handover_user_6",
+            first_name="Handover",
+            last_name="User Six",
+            email="handover6@example.com",
+        )
+        self.user_5.ad_groups.add(self.construction_management_lead_group)
 
     def test_get_serializer_class_by_action(self):
         viewset = ConstructionHandoverViewSet()
@@ -405,9 +430,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "DRAFT")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsPlanner.user_in_planner_group", return_value=True)
-    def test_transitions_allows_submitted_to_construction_for_programmer(self, _mock_is_programmer):
-        self.client.force_authenticate(user=self.user_1)
+    def test_transitions_allows_submitted_to_construction_for_programmer(self):
+        self.client.force_authenticate(user=self.user_4)
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
@@ -424,8 +448,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsPlanner.user_in_planner_group", return_value=False)
-    def test_transitions_denies_submitted_to_construction_for_non_programmer(self, _mock_is_programmer):
+    def test_transitions_denies_submitted_to_construction_for_non_programmer(self):
         self.client.force_authenticate(user=self.user_1)
 
         handover = ConstructionHandover.objects.create(
@@ -443,9 +466,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=True)
-    def test_transitions_allows_project_manager_named_for_construction_management_lead(self, _mock_is_construction_management_lead):
-        self.client.force_authenticate(user=self.user_1)
+    def test_transitions_allows_project_manager_named_for_construction_management_lead(self):
+        self.client.force_authenticate(user=self.user_5)
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
@@ -463,8 +485,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=False)
-    def test_transitions_denies_project_manager_named_for_non_construction_management_lead(self, _mock_is_construction_management_lead):
+    def test_transitions_denies_project_manager_named_for_non_construction_management_lead(self):
         self.client.force_authenticate(user=self.user_1)
 
         handover = ConstructionHandover.objects.create(
@@ -483,9 +504,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=True)
-    def test_transitions_denies_project_manager_named_when_construction_project_manager_missing(self, _mock_is_construction_management_lead):
-        self.client.force_authenticate(user=self.user_1)
+    def test_transitions_denies_project_manager_named_when_construction_project_manager_missing(self):
+        self.client.force_authenticate(user=self.user_5)
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
@@ -599,9 +619,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], "Invalid status 'INVALID_STATUS'.")
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=True)
-    def test_partial_update_auto_transitions_to_project_manager_named_when_trigger_fields_are_updated(self, _mock_is_construction_management_lead):
-        self.client.force_authenticate(user=self.user_1)
+    def test_partial_update_auto_transitions_to_project_manager_named_when_trigger_fields_are_updated(self):
+        self.client.force_authenticate(user=self.user_5)
 
         updated_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Yhteistoiminnalliset",
@@ -629,9 +648,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
         self.assertEqual(handover.constructionProjectManager_id, self.person_planning.id)
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=True)
-    def test_partial_update_does_not_auto_transition_to_project_manager_named_when_only_procurement_method_is_updated(self, _mock_is_construction_management_lead):
-        self.client.force_authenticate(user=self.user_1)
+    def test_partial_update_does_not_auto_transition_to_project_manager_named_when_only_procurement_method_is_updated(self):
+        self.client.force_authenticate(user=self.user_5)
 
         updated_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Yhteistoiminnalliset",
@@ -665,8 +683,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             self.construction_procurement_method.id,
         )
 
-    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=False)
-    def test_partial_update_auto_transition_returns_403_for_non_construction_management_lead(self, _mock_is_construction_management_lead):
+    def test_partial_update_auto_transition_returns_403_for_non_construction_management_lead(self):
         self.client.force_authenticate(user=self.user_1)
 
         handover = ConstructionHandover.objects.create(
