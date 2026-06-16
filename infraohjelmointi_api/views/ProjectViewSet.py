@@ -176,11 +176,7 @@ class ProjectViewSet(BaseViewSet):
             "visibilityEnd",
         ]
         old_values_for_audit_log = {
-            field: (
-                str(getattr(getattr(project, field), 'id', None))
-                if hasattr(getattr(project, field), 'id')
-                else str(getattr(project, field))
-            )
+            field: self._serialize_audit_value(project, field)
             for field in audit_loggable_fields
             if field in request.data
         }
@@ -324,7 +320,14 @@ class ProjectViewSet(BaseViewSet):
 
         # saving audit logs after project data was changed
         if (old_values_for_audit_log):
-            new_values_for_audit_log = {field: request.data[field] for field in audit_loggable_fields if field in request.data}
+            # Read new values from the saved project rather than request.data so
+            # relations are stored consistently as their id (matching old_values),
+            # regardless of how the client sent them.
+            new_values_for_audit_log = {
+                field: self._serialize_audit_value(updated_project, field)
+                for field in audit_loggable_fields
+                if field in request.data
+            }
             self.audit_log_project_card_changes(
                 old_values_for_audit_log,
                 new_values_for_audit_log,
@@ -342,6 +345,18 @@ class ProjectViewSet(BaseViewSet):
         if isinstance(date, str):
             return datetime.strptime(date, '%d.%m.%Y').date()
         return date
+
+    def _serialize_audit_value(self, instance, field):
+        # Relations are stored as their id, scalars as a string, and an absent
+        # value as null (not the string "None") so the Muutoshistoria UI can show
+        # an empty previous/next value cleanly.
+        value = getattr(instance, field)
+        if value is None:
+            return None
+        related_id = getattr(value, 'id', None)
+        if related_id is not None:
+            return str(related_id)
+        return str(value)
 
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         audit_log = AuditLog(

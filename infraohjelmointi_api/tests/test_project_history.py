@@ -229,6 +229,28 @@ class ProjectAuditProducerTestCase(TestCase):
             entry.new_values["constructionProcurementMethod"], str(self.method_new.id)
         )
 
+    def test_patch_records_empty_relation_as_null(self):
+        """A previously-empty relation must be audited as null, not the string
+        "None", so the Muutoshistoria UI renders an empty previous value."""
+        project = Project.objects.create(
+            name="No Method Project",
+            description="No method",
+            hkrId=None,
+            constructionProcurementMethod=None,
+        )
+        response = self.client.patch(
+            f"/projects/{project.id}/",
+            {"constructionProcurementMethod": str(self.method_new.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.content)
+
+        entry = AuditLog.objects.get(project=project, operation="UPDATE")
+        self.assertIsNone(entry.old_values["constructionProcurementMethod"])
+        self.assertEqual(
+            entry.new_values["constructionProcurementMethod"], str(self.method_new.id)
+        )
+
     def test_patch_without_audited_fields_creates_no_entry(self):
         response = self.client.patch(
             f"/projects/{self.project.id}/",
