@@ -25,11 +25,6 @@ class ConstructionHandoverViewSet(BaseViewSet):
         "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION"],
         "MOVED_TO_CONSTRUCTION_PREPARATION": [],
     }
-
-    AUTO_TRANSITION_TRIGGER_FIELDS = {
-        "constructionProjectManager",
-        "constructionProcurementMethod",
-    }
     
     """
     API endpoint that allows construction handovers to be viewed or edited.
@@ -165,7 +160,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
             return False
 
         incoming_fields = self._get_incoming_patch_fields(request)
-        return bool(incoming_fields & self.AUTO_TRANSITION_TRIGGER_FIELDS)
+        return bool(incoming_fields & {"constructionProjectManager"})
 
     def _should_auto_transition_to_moved_to_construction_preparation(self, request, instance):
         if instance.status != "PROJECT_MANAGER_NAMED":

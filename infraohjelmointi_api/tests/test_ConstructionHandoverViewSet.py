@@ -628,9 +628,41 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
         self.assertEqual(handover.constructionProjectManager_id, self.person_planning.id)
+
+    @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=True)
+    def test_partial_update_does_not_auto_transition_to_project_manager_named_when_only_procurement_method_is_updated(self, _mock_is_construction_management_lead):
+        self.client.force_authenticate(user=self.user_1)
+
+        updated_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {
+                "constructionProcurementMethod": str(updated_procurement_method.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Only construction handovers in DRAFT status can be edited.",
+        )
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
         self.assertEqual(
             handover.constructionProcurementMethod_id,
-            updated_procurement_method.id,
+            self.construction_procurement_method.id,
         )
 
     @patch("infraohjelmointi_api.views.ConstructionHandoverViewSet.IsConstructionManagementLead.user_in_construction_management_lead_group", return_value=False)
