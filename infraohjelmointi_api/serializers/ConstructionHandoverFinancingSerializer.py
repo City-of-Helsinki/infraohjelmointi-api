@@ -55,64 +55,84 @@ class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
         data["handover"] = str(instance.handover_id) if instance.handover_id else None
         return data
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-
+    def _resolve_handover(self, attrs):
         handover_id = attrs.get("handover")
-        if handover_id is not None:
-            try:
-                attrs["handover"] = ConstructionHandover.objects.get(id=handover_id)
-            except ConstructionHandover.DoesNotExist:
-                raise serializers.ValidationError({"handover": "Invalid handover id."})
+        if handover_id is None:
+            return
 
+        try:
+            attrs["handover"] = ConstructionHandover.objects.get(id=handover_id)
+        except ConstructionHandover.DoesNotExist:
+            raise serializers.ValidationError({"handover": "Invalid handover id."})
+
+    def _effective_value(self, attrs, field):
+        if field in attrs:
+            return attrs[field]
+        if self.instance:
+            return getattr(self.instance, field, None)
+        return None
+
+    def _effective_financing_party(self, attrs):
         financing_party = attrs.get("financingParty")
         if financing_party is None and self.instance:
             financing_party = self.instance.financingParty
+        return financing_party
 
-        # Helper: get effective value from attrs or instance (for partial updates)
-        def effective(field):
-            if field in attrs:
-                return attrs[field]
-            if self.instance:
-                return getattr(self.instance, field, None)
-            return None
+    def _effective_budget_item(self, attrs):
+        if "budgetItem" in attrs:
+            return attrs["budgetItem"]
+        if self.instance:
+            return self.instance.budgetItem
+        return None
 
+    def _validate_kymp(self, attrs):
+        budget_item = self._effective_budget_item(attrs)
+        if budget_item is None:
+            raise serializers.ValidationError(
+                {"budgetItemId": "Budget item is required for KYMP financing."}
+            )
+        if not self._effective_value(attrs, "budget"):
+            raise serializers.ValidationError(
+                {"budget": "Budget is required for KYMP financing."}
+            )
+        if not self._effective_value(attrs, "projectNumber"):
+            raise serializers.ValidationError(
+                {"projectNumber": "Project number is required for KYMP financing."}
+            )
+
+    def _validate_other(self, attrs):
+        if not self._effective_value(attrs, "description"):
+            raise serializers.ValidationError(
+                {"description": "Description is required when financing party is OTHER."}
+            )
+        if not self._effective_value(attrs, "budget"):
+            raise serializers.ValidationError(
+                {"budget": "Budget is required for OTHER financing."}
+            )
+
+    def _validate_other_financing_party(self, attrs):
+        if not self._effective_value(attrs, "budget"):
+            raise serializers.ValidationError({"budget": "Budget is required."})
+        if (
+            "financingParty" in attrs
+            and "budgetItem" not in attrs
+            and self.instance
+            and self.instance.budgetItem
+        ):
+            attrs["budgetItem"] = None
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        self._resolve_handover(attrs)
+
+        financing_party = self._effective_financing_party(attrs)
         if financing_party == "KYMP":
-            # budgetItem required: check attrs first, then instance
-            if "budgetItem" in attrs:
-                budget_item = attrs["budgetItem"]
-            elif self.instance:
-                budget_item = self.instance.budgetItem
-            else:
-                budget_item = None
-            if budget_item is None:
-                raise serializers.ValidationError(
-                    {"budgetItemId": "Budget item is required for KYMP financing."}
-                )
-            if not effective("budget"):
-                raise serializers.ValidationError(
-                    {"budget": "Budget is required for KYMP financing."}
-                )
-            if not effective("projectNumber"):
-                raise serializers.ValidationError(
-                    {"projectNumber": "Project number is required for KYMP financing."}
-                )
+            self._validate_kymp(attrs)
         elif financing_party == "OTHER":
-            if not effective("description"):
-                raise serializers.ValidationError(
-                    {"description": "Description is required when financing party is OTHER."}
-                )
-            if not effective("budget"):
-                raise serializers.ValidationError(
-                    {"budget": "Budget is required for OTHER financing."}
-                )
+            self._validate_other(attrs)
         elif financing_party is not None:
-            # All other parties: only budget is required; budgetItemId is not used
-            if not effective("budget"):
-                raise serializers.ValidationError({"budget": "Budget is required."})
-            # If changing to a non-KYMP party, clear any existing budgetItem
-            if "financingParty" in attrs and "budgetItem" not in attrs and self.instance and self.instance.budgetItem:
-                attrs["budgetItem"] = None
+            self._validate_other_financing_party(attrs)
 
         return attrs
 
