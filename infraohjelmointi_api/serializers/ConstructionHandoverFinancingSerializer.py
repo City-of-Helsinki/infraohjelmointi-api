@@ -1,7 +1,11 @@
 from rest_framework import serializers
 from rest_framework.settings import api_settings
 
-from infraohjelmointi_api.models import ConstructionHandover, ConstructionHandoverFinancing
+from infraohjelmointi_api.models import (
+    ConstructionHandover,
+    ConstructionHandoverFinancing,
+    ProjectTypeQualifier,
+)
 from infraohjelmointi_api.serializers.ProjectTypeQualifierSerializer import (
     ProjectTypeQualifierSerializer,
 )
@@ -10,7 +14,13 @@ from infraohjelmointi_api.serializers.ProjectTypeQualifierSerializer import (
 class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
     budgetItem = ProjectTypeQualifierSerializer(read_only=True)
     handover = serializers.UUIDField(required=False, allow_null=True)
-    budgetItemId = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    budgetItemId = serializers.PrimaryKeyRelatedField(
+        queryset=ProjectTypeQualifier.objects.all(),
+        source="budgetItem",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     project = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
     class Meta:
@@ -56,22 +66,53 @@ class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"handover": "Invalid handover id."})
 
         financing_party = attrs.get("financingParty")
-        if financing_party == "OTHER" and not attrs.get("description"):
-            raise serializers.ValidationError({
-                "description": "Description is required when financing party is OTHER.",
-            })
+        if financing_party is None and self.instance:
+            financing_party = self.instance.financingParty
 
-        if "budgetItemId" in attrs:
-            budget_item_id = attrs.pop("budgetItemId")
-            if budget_item_id is None:
-                attrs["budgetItem"] = None
+        # Helper: get effective value from attrs or instance (for partial updates)
+        def effective(field):
+            if field in attrs:
+                return attrs[field]
+            if self.instance:
+                return getattr(self.instance, field, None)
+            return None
+
+        if financing_party == "KYMP":
+            # budgetItem required: check attrs first, then instance
+            if "budgetItem" in attrs:
+                budget_item = attrs["budgetItem"]
+            elif self.instance:
+                budget_item = self.instance.budgetItem
             else:
-                from infraohjelmointi_api.models import ProjectTypeQualifier
-
-                try:
-                    attrs["budgetItem"] = ProjectTypeQualifier.objects.get(id=budget_item_id)
-                except ProjectTypeQualifier.DoesNotExist:
-                    raise serializers.ValidationError({"budgetItemId": "Invalid project type qualifier id."})
+                budget_item = None
+            if budget_item is None:
+                raise serializers.ValidationError(
+                    {"budgetItemId": "Budget item is required for KYMP financing."}
+                )
+            if not effective("budget"):
+                raise serializers.ValidationError(
+                    {"budget": "Budget is required for KYMP financing."}
+                )
+            if not effective("projectNumber"):
+                raise serializers.ValidationError(
+                    {"projectNumber": "Project number is required for KYMP financing."}
+                )
+        elif financing_party == "OTHER":
+            if not effective("description"):
+                raise serializers.ValidationError(
+                    {"description": "Description is required when financing party is OTHER."}
+                )
+            if not effective("budget"):
+                raise serializers.ValidationError(
+                    {"budget": "Budget is required for OTHER financing."}
+                )
+        elif financing_party is not None:
+            # All other parties: only budget is required; budgetItemId is not used
+            if not effective("budget"):
+                raise serializers.ValidationError({"budget": "Budget is required."})
+            # If changing to a non-KYMP party, clear any existing budgetItem
+            if "financingParty" in attrs and "budgetItem" not in attrs and self.instance and self.instance.budgetItem:
+                attrs["budgetItem"] = None
 
         return attrs
 

@@ -134,8 +134,8 @@ class ConstructionHandoverFinancingSerializerTestCase(APITestCase):
         serializer = ConstructionHandoverFinancingSerializer(data=data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_kymp_financing_without_budget_item_is_valid(self):
-        """Test that KYMP financing can be created without budgetItem"""
+    def test_kymp_financing_without_budget_item_raises_validation_error(self):
+        """Test that KYMP financing requires budgetItem"""
         data = {
             "handover": str(self.handover.id),
             "financingParty": "KYMP",
@@ -144,7 +144,8 @@ class ConstructionHandoverFinancingSerializerTestCase(APITestCase):
             "budget": "150000.00",
         }
         serializer = ConstructionHandoverFinancingSerializer(data=data)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budgetItemId", serializer.errors)
 
     def test_kymp_financing_with_budget_item_is_valid(self):
         """Test that KYMP financing with budgetItem is valid"""
@@ -157,6 +158,75 @@ class ConstructionHandoverFinancingSerializerTestCase(APITestCase):
             "budget": "150000.00",
         }
         serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_kymp_financing_without_budget_raises_validation_error(self):
+        """Test that KYMP financing requires budget"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "KYMP",
+            "budgetItemId": str(self.budget_item.id),
+            "projectNumber": "HEL-2024-001",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budget", serializer.errors)
+
+    def test_kymp_financing_without_project_number_raises_validation_error(self):
+        """Test that KYMP financing requires projectNumber"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "KYMP",
+            "budgetItemId": str(self.budget_item.id),
+            "budget": "150000.00",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("projectNumber", serializer.errors)
+
+    def test_other_financing_without_budget_raises_validation_error(self):
+        """Test that OTHER financing party requires budget"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "OTHER",
+            "description": "External funding",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budget", serializer.errors)
+
+    def test_third_party_financing_without_budget_raises_validation_error(self):
+        """Test that non-KYMP/non-OTHER financing party requires budget"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "HELEN",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budget", serializer.errors)
+
+    def test_third_party_financing_with_budget_is_valid(self):
+        """Test that non-KYMP/non-OTHER financing party only requires budget"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "HELEN",
+            "budget": "75000.00",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_update_without_financing_party_is_valid(self):
+        """Test that PATCH can omit financingParty and use existing instance value"""
+        instance = ConstructionHandoverFinancing.objects.create(
+            handover=self.handover,
+            financingParty=FinancingParty.HELEN,
+            budget="1000.00",
+        )
+        serializer = ConstructionHandoverFinancingSerializer(
+            instance=instance,
+            data={"budget": "2000.00"},
+            partial=True,
+        )
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
@@ -193,7 +263,7 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
 
     def test_create_with_project_resolves_latest_active_handover(self):
         older = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
-        latest = ConstructionHandover.objects.create(project=self.project, status="SUBMITTED_TO_PROGRAMMER")
+        latest = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
 
         response = self.client.post(
             "/construction-handover-financings/",
@@ -254,6 +324,25 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("budgetItemId", response.data)
+
+    def test_create_non_kymp_with_empty_budget_item_id_is_allowed(self):
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        response = self.client.post(
+            "/construction-handover-financings/",
+            {
+                "handover": str(handover.id),
+                "financingParty": "HELEN",
+                "budgetItemId": "",
+                "budget": "2500.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        financing = ConstructionHandoverFinancing.objects.get(id=response.data["id"])
+        self.assertEqual(financing.financingParty, "HELEN")
+        self.assertIsNone(financing.budgetItem)
 
     def test_create_returns_400_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
@@ -322,6 +411,87 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
             response.data["detail"],
             "Only construction handovers in DRAFT status can be edited.",
         )
+
+    def test_patch_non_kymp_financing_without_budget_item_id_succeeds(self):
+        """PATCH on a non-KYMP/non-OTHER row must not require budgetItemId"""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+        financing = ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty=FinancingParty.HELEN,
+            budget="1000.00",
+        )
+
+        response = self.client.patch(
+            f"/construction-handover-financings/{financing.id}/",
+            {"budget": "2000.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        financing.refresh_from_db()
+        self.assertEqual(financing.budget, Decimal("2000.00"))
+
+    def test_patch_kymp_financing_budget_without_resending_budget_item_succeeds(self):
+        """PATCH only budget on a KYMP row keeps the existing budgetItem"""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+        financing = ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty=FinancingParty.KYMP,
+            budgetItem=self.budget_item,
+            projectNumber="HEL-2024-001",
+            budget="1000.00",
+        )
+
+        response = self.client.patch(
+            f"/construction-handover-financings/{financing.id}/",
+            {"budget": "9999.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        financing.refresh_from_db()
+        self.assertEqual(financing.budget, Decimal("9999.00"))
+        self.assertEqual(financing.budgetItem, self.budget_item)
+
+    def test_patch_without_financing_party_returns_200(self):
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+        financing = ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty=FinancingParty.HELEN,
+            budget="1000.00",
+        )
+
+        response = self.client.patch(
+            f"/construction-handover-financings/{financing.id}/",
+            {"budget": "2000.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        financing.refresh_from_db()
+        self.assertEqual(financing.budget, Decimal("2000.00"))
+
+    def test_patch_changes_financing_party_from_kymp_clears_budget_item(self):
+        """Changing financingParty from KYMP to another party clears budgetItem"""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+        financing = ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty=FinancingParty.KYMP,
+            budgetItem=self.budget_item,
+            projectNumber="HEL-2024-001",
+            budget="5000.00",
+        )
+
+        response = self.client.patch(
+            f"/construction-handover-financings/{financing.id}/",
+            {"financingParty": "HELEN"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        financing.refresh_from_db()
+        self.assertEqual(financing.financingParty, "HELEN")
+        self.assertIsNone(financing.budgetItem)
 
     def test_list_filters_by_handover(self):
         handover_a = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
