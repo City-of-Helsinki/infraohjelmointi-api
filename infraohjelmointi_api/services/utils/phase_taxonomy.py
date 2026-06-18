@@ -1,5 +1,5 @@
 """IO-863: single source of truth for the project phase / phase-detail taxonomy
-change, shared by the ``0108_phase_taxonomy`` migration and its unit tests so
+change, shared by the ``0109_phase_taxonomy`` migration and its unit tests so
 neither has to pull in Django models.
 
 Two concerns live here:
@@ -34,16 +34,18 @@ def decide_programming_phase_detail_value(
     assign to a programming-phase project, or ``None`` if the project should
     keep whatever ``phaseDetail`` it already has.
 
-    Rules from the customer spec on IO-863:
+    Rules from the customer spec on IO-863 (Fanny's clarification comment):
 
-    * planningStartYear >= 2027 -> "programming"
+    * planningStartYear >= 2027, or empty/unknown ("tai on tyhjä") -> "programming"
     * planningStartYear == 2026 and project manager is named -> "waitingPlanningStart"
     * planningStartYear == 2026 and no project manager -> "waitingProjectManager"
-    * < 2026 or unknown -> leave existing detail untouched
+    * < 2026 -> leave existing detail untouched
+
+    Note: the spec phrases this against the "suunnittelu alkaa" date field, but the
+    backfill keys on ``planningStartYear`` because that is the canonical planning
+    start year across the codebase (see ``utils.schedule.resolve_schedule``).
     """
-    if planning_start_year is None:
-        return None
-    if planning_start_year >= 2027:
+    if planning_start_year is None or planning_start_year >= 2027:
         return PROGRAMMING_DETAIL_VALUE
     if planning_start_year == 2026:
         if has_planning_person:
@@ -87,9 +89,20 @@ NEW_DETAILS = {
     "warrantyPeriod": ["warranty", "warrantyIncomplete"],
 }
 
-# Detail removed from the ``construction`` phase (label "Ensimmäinen vaihe valmis").
-# Projects holding it have their phaseDetail NULLed (they stay in ``construction``).
+# IO-863 spec op 4 ("Rakentamishankkeet"): construction projects whose detail is
+# the old ``firstPhaseComplete`` ("Ensimmäinen vaihe valmis") move BACK to the
+# ``constructionWait`` ("Odottaa rakentamista") phase and take the renamed
+# ``firstPhaseCompleteOrIncomplete`` ("Ensimmäinen vaihe valmis/keskeneräinen")
+# detail. The old detail row is then removed. This is a deliberate phase move
+# requested by the customer, not a regression.
 REMOVED_CONSTRUCTION_DETAIL = "firstPhaseComplete"
+FIRST_PHASE_COMPLETE_TARGET_PHASE = "constructionWait"
+FIRST_PHASE_COMPLETE_TARGET_DETAIL = "firstPhaseCompleteOrIncomplete"
+
+# IO-863 spec op 5 ("Takuuajan hankkeet"): every warranty-period project gets the
+# ``warranty`` ("Takuuaika") detail.
+WARRANTY_PHASE_VALUE = "warrantyPeriod"
+WARRANTY_BACKFILL_DETAIL_VALUE = "warranty"
 
 # Details that move to a different (surviving) phase, keeping their value.
 # IO-863: ``movedToConstruction`` (relabeled "Siirretty rakennuttamiseen" in the UI)

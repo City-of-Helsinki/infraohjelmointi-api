@@ -90,9 +90,16 @@ class DecideProgrammingPhaseDetailValueTests(TestCase):
         self.assertIsNone(decide_programming_phase_detail_value(2025, has_planning_person=True))
         self.assertIsNone(decide_programming_phase_detail_value(2025, has_planning_person=False))
 
-    def test_none_planning_start_year_returns_none(self):
-        self.assertIsNone(decide_programming_phase_detail_value(None, has_planning_person=True))
-        self.assertIsNone(decide_programming_phase_detail_value(None, has_planning_person=False))
+    def test_none_planning_start_year_assigns_programming(self):
+        # IO-863 spec: ">= 2027 or empty (tai on tyhjä)" -> programming.
+        self.assertEqual(
+            decide_programming_phase_detail_value(None, has_planning_person=True),
+            PROGRAMMING_DETAIL_VALUE,
+        )
+        self.assertEqual(
+            decide_programming_phase_detail_value(None, has_planning_person=False),
+            PROGRAMMING_DETAIL_VALUE,
+        )
 
 
 class ProgrammingBackfillIntegrationTests(TestCase):
@@ -149,8 +156,8 @@ class ProgrammingBackfillIntegrationTests(TestCase):
         self.assertEqual(future_without_pm.phaseDetail, programming_detail)
         self.assertEqual(y2026_with_pm.phaseDetail, self.waiting_planning_start_detail)
         self.assertEqual(y2026_without_pm.phaseDetail, self.waiting_pm_detail)
-        self.assertIsNone(y2025.phaseDetail)
-        self.assertIsNone(no_year.phaseDetail)
+        self.assertIsNone(y2025.phaseDetail)  # < 2026 left untouched
+        self.assertEqual(no_year.phaseDetail, programming_detail)  # empty -> programming
         self.assertIsNone(other_phase.phaseDetail)  # non-programming phase untouched
 
     def test_backfill_is_idempotent(self):
@@ -268,7 +275,9 @@ class TaxonomyRestructureCallableTests(TestCase):
         self.assertEqual(proj.phaseDetail.value, "movedToConstruction")
         self.assertEqual(proj.phaseDetail.projectPhase.value, "constructionWait")
 
-    def test_first_phase_complete_nulled_and_removed_control_untouched(self):
+    def test_first_phase_complete_moved_to_construction_wait(self):
+        # IO-863 spec op 4: construction projects on the old "first phase complete"
+        # detail move to constructionWait with the renamed firstPhaseCompleteOrIncomplete.
         on_fpc = self._make("fpc", self.construction, detail=self.first_phase_complete)
         pre_con = ProjectPhaseDetail.objects.get(value="preConstruction", projectPhase=self.construction)
         control = self._make("ctrl", self.construction, detail=pre_con)
@@ -277,10 +286,22 @@ class TaxonomyRestructureCallableTests(TestCase):
 
         on_fpc.refresh_from_db()
         control.refresh_from_db()
-        self.assertIsNone(on_fpc.phaseDetail)
-        self.assertEqual(on_fpc.phase.value, "construction")  # phase unchanged
+        self.assertEqual(on_fpc.phase.value, "constructionWait")
+        self.assertEqual(on_fpc.phaseDetail.value, "firstPhaseCompleteOrIncomplete")
+        self.assertEqual(on_fpc.phaseDetail.projectPhase.value, "constructionWait")
         self.assertFalse(ProjectPhaseDetail.objects.filter(value=REMOVED_CONSTRUCTION_DETAIL).exists())
         self.assertEqual(control.phaseDetail, pre_con)  # untouched
+        self.assertEqual(control.phase.value, "construction")  # untouched
+
+    def test_warranty_projects_backfilled_with_warranty_detail(self):
+        # IO-863 spec op 5: every warranty-period project gets the warranty detail.
+        warranty_phase = ProjectPhase.objects.get(value="warrantyPeriod")
+        proj = self._make("warr", warranty_phase)
+        self._restructure()
+        proj.refresh_from_db()
+        self.assertEqual(proj.phase.value, "warrantyPeriod")
+        self.assertEqual(proj.phaseDetail.value, "warranty")
+        self.assertEqual(proj.phaseDetail.projectPhase.value, "warrantyPeriod")
 
     def test_deleted_phases_removed_and_no_dangling(self):
         self._make("di", self.draft_initiation)
