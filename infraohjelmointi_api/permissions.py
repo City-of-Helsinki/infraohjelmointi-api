@@ -196,6 +196,12 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 #### Construction handover custom actions ####
 CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
 
+#### Project change-history custom actions (IO-879) ####
+# Per-project audit-log history powering the "Näytä muutoshistoria" UI.
+# Read-only and scoped to a single project, so it is granted to every role
+# that can view a project (including plain viewers and restricted programmers).
+PROJECT_HISTORY_GET_ACTIONS = ["get_project_history"]
+
 LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER = [
     "finances",
     "name", #* Kohde/hanke Ei (No) # name
@@ -257,6 +263,7 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_FINANCES_PLANNING_GET_ACTIONS,
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -297,6 +304,7 @@ class IsCoordinator(permissions.BasePermission):
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -335,6 +343,7 @@ class IsPlanner(permissions.BasePermission):
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -375,6 +384,7 @@ class IsProjectManager(permissions.BasePermission):
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -461,7 +471,8 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *PROJECT_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
-                *PROJECT_NOTE_ALL_ACTIONS
+                *PROJECT_NOTE_ALL_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -528,6 +539,7 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_FORCED_TO_FRAME_PATCH,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -592,6 +604,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *PROJECT_GROUP_ALL_GET_ACTIONS,
             *SAP_COST_ALL_GET_ACTIONS,
             *PROJECT_NOTE_ALL_GET_ACTIONS,
+            *PROJECT_HISTORY_GET_ACTIONS,
         ]:
             return True
 
