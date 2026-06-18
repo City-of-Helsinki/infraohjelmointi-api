@@ -8,6 +8,9 @@ from infraohjelmointi_api.serializers import ConstructionHandoverFinancingSerial
 from .BaseViewSet import BaseViewSet
 
 
+LOCKED_HANDOVER_EDIT_ERROR = "Only construction handovers in DRAFT status can be edited."
+
+
 class ConstructionHandoverFinancingViewSet(BaseViewSet):
     """API endpoint that allows construction handover financing rows to be viewed or edited."""
 
@@ -37,7 +40,7 @@ class ConstructionHandoverFinancingViewSet(BaseViewSet):
         handover = serializer.validated_data.get("handover")
         if handover and handover.is_locked:
             return Response(
-                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                {"detail": LOCKED_HANDOVER_EDIT_ERROR},
                 status=status.HTTP_409_CONFLICT,
             )
         
@@ -52,7 +55,7 @@ class ConstructionHandoverFinancingViewSet(BaseViewSet):
         
         if instance.handover.is_locked:
             return Response(
-                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                {"detail": LOCKED_HANDOVER_EDIT_ERROR},
                 status=status.HTTP_409_CONFLICT,
             )
         
@@ -70,7 +73,7 @@ class ConstructionHandoverFinancingViewSet(BaseViewSet):
         instance = self.get_object()
         if instance.handover.is_locked:
             return Response(
-                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                {"detail": LOCKED_HANDOVER_EDIT_ERROR},
                 status=status.HTTP_409_CONFLICT,
             )
         return super().destroy(request, *args, **kwargs)
