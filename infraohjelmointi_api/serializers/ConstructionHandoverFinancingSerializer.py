@@ -113,13 +113,31 @@ class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
     def _validate_other_financing_party(self, attrs):
         if not self._effective_value(attrs, "budget"):
             raise serializers.ValidationError({"budget": "Budget is required."})
-        if (
-            "financingParty" in attrs
-            and "budgetItem" not in attrs
-            and self.instance
-            and self.instance.budgetItem
-        ):
-            attrs["budgetItem"] = None
+
+    def _reject_kymp_only_fields(self, attrs):
+        """Reject budgetItem and projectNumber for non-KYMP rows.
+
+        If the client explicitly sends a non-null budgetItem or non-empty
+        projectNumber, raise 400.  When the financingParty is being changed
+        away from KYMP without the client re-sending those fields, silently
+        clear them so the data stays clean.
+        """
+        errors = {}
+        if attrs.get("budgetItem") is not None:
+            errors["budgetItemId"] = "budgetItem is only allowed for KYMP financing."
+        if attrs.get("projectNumber"):
+            errors["projectNumber"] = "projectNumber is only allowed for KYMP financing."
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        # Auto-clear KYMP-only fields when the party is explicitly changed
+        # (i.e. financingParty is present in this request) and the existing
+        # instance still carries those fields.
+        if "financingParty" in attrs and self.instance:
+            if self.instance.budgetItem is not None:
+                attrs["budgetItem"] = None
+            if self.instance.projectNumber:
+                attrs["projectNumber"] = ""
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -129,10 +147,12 @@ class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
         financing_party = self._effective_financing_party(attrs)
         if financing_party == "KYMP":
             self._validate_kymp(attrs)
-        elif financing_party == "OTHER":
-            self._validate_other(attrs)
-        elif financing_party is not None:
-            self._validate_other_financing_party(attrs)
+        else:
+            self._reject_kymp_only_fields(attrs)
+            if financing_party == "OTHER":
+                self._validate_other(attrs)
+            elif financing_party is not None:
+                self._validate_other_financing_party(attrs)
 
         return attrs
 

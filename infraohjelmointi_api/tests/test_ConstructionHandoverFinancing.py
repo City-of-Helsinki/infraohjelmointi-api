@@ -229,6 +229,43 @@ class ConstructionHandoverFinancingSerializerTestCase(APITestCase):
         )
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
+    def test_non_kymp_with_budget_item_raises_validation_error(self):
+        """Non-KYMP row that sends budgetItemId must be rejected with 400"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "HELEN",
+            "budget": "75000.00",
+            "budgetItemId": str(self.budget_item.id),
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budgetItemId", serializer.errors)
+
+    def test_non_kymp_with_project_number_raises_validation_error(self):
+        """Non-KYMP row that sends projectNumber must be rejected with 400"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "HELEN",
+            "budget": "75000.00",
+            "projectNumber": "HEL-2024-999",
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("projectNumber", serializer.errors)
+
+    def test_other_with_budget_item_raises_validation_error(self):
+        """OTHER row that sends budgetItemId must be rejected with 400"""
+        data = {
+            "handover": str(self.handover.id),
+            "financingParty": "OTHER",
+            "description": "External",
+            "budget": "50000.00",
+            "budgetItemId": str(self.budget_item.id),
+        }
+        serializer = ConstructionHandoverFinancingSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("budgetItemId", serializer.errors)
+
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
@@ -245,6 +282,86 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         if isinstance(data, dict) and "results" in data:
             return data["results"]
         return data
+
+    def test_create_kymp_row_with_full_fields_returns_201(self):
+        """KYMP row creation succeeds when all required fields are provided (req 1)."""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        response = self.client.post(
+            "/construction-handover-financings/",
+            {
+                "handover": str(handover.id),
+                "financingParty": "KYMP",
+                "budgetItemId": str(self.budget_item.id),
+                "projectNumber": "HEL-2024-001",
+                "budget": "150000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        row = ConstructionHandoverFinancing.objects.get(id=response.data["id"])
+        self.assertEqual(row.financingParty, "KYMP")
+        self.assertEqual(row.budgetItem, self.budget_item)
+        self.assertEqual(row.projectNumber, "HEL-2024-001")
+        self.assertEqual(row.budget, Decimal("150000.00"))
+
+    def test_create_helen_row_with_only_party_and_budget_returns_201(self):
+        """Non-KYMP (HSY/HELEN) row succeeds with only financingParty + budget (req 2)."""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        response = self.client.post(
+            "/construction-handover-financings/",
+            {
+                "handover": str(handover.id),
+                "financingParty": "HELEN",
+                "budget": "75000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        row = ConstructionHandoverFinancing.objects.get(id=response.data["id"])
+        self.assertEqual(row.financingParty, "HELEN")
+        self.assertIsNone(row.budgetItem)
+        self.assertEqual(row.projectNumber, "")
+        self.assertEqual(row.budget, Decimal("75000.00"))
+
+    def test_create_helen_row_with_budget_item_returns_400(self):
+        """Non-KYMP row that includes budgetItem must be rejected with 400 (req 3)."""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        response = self.client.post(
+            "/construction-handover-financings/",
+            {
+                "handover": str(handover.id),
+                "financingParty": "HELEN",
+                "budget": "75000.00",
+                "budgetItemId": str(self.budget_item.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("budgetItemId", response.data)
+
+    def test_create_helen_row_with_project_number_returns_400(self):
+        """Non-KYMP row that includes projectNumber must be rejected with 400 (req 3)."""
+        handover = ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        response = self.client.post(
+            "/construction-handover-financings/",
+            {
+                "handover": str(handover.id),
+                "financingParty": "HELEN",
+                "budget": "75000.00",
+                "projectNumber": "HEL-2024-999",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("projectNumber", response.data)
 
     def test_create_requires_handover_or_project(self):
         response = self.client.post(
@@ -543,3 +660,50 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         items = self._list_items(response)
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["id"], str(active_row.id))
+
+    def test_lookup_project_number_returns_sap_number_when_site_id_matches(self):
+        """lookup-project-number returns sapProject when Project.siteId_id matches the given UUID.
+
+        The endpoint queries Project.objects.filter(siteId_id=<uuid>). Project.siteId is
+        a FK to BudgetItem, so a matching BudgetItem UUID must be passed as the query param.
+        """
+        from infraohjelmointi_api.models import BudgetItem
+        budget_item = BudgetItem.objects.create(need=0)
+        Project.objects.create(
+            name="SAP project",
+            description="SAP project description",
+            siteId=budget_item,
+            sapProject="SAP-2024-001",
+        )
+
+        response = self.client.get(
+            f"/construction-handover-financings/lookup-project-number/?budgetItem={budget_item.id}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["projectNumber"], "SAP-2024-001")
+
+    def test_lookup_project_number_returns_null_when_no_project_has_matching_site_id(self):
+        """lookup-project-number returns null when no Project has siteId matching the given UUID."""
+        random_uuid = uuid.uuid4()
+
+        response = self.client.get(
+            f"/construction-handover-financings/lookup-project-number/?budgetItem={random_uuid}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["projectNumber"])
+
+    def test_lookup_project_number_returns_400_when_budget_item_missing(self):
+        response = self.client.get("/construction-handover-financings/lookup-project-number/")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("budgetItem", response.data)
+
+    def test_lookup_project_number_returns_400_for_invalid_uuid(self):
+        response = self.client.get(
+            "/construction-handover-financings/lookup-project-number/?budgetItem=not-a-uuid"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("budgetItem", response.data)
