@@ -7,8 +7,11 @@ projects (see services/utils/phase_taxonomy.decide_programming_phase_detail_valu
 op 2 (restructure) — collapse the three standalone planning phases
 (draftInitiation/draftApproval/constructionPlan) into one ``planning``
 ("Suunnittelu") phase, moving their details under it; migrate every affected
-project; add the new constructionWait/construction/warrantyPeriod details; remove
-``firstPhaseComplete`` from construction; and renumber every phase's index/order.
+project; add the new constructionWait/construction/warrantyPeriod details; move
+construction "first phase complete" projects to ``constructionWait`` with the
+renamed ``firstPhaseCompleteOrIncomplete`` detail (spec op 4); back-fill every
+warranty-period project with the ``warranty`` detail (spec op 5); and renumber
+every phase's index/order.
 
 Ordering inside op 2 is load-bearing: Project.phase / phaseDetail /
 suspendedFromPhase are all DO_NOTHING + DEFERRABLE FKs, so every referencing
@@ -26,6 +29,8 @@ from django.db import migrations
 from infraohjelmointi_api.services.utils.phase_taxonomy import (
     DELETED_PHASE_TO_DETAIL,
     DELETED_PHASE_VALUES,
+    FIRST_PHASE_COMPLETE_TARGET_DETAIL,
+    FIRST_PHASE_COMPLETE_TARGET_PHASE,
     MOVED_DETAILS,
     NEW_DETAILS,
     PLANNING_PHASE_VALUE,
@@ -33,6 +38,10 @@ from infraohjelmointi_api.services.utils.phase_taxonomy import (
     REMOVED_CONSTRUCTION_DETAIL,
     REPARENTED_DETAILS,
     TARGET_PHASE_ORDER,
+    WAITING_PLANNING_START_DETAIL_VALUE,
+    WAITING_PROJECT_MANAGER_DETAIL_VALUE,
+    WARRANTY_BACKFILL_DETAIL_VALUE,
+    WARRANTY_PHASE_VALUE,
     decide_programming_phase_detail_value,
 )
 
@@ -65,10 +74,18 @@ def backfill_programming(apps, schema_editor):
     if not programming_phase:
         return
 
-    ProjectPhaseDetail.objects.get_or_create(
-        value=PROGRAMMING_DETAIL_VALUE,
-        projectPhase=programming_phase,
-    )
+    # Ensure every detail the backfill can assign exists under the programming
+    # phase. `waiting*` were created in 0097, but get_or_create keeps this robust
+    # (a missing target would otherwise silently skip 2026 projects).
+    for detail_value in (
+        PROGRAMMING_DETAIL_VALUE,
+        WAITING_PLANNING_START_DETAIL_VALUE,
+        WAITING_PROJECT_MANAGER_DETAIL_VALUE,
+    ):
+        ProjectPhaseDetail.objects.get_or_create(
+            value=detail_value,
+            projectPhase=programming_phase,
+        )
 
     detail_by_value = {
         d.value: d
@@ -207,22 +224,69 @@ def restructure_taxonomy(apps, schema_editor):
         detail.projectPhase = new_phase
         detail.save(update_fields=["projectPhase"])
 
-    # Step 6 — remove firstPhaseComplete from construction. Existing projects keep
-    # their phase but lose this sub-status (NULL before delete; auto-moving them to
-    # constructionWait would be a phase regression).
+    # Step 6 — IO-863 spec op 4 ("Rakentamishankkeet"): move construction projects
+    # that were "first phase complete" to the constructionWait phase with the renamed
+    # firstPhaseCompleteOrIncomplete detail, then drop the obsolete firstPhaseComplete
+    # row. Projects are repointed to the new (phase, detail) BEFORE the old row is
+    # deleted, so no FK dangles and phase/phaseDetail stay consistent.
     fpc = ProjectPhaseDetail.objects.filter(
         value=REMOVED_CONSTRUCTION_DETAIL, projectPhase__value="construction"
     ).first()
     if fpc:
+        target_phase = ProjectPhase.objects.filter(
+            value=FIRST_PHASE_COMPLETE_TARGET_PHASE
+        ).first()
+        target_detail = ProjectPhaseDetail.objects.filter(
+            value=FIRST_PHASE_COMPLETE_TARGET_DETAIL, projectPhase=target_phase
+        ).first()
         affected = Project.objects.filter(phaseDetail=fpc).count()
-        if affected:
-            logger.warning(
-                "IO-863: NULLing phaseDetail on %s construction project(s) (was '%s')",
-                affected,
-                REMOVED_CONSTRUCTION_DETAIL,
+        if target_phase and target_detail:
+            if affected:
+                logger.info(
+                    "IO-863: moving %s project(s) from construction/'%s' to '%s'/'%s'",
+                    affected,
+                    REMOVED_CONSTRUCTION_DETAIL,
+                    FIRST_PHASE_COMPLETE_TARGET_PHASE,
+                    FIRST_PHASE_COMPLETE_TARGET_DETAIL,
+                )
+            Project.objects.filter(phaseDetail=fpc).update(
+                phase=target_phase, phaseDetail=target_detail
             )
-        Project.objects.filter(phaseDetail=fpc).update(phaseDetail=None)
+        else:
+            # Defensive: the move target is missing — NULL the detail so the row can
+            # still be removed without dangling FKs (don't lose the phase).
+            logger.warning(
+                "IO-863: move target '%s'/'%s' missing; NULLing phaseDetail on %s "
+                "construction project(s) instead",
+                FIRST_PHASE_COMPLETE_TARGET_PHASE,
+                FIRST_PHASE_COMPLETE_TARGET_DETAIL,
+                affected,
+            )
+            Project.objects.filter(phaseDetail=fpc).update(phaseDetail=None)
         fpc.delete()
+
+    # Step 6b — IO-863 spec op 5 ("Takuuajan hankkeet"): every warranty-period
+    # project gets the warranty detail. Idempotent via .exclude().
+    warranty_phase = ProjectPhase.objects.filter(value=WARRANTY_PHASE_VALUE).first()
+    warranty_detail = (
+        ProjectPhaseDetail.objects.filter(
+            value=WARRANTY_BACKFILL_DETAIL_VALUE, projectPhase=warranty_phase
+        ).first()
+        if warranty_phase
+        else None
+    )
+    if warranty_phase and warranty_detail:
+        to_backfill = Project.objects.filter(phase=warranty_phase).exclude(
+            phaseDetail=warranty_detail
+        )
+        affected = to_backfill.count()
+        if affected:
+            logger.info(
+                "IO-863: assigning '%s' detail to %s warranty-period project(s)",
+                WARRANTY_BACKFILL_DETAIL_VALUE,
+                affected,
+            )
+            to_backfill.update(phaseDetail=warranty_detail)
 
     # Step 7 — delete the merged-away phases (now unreferenced). Guard first.
     remaining = Project.objects.filter(phase__value__in=DELETED_PHASE_VALUES).count()
