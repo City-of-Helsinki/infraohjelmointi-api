@@ -158,14 +158,8 @@ class ConstructionHandoverFinancingSerializer(serializers.ModelSerializer):
                 })
             validated_data["handover"] = handover
 
-        if handover and handover.is_locked:
-            raise self._locked_handover_error()
-
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        if instance.handover.is_locked:
-            raise self._locked_handover_error()
-
         validated_data.pop("project", None)
         return super().update(instance, validated_data)

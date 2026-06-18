@@ -30,6 +30,42 @@ class ConstructionHandoverFinancingViewSet(BaseViewSet):
         return queryset
 
     @override
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        handover = serializer.validated_data.get("handover")
+        if handover and handover.is_locked:
+            return Response(
+                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @override
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        if instance.handover.is_locked:
+            return Response(
+                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
+
+    @override
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.handover.is_locked:

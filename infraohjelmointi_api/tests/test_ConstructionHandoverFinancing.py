@@ -344,7 +344,7 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         self.assertEqual(financing.financingParty, "HELEN")
         self.assertIsNone(financing.budgetItem)
 
-    def test_create_returns_400_for_locked_handover(self):
+    def test_create_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="SUBMITTED_TO_PROGRAMMER",
@@ -362,13 +362,13 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
-            response.data["non_field_errors"][0],
+            response.data["detail"],
             "Only construction handovers in DRAFT status can be edited.",
         )
 
-    def test_update_returns_400_for_locked_handover(self):
+    def test_update_returns_409_for_locked_handover(self):
         locked_handover = ConstructionHandover.objects.create(
             project=self.project,
             status="SUBMITTED_TO_PROGRAMMER",
@@ -386,9 +386,9 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
-            response.data["non_field_errors"][0],
+            response.data["detail"],
             "Only construction handovers in DRAFT status can be edited.",
         )
 
