@@ -4,12 +4,12 @@ PHASE_MAP_FOR_PW = {
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
     # IO-863: draftInitiation/draftApproval/constructionPlan were merged into one
-    # `planning` ("Suunnittelu") phase (migration 0109). These keys are kept on
+    # `designPlanning` ("Suunnittelu") phase (migration 0109). These keys are kept on
     # purpose: no project references them post-migration (so the outbound mapper
     # never hits them) and the reverse map is still used by tests. A live
-    # `planning` -> PW label mapping is DEFERRED until PW admins create the value
-    # on the PW side; an unmapped `planning` phase safely DEBUG-skips meanwhile.
-    # "planning": "<PW label TBD>",
+    # `designPlanning` -> PW label mapping is DEFERRED until PW admins create the value
+    # on the PW side; an unmapped `designPlanning` phase safely DEBUG-skips meanwhile.
+    # "designPlanning": "<PW label TBD>",
     "draftInitiation": [
         "3. Suunnittelun aloitus / Suunnitelmaluonnos",
         "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
@@ -28,8 +28,8 @@ PHASE_MAP_FOR_INFRATOOL = {
     "proposal": "1. Hanke-ehdotus",
     "design": "1.5 Yleissuunnittelu",
     "programming": "2. Ohjelmointi",
-    # IO-863: merged into `planning`; kept for the reverse map. See PHASE_MAP_FOR_PW.
-    # "planning": "<PW label TBD>",
+    # IO-863: merged into `designPlanning`; kept for the reverse map. See PHASE_MAP_FOR_PW.
+    # "designPlanning": "<PW label TBD>",
     "draftInitiation": "3. Katu- ja puistosuunnittelun aloitus/suunnitelmaluonnos",
     "draftApproval": "4. Katu- / puistosuunnitelmaehdotus ja hyväksyminen",
     "constructionPlan": "5. Rakennussuunnitelma",
