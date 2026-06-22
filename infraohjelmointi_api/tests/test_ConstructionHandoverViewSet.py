@@ -1,5 +1,6 @@
 from unittest.mock import patch
 from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -15,6 +16,7 @@ from infraohjelmointi_api.models import (
     Person,
     Project,
     ProjectProgrammer,
+    ProjectTypeQualifier,
 )
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverCreateSerializer,
@@ -144,11 +146,55 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.data["name"], "Test handover")
         self.assertEqual(response.data["status"], "DRAFT")
 
+    def test_get_construction_handover_includes_financing_rows(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+        budget_item = ProjectTypeQualifier.objects.create(value="K1")
+        ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty="KYMP",
+            budgetItem=budget_item,
+            projectNumber="HEL-2024-001",
+            budget=Decimal("150000.00"),
+        )
+        ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty="OTHER",
+            description="Other financing source",
+            projectNumber="",
+            budget=Decimal("50000.00"),
+        )
+
+        response = self.client.get(f"/construction-handovers/{handover.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["constructionHandoverFinancing"]), 2)
+
+        financing_by_party = {
+            item["financingParty"]: item for item in response.data["constructionHandoverFinancing"]
+        }
+
+        kymp_financing = financing_by_party["KYMP"]
+        self.assertEqual(kymp_financing["financingParty"], "KYMP")
+        self.assertEqual(kymp_financing["projectNumber"], "HEL-2024-001")
+        self.assertEqual(str(kymp_financing["budget"]), "150000.00")
+        self.assertIsNotNone(kymp_financing["budgetItem"])
+
+        other_financing = financing_by_party["OTHER"]
+        self.assertEqual(other_financing["financingParty"], "OTHER")
+        self.assertEqual(other_financing["description"], "Other financing source")
+        self.assertEqual(str(other_financing["budget"]), "50000.00")
+
     def test_create_construction_handover(self):
         self.client.force_authenticate(user=self.user_1)
+        type_qualifier = ProjectTypeQualifier.objects.create(value="K1")
+        self.project.typeQualifier = type_qualifier
         self.project.sapProject = "SAP-123"
         self.project.costForecast = 123456
-        self.project.save(update_fields=["sapProject", "costForecast"])
+        self.project.save(update_fields=["typeQualifier", "sapProject", "costForecast"])
 
         response = self.client.post(
             "/construction-handovers/",
@@ -180,6 +226,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         financing_row = financing_rows.first()
         self.assertEqual(financing_row.financingParty, "KYMP")
+        self.assertEqual(financing_row.budgetItem_id, type_qualifier.id)
         self.assertEqual(financing_row.projectNumber, self.project.sapProject)
         self.assertEqual(financing_row.budget, self.project.costForecast)
 
@@ -758,3 +805,55 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         handover.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+
+    def test_partial_update_saves_total_cost(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": "50000.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertEqual(handover.totalCost, Decimal("50000.00"))
+
+    def test_partial_update_saves_total_cost_as_integer(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": 75000},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertEqual(handover.totalCost, Decimal("75000"))
+
+    def test_partial_update_clears_total_cost(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+            totalCost=Decimal("100000.00"),
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertIsNone(handover.totalCost)
