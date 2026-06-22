@@ -674,6 +674,8 @@ class IsConstructionManagementLead(permissions.BasePermission):
             in request.user.ad_groups.all().values_list("name", flat=True)
         ):
             return True
+        else:
+            return False
 
     def _is_construction_handover_view(self, view):
         return getattr(view, "basename", None) == self.CONSTRUCTION_HANDOVER_BASENAME
