@@ -80,30 +80,3 @@ class ConstructionHandoverFinancingViewSet(BaseViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         return super().destroy(request, *args, **kwargs)
-
-    @action(detail=False, methods=["get"], url_path="lookup-project-number")
-    def lookup_project_number(self, request):
-        """
-        GET /construction-handover-financings/lookup-project-number/?budgetItem={uuid}
-
-        Returns the SAP project number for a budget item by matching Project.siteId.
-        Returns null when no matching project is found.
-        """
-        budget_item_id = request.query_params.get("budgetItem")
-        if not budget_item_id:
-            return Response(
-                {"budgetItem": "This query parameter is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            budget_item_uuid = uuid.UUID(budget_item_id)
-        except ValueError:
-            return Response(
-                {"budgetItem": "Invalid UUID."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        project = Project.objects.filter(siteId_id=budget_item_uuid).first()
-        project_number = project.sapProject if project else None
-        return Response({"projectNumber": project_number})

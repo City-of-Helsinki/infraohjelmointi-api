@@ -661,49 +661,4 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["id"], str(active_row.id))
 
-    def test_lookup_project_number_returns_sap_number_when_site_id_matches(self):
-        """lookup-project-number returns sapProject when Project.siteId_id matches the given UUID.
 
-        The endpoint queries Project.objects.filter(siteId_id=<uuid>). Project.siteId is
-        a FK to BudgetItem, so a matching BudgetItem UUID must be passed as the query param.
-        """
-        from infraohjelmointi_api.models import BudgetItem
-        budget_item = BudgetItem.objects.create(need=0)
-        Project.objects.create(
-            name="SAP project",
-            description="SAP project description",
-            siteId=budget_item,
-            sapProject="SAP-2024-001",
-        )
-
-        response = self.client.get(
-            f"/construction-handover-financings/lookup-project-number/?budgetItem={budget_item.id}"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["projectNumber"], "SAP-2024-001")
-
-    def test_lookup_project_number_returns_null_when_no_project_has_matching_site_id(self):
-        """lookup-project-number returns null when no Project has siteId matching the given UUID."""
-        random_uuid = uuid.uuid4()
-
-        response = self.client.get(
-            f"/construction-handover-financings/lookup-project-number/?budgetItem={random_uuid}"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsNone(response.data["projectNumber"])
-
-    def test_lookup_project_number_returns_400_when_budget_item_missing(self):
-        response = self.client.get("/construction-handover-financings/lookup-project-number/")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("budgetItem", response.data)
-
-    def test_lookup_project_number_returns_400_for_invalid_uuid(self):
-        response = self.client.get(
-            "/construction-handover-financings/lookup-project-number/?budgetItem=not-a-uuid"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("budgetItem", response.data)
