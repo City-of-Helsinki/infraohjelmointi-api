@@ -1311,8 +1311,12 @@ class ProjectViewSet(BaseViewSet):
                 yield queryset[start:end]
 
         bulk_size = 100
+        current_year = date.today().year
 
         new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
+        # Filter out the finances for the current year as they should not be updated
+        new_project_finances = [finance for finance in new_project_finances if finance.year != current_year]
+        update_project_finances = [finance for finance in update_project_finances if finance.year != current_year]
 
         # Bulk create new ProjectFinancial entries
         ProjectFinancial.objects.bulk_create(new_project_finances, bulk_size)
@@ -1323,6 +1327,9 @@ class ProjectViewSet(BaseViewSet):
                 ProjectFinancial.objects.bulk_update(batch, ['value'])
 
         new_class_finances, update_class_finances = self.update_forced_to_frame_classes()
+        # Filter out the finances for the current year as they should not be updated
+        new_class_finances = [finance for finance in new_class_finances if finance.year != current_year]
+        update_class_finances = [finance for finance in update_class_finances if finance.year != current_year]
 
         # Bulk create new ClassFinancial entries
         ClassFinancial.objects.bulk_create(new_class_finances, bulk_size)
@@ -1333,6 +1340,9 @@ class ProjectViewSet(BaseViewSet):
                 ClassFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
         new_location_finances, update_location_finances = self.update_forced_to_frame_locations()
+        # Filter out the finances for the current year as they should not be updated
+        new_location_finances = [finance for finance in new_location_finances if finance.year != current_year]
+        update_location_finances = [finance for finance in update_location_finances if finance.year != current_year]
 
         # Bulk create new LocationFinancial entries
         LocationFinancial.objects.bulk_create(new_location_finances, bulk_size)
@@ -1342,7 +1352,6 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
-        current_year = date.today().year
         for year_offset in range(-2, 13):
             year = current_year + year_offset
             CacheService.invalidate_frame_budgets(year=year)
