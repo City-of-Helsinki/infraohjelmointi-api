@@ -9,15 +9,31 @@ class ProjectProgrammeUrbanSpacingPlanningCriteria(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="urbanSpacingPlanningCriteria"
     )
-    targetUrbanAppearance = models.TextField(blank=True, null=True)
-    surfaceMaterials = models.TextField(blank=True, null=True)
-    structures = models.TextField(blank=True, null=True)
-    technicalNetworksAndSystems = models.TextField(blank=True, null=True)
-    lighting = models.TextField(blank=True, null=True)
-    greenery = models.TextField(blank=True, null=True)
-    lumoConsiderationAndProtection = models.TextField(blank=True, null=True)
-    natureTypes = models.TextField(blank=True, null=True)
+    targetUrbanAppearance = models.TextField(blank=True)
+    surfaceMaterials = models.TextField(blank=True)
+    structures = models.TextField(blank=True)
+    technicalNetworksAndSystems = models.TextField(blank=True)
+    lighting = models.TextField(blank=True)
+    greenery = models.TextField(blank=True)
+    lumoConsiderationAndProtection = models.TextField(blank=True)
+    natureTypes = models.TextField(blank=True)
 
-    equipmentAndFurnishings = models.TextField(blank=True, null=True)
-    waters = models.TextField(blank=True, null=True)
-    stormwaterManagement = models.TextField(blank=True, null=True)
+    equipmentAndFurnishings = models.TextField(blank=True)
+    waters = models.TextField(blank=True)
+    stormwaterManagement = models.TextField(blank=True)
+
+    history_fields = [
+        "status",
+        "targetUrbanAppearance",
+        "surfaceMaterials",
+        "structures",
+        "technicalNetworksAndSystems",
+        "lighting",
+        "greenery",
+        "lumoConsiderationAndProtection",
+        "natureTypes",
+        "equipmentAndFurnishings",
+        "waters",
+        "stormwaterManagement",
+        "_history_user",
+    ]

@@ -9,3 +9,8 @@ class ProjectProgrammeOtherAttachments(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="otherAttachments"
     )
+
+    history_fields = [
+        "status",
+        "_history_user",
+    ]

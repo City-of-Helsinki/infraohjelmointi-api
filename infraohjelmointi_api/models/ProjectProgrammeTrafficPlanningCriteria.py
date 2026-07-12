@@ -9,10 +9,22 @@ class ProjectProgrammeTrafficPlanningCriteria(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="trafficPlanningCriteria"
     )
-    pedestrianTraffic = models.TextField(blank=True, null=True)
-    bicycleTraffic = models.TextField(blank=True, null=True)
-    serviceAndPickupTraffic = models.TextField(blank=True, null=True)
-    otherTraffic = models.TextField(blank=True, null=True)
-    accessibility = models.TextField(blank=True, null=True)
-    noiseManagement = models.TextField(blank=True, null=True)
-    winterMaintenance = models.TextField(blank=True, null=True)
+    pedestrianTraffic = models.TextField(blank=True)
+    bicycleTraffic = models.TextField(blank=True)
+    serviceAndPickupTraffic = models.TextField(blank=True)
+    otherTraffic = models.TextField(blank=True)
+    accessibility = models.TextField(blank=True)
+    noiseManagement = models.TextField(blank=True)
+    winterMaintenance = models.TextField(blank=True)
+
+    history_fields = [
+        "status",
+        "pedestrianTraffic",
+        "bicycleTraffic",
+        "serviceAndPickupTraffic",
+        "otherTraffic",
+        "accessibility",
+        "noiseManagement",
+        "winterMaintenance",
+        "_history_user",
+    ]

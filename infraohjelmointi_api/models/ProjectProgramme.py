@@ -10,3 +10,9 @@ class ProjectProgramme(ProjectProgrammeBase):
         Project, on_delete=models.CASCADE, related_name="projectProgramme"
     )
     briefProjectProgramme = models.BooleanField(default=True, blank=True, null=True)
+
+    history_fields = [
+        "status",
+        "briefProjectProgramme",
+        "_history_user",
+    ]

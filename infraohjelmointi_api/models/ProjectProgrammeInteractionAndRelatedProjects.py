@@ -9,6 +9,14 @@ class ProjectProgrammeInteractionAndRelatedProjects(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="interactionAndRelatedProjects"
     )
-    maintenanceNeeds = models.TextField(blank=True, null=True)
-    collaborationAndExperts = models.TextField(blank=True, null=True)
-    interactionNotes = models.TextField(blank=True, null=True)
+    maintenanceNeeds = models.TextField(blank=True)
+    collaborationAndExperts = models.TextField(blank=True)
+    interactionNotes = models.TextField(blank=True)
+
+    history_fields = [
+        "status",
+        "maintenanceNeeds",
+        "collaborationAndExperts",
+        "interactionNotes",
+        "_history_user",
+    ]

@@ -9,6 +9,14 @@ class ProjectProgrammeDesignCriteria(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="designCriteria"
     )
-    guidingZoningRegulations = models.TextField(blank=True, null=True)
-    siteValuesProtectionAndSignificance = models.TextField(blank=True, null=True)
-    relationshipToPublicAreaServices = models.TextField(blank=True, null=True)
+    guidingZoningRegulations = models.TextField(blank=True)
+    siteValuesProtectionAndSignificance = models.TextField(blank=True)
+    relationshipToPublicAreaServices = models.TextField(blank=True)
+
+    history_fields = [
+        "status",
+        "guidingZoningRegulations",
+        "siteValuesProtectionAndSignificance",
+        "relationshipToPublicAreaServices",
+        "_history_user",
+    ]

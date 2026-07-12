@@ -12,7 +12,7 @@ class ProjectProgrammeLink(models.Model):
     )
     objectId = models.UUIDField()
     sectionObject = GenericForeignKey("contentType", "objectId")
-    value = models.URLField()
+    value = models.URLField(max_length=500, blank=True, null=True)
     createdDate = models.DateTimeField(auto_now_add=True)
     updatedDate = models.DateTimeField(auto_now=True)
 

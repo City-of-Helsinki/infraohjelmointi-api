@@ -9,17 +9,35 @@ class ProjectProgrammeBasicInfo(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="basicInfo"
     )
-    projectName = models.CharField(max_length=200, blank=True, null=True)
-    district = models.CharField(max_length=200, blank=True, null=True)
-    projectProgrammeCompiler = models.CharField(max_length=100, blank=True, null=True)
-    personsInvolved = models.CharField(max_length=200, blank=True, null=True)
-    inspector = models.CharField(max_length=100, blank=True, null=True)
-    summary = models.TextField(blank=True, null=True)
-    strategyGoals = models.TextField(blank=True, null=True)
-    projectSize = models.CharField(max_length=200, blank=True, null=True)
-    risks = models.TextField(blank=True, null=True)
-    studyAndPlanningNeeds = models.TextField(blank=True, null=True)
-    planningAndImplementationFeasibility = models.TextField(blank=True, null=True)
-    specialConsiderations = models.TextField(blank=True, null=True)
-    otherConsiderations = models.TextField(blank=True, null=True)
+    projectName = models.CharField(max_length=200, blank=True)
+    district = models.CharField(max_length=200, blank=True)
+    projectProgrammeCompiler = models.CharField(max_length=100, blank=True)
+    personsInvolved = models.CharField(max_length=200, blank=True)
+    inspector = models.CharField(max_length=100, blank=True)
+    summary = models.TextField(blank=True)
+    strategyGoals = models.TextField(blank=True)
+    projectSize = models.CharField(max_length=200, blank=True)
+    risks = models.TextField(blank=True)
+    studyAndPlanningNeeds = models.TextField(blank=True)
+    planningAndImplementationFeasibility = models.TextField(blank=True)
+    specialConsiderations = models.TextField(blank=True)
+    otherConsiderations = models.TextField(blank=True)
+
+    history_fields = [
+        "status",
+        "projectName",
+        "district",
+        "projectProgrammeCompiler",
+        "personsInvolved",
+        "inspector",
+        "summary",
+        "strategyGoals",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+        "specialConsiderations",
+        "otherConsiderations",
+        "_history_user",
+    ]
 
