@@ -9,7 +9,7 @@ class ProjectProgrammeMaintenanceNeeds(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="maintenanceNeeds"
     )
-    maintenanceNeeds = models.TextField(blank=True)
+    maintenanceNeeds = models.TextField(blank=True, null=True)
 
     history_fields = [
         "status",
