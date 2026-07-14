@@ -791,7 +791,6 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-
 class ProjectProgrammeSerializerTestCase(TestCase):
     def setUp(self):
         self.project_district = ProjectDistrict.objects.create(
