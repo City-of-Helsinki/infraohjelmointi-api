@@ -107,6 +107,15 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], str(programme.id))
 
+    def test_get_by_project_accepts_uppercase_uuid(self):
+        programme = self._create_project_programme()
+
+        uppercase_project_id = str(self.project.id).upper()
+        response = self.client.get(f"/project-programmes/by-project/{uppercase_project_id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], str(programme.id))
+
     def test_get_by_project_invalid_uuid_returns_400(self):
         response = self.client.get("/project-programmes/by-project/1234/")
 
@@ -217,6 +226,18 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(ProjectProgramme.objects.filter(id=programme.id).exists())
+
+    def test_destroy_complete_project_programme_returns_409(self):
+        programme = self._create_project_programme(status="COMPLETE")
+
+        response = self.client.delete(f"/project-programmes/{programme.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Only project programmes in DRAFT status can be deleted.",
+        )
+        self.assertTrue(ProjectProgramme.objects.filter(id=programme.id).exists())
 
 
 class ProjectProgrammeSerializerTestCase(TestCase):
