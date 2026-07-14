@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from infraohjelmointi_api.models import ProjectProgramme
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeGetSerializer,
-    ProjectProgrammeTransitionToCompletedSerializer,
+    ProjectProgrammeStatusTransitionSerializer,
     ProjectProgrammeUpdateSerializer,
 )
 
@@ -41,7 +41,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if self.action in ["list", "retrieve", "get_by_project"]:
             return ProjectProgrammeGetSerializer
         if self.action == "transitions":
-            return ProjectProgrammeTransitionToCompletedSerializer
+            return ProjectProgrammeStatusTransitionSerializer
         return ProjectProgrammeUpdateSerializer
 
     def _get_authenticated_user(self, request):
@@ -66,7 +66,17 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return
         serializer.save()
 
-    @action(methods=["get"], detail=False, url_path=r"by-project/(?P<project_id>[0-9a-f-]+)")
+    @override
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_locked:
+            return Response(
+                {"detail": "Only project programmes in DRAFT status can be deleted."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    @action(methods=["get"], detail=False, url_path=r"by-project/(?P<project_id>[^/.]+)")
     def get_by_project(self, request, project_id=None):
         try:
             uuid.UUID(str(project_id))
@@ -99,7 +109,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
     @action(methods=["post"], detail=True, url_path=r"transitions")
     def transitions(self, request, pk=None):
         instance = self.get_object()
-        serializer = ProjectProgrammeTransitionToCompletedSerializer(data=request.data)
+        serializer = ProjectProgrammeStatusTransitionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         requested_status = serializer.validated_data["to"]

@@ -74,5 +74,5 @@ from .ProjectProgrammeSerializer import (
     ProjectProgrammeOtherAttachmentsUpdateSerializer,
     ProjectProgrammeLinkGetSerializer,
     ProjectProgrammeLinkUpdateSerializer,
-    ProjectProgrammeTransitionToCompletedSerializer,
+    ProjectProgrammeStatusTransitionSerializer,
 )

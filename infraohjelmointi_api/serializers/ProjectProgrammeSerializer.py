@@ -57,7 +57,7 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
                 ):
                     raise serializers.ValidationError(
                         {
-                            "status": "Links can only be modified for entities in DRAFT status."
+                            "detail": "Links can only be modified for entities in DRAFT status."
                         }
                     )
 
@@ -255,5 +255,5 @@ class ProjectProgrammeUpdateSerializer(
         return attrs
 
 
-class ProjectProgrammeTransitionToCompletedSerializer(serializers.Serializer):
+class ProjectProgrammeStatusTransitionSerializer(serializers.Serializer):
     to = serializers.ChoiceField(choices=[("DRAFT", "DRAFT"), ("COMPLETE", "COMPLETE")])
