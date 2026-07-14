@@ -46,21 +46,20 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
         content_type = attrs.get("contentType", getattr(self.instance, "contentType", None))
         object_id = attrs.get("objectId", getattr(self.instance, "objectId", None))
 
-        if not content_type or not object_id:
-            return attrs
-
-        model_class = content_type.model_class()
-        if model_class is None:
-            return attrs
-
-        section_instance = model_class.objects.filter(pk=object_id).first()
-        if section_instance and hasattr(section_instance, "status"):
-            if section_instance.status != "DRAFT":
-                raise serializers.ValidationError(
-                    {
-                        "status": "Links can only be modified for entities in DRAFT status."
-                    }
-                )
+        if content_type and object_id:
+            model_class = content_type.model_class()
+            if model_class is not None:
+                section_instance = model_class.objects.filter(pk=object_id).first()
+                if (
+                    section_instance
+                    and hasattr(section_instance, "status")
+                    and section_instance.status != "DRAFT"
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            "status": "Links can only be modified for entities in DRAFT status."
+                        }
+                    )
 
         return attrs
 
