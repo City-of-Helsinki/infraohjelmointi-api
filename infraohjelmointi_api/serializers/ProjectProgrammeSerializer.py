@@ -68,7 +68,16 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
             model_class = content_type.model_class()
             if model_class is not None:
                 section_instance = model_class.objects.filter(pk=object_id).first()
-                if getattr(section_instance, "is_locked", False):
+                if (
+                    section_instance
+                    and (
+                        getattr(section_instance, "is_locked", False)
+                        or (
+                            hasattr(section_instance, "status")
+                            and section_instance.status != "DRAFT"
+                        )
+                    )
+                ):
                     raise serializers.ValidationError(
                         {
                             "detail": "Links can only be modified for entities in DRAFT status."
