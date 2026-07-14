@@ -218,6 +218,12 @@ router.register(
     basename="financingParties"
 )
 
+router.register(
+    r"project-programmes",
+    views.ProjectProgrammeViewSet,
+    basename="projectProgrammes"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
