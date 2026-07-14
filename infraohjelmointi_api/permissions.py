@@ -197,6 +197,10 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
 CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
 
+#### Project programme custom actions ####
+PROJECT_PROGRAMME_GET_ACTIONS = ["get_by_project"]
+PROJECT_PROGRAMME_POST_ACTIONS = ["switch_type", "transitions"]
+
 #### Project change-history custom actions (IO-879) ####
 # Per-project audit-log history powering the "Näytä muutoshistoria" UI.
 # Read-only and scoped to a single project, so it is granted to every role
@@ -265,6 +269,7 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
             ]
         ):
             return True
@@ -307,6 +312,8 @@ class IsCoordinator(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -347,6 +354,8 @@ class IsPlanner(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -389,6 +398,8 @@ class IsProjectManager(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -477,6 +488,8 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -545,6 +558,8 @@ class IsAdmin(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -610,6 +625,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *SAP_COST_ALL_GET_ACTIONS,
             *PROJECT_NOTE_ALL_GET_ACTIONS,
             *PROJECT_HISTORY_GET_ACTIONS,
+            *PROJECT_PROGRAMME_GET_ACTIONS,
         ]:
             return True
 
@@ -619,6 +635,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS,
             "patch_bulk_projects",
+            *PROJECT_PROGRAMME_POST_ACTIONS,
         ]:
             return True
 
@@ -629,6 +646,11 @@ class IsClassProgrammer(permissions.BasePermission):
         _type = obj._meta.model.__name__
         if _type == "Project":
             return obj.projectClass.path if obj.projectClass else None
+        if _type == "ProjectProgramme":
+            target_project = getattr(obj, "project", None)
+            if target_project and target_project.projectClass:
+                return target_project.projectClass.path
+            return None
         if _type == "Note":
             target_project = obj.project
             if target_project and target_project.projectClass:
@@ -700,6 +722,7 @@ class IsConstructionManagementLead(permissions.BasePermission):
             *PROJECT_ALL_GET_ACTIONS,
             *SAP_COST_ALL_GET_ACTIONS,
             *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+            *PROJECT_PROGRAMME_GET_ACTIONS,
         ]:
             return True
 
