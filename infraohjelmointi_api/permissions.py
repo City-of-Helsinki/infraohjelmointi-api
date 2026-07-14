@@ -197,6 +197,11 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
 CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
 
+#### Project programme custom actions ####
+PROJECT_PROGRAMME_BASENAME = "projectProgrammes"
+PROJECT_PROGRAMME_POST_ACTIONS = ["transitions", "section_transitions", "switch_type"]
+PROJECT_PROGRAMME_READ_ACTIONS = [*DJANGO_BASE_READ_ONLY_ACTIONS, "get_by_project"]
+
 #### Project change-history custom actions (IO-879) ####
 # Per-project audit-log history powering the "Näytä muutoshistoria" UI.
 # Read-only and scoped to a single project, so it is granted to every role
@@ -307,6 +312,7 @@ class IsCoordinator(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -347,6 +353,7 @@ class IsPlanner(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -398,6 +405,9 @@ class IsProjectManager(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if user_in_restricted_programmer_group(request):
             return False
+        # Project managers can only transition project programmes back to DRAFT
+        if getattr(view, "basename", None) == PROJECT_PROGRAMME_BASENAME and view.action == "transitions":
+            return request.data.get("to") == "DRAFT"
         # has edit permissions for projects nad notes only
         # and only specific project fields
         _type = obj._meta.model.__name__
@@ -545,6 +555,7 @@ class IsAdmin(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -619,6 +630,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS,
             "patch_bulk_projects",
+            *PROJECT_PROGRAMME_POST_ACTIONS,
         ]:
             return True
 
@@ -636,6 +648,11 @@ class IsClassProgrammer(permissions.BasePermission):
             return None
         if _type == "ProjectGroup":
             return obj.classRelation.path if obj.classRelation else None
+        if _type == "ProjectProgramme":
+            project = getattr(obj, "project", None)
+            if project and project.projectClass:
+                return project.projectClass.path
+            return None
         return None
 
     @staticmethod
@@ -718,5 +735,145 @@ class IsConstructionManagementLead(permissions.BasePermission):
 
         if self._is_construction_handover_view(view):
             return True
+
+        return False
+
+
+class IsProjectProgrammeContributor(permissions.BasePermission):
+    """
+    Permission class for project programme contributors.
+
+    Editors (PROJECT_PROGRAMME_EDITOR_AD_GROUPS): users related to the project
+    via personPlanning, personProgramming, or otherPersons can create, edit, and
+    transition project programmes and sections to COMPLETE.
+
+    Reverters (PROJECT_PROGRAMME_REVERTER_AD_GROUPS): can read all project
+    programmes and transition any programme back to DRAFT.
+    """
+
+    _EDITOR_WRITE_ACTIONS = [
+        *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+        *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+        "transitions",
+        "section_transitions",
+        "switch_type",
+    ]
+
+    def _get_editor_groups(self):
+        return getattr(settings, "PROJECT_PROGRAMME_EDITOR_AD_GROUPS", [])
+
+    def _get_reverter_groups(self):
+        return getattr(settings, "PROJECT_PROGRAMME_REVERTER_AD_GROUPS", [])
+
+    def _get_user_ad_group_names(self, user):
+        return set(user.ad_groups.all().values_list("name", flat=True))
+
+    def _user_is_editor(self, user):
+        editor_groups = self._get_editor_groups()
+        if not editor_groups:
+            return False
+        return bool(set(editor_groups) & self._get_user_ad_group_names(user))
+
+    def _user_is_reverter(self, user):
+        reverter_groups = self._get_reverter_groups()
+        if not reverter_groups:
+            return False
+        return bool(set(reverter_groups) & self._get_user_ad_group_names(user))
+
+    def _user_is_related_to_project(self, user, project):
+        """Check if user is related to the project via person relationships (email-based)."""
+        if not user.email:
+            return False
+        user_email = user.email.lower()
+
+        if project.personPlanning and project.personPlanning.email:
+            if project.personPlanning.email.lower() == user_email:
+                return True
+
+        if project.personProgramming:
+            person = getattr(project.personProgramming, "person", None)
+            if person and person.email and person.email.lower() == user_email:
+                return True
+
+        for other_person in project.otherPersons.all():
+            if other_person.email and other_person.email.lower() == user_email:
+                return True
+
+        return False
+
+    def _user_is_related_to_programme(self, user, programme):
+        project = getattr(programme, "project", None)
+        if project is None:
+            return False
+        return self._user_is_related_to_project(user, project)
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if getattr(view, "basename", None) != PROJECT_PROGRAMME_BASENAME:
+            return False
+
+        if request.method not in SAFE_METHODS:
+            return False
+
+        is_editor = self._user_is_editor(request.user)
+        is_reverter = self._user_is_reverter(request.user)
+
+        if not is_editor and not is_reverter:
+            return False
+
+        # Read actions: allowed for both editors and reverters
+        if view.action in PROJECT_PROGRAMME_READ_ACTIONS:
+            return True
+
+        # Create: editor only, relatedness checked via project in request body
+        if view.action == "create":
+            if not is_editor:
+                return False
+            project_id = request.data.get("project")
+            if not project_id:
+                return False
+            from infraohjelmointi_api.models import Project as _Project
+            try:
+                project = _Project.objects.get(id=project_id)
+            except (_Project.DoesNotExist, Exception):
+                return False
+            return self._user_is_related_to_project(request.user, project)
+
+        # Write actions: editors only (object-level relatedness in has_object_permission)
+        if is_editor and view.action in self._EDITOR_WRITE_ACTIONS:
+            return True
+
+        # Transitions to DRAFT: reverters only (direction enforced in has_object_permission)
+        if is_reverter and view.action == "transitions":
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if getattr(view, "basename", None) != PROJECT_PROGRAMME_BASENAME:
+            return False
+
+        is_editor = self._user_is_editor(request.user)
+        is_reverter = self._user_is_reverter(request.user)
+
+        if not is_editor and not is_reverter:
+            return False
+
+        # Read actions: allow all for both roles
+        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+            return True
+
+        # Transitions: editors can do any direction if related; reverters only DRAFT
+        if view.action == "transitions":
+            if is_editor:
+                return self._user_is_related_to_programme(request.user, obj)
+            if is_reverter:
+                return request.data.get("to") == "DRAFT"
+
+        # Remaining write actions: editors must be related to the project
+        if is_editor:
+            return self._user_is_related_to_programme(request.user, obj)
 
         return False

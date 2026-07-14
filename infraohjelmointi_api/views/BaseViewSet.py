@@ -21,6 +21,7 @@ class BaseViewSet(viewsets.ModelViewSet):
             | IsViewer
             | IsAdmin
             | IsConstructionManagementLead
+            | IsProjectProgrammeContributor
         )
     ]
     authentication_classes = [ApiTokenAuthentication, SessionAuthentication]
