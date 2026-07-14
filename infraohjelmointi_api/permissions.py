@@ -2,6 +2,7 @@ from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectClass import ProjectClass
 from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssignment
+from django.core.exceptions import ValidationError
 from rest_framework import permissions
 from django.conf import settings
 
@@ -819,7 +820,7 @@ class IsProjectProgrammeContributor(permissions.BasePermission):
 
         try:
             project = _Project.objects.get(id=project_id)
-        except (_Project.DoesNotExist, Exception):
+        except (_Project.DoesNotExist, ValidationError, ValueError, TypeError):
             return False
 
         return self._user_is_related_to_project(request.user, project)

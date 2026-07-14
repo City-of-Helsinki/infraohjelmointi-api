@@ -372,15 +372,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             else:
                 self._save_section_status(section_instance, "COMPLETE", user=user)
         else:
-            if section_instance is None:
-                section_instance = self._create_section_instance(
-                    instance,
-                    section_key,
-                    "DRAFT",
-                    user=user,
-                )
-            else:
-                self._save_section_status(section_instance, "DRAFT", user=user)
+            self._save_section_status(section_instance, "DRAFT", user=user)
 
         return Response(
             {

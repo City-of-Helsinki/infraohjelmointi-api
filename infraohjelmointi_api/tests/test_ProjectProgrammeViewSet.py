@@ -785,6 +785,17 @@ class ProjectProgrammeContributorPermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_editor_group_user_with_invalid_project_id_cannot_create_project_programme(self):
+        self.client.force_authenticate(user=self.landscape_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": "not-a-uuid"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_editor_group_user_matching_project_person_can_update_project_programme(self):
         self.client.force_authenticate(user=self.landscape_user)
         self.programme.status = "DRAFT"
