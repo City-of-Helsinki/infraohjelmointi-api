@@ -55,3 +55,24 @@ from .ConstructionHandoverCreateSerializer import ConstructionHandoverCreateSeri
 from .ConstructionHandoverUpdateSerializer import ConstructionHandoverUpdateSerializer
 from .ConstructionHandoverFinancingSerializer import ConstructionHandoverFinancingSerializer
 from .FinancingPartySerializer import FinancingPartySerializer
+from .ProjectProgrammeSerializer import (
+    ProjectProgrammeGetSerializer,
+    ProjectProgrammeUpdateSerializer,
+    ProjectProgrammeBasicInfoGetSerializer,
+    ProjectProgrammeBasicInfoUpdateSerializer,
+    ProjectProgrammeDesignCriteriaGetSerializer,
+    ProjectProgrammeDesignCriteriaUpdateSerializer,
+    ProjectProgrammeTrafficPlanningCriteriaGetSerializer,
+    ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer,
+    ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer,
+    ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer,
+    ProjectProgrammeMaintenanceNeedsGetSerializer,
+    ProjectProgrammeMaintenanceNeedsUpdateSerializer,
+    ProjectProgrammeInteractionAndRelatedProjectsGetSerializer,
+    ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer,
+    ProjectProgrammeOtherAttachmentsGetSerializer,
+    ProjectProgrammeOtherAttachmentsUpdateSerializer,
+    ProjectProgrammeLinkGetSerializer,
+    ProjectProgrammeLinkUpdateSerializer,
+    ProjectProgrammeTransitionToCompletedSerializer,
+)
