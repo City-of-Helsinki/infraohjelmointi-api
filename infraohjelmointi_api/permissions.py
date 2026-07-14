@@ -807,6 +807,23 @@ class IsProjectProgrammeContributor(permissions.BasePermission):
             return False
         return self._user_is_related_to_project(user, project)
 
+    def _can_create_project_programme(self, request):
+        if not self._user_is_editor(request.user):
+            return False
+
+        project_id = request.data.get("project")
+        if not project_id:
+            return False
+
+        from infraohjelmointi_api.models import Project as _Project
+
+        try:
+            project = _Project.objects.get(id=project_id)
+        except (_Project.DoesNotExist, Exception):
+            return False
+
+        return self._user_is_related_to_project(request.user, project)
+
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
@@ -829,17 +846,7 @@ class IsProjectProgrammeContributor(permissions.BasePermission):
 
         # Create: editor only, relatedness checked via project in request body
         if view.action == "create":
-            if not is_editor:
-                return False
-            project_id = request.data.get("project")
-            if not project_id:
-                return False
-            from infraohjelmointi_api.models import Project as _Project
-            try:
-                project = _Project.objects.get(id=project_id)
-            except (_Project.DoesNotExist, Exception):
-                return False
-            return self._user_is_related_to_project(request.user, project)
+            return self._can_create_project_programme(request)
 
         # Write actions: editors only (object-level relatedness in has_object_permission)
         if is_editor and view.action in self._EDITOR_WRITE_ACTIONS:
@@ -869,8 +876,7 @@ class IsProjectProgrammeContributor(permissions.BasePermission):
         if view.action == "transitions":
             if is_editor:
                 return self._user_is_related_to_programme(request.user, obj)
-            if is_reverter:
-                return request.data.get("to") == "DRAFT"
+            return request.data.get("to") == "DRAFT"
 
         # Remaining write actions: editors must be related to the project
         if is_editor:

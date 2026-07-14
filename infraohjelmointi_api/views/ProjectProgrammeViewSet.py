@@ -224,7 +224,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
         for section_key in self._get_relevant_section_keys(project_programme):
             section_instance = self._get_section_instance(project_programme, section_key)
             if section_instance is None:
-                section_instance = self._create_section_instance(
+                self._create_section_instance(
                     project_programme,
                     section_key,
                     "COMPLETE",
