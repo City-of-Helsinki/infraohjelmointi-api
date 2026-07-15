@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from infraohjelmointi_api.models import (
     ClassProgrammerAssignment,
+    Person,
     Project,
     ProjectClass,
     ProjectDistrict,
@@ -42,6 +43,15 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             last_name="Programme",
             email="projectprogramme@example.com",
         )
+        self.client.force_authenticate(user=self.user)
+
+        self.responsible_person = Person.objects.create(
+            firstName="Project",
+            lastName="Programme",
+            email=self.user.email,
+            title="Planner",
+            phone="1234567",
+        )
 
         self.project_district = ProjectDistrict.objects.create(
             name="Kallio",
@@ -53,12 +63,14 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             name="Test project programme project",
             description="Project used for project programme tests",
             projectDistrict=self.project_district,
+            personPlanning=self.responsible_person,
         )
 
         self.second_project = Project.objects.create(
             name="Second project",
             description="Second project used for list tests",
             projectDistrict=self.project_district,
+            personPlanning=self.responsible_person,
         )
 
     def _create_project_programme(self, **kwargs):
@@ -259,6 +271,93 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("to", response.data)
+
+    def test_transitions_to_complete_updates_draft_sections_to_complete(self):
+        programme = self._create_project_programme(status="DRAFT")
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            projectName="Test name",
+            district="Test district",
+        )
+        design_criteria = ProjectProgrammeDesignCriteria.objects.create(
+            project_programme=programme,
+            status="COMPLETE",
+            guidingZoningRegulations="Existing",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        basic_info.refresh_from_db()
+        design_criteria.refresh_from_db()
+        self.assertEqual(programme.status, "COMPLETE")
+        self.assertEqual(basic_info.status, "COMPLETE")
+        self.assertEqual(design_criteria.status, "COMPLETE")
+
+    def test_section_transitions_updates_status(self):
+        programme = self._create_project_programme(status="DRAFT")
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            projectName="Test name",
+            district="Test district",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        basic_info.refresh_from_db()
+        self.assertEqual(basic_info.status, "COMPLETE")
+        self.assertEqual(response.data["section"], "basicInfo")
+
+    def test_section_transitions_same_status_returns_409(self):
+        programme = self._create_project_programme(status="DRAFT")
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            projectName="Test name",
+            district="Test district",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_section_transitions_unknown_section_key_returns_404(self):
+        programme = self._create_project_programme(status="DRAFT")
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/unknown/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_section_transitions_missing_section_returns_404(self):
+        programme = self._create_project_programme(status="DRAFT")
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_destroy_project_programme(self):
         programme = self._create_project_programme()
@@ -1038,6 +1137,14 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name=restricted_group_name,
             display_name="Restricted Programmers",
         )
+        self.viewer_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_katselijat_muut",
+            display_name="Viewers",
+        )
+        self.project_manager_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_projektipaallikot",
+            display_name="Project managers",
+        )
 
         self.allowed_user = User.objects.create_user(
             username="allowed.programmer@test.fi",
@@ -1050,6 +1157,38 @@ class ProjectProgrammePermissionTestCase(TestCase):
             email="unassigned.programmer@test.fi",
         )
         self.unassigned_user.ad_groups.add(self.restricted_programmer_group)
+
+        self.project_manager_user = User.objects.create_user(
+            username="project.manager@test.fi",
+            email="project.manager@test.fi",
+        )
+        self.project_manager_user.ad_groups.add(self.project_manager_group)
+
+        self.responsible_viewer_user = User.objects.create_user(
+            username="responsible.viewer@test.fi",
+            email="responsible.viewer@test.fi",
+        )
+        self.responsible_viewer_user.ad_groups.add(self.viewer_group)
+
+        self.responsible_person = Person.objects.create(
+            firstName="Responsible",
+            lastName="Viewer",
+            email="responsible.viewer@test.fi",
+            title="Landscape architect",
+            phone="0401234567",
+        )
+        self.responsible_programmer_person = Person.objects.create(
+            firstName="Allowed",
+            lastName="Programmer",
+            email="allowed.programmer@test.fi",
+            title="Programmer",
+            phone="0402345678",
+        )
+        self.responsible_programmer = ProjectProgrammer.objects.create(
+            firstName="Allowed",
+            lastName="Programmer",
+            person=self.responsible_programmer_person,
+        )
 
         self.district = ProjectDistrict.objects.create(
             name="Auth district",
@@ -1071,12 +1210,20 @@ class ProjectProgrammePermissionTestCase(TestCase):
             description="Project in assigned class",
             projectDistrict=self.district,
             projectClass=self.allowed_class,
+            personPlanning=self.responsible_person,
+            personProgramming=self.responsible_programmer,
         )
         self.unassigned_project = Project.objects.create(
             name="Unassigned programme project",
             description="Project outside assigned class",
             projectDistrict=self.district,
             projectClass=self.unassigned_class,
+        )
+        self.responsible_project = Project.objects.create(
+            name="Responsible project",
+            description="Project for responsible creator",
+            projectDistrict=self.district,
+            personPlanning=self.responsible_person,
         )
 
         self.allowed_programme = ProjectProgramme.objects.create(
@@ -1156,12 +1303,79 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.allowed_programme.refresh_from_db()
         self.assertEqual(self.allowed_programme.status, "COMPLETE")
 
+    def test_restricted_programmer_can_transition_assigned_section_to_complete(self):
+        self.client.force_authenticate(user=self.allowed_user)
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=self.allowed_programme,
+            status="DRAFT",
+            projectName="Allowed",
+            district="District",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        basic_info.refresh_from_db()
+        self.assertEqual(basic_info.status, "COMPLETE")
+
     def test_restricted_programmer_cannot_update_unassigned_project_programme(self):
         self.client.force_authenticate(user=self.unassigned_user)
 
         response = self.client.patch(
             f"/project-programmes/{self.unassigned_programme.id}/",
             {"briefProjectProgramme": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_responsible_viewer_can_create_project_programme(self):
+        self.client.force_authenticate(user=self.responsible_viewer_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_project_manager_cannot_edit_project_programme_data(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+
+        response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_project_manager_can_return_project_programme_to_draft(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+        self.allowed_programme.status = "COMPLETE"
+        self.allowed_programme.save()
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.allowed_programme.refresh_from_db()
+        self.assertEqual(self.allowed_programme.status, "DRAFT")
+
+    def test_project_manager_cannot_mark_project_programme_complete(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/transitions/",
+            {"to": "COMPLETE"},
             format="json",
         )
 
