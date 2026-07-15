@@ -665,6 +665,114 @@ class IsClassProgrammer(permissions.BasePermission):
         """True if target equals or is a child of an assigned path (paths use '/')."""
         return target_path_matches_assigned_paths(target_class_path, assigned_paths)
 
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated or getattr(view, "basename", None) != "projects":
+            return False
+        if request.method not in SAFE_METHODS:
+            return True
+        return view.action in [
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *PROJECT_ALL_GET_ACTIONS,
+            *PROJECT_CLASS_ALL_GET_ACTIONS,
+            *PROJECT_LOCATION_ALL_GET_ACTIONS,
+            *PROJECT_FINANCES_ALL_GET_ACTIONS,
+            *PROJECT_GROUP_ALL_GET_ACTIONS,
+            *SAP_COST_ALL_GET_ACTIONS,
+            *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+            *PROJECT_PROGRAMME_GET_ACTIONS,
+        ]
+
+    def has_object_permission(self, request, view, obj):
+        if request.method == GET:
+            return True
+
+        if self._is_construction_handover_view(view):
+            return True
+
+        return False
+
+
+class IsResponsiblePersonInProject(permissions.BasePermission):
+    """
+    Permission class for project programme access based on project responsibility.
+
+    Project Updater/Contributors: Users who are related to the project via
+    personPlanning, personProgramming, or otherPersons can edit project programme
+    details and mark sections/programme as complete.
+
+    Read access is allowed for authenticated users.
+    """
+
+    def _user_is_related_to_project(self, user, project):
+        """Check if user is related to the project via person relationships (email-based)."""
+        if not user.email:
+            return False
+        user_email = user.email.lower()
+
+        if project.personPlanning and project.personPlanning.email:
+            if project.personPlanning.email.lower() == user_email:
+                return True
+
+        if project.personProgramming:
+            person = getattr(project.personProgramming, "person", None)
+            if person and person.email and person.email.lower() == user_email:
+                return True
+
+        for other_person in project.otherPersons.all():
+            if other_person.email and other_person.email.lower() == user_email:
+                return True
+
+        return False
+
+    def _user_is_related_to_programme(self, user, programme):
+        """Check if user is related to the programme's parent project."""
+        project = getattr(programme, "project", None)
+        if project is None:
+            return False
+        return self._user_is_related_to_project(user, project)
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if getattr(view, "basename", None) != PROJECT_PROGRAMME_BASENAME:
+            return False
+
+        # Read-only actions allowed for all authenticated users
+        if request.method in SAFE_METHODS:
+            return True
+
+        # Write actions (create, update, transitions) - check object-level permissions
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if getattr(view, "basename", None) != PROJECT_PROGRAMME_BASENAME:
+            return False
+
+        # Read actions allowed for all authenticated users
+        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+            return True
+
+        # Write actions require user to be related to the project
+        if view.action in [*DJANGO_BASE_CREATE_ONLY_ACTIONS, *DJANGO_BASE_UPDATE_ONLY_ACTIONS, "transitions", "section_transitions", "switch_type"]:
+            return self._user_is_related_to_programme(request.user, obj)
+
+        return False
+            return None
+        if _type == "Note":
+            target_project = obj.project
+            if target_project and target_project.projectClass:
+                return target_project.projectClass.path
+            return None
+        if _type == "ProjectGroup":
+            return obj.classRelation.path if obj.classRelation else None
+        return None
+
+    @staticmethod
+    def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
+        """True if target equals or is a child of an assigned path (paths use '/')."""
+        return target_path_matches_assigned_paths(target_class_path, assigned_paths)
+
     def has_object_permission(self, request, view, obj):
         """Check if user has permission for this specific object"""
         if self.user_is_coordinator_or_admin(request):
