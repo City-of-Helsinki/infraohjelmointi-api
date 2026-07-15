@@ -275,6 +275,20 @@ class IsViewer(permissions.BasePermission):
         if (
             request.user.is_authenticated
             and self.user_in_viewer_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and request.method in SAFE_METHODS
+            and view.action
+            in [
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        ):
+            return True
+
+        if (
+            request.user.is_authenticated
+            and self.user_in_viewer_group(request=request)
             and request.method == GET
             and view.action
             in [
@@ -296,6 +310,9 @@ class IsViewer(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Viewer can only access project object, to be able to see the project card
         _type = obj._meta.model.__name__
+
+        if _type == "ProjectProgramme":
+            return True
 
         if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
             return True
