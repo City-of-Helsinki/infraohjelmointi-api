@@ -360,6 +360,27 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_section_transitions_rejects_when_parent_programme_is_complete(self):
+        programme = self._create_project_programme(status="COMPLETE")
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="COMPLETE",
+            projectName="Test name",
+            district="Test district",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Sections can only be transitioned when the project programme is in DRAFT status.",
+        )
+
     def test_destroy_project_programme(self):
         programme = self._create_project_programme()
 
