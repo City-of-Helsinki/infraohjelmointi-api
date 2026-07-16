@@ -9,6 +9,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+<<<<<<< HEAD
 from infraohjelmointi_api.models import (
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
@@ -19,6 +20,15 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeOtherAttachments,
     ProjectProgrammeTrafficPlanningCriteria,
     ProjectProgrammeUrbanSpacingPlanningCriteria,
+=======
+from infraohjelmointi_api.models import ProjectProgramme
+from infraohjelmointi_api.permissions import (
+    get_project_programme_contributor_group_name,
+    get_restricted_programmer_group_name,
+)
+from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
+    ProjectPersonAuthorizationService,
+>>>>>>> 81a8450 (fix(api): fixed according to requirements: added need for new ad group)
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeBasicInfoGetSerializer,
@@ -244,6 +254,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
         reviewer_groups.add(get_restricted_programmer_group_name())
         return bool(group_names.intersection(reviewer_groups))
 
+    def _is_project_programme_contributor(self, user):
+        return get_project_programme_contributor_group_name() in self._get_user_group_names(
+            user
+        )
+
     def _is_commissioning_manager(self, user):
         return self.COMMISSIONING_MANAGER_GROUP in self._get_user_group_names(user)
 
@@ -273,6 +288,9 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
 
         if self._is_reviewer(user):
+            return
+
+        if self._is_project_programme_contributor(user):
             return
 
         if self._is_responsible_for_project_programme(user, project):
@@ -441,7 +459,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
             status=status.HTTP_200_OK,
         )
 
-<<<<<<< HEAD
     @action(methods=["post", "patch"], detail=True, url_path="sections/basic-info")
     def section_basic_info(self, request, pk=None):
         return self._handle_section(
@@ -558,7 +575,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
         serializer.save()
         return Response(
             ProjectProgrammeLinkGetSerializer(serializer.instance).data,
-=======
     @action(
         methods=["post"],
         detail=True,
@@ -611,6 +627,5 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 "section": relation_name,
                 "currentStatus": section_instance.status,
             },
->>>>>>> 4b583c7 (feat(api): fixed project programme permissions to work as requested)
             status=status.HTTP_200_OK,
         )

@@ -27,6 +27,7 @@ from infraohjelmointi_api.serializers import (
     ProjectProgrammeLinkUpdateSerializer,
     ProjectProgrammeUpdateSerializer,
 )
+from infraohjelmointi_api.permissions import get_project_programme_contributor_group_name
 from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
 
 User = get_user_model()
@@ -1145,6 +1146,10 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name="sg_kymp_sso_io_projektipaallikot",
             display_name="Project managers",
         )
+        self.project_programme_contributor_group = ADGroup.objects.create(
+            name=get_project_programme_contributor_group_name(),
+            display_name="Project programme contributors",
+        )
 
         self.allowed_user = User.objects.create_user(
             username="allowed.programmer@test.fi",
@@ -1169,6 +1174,12 @@ class ProjectProgrammePermissionTestCase(TestCase):
             email="responsible.viewer@test.fi",
         )
         self.responsible_viewer_user.ad_groups.add(self.viewer_group)
+
+        self.contributor_user = User.objects.create_user(
+            username="contributor.user@test.fi",
+            email="contributor.user@test.fi",
+        )
+        self.contributor_user.ad_groups.add(self.project_programme_contributor_group)
 
         self.responsible_person = Person.objects.create(
             firstName="Responsible",
@@ -1380,6 +1391,47 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_contributor_group_user_can_update_project_programme_without_membership(self):
+        self.client.force_authenticate(user=self.contributor_user)
+
+        response = self.client.patch(
+            f"/project-programmes/{self.unassigned_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_contributor_group_user_can_mark_project_programme_complete_without_membership(self):
+        self.client.force_authenticate(user=self.contributor_user)
+
+        response = self.client.post(
+            f"/project-programmes/{self.unassigned_programme.id}/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_contributor_group_user_can_mark_section_complete_without_membership(self):
+        self.client.force_authenticate(user=self.contributor_user)
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=self.unassigned_programme,
+            status="DRAFT",
+            projectName="Unassigned",
+            district="District",
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{self.unassigned_programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        basic_info.refresh_from_db()
+        self.assertEqual(basic_info.status, "COMPLETE")
 
     def test_project_programme_endpoint_requires_authentication(self):
         response = self.client.get(f"/project-programmes/{self.allowed_programme.id}/")
