@@ -37,9 +37,9 @@ def user_in_project_programme_contributor_group(request):
     """True if the authenticated user is in the project programme contributor AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return False
-    return get_project_programme_contributor_group_name() in request.user.ad_groups.all().values_list(
-        "name", flat=True
-    )
+    return request.user.ad_groups.filter(
+        name=get_project_programme_contributor_group_name()
+    ).exists()
 
 
 def _get_legacy_class_paths_from_email(user_email):

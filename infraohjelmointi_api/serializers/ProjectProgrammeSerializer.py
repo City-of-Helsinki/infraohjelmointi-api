@@ -338,7 +338,11 @@ class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer)
         fields = "__all__"
 
     def get_links(self, instance):
-        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        content_type = getattr(self, "_other_attachments_content_type", None)
+        if content_type is None:
+            content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+            self._other_attachments_content_type = content_type
+
         links = ProjectProgrammeLink.objects.filter(
             contentType=content_type,
             objectId=instance.id,

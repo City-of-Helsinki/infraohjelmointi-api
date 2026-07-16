@@ -608,6 +608,17 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        if programme.status != "DRAFT":
+            return Response(
+                {
+                    "detail": (
+                        "Sections can only be transitioned when the project programme "
+                        "is in DRAFT status."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         if requested_status == "DRAFT":
             self._assert_can_return_to_draft(request)
         else:
