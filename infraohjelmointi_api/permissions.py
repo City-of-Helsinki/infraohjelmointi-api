@@ -15,11 +15,29 @@ def get_restricted_programmer_group_name():
     )
 
 
+def get_project_programme_contributor_group_name():
+    """AD group for users allowed to contribute to any project programme."""
+    return getattr(
+        settings,
+        "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
+        "sg_kymp_sso_io_projektiohjelman_osallistujat",
+    )
+
+
 def user_in_restricted_programmer_group(request):
     """True if the authenticated user is in the restricted programmer AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return False
     return get_restricted_programmer_group_name() in request.user.ad_groups.all().values_list(
+        "name", flat=True
+    )
+
+
+def user_in_project_programme_contributor_group(request):
+    """True if the authenticated user is in the project programme contributor AD group."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    return get_project_programme_contributor_group_name() in request.user.ad_groups.all().values_list(
         "name", flat=True
     )
 
@@ -272,6 +290,22 @@ class IsViewer(permissions.BasePermission):
             return True
 
     def has_permission(self, request, view):
+        if (
+            request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and request.method in SAFE_METHODS
+            and view.action
+            in [
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        ):
+            return True
+
         if (
             request.user.is_authenticated
             and self.user_in_viewer_group(request=request)
