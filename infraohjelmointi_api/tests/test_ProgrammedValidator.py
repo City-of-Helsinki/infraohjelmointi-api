@@ -8,6 +8,7 @@ from infraohjelmointi_api.models import (
     ProjectCategory,
     ProjectClass,
     ProjectPhase,
+    ProjectPhaseDetail,
     ProjectType,
 )
 from infraohjelmointi_api.validators.ProjectValidators.ProgrammedValidator import (
@@ -31,15 +32,21 @@ class ProgrammedValidatorTestCase(TestCase):
         self.phase_programming, _ = ProjectPhase.objects.get_or_create(value="programming")
         self.phase_proposal, _ = ProjectPhase.objects.get_or_create(value="proposal")
         self.phase_completed, _ = ProjectPhase.objects.get_or_create(value="completed")
-        self.phase_suspended, _ = ProjectPhase.objects.get_or_create(value="suspended")
+        # IO-863: suspension is now the `suspended` phaseDetail under designPlanning.
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value="designPlanning")
+        self.suspended_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="suspended", projectPhase=self.phase_planning
+        )
         self.validator = ProgrammedValidator()
 
-    def test_programmed_false_with_suspended_phase_allowed(self):
+    def test_programmed_false_with_suspended_detail_allowed(self):
+        # IO-863: a suspended project is now designPlanning + the `suspended` detail.
         project = Project.objects.create(
             name="PV suspended",
             description="d",
             type=self.project_type,
-            phase=self.phase_suspended,
+            phase=self.phase_planning,
+            phaseDetail=self.suspended_detail,
             category=self.category,
             projectClass=self.project_class,
             programmed=False,
