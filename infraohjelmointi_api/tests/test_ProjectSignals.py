@@ -4,6 +4,7 @@ from django.test import TestCase
 from infraohjelmointi_api.models import (
     Project,
     ProjectPhase,
+    ProjectPhaseDetail,
     ProjectCategory,
     ProjectType,
     ProjectFinancial,
@@ -16,7 +17,11 @@ class ProjectSignalTestCase(TestCase):
         self.phase_proposal, _ = ProjectPhase.objects.get_or_create(value="proposal", defaults={"index": 1})
         self.phase_construction, _ = ProjectPhase.objects.get_or_create(value="construction", defaults={"index": 2})
         self.phase_other, _ = ProjectPhase.objects.get_or_create(value="planning", defaults={"index": 3})
-        self.phase_suspended, _ = ProjectPhase.objects.get_or_create(value="suspended", defaults={"index": 10})
+        # IO-863: suspension is now the `suspended` phaseDetail under designPlanning.
+        self.phase_planning, _ = ProjectPhase.objects.get_or_create(value="designPlanning", defaults={"index": 4})
+        self.suspended_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="suspended", projectPhase=self.phase_planning
+        )
         self.category_k1, _ = ProjectCategory.objects.get_or_create(value="K1")
         self.category_k2, _ = ProjectCategory.objects.get_or_create(value="K2")
 
@@ -99,7 +104,9 @@ class ProjectSignalTestCase(TestCase):
         project.refresh_from_db()
         self.assertEqual(project.category, self.category_k1)
 
-    def test_suspended_date_and_from_phase_set_when_entering_suspended(self):
+    def test_suspended_date_set_when_entering_suspended_detail(self):
+        # IO-863: suspension is entered via the designPlanning `suspended` detail;
+        # suspendedFromPhase is no longer written by the signal.
         project = Project.objects.create(
             name="Suspension Test",
             description="Description",
@@ -108,71 +115,68 @@ class ProjectSignalTestCase(TestCase):
             category=self.category_k2,
         )
         self.assertIsNone(project.suspendedDate)
-        self.assertIsNone(project.suspendedFromPhase_id)
 
-        project.phase = self.phase_suspended
+        project.phase = self.phase_planning
+        project.phaseDetail = self.suspended_detail
         project.save()
         project.refresh_from_db()
 
-        self.assertEqual(project.phase, self.phase_suspended)
+        self.assertEqual(project.phaseDetail, self.suspended_detail)
         self.assertEqual(project.suspendedDate, date.today())
-        self.assertEqual(project.suspendedFromPhase, self.phase_proposal)
 
-    def test_suspended_fields_cleared_when_leaving_suspended(self):
+    def test_suspended_date_cleared_when_leaving_suspended_detail(self):
         project = Project.objects.create(
             name="Resume Test",
             description="Description",
             type=self.projectType,
-            phase=self.phase_suspended,
+            phase=self.phase_planning,
+            phaseDetail=self.suspended_detail,
             category=self.category_k2,
-            suspendedDate=date.today(),
-            suspendedFromPhase=self.phase_proposal,
         )
         project.refresh_from_db()
-        self.assertEqual(project.suspendedFromPhase, self.phase_proposal)
+        self.assertEqual(project.suspendedDate, date.today())
 
+        # Leaving the suspended detail clears suspendedDate.
         project.phase = self.phase_construction
+        project.phaseDetail = None
         project.save()
         project.refresh_from_db()
 
         self.assertEqual(project.phase, self.phase_construction)
         self.assertIsNone(project.suspendedDate)
-        self.assertIsNone(project.suspendedFromPhase)
 
-    def test_suspended_date_set_when_created_directly_in_suspended(self):
+    def test_suspended_date_set_when_created_directly_in_suspended_detail(self):
         project = Project.objects.create(
             name="Created Suspended",
             description="Description",
             type=self.projectType,
-            phase=self.phase_suspended,
+            phase=self.phase_planning,
+            phaseDetail=self.suspended_detail,
             category=self.category_k2,
         )
         project.refresh_from_db()
 
-        self.assertEqual(project.phase, self.phase_suspended)
+        self.assertEqual(project.phaseDetail, self.suspended_detail)
         self.assertEqual(project.suspendedDate, date.today())
         self.assertIsNone(project.suspendedFromPhase)
 
-    def test_suspended_fields_unchanged_when_phase_unchanged(self):
+    def test_suspended_date_unchanged_when_detail_unchanged(self):
         project = Project.objects.create(
             name="No Change Test",
             description="Description",
             type=self.projectType,
-            phase=self.phase_proposal,
+            phase=self.phase_planning,
+            phaseDetail=self.suspended_detail,
             category=self.category_k2,
         )
-        project.phase = self.phase_suspended
-        project.save()
         project.refresh_from_db()
         saved_date = project.suspendedDate
-        saved_from = project.suspendedFromPhase
 
         project.name = "Updated Name"
         project.save()
         project.refresh_from_db()
 
         self.assertEqual(project.suspendedDate, saved_date)
-        self.assertEqual(project.suspendedFromPhase, saved_from)
 
 
 class ReconcileFinancesOnScheduleChangeTestCase(TestCase):

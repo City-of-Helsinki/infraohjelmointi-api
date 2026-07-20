@@ -29,6 +29,8 @@ from infraohjelmointi_api.services.utils.phase_taxonomy import (
     PLANNING_PHASE_VALUE,
     PROGRAMMING_DETAIL_VALUE,
     REMOVED_CONSTRUCTION_DETAIL,
+    SUSPENDED_DETAIL_VALUE,
+    SUSPENDED_PHASE_VALUE,
     TARGET_PHASE_ORDER,
     WAITING_PLANNING_START_DETAIL_VALUE,
     WAITING_PROJECT_MANAGER_DETAIL_VALUE,
@@ -53,7 +55,8 @@ class PhaseTaxonomyConstantsTests(TestCase):
     def test_target_order_is_unique_and_excludes_deleted(self):
         self.assertEqual(len(TARGET_PHASE_ORDER), len(set(TARGET_PHASE_ORDER)))
         self.assertIn(PLANNING_PHASE_VALUE, TARGET_PHASE_ORDER)
-        self.assertIn("suspended", TARGET_PHASE_ORDER)
+        # IO-863: `suspended` is no longer a phase — it is a designPlanning detail.
+        self.assertNotIn(SUSPENDED_PHASE_VALUE, TARGET_PHASE_ORDER)
         self.assertTrue(set(TARGET_PHASE_ORDER).isdisjoint(DELETED_PHASE_VALUES))
 
 
@@ -175,14 +178,22 @@ class TaxonomyEndStateTests(TestCase):
 
     def test_planning_phase_holds_the_moved_details(self):
         planning = ProjectPhase.objects.get(value=PLANNING_PHASE_VALUE)
+        # the moved planning details + the demoted `suspended` detail (IO-863)
         self.assertEqual(
             {d.value for d in planning.phaseDetails.all()},
-            set(MOVED_DETAILS.keys()),
+            set(MOVED_DETAILS.keys()) | {SUSPENDED_DETAIL_VALUE},
         )
 
     def test_deleted_phases_and_removed_detail_are_gone(self):
         self.assertFalse(ProjectPhase.objects.filter(value__in=DELETED_PHASE_VALUES).exists())
         self.assertFalse(ProjectPhaseDetail.objects.filter(value=REMOVED_CONSTRUCTION_DETAIL).exists())
+
+    def test_suspended_phase_removed_and_demoted_to_designplanning_detail(self):
+        # IO-863: the standalone `suspended` phase is gone; "Keskeytetty toistaiseksi"
+        # is now a phaseDetail under designPlanning.
+        self.assertFalse(ProjectPhase.objects.filter(value=SUSPENDED_PHASE_VALUE).exists())
+        planning = ProjectPhase.objects.get(value=PLANNING_PHASE_VALUE)
+        self.assertTrue(planning.phaseDetails.filter(value=SUSPENDED_DETAIL_VALUE).exists())
 
     def test_new_details_present_under_right_phases(self):
         for phase_value, detail_values in NEW_DETAILS.items():
@@ -258,12 +269,19 @@ class TaxonomyRestructureCallableTests(TestCase):
             self.assertEqual(proj.phaseDetail.value, expected_detail)
             self.assertEqual(proj.phaseDetail.projectPhase, planning)
 
-    def test_repoints_suspended_from_phase(self):
+    def test_suspended_project_demoted_to_designplanning_detail(self):
+        # IO-863: the standalone `suspended` phase is removed; the project moves to
+        # designPlanning + the `suspended` detail. suspendedFromPhase is PRESERVED
+        # (repointed off the deleted draftApproval phase to planning) so the change
+        # stays reversible.
         susp = self._make("susp", self.suspended, suspended_from=self.draft_approval)
         self._restructure()
         susp.refresh_from_db()
+        planning = ProjectPhase.objects.get(value=PLANNING_PHASE_VALUE)
+        self.assertEqual(susp.phase, planning)
+        self.assertEqual(susp.phaseDetail.value, SUSPENDED_DETAIL_VALUE)
+        self.assertEqual(susp.phaseDetail.projectPhase, planning)
         self.assertEqual(susp.suspendedFromPhase.value, PLANNING_PHASE_VALUE)
-        self.assertEqual(susp.phase, self.suspended)  # phase itself unchanged
 
     def test_reparents_moved_to_construction_and_its_projects(self):
         proj = self._make(
