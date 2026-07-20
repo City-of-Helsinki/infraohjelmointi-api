@@ -37,6 +37,8 @@ from infraohjelmointi_api.services.utils.phase_taxonomy import (
     PROGRAMMING_DETAIL_VALUE,
     REMOVED_CONSTRUCTION_DETAIL,
     REPARENTED_DETAILS,
+    SUSPENDED_DETAIL_VALUE,
+    SUSPENDED_PHASE_VALUE,
     TARGET_PHASE_ORDER,
     WAITING_PLANNING_START_DETAIL_VALUE,
     WAITING_PROJECT_MANAGER_DETAIL_VALUE,
@@ -288,6 +290,42 @@ def restructure_taxonomy(apps, schema_editor):
             )
             to_backfill.update(phaseDetail=warranty_detail)
 
+    # Step 6c — IO-863: demote the standalone `suspended` phase to the `suspended`
+    # detail under designPlanning (spec table: the top-level "Keskeytetty" phase is
+    # removed; "Keskeytetty toistaiseksi" becomes a Suunnittelu detail). Move every
+    # suspended-phase project to designPlanning + the suspended detail, then delete
+    # the phase. suspendedFromPhase is PRESERVED (not nulled) so the change stays
+    # reversible — a follow-up migration could restore cross-phase suspension from it.
+    # Only a pathological suspended-from-suspended self-reference is cleared so the
+    # row can be deleted without a dangling FK.
+    suspended_phase = ProjectPhase.objects.filter(value=SUSPENDED_PHASE_VALUE).first()
+    if suspended_phase:
+        suspended_detail = ProjectPhaseDetail.objects.filter(
+            value=SUSPENDED_DETAIL_VALUE, projectPhase=planning
+        ).first()
+        if suspended_detail:
+            moved = Project.objects.filter(phase=suspended_phase).count()
+            if moved:
+                logger.info(
+                    "IO-863: demoting %s suspended-phase project(s) to designPlanning "
+                    "+ '%s' detail (suspendedFromPhase preserved)",
+                    moved,
+                    SUSPENDED_DETAIL_VALUE,
+                )
+            Project.objects.filter(phase=suspended_phase).update(
+                phase=planning, phaseDetail=suspended_detail
+            )
+        Project.objects.filter(suspendedFromPhase=suspended_phase).update(
+            suspendedFromPhase=None
+        )
+        remaining = Project.objects.filter(phase=suspended_phase).count()
+        if remaining:
+            raise RuntimeError(
+                f"IO-863: {remaining} project(s) still on the suspended phase after "
+                "demotion; aborting to avoid a dangling FK."
+            )
+        suspended_phase.delete()
+
     # Step 7 — delete the merged-away phases (now unreferenced). Guard first.
     remaining = Project.objects.filter(phase__value__in=DELETED_PHASE_VALUES).count()
     if remaining:
@@ -322,6 +360,28 @@ def reverse_restructure(apps, schema_editor):
             value=value,
             defaults={"order": max_order + offset, "index": max_order + offset},
         )
+
+    # IO-863 reverse: re-create the `suspended` phase and move its projects back to
+    # it (their preserved `suspendedFromPhase` stays intact). Done before the
+    # new-detail cleanup below, which would otherwise only NULL their phaseDetail in
+    # place and leave them on designPlanning.
+    suspended_offset = len(DELETED_PHASE_VALUES) + 1
+    suspended_phase, _ = ProjectPhase.objects.get_or_create(
+        value=SUSPENDED_PHASE_VALUE,
+        defaults={
+            "order": max_order + suspended_offset,
+            "index": max_order + suspended_offset,
+        },
+    )
+    planning = ProjectPhase.objects.filter(value=PLANNING_PHASE_VALUE).first()
+    if planning:
+        suspended_detail = ProjectPhaseDetail.objects.filter(
+            value=SUSPENDED_DETAIL_VALUE, projectPhase=planning
+        ).first()
+        if suspended_detail:
+            Project.objects.filter(phaseDetail=suspended_detail).update(
+                phase=suspended_phase, phaseDetail=None
+            )
 
     # Move the planning details back under their original phases.
     for detail_value, old_phase_value in MOVED_DETAILS.items():

@@ -77,6 +77,18 @@ MOVED_DETAILS = {
 # MOVED_DETAILS so the mapping can never drift out of sync / get swapped.
 DELETED_PHASE_TO_DETAIL = {phase: detail for detail, phase in MOVED_DETAILS.items()}
 
+# IO-863: `suspended` ("Keskeytetty toistaiseksi") is demoted from a standalone
+# top-level phase to a phaseDetail under `designPlanning` (Suunnittelu), per the
+# IO-863 spec table (the old top-level "Keskeytetty" phase is struck through there).
+# Migration 0109 moves every project on the old phase to designPlanning + this detail
+# and DELETES the suspended phase. It deliberately PRESERVES each project's
+# `suspendedFromPhase` (the phase it was suspended from) so the change is reversible:
+# if the customer later wants cross-phase suspension back, a follow-up migration can
+# restore each project to its original phase. `suspendedFromPhase` is no longer
+# populated for newly-suspended projects (see signals.on_project_phase_change).
+SUSPENDED_PHASE_VALUE = "suspended"
+SUSPENDED_DETAIL_VALUE = "suspended"  # label "Keskeytetty toistaiseksi", under designPlanning
+
 # New details to create: phase value -> [detail values]. Labels:
 #   firstPhaseCompleteOrIncomplete -> "Ensimmäinen vaihe valmis/keskeneräinen"
 #   otherReason                    -> "Muu syy"
@@ -84,6 +96,9 @@ DELETED_PHASE_TO_DETAIL = {phase: detail for detail, phase in MOVED_DETAILS.item
 #   warranty                       -> "Takuuaika"
 #   warrantyIncomplete             -> "Takuuaika/keskeneräinen"
 NEW_DETAILS = {
+    # IO-863: the demoted suspended state — "Keskeytetty toistaiseksi" as a detail
+    # under Suunnittelu (designPlanning) rather than a standalone phase.
+    PLANNING_PHASE_VALUE: [SUSPENDED_DETAIL_VALUE],
     "constructionWait": ["firstPhaseCompleteOrIncomplete", "otherReason"],
     "construction": ["constructionStage"],
     "warrantyPeriod": ["warranty", "warrantyIncomplete"],
@@ -125,5 +140,4 @@ TARGET_PHASE_ORDER = [
     "construction",
     "warrantyPeriod",
     "completed",
-    "suspended",
 ]
