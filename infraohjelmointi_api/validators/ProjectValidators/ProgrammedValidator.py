@@ -36,14 +36,14 @@ class ProgrammedValidator(BaseValidator):
         # IO-863: suspension moved from a standalone phase to the `suspended`
         # phaseDetail under designPlanning. A suspended project may still be
         # programmed=False, so resolve its detail for the check below.
-        phaseDetail = allFields.get("phaseDetail", None)
+        phase_detail = allFields.get("phaseDetail", None)
         if (
-            phaseDetail is None
+            phase_detail is None
             and project is not None
             and "phaseDetail" not in allFields
         ):
-            phaseDetail = project.phaseDetail
-        is_suspended = getattr(phaseDetail, "value", None) == "suspended"
+            phase_detail = project.phaseDetail
+        is_suspended = getattr(phase_detail, "value", None) == "suspended"
 
         if programmed == True and (
             phase is None or (phase.value in ["proposal", "design"])
