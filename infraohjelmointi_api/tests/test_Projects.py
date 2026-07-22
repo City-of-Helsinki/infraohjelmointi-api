@@ -29,6 +29,8 @@ from ..models import (
     ProjectHashTag,
     ProjectGroup,
     ProjectFinancial,
+    ClassFinancial,
+    LocationFinancial,
     User,
     ProjectProgrammer,
 )
@@ -988,6 +990,201 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_patch_bulk_forced_to_frame_skips_current_year_project_finances(self):
+        current_year = date.today().year
+        next_year = current_year + 1
+
+        # Keep this test deterministic regardless of other test data.
+        ProjectFinancial.objects.filter(
+            project_id=self.project_1_Id,
+            year__in=[current_year, next_year],
+        ).delete()
+
+        # Planning view source values.
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=current_year,
+            value=111,
+            forFrameView=False,
+        )
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=next_year,
+            value=222,
+            forFrameView=False,
+        )
+
+        # Existing frame view values that action may update.
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=current_year,
+            value=999,
+            forFrameView=True,
+        )
+        ProjectFinancial.objects.create(
+            project_id=self.project_1_Id,
+            year=next_year,
+            value=1,
+            forFrameView=True,
+        )
+
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            [],
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        current_year_frame = ProjectFinancial.objects.get(
+            project_id=self.project_1_Id,
+            year=current_year,
+            forFrameView=True,
+        )
+        next_year_frame = ProjectFinancial.objects.get(
+            project_id=self.project_1_Id,
+            year=next_year,
+            forFrameView=True,
+        )
+
+        self.assertEqual(current_year_frame.value, 999)
+        self.assertEqual(next_year_frame.value, 222)
+
+    def test_patch_bulk_forced_to_frame_skips_current_year_class_finances(self):
+        current_year = date.today().year
+        next_year = current_year + 1
+
+        coordinator_class = ProjectClass.objects.create(
+            name="Coordinator class for frame finance test",
+            path="Coordinator class for frame finance test",
+            forCoordinatorOnly=True,
+        )
+
+        ClassFinancial.objects.filter(
+            classRelation_id=coordinator_class.id,
+            year__in=[current_year, next_year],
+        ).delete()
+
+        ClassFinancial.objects.create(
+            classRelation_id=coordinator_class.id,
+            year=current_year,
+            frameBudget=111,
+            budgetChange=11,
+            forFrameView=False,
+        )
+        ClassFinancial.objects.create(
+            classRelation_id=coordinator_class.id,
+            year=next_year,
+            frameBudget=222,
+            budgetChange=22,
+            forFrameView=False,
+        )
+
+        ClassFinancial.objects.create(
+            classRelation_id=coordinator_class.id,
+            year=current_year,
+            frameBudget=999,
+            budgetChange=99,
+            forFrameView=True,
+        )
+        ClassFinancial.objects.create(
+            classRelation_id=coordinator_class.id,
+            year=next_year,
+            frameBudget=1,
+            budgetChange=1,
+            forFrameView=True,
+        )
+
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            [],
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        current_year_frame = ClassFinancial.objects.get(
+            classRelation_id=coordinator_class.id,
+            year=current_year,
+            forFrameView=True,
+        )
+        next_year_frame = ClassFinancial.objects.get(
+            classRelation_id=coordinator_class.id,
+            year=next_year,
+            forFrameView=True,
+        )
+
+        self.assertEqual(current_year_frame.frameBudget, 999)
+        self.assertEqual(current_year_frame.budgetChange, 99)
+        self.assertEqual(next_year_frame.frameBudget, 222)
+        self.assertEqual(next_year_frame.budgetChange, 22)
+
+    def test_patch_bulk_forced_to_frame_skips_current_year_location_finances(self):
+        current_year = date.today().year
+        next_year = current_year + 1
+
+        coordinator_location = ProjectLocation.objects.create(
+            name="Coordinator location for frame finance test",
+            path="Coordinator location for frame finance test",
+            forCoordinatorOnly=True,
+        )
+
+        LocationFinancial.objects.filter(
+            locationRelation_id=coordinator_location.id,
+            year__in=[current_year, next_year],
+        ).delete()
+
+        LocationFinancial.objects.create(
+            locationRelation_id=coordinator_location.id,
+            year=current_year,
+            frameBudget=111,
+            budgetChange=11,
+            forFrameView=False,
+        )
+        LocationFinancial.objects.create(
+            locationRelation_id=coordinator_location.id,
+            year=next_year,
+            frameBudget=222,
+            budgetChange=22,
+            forFrameView=False,
+        )
+
+        LocationFinancial.objects.create(
+            locationRelation_id=coordinator_location.id,
+            year=current_year,
+            frameBudget=999,
+            budgetChange=99,
+            forFrameView=True,
+        )
+        LocationFinancial.objects.create(
+            locationRelation_id=coordinator_location.id,
+            year=next_year,
+            frameBudget=1,
+            budgetChange=1,
+            forFrameView=True,
+        )
+
+        response = self.client.patch(
+            "/projects/bulk-update/forced-to-frame/",
+            [],
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.json())
+
+        current_year_frame = LocationFinancial.objects.get(
+            locationRelation_id=coordinator_location.id,
+            year=current_year,
+            forFrameView=True,
+        )
+        next_year_frame = LocationFinancial.objects.get(
+            locationRelation_id=coordinator_location.id,
+            year=next_year,
+            forFrameView=True,
+        )
+
+        self.assertEqual(current_year_frame.frameBudget, 999)
+        self.assertEqual(current_year_frame.budgetChange, 99)
+        self.assertEqual(next_year_frame.frameBudget, 222)
+        self.assertEqual(next_year_frame.budgetChange, 22)
 
 
     def test_notes_project(self):

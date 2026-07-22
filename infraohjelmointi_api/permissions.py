@@ -195,6 +195,13 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 
 #### Construction handover custom actions ####
 CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
+CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
+
+#### Project change-history custom actions (IO-879) ####
+# Per-project audit-log history powering the "Näytä muutoshistoria" UI.
+# Read-only and scoped to a single project, so it is granted to every role
+# that can view a project (including plain viewers and restricted programmers).
+PROJECT_HISTORY_GET_ACTIONS = ["get_project_history"]
 
 LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER = [
     "finances",
@@ -257,6 +264,7 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_FINANCES_PLANNING_GET_ACTIONS,
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -297,6 +305,8 @@ class IsCoordinator(permissions.BasePermission):
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
             ]
         ):
             return True
@@ -335,6 +345,8 @@ class IsPlanner(permissions.BasePermission):
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
             ]
         ):
             return True
@@ -375,6 +387,8 @@ class IsProjectManager(permissions.BasePermission):
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
             ]
         ):
             return True
@@ -461,7 +475,8 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *PROJECT_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
-                *PROJECT_NOTE_ALL_ACTIONS
+                *PROJECT_NOTE_ALL_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
             ]
         ):
             return True
@@ -528,6 +543,8 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_FORCED_TO_FRAME_PATCH,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
             ]
         ):
             return True
@@ -592,6 +609,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *PROJECT_GROUP_ALL_GET_ACTIONS,
             *SAP_COST_ALL_GET_ACTIONS,
             *PROJECT_NOTE_ALL_GET_ACTIONS,
+            *PROJECT_HISTORY_GET_ACTIONS,
         ]:
             return True
 
@@ -644,3 +662,61 @@ class IsClassProgrammer(permissions.BasePermission):
         return self._target_path_matches_assigned_paths(
             target_class_path, assigned_paths
         )
+    
+class IsConstructionManagementLead(permissions.BasePermission):
+    """Permission class for construction management leads (Rakennuttamisen esihenkilöt)."""
+
+    CONSTRUCTION_HANDOVER_BASENAME = "constructionHandovers"
+
+    def user_in_construction_management_lead_group(self, request):
+        if (
+            "sg_kymp_sso_io_rakennuttamisen_esihenkilot"
+            in request.user.ad_groups.all().values_list("name", flat=True)
+        ):
+            return True
+        else:
+            return False
+
+    def _is_construction_handover_view(self, view):
+        return getattr(view, "basename", None) == self.CONSTRUCTION_HANDOVER_BASENAME
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if not self.user_in_construction_management_lead_group(request=request):
+            return False
+
+        if request.method not in SAFE_METHODS:
+            return False
+
+        # Allow read rights for all resources this role can view.
+        if request.method == GET and view.action in [
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *PROJECT_CLASS_ALL_GET_ACTIONS,
+            *PROJECT_LOCATION_ALL_GET_ACTIONS,
+            *PROJECT_GROUP_ALL_GET_ACTIONS,
+            *PROJECT_FINANCES_ALL_GET_ACTIONS,
+            *PROJECT_ALL_GET_ACTIONS,
+            *SAP_COST_ALL_GET_ACTIONS,
+            *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+        ]:
+            return True
+
+        # Strict write rights: only update/transition actions on construction handovers.
+        if self._is_construction_handover_view(view) and view.action in [
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+        ]:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.method == GET:
+            return True
+
+        if self._is_construction_handover_view(view):
+            return True
+
+        return False

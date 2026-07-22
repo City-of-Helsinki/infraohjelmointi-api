@@ -15,6 +15,7 @@ from infraohjelmointi_api.serializers import (
     SearchResultSerializer,
     ProjectNoteGetSerializer,
     ConstructionHandoverGetSerializer,
+    AuditLogSerializer,
 )
 from infraohjelmointi_api.models import (
     AuditLog,
@@ -167,8 +168,10 @@ class ProjectViewSet(BaseViewSet):
             "category",
             "projectClass",
             "name",
+            "description",
             "phase",
             "phaseDetail",
+            "constructionProcurementMethod",
             "planningStartYear",
             "constructionEndYear",
             "estPlanningStart",
@@ -183,11 +186,7 @@ class ProjectViewSet(BaseViewSet):
             "visibilityEnd",
         ]
         old_values_for_audit_log = {
-            field: (
-                str(getattr(getattr(project, field), 'id', None))
-                if hasattr(getattr(project, field), 'id')
-                else str(getattr(project, field))
-            )
+            field: self._serialize_audit_value(project, field)
             for field in audit_loggable_fields
             if field in request.data
         }
@@ -331,7 +330,14 @@ class ProjectViewSet(BaseViewSet):
 
         # saving audit logs after project data was changed
         if (old_values_for_audit_log):
-            new_values_for_audit_log = {field: request.data[field] for field in audit_loggable_fields if field in request.data}
+            # Read new values from the saved project rather than request.data so
+            # relations are stored consistently as their id (matching old_values),
+            # regardless of how the client sent them.
+            new_values_for_audit_log = {
+                field: self._serialize_audit_value(updated_project, field)
+                for field in audit_loggable_fields
+                if field in request.data
+            }
             self.audit_log_project_card_changes(
                 old_values_for_audit_log,
                 new_values_for_audit_log,
@@ -349,6 +355,18 @@ class ProjectViewSet(BaseViewSet):
         if isinstance(date, str):
             return datetime.strptime(date, '%d.%m.%Y').date()
         return date
+
+    def _serialize_audit_value(self, instance, field):
+        # Relations are stored as their id, scalars as a string, and an absent
+        # value as null (not the string "None") so the Muutoshistoria UI can show
+        # an empty previous/next value cleanly.
+        value = getattr(instance, field)
+        if value is None:
+            return None
+        related_id = getattr(value, 'id', None)
+        if related_id is not None:
+            return str(related_id)
+        return str(value)
 
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         # Existing local AuditLog write — kept so /audit-logs/ (used by the
@@ -1293,8 +1311,12 @@ class ProjectViewSet(BaseViewSet):
                 yield queryset[start:end]
 
         bulk_size = 100
+        current_year = date.today().year
 
         new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
+        # Filter out the finances for the current year as they should not be updated
+        new_project_finances = [finance for finance in new_project_finances if finance.year != current_year]
+        update_project_finances = [finance for finance in update_project_finances if finance.year != current_year]
 
         # Bulk create new ProjectFinancial entries
         ProjectFinancial.objects.bulk_create(new_project_finances, bulk_size)
@@ -1305,6 +1327,9 @@ class ProjectViewSet(BaseViewSet):
                 ProjectFinancial.objects.bulk_update(batch, ['value'])
 
         new_class_finances, update_class_finances = self.update_forced_to_frame_classes()
+        # Filter out the finances for the current year as they should not be updated
+        new_class_finances = [finance for finance in new_class_finances if finance.year != current_year]
+        update_class_finances = [finance for finance in update_class_finances if finance.year != current_year]
 
         # Bulk create new ClassFinancial entries
         ClassFinancial.objects.bulk_create(new_class_finances, bulk_size)
@@ -1315,6 +1340,9 @@ class ProjectViewSet(BaseViewSet):
                 ClassFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
         new_location_finances, update_location_finances = self.update_forced_to_frame_locations()
+        # Filter out the finances for the current year as they should not be updated
+        new_location_finances = [finance for finance in new_location_finances if finance.year != current_year]
+        update_location_finances = [finance for finance in update_location_finances if finance.year != current_year]
 
         # Bulk create new LocationFinancial entries
         LocationFinancial.objects.bulk_create(new_location_finances, bulk_size)
@@ -1324,7 +1352,6 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
-        current_year = date.today().year
         for year_offset in range(-2, 13):
             year = current_year + year_offset
             CacheService.invalidate_frame_budgets(year=year)
@@ -1999,4 +2026,86 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(methods=["get"], detail=True, url_path=r"history", name="get_project_history")
+    def get_project_history(self, request, pk):
+        """
+        Custom action returning the change history (audit log) of a single
+        project, powering the "Muutoshistoria" UI (IO-879).
+
+        Unlike the admin-only /audit-logs/ endpoint, this is scoped to one
+        project, so it is available to any user allowed to view that project
+        (the same role-based permissions as the rest of ProjectViewSet).
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Query Parameters
+            ----------
+
+            year : keep only entries whose old/new values touch that year.
+                   Financial figures are stored keyed by year, so this narrows
+                   the history to a single budget cell (IO-880).
+            field : keep only entries whose old/new values touch that field
+                    name. Form fields are stored keyed by field name, so this
+                    narrows the history to a single form field (IO-882).
+            operation : CREATE / UPDATE / DELETE passthrough filter.
+
+            Usage
+            ----------
+
+            projects/<project_id>/history/
+
+            Returns
+            -------
+
+            JSON
+                Paginated list of AuditLog entries for the project, newest first
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        project = Project.objects.filter(pk=pk).first()
+        if project is None:
+            return Response(
+                data={"message": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        queryset = (
+            AuditLog.objects.select_related("actor")
+            .filter(project=project)
+            .order_by("-createdDate")
+        )
+
+        operation = request.query_params.get("operation")
+        if operation:
+            queryset = queryset.filter(operation=operation)
+
+        # Financial figures and form fields are both stored as JSON objects in
+        # old_values / new_values - financial ones keyed by year ("2026"), form
+        # ones keyed by field name ("phase"). A JSONB key-existence match on
+        # either side narrows the history to a single budget cell or a single
+        # form field without unpacking the JSON in Python.
+        year = request.query_params.get("year")
+        if year:
+            queryset = queryset.filter(
+                Q(old_values__has_key=year) | Q(new_values__has_key=year)
+            )
+
+        field = request.query_params.get("field")
+        if field:
+            queryset = queryset.filter(
+                Q(old_values__has_key=field) | Q(new_values__has_key=field)
+            )
+
+        page = self.paginate_queryset(queryset)
+        serializer = AuditLogSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 

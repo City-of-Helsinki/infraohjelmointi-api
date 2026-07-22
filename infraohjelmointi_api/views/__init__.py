@@ -52,3 +52,5 @@ from .TalpaServiceClassViewSet import *
 from .TalpaAssetClassViewSet import *
 from .TalpaProjectNumberRangeViewSet import *
 from .ConstructionHandoverViewSet import *
+from .ConstructionHandoverFinancingViewSet import *
+from .FinancingPartyViewSet import *

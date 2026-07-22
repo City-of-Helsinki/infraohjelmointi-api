@@ -15,6 +15,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
         "az_kymp_asgd_u_infraohjelmointi_ulkopuoliset": "952da398-75b3-404a-b274-c8f351d7f5a7",
         "952da398-75b3-404a-b274-c8f351d7f5a7": "952da398-75b3-404a-b274-c8f351d7f5a7",
         "sg_kymp_sso_io_admin": "sg_kymp_sso_io_admin",
+        "sg_kymp_sso_io_rakennuttamisen_esihenkilot": "9d22d98e-5cc6-4a91-9fec-1a288a67290e"
     }
 
     class Meta:

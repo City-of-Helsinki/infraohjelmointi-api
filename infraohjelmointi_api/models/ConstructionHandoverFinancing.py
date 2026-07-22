@@ -34,7 +34,7 @@ class ConstructionHandoverFinancing(models.Model):
         default="",
     )
     budgetItem = models.ForeignKey(
-        "infraohjelmointi_api.BudgetItem",
+        "infraohjelmointi_api.ProjectTypeQualifier",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

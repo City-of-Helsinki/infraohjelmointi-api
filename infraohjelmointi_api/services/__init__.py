@@ -23,3 +23,7 @@ from .SapCostService import SapCostService
 from .AppStateValueService import AppStateValueService
 from .CacheService import CacheService
 from .TalpaExcelService import TalpaExcelService
+from .ProjectPersonAuthorizationService import ProjectPersonAuthorizationService
+from .ConstructionHandoverTransitionPermissionService import (
+	ConstructionHandoverTransitionPermissionService,
+)
