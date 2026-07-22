@@ -1,4 +1,4 @@
-"""IO-863: tests for the phase/detail taxonomy migration (0109_phase_taxonomy).
+"""IO-863: tests for the phase/detail taxonomy migration (0110_phase_taxonomy).
 
 Layers:
 1. Pure-function / constant-consistency tests (no DB).
@@ -39,7 +39,7 @@ from infraohjelmointi_api.services.utils.phase_taxonomy import (
 
 # Module name starts with a digit -> import via importlib to drive its callables.
 taxonomy_migration = importlib.import_module(
-    "infraohjelmointi_api.migrations.0109_phase_taxonomy"
+    "infraohjelmointi_api.migrations.0110_phase_taxonomy"
 )
 
 
