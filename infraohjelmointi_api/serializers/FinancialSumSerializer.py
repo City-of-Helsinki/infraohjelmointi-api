@@ -420,7 +420,13 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
                     .filter(
-                        Q(projectClass__path__startswith=instance.path)
+                        # IO-928: match descendants by path prefix WITH a trailing-slash
+                        # boundary. `path` is name-based, so without the boundary a class
+                        # whose name is a prefix of a sibling's (e.g. "…/Malmi" is a prefix
+                        # of "…/Malminkartano-Kannelmäki") pulls the sibling's projects into
+                        # this class's sum. `Q(projectClass=instance)` keeps the class's own
+                        # (non-descendant) projects.
+                        Q(projectClass__path__startswith=instance.path + "/")
                         | Q(projectClass=instance),
                         programmed=True,
                     )

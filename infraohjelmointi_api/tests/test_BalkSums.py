@@ -1021,3 +1021,54 @@ class BalkSumTestCase(CacheClearingMixin, TestCase):
         self.assertEqual(response.json()["finances"]["projectBudgets"], 0)
 
         self.runFinancesAssertTests(response, index=None, name="plannedBudget", values=[0,0,0,0,0,0,0,0,0,0,0])
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ClassSumSiblingNamePrefixTestCase(CacheClearingMixin, TestCase):
+    """IO-928 regression: a class planned-budget sum is a path-prefix query, so a
+    class whose name is a prefix of a sibling's must NOT absorb the sibling's
+    projects. Concretely, "MC/Malmi" must not match "MC/Malminkartano-Kannelmäki".
+    """
+
+    def setUp(self):
+        year = date.today().year
+        mc = ProjectClass.objects.create(name="MC", path="MC")
+        malmi = ProjectClass.objects.create(name="Malmi", path="MC/Malmi", parent=mc)
+        # sibling whose name STARTS WITH "Malmi" (the bug trigger)
+        kartano = ProjectClass.objects.create(
+            name="Malminkartano-Kannelmäki",
+            path="MC/Malminkartano-Kannelmäki",
+            parent=mc,
+        )
+        # a genuine descendant of Malmi (must stay included in Malmi's sum)
+        malmi_sub = ProjectClass.objects.create(
+            name="Esirakentaminen", path="MC/Malmi/Esirakentaminen", parent=malmi
+        )
+
+        p_malmi = Project.objects.create(
+            name="Malmi project", description="d", programmed=True, projectClass=malmi_sub
+        )
+        p_kartano = Project.objects.create(
+            name="Kartano project", description="d", programmed=True, projectClass=kartano
+        )
+        ProjectFinancial.objects.create(project=p_malmi, year=year, value=10)
+        ProjectFinancial.objects.create(project=p_kartano, year=year, value=100)
+
+        self.mc_id = mc.id
+        self.malmi_id = malmi.id
+        self.kartano_id = kartano.id
+
+    def test_prefix_named_sibling_not_summed_into_class(self):
+        # Malmi: includes its descendant (10), excludes the prefix-named sibling (100).
+        resp = self.client.get("/project-classes/{}/".format(self.malmi_id))
+        self.assertEqual(resp.status_code, 200, msg=resp.content)
+        self.assertEqual(resp.json()["finances"]["year0"]["plannedBudget"], 10)
+
+        # sibling still sums its own project
+        resp2 = self.client.get("/project-classes/{}/".format(self.kartano_id))
+        self.assertEqual(resp2.json()["finances"]["year0"]["plannedBudget"], 100)
+
+        # shared parent legitimately includes both
+        resp3 = self.client.get("/project-classes/{}/".format(self.mc_id))
+        self.assertEqual(resp3.json()["finances"]["year0"]["plannedBudget"], 110)
