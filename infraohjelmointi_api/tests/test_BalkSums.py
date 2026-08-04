@@ -1032,7 +1032,8 @@ class ClassSumSiblingNamePrefixTestCase(CacheClearingMixin, TestCase):
     """
 
     def setUp(self):
-        year = date.today().year
+        super().setUp()  # CacheClearingMixin.setUp, see tests/helpers.py
+
         mc = ProjectClass.objects.create(name="MC", path="MC")
         malmi = ProjectClass.objects.create(name="Malmi", path="MC/Malmi", parent=mc)
         # sibling whose name STARTS WITH "Malmi" (the bug trigger)
@@ -1046,29 +1047,34 @@ class ClassSumSiblingNamePrefixTestCase(CacheClearingMixin, TestCase):
             name="Esirakentaminen", path="MC/Malmi/Esirakentaminen", parent=malmi
         )
 
-        p_malmi = Project.objects.create(
-            name="Malmi project", description="d", programmed=True, projectClass=malmi_sub
-        )
-        p_kartano = Project.objects.create(
-            name="Kartano project", description="d", programmed=True, projectClass=kartano
-        )
-        ProjectFinancial.objects.create(project=p_malmi, year=year, value=10)
-        ProjectFinancial.objects.create(project=p_kartano, year=year, value=100)
+        year = date.today().year
+        for projectClass, value in ((malmi, 5), (malmi_sub, 10), (kartano, 100)):
+            project = Project.objects.create(
+                name="{} project".format(projectClass.name),
+                description="d",
+                programmed=True,
+                projectClass=projectClass,
+            )
+            ProjectFinancial.objects.create(project=project, year=year, value=value)
 
         self.mc_id = mc.id
         self.malmi_id = malmi.id
         self.kartano_id = kartano.id
 
+    def assertPlannedBudget(self, class_id, expected):
+        response = self.client.get("/project-classes/{}/".format(class_id))
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.assertEqual(
+            response.json()["finances"]["year0"]["plannedBudget"], expected
+        )
+
     def test_prefix_named_sibling_not_summed_into_class(self):
-        # Malmi: includes its descendant (10), excludes the prefix-named sibling (100).
-        resp = self.client.get("/project-classes/{}/".format(self.malmi_id))
-        self.assertEqual(resp.status_code, 200, msg=resp.content)
-        self.assertEqual(resp.json()["finances"]["year0"]["plannedBudget"], 10)
+        # Malmi: its own project (5) plus its descendant's (10). The prefix-named
+        # sibling's project (100) must stay out.
+        self.assertPlannedBudget(self.malmi_id, 15)
 
-        # sibling still sums its own project
-        resp2 = self.client.get("/project-classes/{}/".format(self.kartano_id))
-        self.assertEqual(resp2.json()["finances"]["year0"]["plannedBudget"], 100)
+        # the sibling still sums its own project
+        self.assertPlannedBudget(self.kartano_id, 100)
 
-        # shared parent legitimately includes both
-        resp3 = self.client.get("/project-classes/{}/".format(self.mc_id))
-        self.assertEqual(resp3.json()["finances"]["year0"]["plannedBudget"], 110)
+        # the shared parent legitimately includes both branches
+        self.assertPlannedBudget(self.mc_id, 115)
