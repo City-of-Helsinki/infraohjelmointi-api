@@ -16,6 +16,7 @@ class ProjectProgrammeBasicInfo(ProjectProgrammeBase):
     inspector = models.CharField(max_length=100, blank=True)
     summary = models.TextField(blank=True)
     strategyGoals = models.TextField(blank=True)
+    costClass = models.TextField(blank=True)
     projectSize = models.CharField(max_length=200, blank=True)
     risks = models.TextField(blank=True)
     studyAndPlanningNeeds = models.TextField(blank=True)
@@ -32,6 +33,7 @@ class ProjectProgrammeBasicInfo(ProjectProgrammeBase):
         "inspector",
         "summary",
         "strategyGoals",
+        "costClass",
         "projectSize",
         "risks",
         "studyAndPlanningNeeds",
