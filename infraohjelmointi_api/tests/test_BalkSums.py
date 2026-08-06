@@ -1021,3 +1021,121 @@ class BalkSumTestCase(CacheClearingMixin, TestCase):
         self.assertEqual(response.json()["finances"]["projectBudgets"], 0)
 
         self.runFinancesAssertTests(response, index=None, name="plannedBudget", values=[0,0,0,0,0,0,0,0,0,0,0])
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ClassSumSiblingNamePrefixTestCase(CacheClearingMixin, TestCase):
+    """IO-928 regression: a class planned-budget sum is a path-prefix query, so a
+    class whose name is a prefix of a sibling's must NOT absorb the sibling's
+    projects. Concretely, "MC/Malmi" must not match "MC/Malminkartano-Kannelmäki".
+    """
+
+    def setUp(self):
+        super().setUp()  # CacheClearingMixin.setUp, see tests/helpers.py
+
+        mc = ProjectClass.objects.create(name="MC", path="MC")
+        malmi = ProjectClass.objects.create(name="Malmi", path="MC/Malmi", parent=mc)
+        # sibling whose name STARTS WITH "Malmi" (the bug trigger)
+        kartano = ProjectClass.objects.create(
+            name="Malminkartano-Kannelmäki",
+            path="MC/Malminkartano-Kannelmäki",
+            parent=mc,
+        )
+        # a genuine descendant of Malmi (must stay included in Malmi's sum)
+        malmi_sub = ProjectClass.objects.create(
+            name="Esirakentaminen", path="MC/Malmi/Esirakentaminen", parent=malmi
+        )
+
+        year = date.today().year
+        for projectClass, value in ((malmi, 5), (malmi_sub, 10), (kartano, 100)):
+            project = Project.objects.create(
+                name="{} project".format(projectClass.name),
+                description="d",
+                programmed=True,
+                projectClass=projectClass,
+            )
+            ProjectFinancial.objects.create(project=project, year=year, value=value)
+
+        self.mc_id = mc.id
+        self.malmi_id = malmi.id
+        self.kartano_id = kartano.id
+
+    def assertPlannedBudget(self, class_id, expected):
+        response = self.client.get("/project-classes/{}/".format(class_id))
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.assertEqual(
+            response.json()["finances"]["year0"]["plannedBudget"], expected
+        )
+
+    def test_prefix_named_sibling_not_summed_into_class(self):
+        # Malmi: its own project (5) plus its descendant's (10). The prefix-named
+        # sibling's project (100) must stay out.
+        self.assertPlannedBudget(self.malmi_id, 15)
+
+        # the sibling still sums its own project
+        self.assertPlannedBudget(self.kartano_id, 100)
+
+        # the shared parent legitimately includes both branches
+        self.assertPlannedBudget(self.mc_id, 115)
+
+
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class CoordinatorSumSiblingNamePrefixTestCase(CacheClearingMixin, TestCase):
+    """IO-928 regression (coordinator branch): same prefix-collision fix as the
+    planning branch, but with the added constraint that the coordinator query
+    must keep an equality leg — without it, projects directly mapped to the
+    viewed coordinator class are dropped from its sum.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # Planning hierarchy: two planning classes, each with one programmed project
+        plan_a = ProjectClass.objects.create(name="Plan A", path="Plan A")
+        plan_b = ProjectClass.objects.create(name="Plan B", path="Plan B")
+
+        year = date.today().year
+        for pc, val in ((plan_a, 30), (plan_b, 70)):
+            p = Project.objects.create(
+                name="{} project".format(pc.name),
+                description="d",
+                programmed=True,
+                projectClass=pc,
+            )
+            ProjectFinancial.objects.create(project=p, year=year, value=val)
+
+        # Coordinator hierarchy: "CO/Malmi" and "CO/Malminkartano" are siblings
+        # whose names trigger the prefix bug.
+        co = ProjectClass.objects.create(
+            name="CO", path="CO", forCoordinatorOnly=True,
+        )
+        co_malmi = ProjectClass.objects.create(
+            name="Malmi", path="CO/Malmi", parent=co,
+            forCoordinatorOnly=True, relatedTo=plan_a,
+        )
+        co_kartano = ProjectClass.objects.create(
+            name="Malminkartano", path="CO/Malminkartano", parent=co,
+            forCoordinatorOnly=True, relatedTo=plan_b,
+        )
+
+        self.co_id = co.id
+        self.co_malmi_id = co_malmi.id
+        self.co_kartano_id = co_kartano.id
+
+    def assertCoordinatorPlannedBudget(self, class_id, expected):
+        response = self.client.get("/project-classes/coordinator/")
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        row = next(r for r in response.json() if r["id"] == str(class_id))
+        self.assertEqual(row["finances"]["year0"]["plannedBudget"], expected)
+
+    def test_prefix_named_coordinator_sibling_not_summed(self):
+        # CO/Malmi maps to plan_a (30) — must NOT absorb plan_b's 70
+        self.assertCoordinatorPlannedBudget(self.co_malmi_id, 30)
+
+        # CO/Malminkartano maps to plan_b (70) — must keep its own
+        self.assertCoordinatorPlannedBudget(self.co_kartano_id, 70)
+
+        # shared parent includes both
+        self.assertCoordinatorPlannedBudget(self.co_id, 100)

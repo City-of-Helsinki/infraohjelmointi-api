@@ -403,14 +403,21 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
                     .prefetch_related("finances")  # CRITICAL: Prevents N+1 queries when aggregating ProjectFinancial
                     .filter(
+                        # IO-928: same trailing-slash boundary as the planning branch.
                         (
                             Q(projectClass__name__icontains="suurpiiri")
-                            & Q(
-                                projectClass__parent__coordinatorClass__path__startswith=instance.path
+                            & (
+                                Q(projectClass__parent__coordinatorClass=instance)
+                                | Q(
+                                    projectClass__parent__coordinatorClass__path__startswith=instance.path
+                                    + "/"
+                                )
                             )
                         )
+                        | Q(projectClass__coordinatorClass=instance)
                         | Q(
                             projectClass__coordinatorClass__path__startswith=instance.path
+                            + "/"
                         ),
                         programmed=True,
                     )
@@ -420,7 +427,11 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
                     .filter(
-                        Q(projectClass__path__startswith=instance.path)
+                        # IO-928: `path` is name-based, so the descendant prefix match
+                        # needs a trailing-slash boundary — without it ".../Malmi" also
+                        # matches the sibling ".../Malminkartano-Kannelmäki" and absorbs
+                        # its projects. Q(projectClass=instance) keeps this class's own.
+                        Q(projectClass__path__startswith=instance.path + "/")
                         | Q(projectClass=instance),
                         programmed=True,
                     )
