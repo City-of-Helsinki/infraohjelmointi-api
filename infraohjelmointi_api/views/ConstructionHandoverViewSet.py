@@ -308,12 +308,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
                 {"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        handover = ConstructionHandover.objects.filter(pk=pk).first()
-        if handover is None:
-            return Response(
-                {"message": "Construction handover not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        handover = self.get_object()
 
         events = build_history(handover)
 
