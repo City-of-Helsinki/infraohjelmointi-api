@@ -19,10 +19,23 @@ class ProjectProgrammeDraftOnlyUpdateMixin:
         attrs = super().validate(attrs)
 
         instance = getattr(self, "instance", None)
-        status = attrs.get("status", getattr(instance, "status", "DRAFT"))
-        if status != "DRAFT":
+        if getattr(instance, "is_locked", False):
             raise serializers.ValidationError(
                 {"status": "Only entities in DRAFT status can be saved."}
+            )
+
+        return attrs
+
+
+class ProjectProgrammeSectionParentImmutableMixin:
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        parent = attrs.get("project_programme")
+        if instance and parent and parent != instance.project_programme:
+            raise serializers.ValidationError(
+                {"project_programme": "Section parent project programme cannot be changed."}
             )
 
         return attrs
@@ -43,6 +56,11 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
+        if self.instance and ("contentType" in attrs or "objectId" in attrs):
+            raise serializers.ValidationError(
+                {"detail": "Link target cannot be changed."}
+            )
+
         content_type = attrs.get("contentType", getattr(self.instance, "contentType", None))
         object_id = attrs.get("objectId", getattr(self.instance, "objectId", None))
 
@@ -50,11 +68,7 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
             model_class = content_type.model_class()
             if model_class is not None:
                 section_instance = model_class.objects.filter(pk=object_id).first()
-                if (
-                    section_instance
-                    and hasattr(section_instance, "status")
-                    and section_instance.status != "DRAFT"
-                ):
+                if getattr(section_instance, "is_locked", False):
                     raise serializers.ValidationError(
                         {
                             "detail": "Links can only be modified for entities in DRAFT status."
@@ -71,7 +85,9 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
 
 
 class ProjectProgrammeBasicInfoUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeBasicInfo
@@ -98,7 +114,9 @@ class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
 
 
 class ProjectProgrammeDesignCriteriaUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeDesignCriteria
@@ -113,7 +131,9 @@ class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSeri
 
 
 class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
@@ -128,7 +148,9 @@ class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.Mode
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
@@ -143,7 +165,9 @@ class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer)
 
 
 class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
@@ -158,7 +182,9 @@ class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.Mod
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
@@ -183,7 +209,9 @@ class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer)
 
 
 class ProjectProgrammeOtherAttachmentsUpdateSerializer(
-    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
 ):
     class Meta:
         model = ProjectProgrammeOtherAttachments
@@ -211,13 +239,20 @@ class ProjectProgrammeGetSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ProjectProgrammeCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectProgramme
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+
+
 class ProjectProgrammeUpdateSerializer(
     ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
 ):
     class Meta:
         model = ProjectProgramme
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -225,6 +260,16 @@ class ProjectProgrammeUpdateSerializer(
         instance = getattr(self, "instance", None)
         if not instance:
             return attrs
+
+        if "project" in getattr(self, "initial_data", {}):
+            raise serializers.ValidationError(
+                {"project": "Project programme project cannot be changed."}
+            )
+
+        if "project" in attrs and attrs["project"] != instance.project:
+            raise serializers.ValidationError(
+                {"project": "Project programme project cannot be changed."}
+            )
 
         current_is_brief = instance.briefProjectProgramme
         new_is_brief = attrs.get("briefProjectProgramme", current_is_brief)

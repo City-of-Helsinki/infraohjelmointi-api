@@ -1,7 +1,9 @@
+import uuid
 from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from helusers.models import ADGroup
 from rest_framework import status
@@ -15,9 +17,12 @@ from infraohjelmointi_api.models import (
     ProjectProgramme,
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
+    ProjectProgrammeLink,
+    ProjectProgrammeOtherAttachments,
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeBasicInfoUpdateSerializer,
+    ProjectProgrammeLinkUpdateSerializer,
     ProjectProgrammeUpdateSerializer,
 )
 from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
@@ -138,6 +143,33 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("status", response.data)
 
+    def test_partial_update_cannot_change_project(self):
+        programme = self._create_project_programme(project=self.project)
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/",
+            {"project": str(self.second_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("project", response.data)
+        programme.refresh_from_db()
+        self.assertEqual(programme.project_id, self.project.id)
+
+    def test_partial_update_cannot_change_status(self):
+        programme = self._create_project_programme(status="DRAFT")
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/",
+            {"status": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "DRAFT")
+
     def test_switch_type_toggles_brief_project_programme(self):
         programme = self._create_project_programme(briefProjectProgramme=True)
 
@@ -239,6 +271,475 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         )
         self.assertTrue(ProjectProgramme.objects.filter(id=programme.id).exists())
 
+    def test_post_section_basic_info_creates_section(self):
+        programme = self._create_project_programme()
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "A summary"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+        self.assertEqual(response.data["projectName"], self.project.name)
+        self.assertEqual(response.data["summary"], "A summary")
+
+    def test_post_section_basic_info_sets_created_by(self):
+        self.client.force_authenticate(user=self.user)
+        programme = self._create_project_programme()
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        basic_info = ProjectProgrammeBasicInfo.objects.get(project_programme=programme)
+        self.assertEqual(basic_info.createdBy_id, self.user.uuid)
+        self.assertEqual(basic_info.updatedBy_id, self.user.uuid)
+
+    def test_post_section_basic_info_returns_409_if_already_exists(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(project_programme=programme, status="DRAFT")
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_patch_section_basic_info_updates_section(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            summary="Original",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Updated"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["summary"], "Updated")
+
+    def test_patch_section_basic_info_returns_404_if_not_exists(self):
+        programme = self._create_project_programme()
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Updated"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_patch_section_basic_info_blocked_when_section_is_complete(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="COMPLETE",
+            projectName="Existing",
+            district="Existing",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Blocked update"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", response.data)
+
+    def test_section_mutation_blocked_when_parent_programme_is_complete(self):
+        programme = self._create_project_programme(status="COMPLETE")
+
+        post_response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Blocked create"},
+            format="json",
+        )
+
+        self.assertEqual(post_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            post_response.data["detail"],
+            "Only sections of project programmes in DRAFT status can be edited.",
+        )
+        self.assertFalse(
+            ProjectProgrammeBasicInfo.objects.filter(project_programme=programme).exists()
+        )
+
+        programme.status = "DRAFT"
+        programme.save(update_fields=["status"])
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            summary="Original",
+        )
+        programme.status = "COMPLETE"
+        programme.save(update_fields=["status"])
+
+        patch_response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Blocked update"},
+            format="json",
+        )
+
+        self.assertEqual(patch_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            patch_response.data["detail"],
+            "Only sections of project programmes in DRAFT status can be edited.",
+        )
+        self.assertEqual(
+            ProjectProgrammeBasicInfo.objects.get(project_programme=programme).summary,
+            "Original",
+        )
+
+    def test_patch_section_basic_info_cannot_change_parent_programme(self):
+        programme = self._create_project_programme(project=self.project)
+        second_programme = self._create_project_programme(project=self.second_project)
+        section = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            summary="Original",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"project_programme": str(second_programme.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        section.refresh_from_db()
+        self.assertEqual(section.project_programme_id, programme.id)
+
+    def test_patch_section_design_criteria_cannot_change_parent_programme(self):
+        programme = self._create_project_programme(project=self.project, briefProjectProgramme=False)
+        second_programme = self._create_project_programme(
+            project=self.second_project,
+            briefProjectProgramme=False,
+        )
+        section = ProjectProgrammeDesignCriteria.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            guidingZoningRegulations="Original",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/design-criteria/",
+            {"project_programme": str(second_programme.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        section.refresh_from_db()
+        self.assertEqual(section.project_programme_id, programme.id)
+
+    def test_patch_section_other_attachments_cannot_change_parent_programme(self):
+        programme = self._create_project_programme(project=self.project, briefProjectProgramme=False)
+        second_programme = self._create_project_programme(
+            project=self.second_project,
+            briefProjectProgramme=False,
+        )
+        section = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/other-attachments/",
+            {"project_programme": str(second_programme.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        section.refresh_from_db()
+        self.assertEqual(section.project_programme_id, programme.id)
+
+    def test_post_section_design_criteria_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/design-criteria/",
+            {"guidingZoningRegulations": "Some text"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_traffic_planning_criteria_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/traffic-planning-criteria/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_urban_spacing_planning_criteria_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/urban-spacing-planning-criteria/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_maintenance_needs_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/maintenance-needs/",
+            {"maintenanceNeeds": "Some needs"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_interaction_and_related_projects_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/interaction-and-related-projects/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_other_attachments_creates_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/other-attachments/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_link_creates_link(self):
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="DRAFT"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": content_type.id,
+                "objectId": str(other_attachments.id),
+                "value": "https://example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["value"], "https://example.com")
+        self.assertTrue(ProjectProgrammeLink.objects.filter(id=response.data["id"]).exists())
+
+    def test_post_link_rejects_section_from_different_programme(self):
+        programme = self._create_project_programme(project=self.project)
+        second_programme = self._create_project_programme(project=self.second_project)
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=second_programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": content_type.id,
+                "objectId": str(other_attachments.id),
+                "value": "https://example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(ProjectProgrammeLink.objects.filter(objectId=other_attachments.id).exists())
+
+    def test_post_link_rejects_non_programme_section_content_type(self):
+        programme = self._create_project_programme(project=self.project)
+        non_section_content_type = ContentType.objects.get_for_model(Project)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": non_section_content_type.id,
+                "objectId": str(self.project.id),
+                "value": "https://example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(ProjectProgrammeLink.objects.exists())
+
+    def test_patch_link_updates_link(self):
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="DRAFT"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://original.com",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+            {"value": "https://updated.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["value"], "https://updated.com")
+
+    def test_delete_link_removes_link(self):
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="DRAFT"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://example.com",
+        )
+
+        response = self.client.delete(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(ProjectProgrammeLink.objects.filter(id=link.id).exists())
+
+    def test_patch_link_rejects_link_from_different_programme(self):
+        programme = self._create_project_programme(project=self.project)
+        second_programme = self._create_project_programme(project=self.second_project)
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=second_programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://original.com",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+            {"value": "https://updated.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        link.refresh_from_db()
+        self.assertEqual(link.value, "https://original.com")
+
+    def test_patch_link_cannot_change_target(self):
+        programme = self._create_project_programme(project=self.project)
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+        )
+        second_programme = self._create_project_programme(project=self.second_project)
+        another_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=second_programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://original.com",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+            {"objectId": str(another_attachments.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        link.refresh_from_db()
+        self.assertEqual(link.objectId, other_attachments.id)
+
+    def test_delete_link_rejects_link_from_different_programme(self):
+        programme = self._create_project_programme(project=self.project)
+        second_programme = self._create_project_programme(project=self.second_project)
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=second_programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://example.com",
+        )
+
+        response = self.client.delete(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(ProjectProgrammeLink.objects.filter(id=link.id).exists())
+
+    def test_patch_nonexistent_link_returns_404(self):
+        programme = self._create_project_programme()
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{uuid.uuid4()}/",
+            {"value": "https://example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_link_on_locked_section_returns_400(self):
+        """Regression: link serializer must check section_instance.is_locked, not the undefined `instance`."""
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="COMPLETE"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": content_type.id,
+                "objectId": str(other_attachments.id),
+                "value": "https://example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class ProjectProgrammeSerializerTestCase(TestCase):
     def setUp(self):
@@ -312,6 +813,73 @@ class ProjectProgrammeSerializerTestCase(TestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("briefProjectProgramme", serializer.errors)
+
+    def test_project_programme_update_serializer_rejects_project_change(self):
+        other_project = Project.objects.create(
+            name="Other serializer project",
+            description="Other serializer test project",
+            projectDistrict=self.project_district,
+        )
+
+        serializer = ProjectProgrammeUpdateSerializer(
+            self.project_programme,
+            data={"project": str(other_project.id)},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("project", serializer.errors)
+
+    def test_link_update_serializer_blocks_locked_section(self):
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=self.project_programme, status="COMPLETE"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+
+        serializer = ProjectProgrammeLinkUpdateSerializer(
+            data={
+                "contentType": content_type.id,
+                "objectId": str(other_attachments.id),
+                "value": "https://example.com",
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("detail", serializer.errors)
+
+    def test_link_update_serializer_cannot_change_target(self):
+        attachments_1 = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=self.project_programme,
+            status="DRAFT",
+        )
+        other_programme = ProjectProgramme.objects.create(
+            project=Project.objects.create(
+                name="Another serializer project",
+                description="Another serializer test project",
+                projectDistrict=self.project_district,
+            ),
+            status="DRAFT",
+            briefProjectProgramme=True,
+        )
+        attachments_2 = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=other_programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=attachments_1.id,
+            value="https://example.com",
+        )
+
+        serializer = ProjectProgrammeLinkUpdateSerializer(
+            link,
+            data={"objectId": str(attachments_2.id)},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("detail", serializer.errors)
 
 
 class ProjectProgrammePermissionTestCase(TestCase):
@@ -405,6 +973,20 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.allowed_programme.refresh_from_db()
         self.assertFalse(self.allowed_programme.briefProjectProgramme)
 
+    def test_restricted_programmer_cannot_reassign_assigned_programme_to_unassigned_project(self):
+        self.client.force_authenticate(user=self.allowed_user)
+
+        response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"project": str(self.unassigned_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("project", response.data)
+        self.allowed_programme.refresh_from_db()
+        self.assertEqual(self.allowed_programme.project_id, self.allowed_project.id)
+
     def test_restricted_programmer_can_switch_type_for_assigned_project_programme(self):
         self.client.force_authenticate(user=self.allowed_user)
 
@@ -446,3 +1028,25 @@ class ProjectProgrammePermissionTestCase(TestCase):
         response = self.client.get(f"/project-programmes/{self.allowed_programme.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_restricted_programmer_can_create_section_for_assigned_programme(self):
+        self.client.force_authenticate(user=self.allowed_user)
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_restricted_programmer_cannot_create_section_for_unassigned_programme(self):
+        self.client.force_authenticate(user=self.unassigned_user)
+
+        response = self.client.post(
+            f"/project-programmes/{self.unassigned_programme.id}/sections/basic-info/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

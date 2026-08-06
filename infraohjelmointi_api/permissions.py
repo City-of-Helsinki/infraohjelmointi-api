@@ -199,7 +199,19 @@ CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
 
 #### Project programme custom actions ####
 PROJECT_PROGRAMME_GET_ACTIONS = ["get_by_project"]
-PROJECT_PROGRAMME_POST_ACTIONS = ["switch_type", "transitions"]
+PROJECT_PROGRAMME_POST_ACTIONS = [
+    "switch_type",
+    "transitions",
+    "section_basic_info",
+    "section_design_criteria",
+    "section_traffic_planning_criteria",
+    "section_urban_spacing_planning_criteria",
+    "section_maintenance_needs",
+    "section_interaction_and_related_projects",
+    "section_other_attachments",
+    "section_links",
+    "section_link_detail",
+]
 
 #### Project change-history custom actions (IO-879) ####
 # Per-project audit-log history powering the "Näytä muutoshistoria" UI.
