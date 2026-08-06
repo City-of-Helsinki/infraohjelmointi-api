@@ -403,14 +403,21 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
                     .prefetch_related("finances")  # CRITICAL: Prevents N+1 queries when aggregating ProjectFinancial
                     .filter(
+                        # IO-928: same trailing-slash boundary as the planning branch.
                         (
                             Q(projectClass__name__icontains="suurpiiri")
-                            & Q(
-                                projectClass__parent__coordinatorClass__path__startswith=instance.path
+                            & (
+                                Q(projectClass__parent__coordinatorClass=instance)
+                                | Q(
+                                    projectClass__parent__coordinatorClass__path__startswith=instance.path
+                                    + "/"
+                                )
                             )
                         )
+                        | Q(projectClass__coordinatorClass=instance)
                         | Q(
                             projectClass__coordinatorClass__path__startswith=instance.path
+                            + "/"
                         ),
                         programmed=True,
                     )
