@@ -234,6 +234,7 @@ PROJECT_PROGRAMME_POST_ACTIONS = [
     "section_other_attachments",
     "section_links",
     "section_link_detail",
+    "section_transitions",
 ]
 
 #### Project change-history custom actions (IO-879) ####
