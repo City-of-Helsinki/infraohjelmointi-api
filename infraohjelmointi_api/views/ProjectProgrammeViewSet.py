@@ -9,7 +9,6 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-<<<<<<< HEAD
 from infraohjelmointi_api.models import (
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
@@ -20,15 +19,13 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeOtherAttachments,
     ProjectProgrammeTrafficPlanningCriteria,
     ProjectProgrammeUrbanSpacingPlanningCriteria,
-=======
-from infraohjelmointi_api.models import ProjectProgramme
+)
 from infraohjelmointi_api.permissions import (
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
 )
 from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
     ProjectPersonAuthorizationService,
->>>>>>> 81a8450 (fix(api): fixed according to requirements: added need for new ad group)
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeBasicInfoGetSerializer,
@@ -91,7 +88,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
     @override
     def get_queryset(self):
         queryset = ProjectProgramme.objects.all()
-        if self.action in ["list", "retrieve", "get_by_project"]:
+        if self.action in ["list", "retrieve", "get_by_project", "transitions", "section_transitions"]:
             return queryset.select_related(
                 "project",
                 "basicInfo",
@@ -233,6 +230,9 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if not user_email:
             return False
 
+        if self._matches_programmer_name_from_email(user_email, project_programmer):
+            return True
+
         project_set = getattr(project, "projectSet", None)
         project_set_responsible = getattr(project_set, "responsiblePerson", None)
         if ProjectPersonAuthorizationService.is_matching_project_person_email(
@@ -246,28 +246,12 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if project.favPersons.filter(email__iexact=user_email).exists():
             return True
 
-        return self._matches_programmer_name_from_email(user_email, project_programmer)
-
-    def _is_reviewer(self, user):
-        group_names = self._get_user_group_names(user)
-        reviewer_groups = set(self.REVIEWER_GROUPS)
-        reviewer_groups.add(get_restricted_programmer_group_name())
-        return bool(group_names.intersection(reviewer_groups))
-
-    def _is_project_programme_contributor(self, user):
-        return get_project_programme_contributor_group_name() in self._get_user_group_names(
-            user
-        )
-
-    def _is_commissioning_manager(self, user):
-        return self.COMMISSIONING_MANAGER_GROUP in self._get_user_group_names(user)
-
-    def _is_admin(self, user):
-        return self.ADMIN_GROUP in self._get_user_group_names(user)
+        return False
 
     def _assert_can_create_programme(self, request, project):
         user = self._get_authenticated_user(request)
-        if self._is_admin(user):
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
             return
 
         if self._is_responsible_for_project_programme(user, project):
@@ -279,18 +263,20 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     def _assert_can_edit_or_complete(self, request, project):
         user = self._get_authenticated_user(request)
-        if self._is_admin(user):
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
             return
 
-        if self._is_commissioning_manager(user):
+        if self.COMMISSIONING_MANAGER_GROUP in group_names:
             raise PermissionDenied(
                 "Commissioning managers can only return a project programme to DRAFT."
             )
 
-        if self._is_reviewer(user):
+        reviewer_groups = {*self.REVIEWER_GROUPS, get_restricted_programmer_group_name()}
+        if group_names.intersection(reviewer_groups):
             return
 
-        if self._is_project_programme_contributor(user):
+        if get_project_programme_contributor_group_name() in group_names:
             return
 
         if self._is_responsible_for_project_programme(user, project):
@@ -302,13 +288,15 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     def _assert_can_return_to_draft(self, request):
         user = self._get_authenticated_user(request)
-        if self._is_admin(user):
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
             return
 
-        if self._is_reviewer(user):
+        reviewer_groups = {*self.REVIEWER_GROUPS, get_restricted_programmer_group_name()}
+        if group_names.intersection(reviewer_groups):
             return
 
-        if self._is_commissioning_manager(user):
+        if self.COMMISSIONING_MANAGER_GROUP in group_names:
             return
 
         raise PermissionDenied(
@@ -575,6 +563,9 @@ class ProjectProgrammeViewSet(BaseViewSet):
         serializer.save()
         return Response(
             ProjectProgrammeLinkGetSerializer(serializer.instance).data,
+            status=status.HTTP_200_OK,
+        )
+
     @action(
         methods=["post"],
         detail=True,

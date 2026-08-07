@@ -20,6 +20,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeDesignCriteria,
     ProjectProgrammeLink,
     ProjectProgrammeOtherAttachments,
+    ProjectProgrammer,
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeBasicInfoGetSerializer,
@@ -1375,6 +1376,48 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_programmer_name_match_can_create_project_programme(self):
+        user = User.objects.create_user(
+            username="fallback.programmer@test.fi",
+            email="fallback.programmer@test.fi",
+        )
+        user.ad_groups.add(self.viewer_group)
+        programmer = ProjectProgrammer.objects.create(
+            firstName="Fallback",
+            lastName="Programmer",
+        )
+        project = Project.objects.create(
+            name="Fallback project",
+            description="Project for programmer-name fallback",
+            projectDistrict=self.district,
+            personProgramming=programmer,
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_non_responsible_viewer_cannot_create_project_programme(self):
+        non_responsible_viewer = User.objects.create_user(
+            username="stranger.viewer@test.fi",
+            email="stranger.viewer@test.fi",
+        )
+        non_responsible_viewer.ad_groups.add(self.viewer_group)
+        self.client.force_authenticate(user=non_responsible_viewer)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_project_manager_cannot_edit_project_programme_data(self):
         self.client.force_authenticate(user=self.project_manager_user)
