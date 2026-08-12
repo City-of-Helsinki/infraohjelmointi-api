@@ -1,6 +1,7 @@
 import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.db import transaction
 from overrides import override
 from rest_framework import status
@@ -340,6 +341,39 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return relation_name, None
 
         return relation_name, getattr(programme, relation_name)
+
+    @override
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        project = serializer.validated_data.get("project")
+        existing = ProjectProgramme.objects.filter(project=project).first()
+        if existing is not None:
+            return Response(
+                {
+                    "detail": "Project programme already exists for this project.",
+                    "id": str(existing.id),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            self.perform_create(serializer)
+        except IntegrityError:
+            existing_after_race = ProjectProgramme.objects.filter(project=project).first()
+            if existing_after_race is not None:
+                return Response(
+                    {
+                        "detail": "Project programme already exists for this project.",
+                        "id": str(existing_after_race.id),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            raise
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @override
     def perform_create(self, serializer):
