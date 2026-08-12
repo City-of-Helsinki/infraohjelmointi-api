@@ -16,7 +16,7 @@ def get_restricted_programmer_group_name():
 
 
 def get_project_programme_contributor_group_name():
-    """AD group for users allowed to contribute to any project programme."""
+    """AD group for users allowed to edit any existing project programme."""
     return getattr(
         settings,
         "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
@@ -301,7 +301,6 @@ class IsViewer(permissions.BasePermission):
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
@@ -314,9 +313,7 @@ class IsViewer(permissions.BasePermission):
             and request.method in SAFE_METHODS
             and view.action
             in [
-                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
                 *DJANGO_BASE_CREATE_ONLY_ACTIONS,
-                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True

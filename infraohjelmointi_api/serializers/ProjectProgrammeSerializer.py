@@ -99,6 +99,7 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
         "specialConsiderations",
         "otherConsiderations",
     }
+    links = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeBasicInfo
@@ -120,6 +121,14 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
                 if name not in self.BRIEF_ONLY_FIELDS
             }
         return fields
+
+    def get_links(self, instance):
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
+        links = ProjectProgrammeLink.objects.filter(
+            contentType=content_type,
+            objectId=instance.id,
+        )
+        return ProjectProgrammeLinkGetSerializer(links, many=True).data
 
 
 class ProjectProgrammeBasicInfoUpdateSerializer(
@@ -154,6 +163,11 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         "studyAndPlanningNeeds",
         "planningAndImplementationFeasibility",
     }
+    links = serializers.ListField(
+        child=serializers.CharField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
 
     class Meta:
         model = ProjectProgrammeBasicInfo
@@ -232,7 +246,36 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
             )
         return super().to_internal_value(data)
 
+    def _sync_links(self, basic_info, links):
+        if links is None:
+            return
+
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
+        ProjectProgrammeLink.objects.filter(
+            contentType=content_type,
+            objectId=basic_info.id,
+        ).delete()
+
+        cleaned_links = [
+            link.strip() for link in links if isinstance(link, str) and link.strip()
+        ]
+
+        if not cleaned_links:
+            return
+
+        ProjectProgrammeLink.objects.bulk_create(
+            [
+                ProjectProgrammeLink(
+                    contentType=content_type,
+                    objectId=basic_info.id,
+                    value=link,
+                )
+                for link in cleaned_links
+            ]
+        )
+
     def create(self, validated_data):
+        links = validated_data.pop("links", None)
         project_programme = validated_data.get("project_programme")
         project = getattr(project_programme, "project", None)
 
@@ -242,7 +285,15 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
                 project.projectDistrict.name if project.projectDistrict else ""
             )
 
-        return super().create(validated_data)
+        basic_info = super().create(validated_data)
+        self._sync_links(basic_info, links)
+        return basic_info
+
+    def update(self, instance, validated_data):
+        links = validated_data.pop("links", None)
+        basic_info = super().update(instance, validated_data)
+        self._sync_links(basic_info, links)
+        return basic_info
 
 
 class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
@@ -383,6 +434,9 @@ class ProjectProgrammeCreateSerializer(serializers.ModelSerializer):
         model = ProjectProgramme
         fields = "__all__"
         read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        extra_kwargs = {
+            "project": {"validators": []},
+        }
 
 
 class ProjectProgrammeUpdateSerializer(

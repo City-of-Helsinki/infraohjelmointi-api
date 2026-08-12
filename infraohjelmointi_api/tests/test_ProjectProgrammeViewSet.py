@@ -110,6 +110,20 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(created.createdBy_id, self.user.uuid)
         self.assertEqual(created.updatedBy_id, self.user.uuid)
 
+    def test_create_project_programme_returns_409_if_already_exists(self):
+        existing = self._create_project_programme(project=self.project)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {
+                "project": str(self.project.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["id"], str(existing.id))
+
     def test_list_and_retrieve_project_programmes(self):
         programme_1 = self._create_project_programme(project=self.project)
         programme_2 = self._create_project_programme(project=self.second_project)
@@ -501,6 +515,56 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["summary"], "Only summary changed")
         self.assertEqual(response.data["projectProgrammeCompiler"], "Compiler")
+
+    def test_post_section_basic_info_creates_links(self):
+        programme = self._create_project_programme()
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {
+                "summary": "A summary",
+                "links": ["https://example.com", "https://hel.fi"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["links"]), 2)
+        self.assertEqual(response.data["links"][0]["value"], "https://example.com")
+        self.assertEqual(response.data["links"][1]["value"], "https://hel.fi")
+
+    def test_patch_section_basic_info_replaces_links(self):
+        programme = self._create_project_programme()
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            summary="Original",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
+        ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=basic_info.id,
+            value="https://old-link.fi",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {
+                "links": ["https://new-link.fi"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["links"]), 1)
+        self.assertEqual(response.data["links"][0]["value"], "https://new-link.fi")
+        self.assertEqual(
+            ProjectProgrammeLink.objects.filter(
+                contentType=content_type,
+                objectId=basic_info.id,
+            ).count(),
+            1,
+        )
 
     def test_patch_section_basic_info_returns_404_if_not_exists(self):
         programme = self._create_project_programme()
@@ -1496,6 +1560,17 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         basic_info.refresh_from_db()
         self.assertEqual(basic_info.status, "COMPLETE")
+
+    def test_contributor_group_user_cannot_create_project_programme(self):
+        self.client.force_authenticate(user=self.contributor_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_project_programme_endpoint_requires_authentication(self):
         response = self.client.get(f"/project-programmes/{self.allowed_programme.id}/")
