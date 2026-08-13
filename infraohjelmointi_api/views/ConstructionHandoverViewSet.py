@@ -195,14 +195,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
             return None
 
     def _get_project_phase_detail_or_none(self, phase_detail_value):
-        try:
-            return ProjectPhaseDetailService.find_by_value(value=phase_detail_value)
-        except ProjectPhaseDetail.DoesNotExist:
-            logger.warning(
-                "Skipping project phase detail sync for missing ProjectPhaseDetail value '%s'.",
-                phase_detail_value,
-            )
-            return None
+        return ProjectPhaseDetailService.find_by_value(value=phase_detail_value)
 
     def _sync_procurement_method(self, project, instance, project_update_fields):
         # Keep project's procurement method aligned with the handover value.
@@ -298,6 +291,8 @@ class ConstructionHandoverViewSet(BaseViewSet):
         handover_update_fields,
     ):
         # Restore previously saved phase values when transition returns to DRAFT.
+        # PersonConstruction and constructionProcurementMethod are not reverted to previous values.
+        
         if not instance.previousProjectPhase_id:
             return
 
