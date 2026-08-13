@@ -419,7 +419,7 @@ def reverse_restructure(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("infraohjelmointi_api", "0109_merge_20260617_1214"),
+        ("infraohjelmointi_api", "0110_projectprogramme_and_more"),
     ]
 
     operations = [
