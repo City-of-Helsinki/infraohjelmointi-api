@@ -1,21 +1,36 @@
+import uuid
+
 from overrides import override
 from django.db import transaction
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 
-from infraohjelmointi_api.models import ConstructionHandover
+from infraohjelmointi_api.models import ConstructionHandover, ConstructionHandoverAttachment
 
 from .BaseViewSet import BaseViewSet
 from ..permissions import IsConstructionManagementLead, IsPlanner, IsProjectManager
 from ..services.ConstructionHandoverTransitionPermissionService import (
     ConstructionHandoverTransitionPermissionService,
 )
+from ..utils.upload_validation import validate_handover_attachment
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
     ConstructionHandoverCreateSerializer,
-    ConstructionHandoverUpdateSerializer
+    ConstructionHandoverUpdateSerializer,
+    ConstructionHandoverAttachmentSerializer,
 )
+
+# Mirrors LOCKED_HANDOVER_EDIT_ERROR in ConstructionHandoverFinancingViewSet: the
+# ticket asks for attachments to follow the same DRAFT-only rule as financing rows.
+LOCKED_HANDOVER_ATTACHMENT_ERROR = (
+    "Attachments can only be added or removed while the construction handover is in DRAFT status."
+)
+
 
 class ConstructionHandoverViewSet(BaseViewSet):
     ALLOWED_STATUS_TRANSITIONS = {
@@ -34,7 +49,11 @@ class ConstructionHandoverViewSet(BaseViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action in ["list", "retrieve"]:
-            return queryset.prefetch_related("financing", "financing__budgetItem")
+            # attachments is prefetched too, else embedding it in the GET serializer
+            # is an N+1 across a handover list.
+            return queryset.prefetch_related(
+                "financing", "financing__budgetItem", "attachments"
+            )
         return queryset
 
     @override
@@ -134,6 +153,134 @@ class ConstructionHandoverViewSet(BaseViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         return super().destroy(request, *args, **kwargs)
+
+    @action(
+        methods=["get", "post"],
+        detail=True,
+        url_path=r"attachments",
+        url_name="attachments",
+        name="handover_attachments",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def attachments(self, request, pk):
+        """List or upload attachments for a handover (IO-857).
+
+        GET  /construction-handovers/<id>/attachments/  -> ConstructionHandoverAttachment[]
+        POST /construction-handovers/<id>/attachments/  -> created rows (multipart, field 'file' x N)
+        """
+        handover = self.get_object()
+        if request.method == "GET":
+            return Response(
+                ConstructionHandoverAttachmentSerializer(
+                    handover.attachments.all(), many=True, context={"request": request}
+                ).data
+            )
+
+        # Same rule as financing rows: content may only change while in DRAFT.
+        if handover.is_locked:
+            return Response(
+                {"detail": LOCKED_HANDOVER_ATTACHMENT_ERROR},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        files = request.FILES.getlist("file")
+        if not files:
+            raise ValidationError({"file": "At least one file is required."})
+
+        # Validate the whole batch first so one bad file rejects the request before
+        # any row or blob is written, rather than leaving a half-applied upload.
+        for f in files:
+            validate_handover_attachment(f)
+
+        uploader = self._get_authenticated_user(request)
+        with transaction.atomic():
+            created = [
+                ConstructionHandoverAttachment.objects.create(
+                    handover=handover,
+                    file=f,
+                    originalName=f.name,
+                    contentType=(f.content_type or "").lower(),
+                    size=f.size or 0,
+                    uploadedBy=uploader,
+                )
+                for f in files
+            ]
+        return Response(
+            ConstructionHandoverAttachmentSerializer(
+                created, many=True, context={"request": request}
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"attachments/(?P<attachmentId>[^/.]+)/download",
+        url_name="download-attachment",
+        name="download_handover_attachment",
+    )
+    def download_attachment(self, request, pk, attachmentId):
+        """Stream one attachment back to the caller (IO-857).
+
+        GET /construction-handovers/<id>/attachments/<aid>/download/
+
+        Proxied through the API rather than handing out a storage URL, so the blob
+        container stays private and normal viewset permissions apply. At the 500 KB
+        cap this is cheap; if PDF support raises the cap to ~25 MB it is worth
+        switching to short-lived SAS URLs so a download does not occupy a worker.
+        """
+        attachment = self._get_attachment_or_404(pk, attachmentId)
+        if not attachment.file:
+            raise NotFound("Attachment has no stored file.")
+
+        response = FileResponse(
+            attachment.file.open("rb"),
+            as_attachment=True,
+            filename=attachment.originalName,
+            content_type=attachment.contentType or "application/octet-stream",
+        )
+        return response
+
+    @action(
+        methods=["delete"],
+        detail=True,
+        url_path=r"attachments/(?P<attachmentId>[^/.]+)",
+        url_name="delete-attachment",
+        name="delete_handover_attachment",
+    )
+    def delete_attachment(self, request, pk, attachmentId):
+        """Delete one attachment (IO-857).
+
+        DELETE /construction-handovers/<id>/attachments/<aid>/  -> 204
+        """
+        handover = self.get_object()
+        if handover.is_locked:
+            return Response(
+                {"detail": LOCKED_HANDOVER_ATTACHMENT_ERROR},
+                status=status.HTTP_409_CONFLICT,
+            )
+        attachment = self._get_attachment_or_404(pk, attachmentId, handover=handover)
+        # Remove the blob before the row, so a failed storage delete does not leave
+        # orphaned bytes referenced by a row that is already gone.
+        attachment.file.delete(save=False)
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _get_attachment_or_404(self, pk, attachmentId, handover=None):
+        """Resolve an attachment scoped to its handover, validating the UUID first.
+
+        Scoping by handover matters: without it, a caller who can read one handover
+        could pass another handover's attachment id and get its file.
+        """
+        try:
+            uuid.UUID(str(attachmentId))
+        except ValueError:
+            raise ValidationError({"attachmentId": "Invalid UUID."})
+        if handover is None:
+            handover = self.get_object()
+        return get_object_or_404(
+            ConstructionHandoverAttachment, pk=attachmentId, handover=handover
+        )
 
     def _get_possible_status_transitions(self, current_status):
         return self.ALLOWED_STATUS_TRANSITIONS.get(current_status, [])

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from infraohjelmointi_api.models import ConstructionHandover
 from infraohjelmointi_api.serializers.ConstructionHandoverFinancingSerializer import ConstructionHandoverFinancingSerializer
+from infraohjelmointi_api.serializers.ConstructionHandoverAttachmentSerializer import ConstructionHandoverAttachmentSerializer
 from infraohjelmointi_api.serializers import (
   ConstructionProcurementMethodSerializer,
   PersonSerializer,
@@ -15,6 +16,9 @@ class ConstructionHandoverGetSerializer(serializers.ModelSerializer):
     constructionHandoverFinancing = ConstructionHandoverFinancingSerializer(
         many=True, read_only=True, source='financing'
     )
+    # IO-857: embedded so the "Liitteet ja linkit" section (IO-856) can render the
+    # existing attachments without a second request.
+    attachments = ConstructionHandoverAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = ConstructionHandover
