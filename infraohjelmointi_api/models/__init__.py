@@ -10,6 +10,7 @@ from .ProjectPhase import ProjectPhase
 from .ProjectPriority import ProjectPriority
 from .TaskStatus import TaskStatus
 from .Note import Note
+from .NoteImage import NoteImage
 from .ProjectPhaseDetail import ProjectPhaseDetail
 from .ConstructionProcurementMethod import ConstructionProcurementMethod
 from .StaraProcurementReason import StaraProcurementReason
