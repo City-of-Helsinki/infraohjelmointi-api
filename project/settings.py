@@ -43,6 +43,27 @@ env = environ.Env(
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
+    MEDIA_ROOT=(str, str(BASE_DIR / "media")),
+    MEDIA_URL=(str, "/media/"),
+    NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
+    # IO-857: Figma states "500Kb max tiedostokoko" for handover attachments.
+    # If PDF support is confirmed (see the ticket's note to Vesa/Kati) this needs to
+    # grow to ~25 MB, and the ingress body-size limit has to be checked to match.
+    HANDOVER_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
+    # IO-812 phase 2: Azure Blob storage for uploaded files. Empty by default so
+    # local/CI keep using FileSystemStorage; Platta sets these in the deploy env.
+    #
+    # Names follow the Helsinki/Platta convention (AZURE_BLOB_STORAGE_*) rather than
+    # django-storages' own naming. This matters operationally: Platta rotates the SAS
+    # token annually into a Key Vault secret named AZURE-BLOB-STORAGE-SAS-TOKEN, and
+    # matching that name means the rotation automation needs no special-casing for us.
+    AZURE_BLOB_STORAGE_NAME=(str, ""),
+    AZURE_BLOB_STORAGE_CONTAINER=(str, ""),
+    AZURE_BLOB_STORAGE_SAS_TOKEN=(str, ""),
+    # Local/Azurite only - Platta forbids authenticating with account keys
+    # ("No application should authenticate directly with account keys"), so this is
+    # for the emulator, never for a deployed environment.
+    AZURE_BLOB_STORAGE_CONNECTION_STRING=(str, ""),
     DJANGO_LOG_LEVEL=(str, "INFO"),
     HELSINKI_TUNNISTUS_ISSUER=(
         str,
@@ -251,6 +272,64 @@ USE_TZ = True
 
 STATIC_URL = env("STATIC_URL")
 STATIC_ROOT = env("STATIC_ROOT")
+
+# Media (user-uploaded files). MEDIA_ROOT/URL are used by the local
+# FileSystemStorage backend (dev/CI); ignored when Azure Blob is active.
+MEDIA_URL = env("MEDIA_URL")
+MEDIA_ROOT = env("MEDIA_ROOT")
+
+# IO-812 phase 2: file storage backend for uploads (NoteImage, handover
+# attachments). Local FileSystemStorage by default; Azure Blob once Platta has
+# provisioned the storage account + container and set AZURE_BLOB_STORAGE_NAME +
+# AZURE_BLOB_STORAGE_CONTAINER (+ a credential). The Azure backend path is a
+# string, so django-storages is only imported when Azure is actually configured —
+# local and CI runs never need the dependency installed.
+_azure_account = env("AZURE_BLOB_STORAGE_NAME")
+_azure_container = env("AZURE_BLOB_STORAGE_CONTAINER")
+_use_azure_storage = bool(_azure_account and _azure_container)
+
+if _use_azure_storage:
+    _azure_options = {
+        "account_name": _azure_account,
+        "azure_container": _azure_container,
+    }
+    # SAS token is the mechanism Platta provisions for blob containers, so it wins.
+    # The connection string is a local/Azurite escape hatch only. Account keys are
+    # deliberately unsupported: Platta's guidance is that no application should
+    # authenticate directly with them.
+    if env("AZURE_BLOB_STORAGE_SAS_TOKEN"):
+        _azure_options["sas_token"] = env("AZURE_BLOB_STORAGE_SAS_TOKEN")
+    elif env("AZURE_BLOB_STORAGE_CONNECTION_STRING"):
+        _azure_options["connection_string"] = env("AZURE_BLOB_STORAGE_CONNECTION_STRING")
+    _default_file_storage = {
+        "BACKEND": "storages.backends.azure_storage.AzureStorage",
+        "OPTIONS": _azure_options,
+    }
+else:
+    _default_file_storage = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
+# Both keys must be present: overriding STORAGES replaces the setting wholesale,
+# so re-declare the (unchanged) staticfiles backend used with whitenoise.
+STORAGES = {
+    "default": _default_file_storage,
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+# Upload constraints, one pair per feature. Size limits are env-overridable so
+# product can retune them without a code change; the allowed type tuples are
+# deliberately hard-coded, because widening them is a product/security decision
+# rather than configuration.
+#
+# IO-812 note images. Figma copy says 500 KB; this default is the older internal
+# spec of 10 MB. The discrepancy is an open product question on the ticket.
+NOTE_IMAGE_MAX_BYTES = env.int("NOTE_IMAGE_MAX_BYTES")
+NOTE_IMAGE_ALLOWED_TYPES = ("image/jpeg", "image/png")
+
+# IO-857 handover attachments. Per Figma: "Vain .jpg ja .png tiedostot", 500 KB.
+# Adding "application/pdf" here plus raising HANDOVER_ATTACHMENT_MAX_BYTES is the
+# whole change if PDF support is confirmed.
+HANDOVER_ATTACHMENT_MAX_BYTES = env.int("HANDOVER_ATTACHMENT_MAX_BYTES")
+HANDOVER_ATTACHMENT_ALLOWED_TYPES = ("image/jpeg", "image/png")
 
 
 # Default primary key field type
