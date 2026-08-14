@@ -21,6 +21,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeOtherAttachments,
 )
 from infraohjelmointi_api.serializers import (
+    ProjectProgrammeBasicInfoGetSerializer,
     ProjectProgrammeBasicInfoUpdateSerializer,
     ProjectProgrammeLinkUpdateSerializer,
     ProjectProgrammeUpdateSerializer,
@@ -68,6 +69,14 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         }
         defaults.update(kwargs)
         return ProjectProgramme.objects.create(**defaults)
+
+    def _basic_info_payload(self):
+        return {
+            "projectProgrammeCompiler": "Compiler",
+            "personsInvolved": "Person",
+            "inspector": "Inspector",
+            "estimatedCosts": "100000",
+        }
 
     def test_create_project_programme(self):
         self.client.force_authenticate(user=self.user)
@@ -276,7 +285,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/sections/basic-info/",
-            {"summary": "A summary"},
+            {**self._basic_info_payload(), "summary": "A summary"},
             format="json",
         )
 
@@ -284,6 +293,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(str(response.data["project_programme"]), str(programme.id))
         self.assertEqual(response.data["projectName"], self.project.name)
         self.assertEqual(response.data["summary"], "A summary")
+        self.assertEqual(response.data["estimatedCosts"], "100000")
 
     def test_post_section_basic_info_sets_created_by(self):
         self.client.force_authenticate(user=self.user)
@@ -291,7 +301,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/sections/basic-info/",
-            {},
+            self._basic_info_payload(),
             format="json",
         )
 
@@ -759,10 +769,19 @@ class ProjectProgrammeSerializerTestCase(TestCase):
             briefProjectProgramme=True,
         )
 
+    def _basic_info_payload(self):
+        return {
+            "projectProgrammeCompiler": "Compiler",
+            "personsInvolved": "Person",
+            "inspector": "Inspector",
+            "estimatedCosts": "100000",
+        }
+
     def test_basic_info_create_prefills_project_name_and_district(self):
         serializer = ProjectProgrammeBasicInfoUpdateSerializer(
             data={
                 "project_programme": str(self.project_programme.id),
+                **self._basic_info_payload(),
             }
         )
 
@@ -771,6 +790,52 @@ class ProjectProgrammeSerializerTestCase(TestCase):
 
         self.assertEqual(basic_info.projectName, self.project.name)
         self.assertEqual(basic_info.district, self.project_district.name)
+
+    def test_basic_info_brief_fields_are_required_and_complete_fields_hidden(self):
+        serializer = ProjectProgrammeBasicInfoUpdateSerializer(
+            data={
+                "project_programme": str(self.project_programme.id),
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("projectProgrammeCompiler", serializer.errors)
+        self.assertIn("personsInvolved", serializer.errors)
+        self.assertIn("inspector", serializer.errors)
+        self.assertIn("estimatedCosts", serializer.errors)
+        self.assertNotIn("summary", serializer.fields)
+        self.assertNotIn("strategyGoals", serializer.fields)
+
+    def test_basic_info_complete_fields_are_required_and_brief_field_hidden(self):
+        programme = ProjectProgramme.objects.create(
+            project=Project.objects.create(
+                name="Complete serializer project",
+                description="Complete serializer test project",
+                projectDistrict=self.project_district,
+            ),
+            status="DRAFT",
+            briefProjectProgramme=False,
+        )
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+        )
+        serializer = ProjectProgrammeBasicInfoUpdateSerializer(
+            basic_info,
+            data={},
+            partial=False,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("summary", serializer.errors)
+        self.assertIn("strategyGoals", serializer.errors)
+        self.assertNotIn("estimatedCosts", serializer.fields)
+        self.assertFalse(serializer.fields["inspector"].required)
+        self.assertFalse(serializer.fields["specialConsiderations"].required)
+
+        get_serializer = ProjectProgrammeBasicInfoGetSerializer(basic_info)
+        self.assertNotIn("estimatedCosts", get_serializer.fields)
+        self.assertIn("specialConsiderations", get_serializer.fields)
 
     def test_basic_info_update_serializer_requires_draft_status(self):
         basic_info = ProjectProgrammeBasicInfo.objects.create(
@@ -1034,7 +1099,12 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         response = self.client.post(
             f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/",
-            {},
+            {
+                "projectProgrammeCompiler": "Compiler",
+                "personsInvolved": "Person",
+                "inspector": "Inspector",
+                "estimatedCosts": "100000",
+            },
             format="json",
         )
 
