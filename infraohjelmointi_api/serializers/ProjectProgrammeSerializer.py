@@ -175,8 +175,9 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         )
         for name in hidden_fields:
             fields.pop(name, None)
-        for name, field in fields.items():
-            field.required = name in required_fields
+        if self.instance:
+            for name, field in fields.items():
+                field.required = name in required_fields
         return fields
 
     def to_internal_value(self, data):

@@ -285,7 +285,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/sections/basic-info/",
-            {**self._basic_info_payload(), "summary": "A summary"},
+            {"summary": "A summary"},
             format="json",
         )
 
@@ -293,7 +293,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(str(response.data["project_programme"]), str(programme.id))
         self.assertEqual(response.data["projectName"], self.project.name)
         self.assertEqual(response.data["summary"], "A summary")
-        self.assertEqual(response.data["estimatedCosts"], "100000")
+        self.assertEqual(response.data["estimatedCosts"], "")
 
     def test_post_section_basic_info_sets_created_by(self):
         self.client.force_authenticate(user=self.user)
@@ -332,12 +332,31 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         response = self.client.patch(
             f"/project-programmes/{programme.id}/sections/basic-info/",
-            {"summary": "Updated"},
+            {**self._basic_info_payload(), "summary": "Updated"},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["summary"], "Updated")
+
+    def test_patch_section_basic_info_requires_brief_programme_fields(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"summary": "Updated"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("projectProgrammeCompiler", response.data)
+        self.assertIn("personsInvolved", response.data)
+        self.assertIn("inspector", response.data)
+        self.assertIn("estimatedCosts", response.data)
 
     def test_patch_section_basic_info_returns_404_if_not_exists(self):
         programme = self._create_project_programme()
@@ -361,7 +380,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         response = self.client.patch(
             f"/project-programmes/{programme.id}/sections/basic-info/",
-            {"summary": "Blocked update"},
+            {**self._basic_info_payload(), "summary": "Blocked update"},
             format="json",
         )
 
@@ -791,20 +810,18 @@ class ProjectProgrammeSerializerTestCase(TestCase):
         self.assertEqual(basic_info.projectName, self.project.name)
         self.assertEqual(basic_info.district, self.project_district.name)
 
-    def test_basic_info_brief_fields_are_required_and_complete_fields_hidden(self):
+    def test_basic_info_create_allows_incomplete_brief_fields(self):
         serializer = ProjectProgrammeBasicInfoUpdateSerializer(
             data={
                 "project_programme": str(self.project_programme.id),
             }
         )
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("projectProgrammeCompiler", serializer.errors)
-        self.assertIn("personsInvolved", serializer.errors)
-        self.assertIn("inspector", serializer.errors)
-        self.assertIn("estimatedCosts", serializer.errors)
-        self.assertNotIn("summary", serializer.fields)
-        self.assertNotIn("strategyGoals", serializer.fields)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertFalse(serializer.fields["projectProgrammeCompiler"].required)
+        self.assertFalse(serializer.fields["personsInvolved"].required)
+        self.assertFalse(serializer.fields["inspector"].required)
+        self.assertFalse(serializer.fields["estimatedCosts"].required)
 
     def test_basic_info_complete_fields_are_required_and_brief_field_hidden(self):
         programme = ProjectProgramme.objects.create(
