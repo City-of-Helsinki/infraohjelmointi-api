@@ -37,13 +37,12 @@ HISTORY_FIELDS = [
     "linkCostAllocation",
     "linkContractBoundaries",
     "constructionProjectManager",
-    "previousProjectPhase",
 ]
 
 # Relations rendered via a person's name.
 _PERSON_FIELDS = {"personPlanning", "personFinancing", "constructionProjectManager"}
 # Relations rendered via the related row's `value`.
-_VALUE_FIELDS = {"constructionProcurementMethod", "previousProjectPhase"}
+_VALUE_FIELDS = {"constructionProcurementMethod"}
 _RELATION_FIELDS = _PERSON_FIELDS | _VALUE_FIELDS
 
 
