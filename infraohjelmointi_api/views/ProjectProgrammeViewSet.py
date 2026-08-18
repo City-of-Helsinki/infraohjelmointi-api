@@ -146,7 +146,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
         serializer = update_serializer_class(
             existing_section,
             data=request.data,
-            partial=related_name != "basicInfo",
+            partial=True,
         )
         serializer.is_valid(raise_exception=True)
         user = self._get_authenticated_user(request)
