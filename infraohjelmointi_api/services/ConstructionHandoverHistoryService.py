@@ -107,7 +107,16 @@ def _event(event_id, operation, actor, when, old_values, new_values) -> dict:
 
 def build_history(handover) -> list:
     """Return the handover's change events, newest first."""
-    records = list(handover.history.all().order_by("history_date", "history_id"))
+    records = list(
+        handover.history.all()
+        .select_related(
+            "personPlanning",
+            "personFinancing",
+            "constructionProjectManager",
+            "constructionProcurementMethod",
+        )
+        .order_by("history_date", "history_id")
+    )
     # Snapshots oldest→newest: each record holds an old state, the live object
     # holds the current one.
     snapshots = records + [handover]

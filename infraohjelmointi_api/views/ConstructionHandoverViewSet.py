@@ -508,5 +508,6 @@ class ConstructionHandoverViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = 100
         paginator.page_size_query_param = "pageSize"
+        paginator.max_page_size = 500
         page = paginator.paginate_queryset(events, request, view=self)
         return paginator.get_paginated_response(page)
