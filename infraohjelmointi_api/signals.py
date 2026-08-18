@@ -16,7 +16,7 @@ from .services.CacheService import CacheService
 from django.dispatch import receiver
 from django.db.models.signals import post_delete, pre_save
 from django_eventstream import send_event
-from .models import ProjectFinancial, ProjectCategory, ProjectPhase
+from .models import ProjectFinancial, ProjectCategory
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -508,40 +508,43 @@ def update_talpa_status_on_sap_project(sender, instance, created, update_fields,
         f"(sapProject: {instance.sapProject})"
     )
 
+def _lookup_value(obj):
+    """Return the `.value` of a ProjectPhase / ProjectPhaseDetail, or None."""
+    return obj.value if obj else None
+
+
+def _update_suspended_date(instance, old_detail_value, new_detail_value):
+    """IO-863: set suspendedDate when entering the `suspended` phaseDetail and clear
+    it when leaving. suspendedFromPhase is intentionally left untouched (deprecated,
+    preserved historically by migration 0110)."""
+    if new_detail_value == "suspended" and old_detail_value != "suspended":
+        instance.suspendedDate = date.today()
+    elif old_detail_value == "suspended" and new_detail_value != "suspended":
+        instance.suspendedDate = None
+
+
 @receiver(pre_save, sender=Project)
 def on_project_phase_change(sender, instance, **kwargs):
-    """K1 on construction; suspension fields when entering/leaving suspended."""
-    if not instance.phase:
-        return
-
+    """K1 category when entering construction; suspendedDate when entering/leaving
+    the `suspended` phaseDetail. IO-863: suspension is a designPlanning detail (not a
+    standalone phase), so it is tracked via phaseDetail."""
     old_phase_value = None
+    old_detail_value = None
     if instance.pk:
         try:
-            old_instance = Project.objects.get(pk=instance.pk)
-            old_phase_value = old_instance.phase.value if old_instance.phase else None
+            previous = Project.objects.get(pk=instance.pk)
+            old_phase_value = _lookup_value(previous.phase)
+            old_detail_value = _lookup_value(previous.phaseDetail)
         except Project.DoesNotExist:
             pass
 
-    new_phase_value = instance.phase.value
-
-    if old_phase_value == new_phase_value:
-        return
-
-    if new_phase_value == "construction":
+    if _lookup_value(instance.phase) == "construction" and old_phase_value != "construction":
         try:
             instance.category = ProjectCategory.objects.get(value="K1")
         except ProjectCategory.DoesNotExist:
             logger.error("ProjectCategory 'K1' does not exist, cannot set category on construction phase change")
 
-    if new_phase_value == "suspended":
-        instance.suspendedDate = date.today()
-        if old_phase_value:
-            instance.suspendedFromPhase = ProjectPhase.objects.filter(
-                value=old_phase_value
-            ).first()
-    elif old_phase_value == "suspended":
-        instance.suspendedDate = None
-        instance.suspendedFromPhase = None
+    _update_suspended_date(instance, old_detail_value, _lookup_value(instance.phaseDetail))
 
 
 def _is_valid_sap_project(value: str | None) -> bool:

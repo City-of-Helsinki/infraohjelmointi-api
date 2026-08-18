@@ -1,39 +1,23 @@
-UPDATE infraohjelmointi_api_projectphase
-SET index = 0
-WHERE value = 'proposal';
+-- IO-863: phase index/order after the taxonomy restructure (migration 0109).
+-- The three planning phases (draftInitiation/draftApproval/constructionPlan) were
+-- merged into a single `designPlanning` ("Suunnittelu") phase. This is the manual
+-- fallback for migration 0109's step 8; the source of truth is
+-- phase_taxonomy.TARGET_PHASE_ORDER. Keep both files in sync.
 
-UPDATE infraohjelmointi_api_projectphase
-SET index = 1
-WHERE value = 'design';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 2
-WHERE value = 'programming';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 3
-WHERE value = 'draftInitiation';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 4
-WHERE value = 'draftApproval';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 5
-WHERE value = 'constructionPlan';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 6
-WHERE value = 'constructionWait';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 7
-WHERE value = 'construction';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 8
-WHERE value = 'warrantyPeriod';
-
-UPDATE infraohjelmointi_api_projectphase
-SET index = 9
-WHERE value = 'completed';
+UPDATE infraohjelmointi_api_projectphase AS p
+SET index = v.idx,
+    "order" = v.idx
+FROM (
+    VALUES
+        ('proposal', 0),
+        ('design', 1),
+        ('programming', 2),
+        ('designPlanning', 3),
+        ('constructionWait', 4),
+        ('constructionPreparation', 5),
+        ('construction', 6),
+        ('warrantyPeriod', 7),
+        ('completed', 8),
+        ('suspended', 9)
+) AS v(value, idx)
+WHERE p.value = v.value;

@@ -3405,7 +3405,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             value="completed"
         ).id.__str__()
         self.projectPhase_4_Id = ProjectPhase.objects.get(
-            value="draftInitiation"
+            value="designPlanning"
         ).id.__str__()
         self.projectPhase_5_Id = ProjectPhase.objects.get(
             value="construction"
@@ -3522,7 +3522,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             msg="Status code != 400 , Error: {}".format(response.json()),
         )
         self.assertEqual(
-            "estPlanningStart and estPlanningEnd must be populated if phase is `draftInitiation`",
+            "estPlanningStart and estPlanningEnd must be populated if phase is `designPlanning`",
             response.json()["phase"][0],
         )
 
@@ -3669,7 +3669,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             content_type="application/json",
         )
 
-        # programmed False + warrantyPeriod is invalid (allowed phases for False: proposal, design, completed, suspended)
+        # programmed False + warrantyPeriod is invalid (allowed for False: proposal, design, completed, or the suspended detail)
         self.assertEqual(
             response.status_code,
             400,
@@ -3689,7 +3689,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
 
         self.assertEqual(
-            "phase must be set to `proposal`, `design`, `completed` or `suspended` if programmed is `False`",
+            "phase must be set to `proposal`, `design`, `completed` or carry the `suspended` phaseDetail if programmed is `False`",
             response.json()["programmed"][0],
         )
         # Getting proposal phase from the data that is populated when tests run the migrations
@@ -3709,14 +3709,30 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             msg="Status code != 200 , Error: {}".format(response.json()),
         )
 
+        # IO-863: suspension is now the `suspended` phaseDetail under designPlanning;
+        # programmed=False stays allowed for it.
+        _planning_phase = ProjectPhase.objects.get(value="designPlanning")
         data = {
             "programmed": False,
-            "phase": ProjectPhase.objects.get(value="suspended").id,
-            "phaseDetail": None,
+            "phase": _planning_phase.id,
+            "phaseDetail": _planning_phase.phaseDetails.get(value="suspended").id,
         }
         response = self.client.patch(
             "/projects/{}/".format(createdId),
             data,
+            content_type="application/json",
+        )
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Status code != 200 , Error: {}".format(response.json()),
+        )
+
+        # Reset to proposal with no phaseDetail so the suspended detail doesn't dangle
+        # when the following PATCHes change the phase (a detail must match its phase).
+        response = self.client.patch(
+            "/projects/{}/".format(createdId),
+            {"phase": ProjectPhase.objects.get(value="proposal").id, "phaseDetail": None},
             content_type="application/json",
         )
         self.assertEqual(

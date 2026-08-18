@@ -33,6 +33,18 @@ class ProgrammedValidator(BaseValidator):
         if phase is None and project is not None and "phase" not in allFields:
             phase = project.phase
 
+        # IO-863: suspension moved from a standalone phase to the `suspended`
+        # phaseDetail under designPlanning. A suspended project may still be
+        # programmed=False, so resolve its detail for the check below.
+        phase_detail = allFields.get("phaseDetail", None)
+        if (
+            phase_detail is None
+            and project is not None
+            and "phaseDetail" not in allFields
+        ):
+            phase_detail = project.phaseDetail
+        is_suspended = getattr(phase_detail, "value", None) == "suspended"
+
         if programmed == True and (
             phase is None or (phase.value in ["proposal", "design"])
         ):
@@ -52,17 +64,17 @@ class ProgrammedValidator(BaseValidator):
                 code="programmed_true_missing_category",
             )
         # IO-755: Allow programmed=False for completed phase (when no budget)
-        # IO-389: Allow programmed=False for suspended (e.g. from proposal/design)
-        if programmed == False and (
-            phase is not None
-            and (
-                phase.value
-                not in ["proposal", "design", "completed", "suspended"]
-            )
+        # IO-389/IO-863: Allow programmed=False when suspended — suspension is now the
+        # `suspended` phaseDetail under designPlanning, not a standalone phase.
+        if (
+            programmed == False
+            and phase is not None
+            and not is_suspended
+            and phase.value not in ["proposal", "design", "completed"]
         ):
             raise ValidationError(
                 detail={
-                    "programmed": "phase must be set to `proposal`, `design`, `completed` or `suspended` if programmed is `False`"
+                    "programmed": "phase must be set to `proposal`, `design`, `completed` or carry the `suspended` phaseDetail if programmed is `False`"
                 },
                 code="programmed_false_missing_phase",
             )

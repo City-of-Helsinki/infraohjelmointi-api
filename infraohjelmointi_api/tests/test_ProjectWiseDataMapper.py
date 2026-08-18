@@ -106,7 +106,9 @@ class ProjectWiseDataMapperTestCase(TestCase):
     @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
     def test_phase_detail_mapping_skips_unmapped_values_with_debug_log(self, mock_get_by_id):
         mapper = ProjectWiseDataMapper()
-        mock_get_by_id.return_value = Mock(value="waitingPlanningStart")
+        # IO-863: ``waitingPlanningStart`` is now mapped, so use a still-unmapped
+        # value (the streetParkPlanDraft mirror detail isn't in PHASE_DETAILS_MAP_FOR_PW).
+        mock_get_by_id.return_value = Mock(value="streetParkPlanDraft")
 
         # Logger is getLogger("infraohjelmointi_api") in ProjectWiseDataMapper.py
         with self.assertLogs("infraohjelmointi_api", level="DEBUG") as logs:
@@ -114,8 +116,28 @@ class ProjectWiseDataMapperTestCase(TestCase):
 
         self.assertNotIn("PROJECT_Rakentamisvaiheen_tarkenne", result)
         self.assertTrue(
-            any("No ProjectWise mapping for phaseDetail='waitingPlanningStart'" in msg for msg in logs.output)
+            any("No ProjectWise mapping for phaseDetail='streetParkPlanDraft'" in msg for msg in logs.output)
         )
+
+    @patch("infraohjelmointi_api.services.utils.ProjectWiseDataMapper.ProjectPhaseDetailService.get_by_id")
+    def test_phase_detail_mapping_defers_io863_programming_details(self, mock_get_by_id):
+        """IO-863: the new programming-phase details are DEFERRED (left unmapped)
+        until ProjectWise admins create the matching values, so they DEBUG-skip
+        instead of pushing a value PW may reject."""
+        mapper = ProjectWiseDataMapper()
+
+        for detail_value in ("programming", "waitingProjectManager", "waitingPlanningStart"):
+            mock_get_by_id.return_value = Mock(value=detail_value)
+            with self.assertLogs("infraohjelmointi_api", level="DEBUG") as logs:
+                result = mapper.convert_to_pw_data({"phaseDetail": "dummy-id"}, None)
+            self.assertNotIn("PROJECT_Rakentamisvaiheen_tarkenne", result)
+            self.assertTrue(
+                any(
+                    f"No ProjectWise mapping for phaseDetail='{detail_value}'" in msg
+                    for msg in logs.output
+                ),
+                msg=f"expected debug-skip log for '{detail_value}'",
+            )
 
 
 class ProjectWisePhaseAssignmentTestCase(TestCase):
