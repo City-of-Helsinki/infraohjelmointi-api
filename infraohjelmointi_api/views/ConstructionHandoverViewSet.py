@@ -1,12 +1,17 @@
 import logging
+import uuid
 
 from overrides import override
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 
 from infraohjelmointi_api.models import ConstructionHandover
+from infraohjelmointi_api.services.ConstructionHandoverHistoryService import (
+    build_history,
+)
 
 from .BaseViewSet import BaseViewSet
 from ..models import ProjectPhase, ProjectPhaseDetail
@@ -476,3 +481,33 @@ class ConstructionHandoverViewSet(BaseViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"history",
+        name="get_construction_handover_history",
+    )
+    def get_construction_handover_history(self, request, pk=None):
+        """
+        Change history for a single handover, reconstructed from its
+        django-simple-history records and returned newest-first as
+        who-changed-what-when events (same shape as the project history feed).
+        """
+        try:
+            uuid.UUID(str(pk))
+        except (ValueError, TypeError):
+            return Response(
+                {"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        handover = self.get_object()
+
+        events = build_history(handover)
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 100
+        paginator.page_size_query_param = "pageSize"
+        paginator.max_page_size = 500
+        page = paginator.paginate_queryset(events, request, view=self)
+        return paginator.get_paginated_response(page)
