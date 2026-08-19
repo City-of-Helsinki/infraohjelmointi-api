@@ -79,9 +79,38 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
+    BRIEF_ONLY_FIELDS = {"estimatedCosts"}
+    COMPLETE_ONLY_FIELDS = {
+        "strategyGoals",
+        "costClass",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+        "specialConsiderations",
+        "otherConsiderations",
+    }
+
     class Meta:
         model = ProjectProgrammeBasicInfo
         fields = "__all__"
+
+    def get_fields(self):
+        fields = super().get_fields()
+        programme = getattr(self.instance, "project_programme", None)
+        if programme and programme.briefProjectProgramme:
+            fields = {
+                name: field
+                for name, field in fields.items()
+                if name not in self.COMPLETE_ONLY_FIELDS
+            }
+        elif programme:
+            fields = {
+                name: field
+                for name, field in fields.items()
+                if name not in self.BRIEF_ONLY_FIELDS
+            }
+        return fields
 
 
 class ProjectProgrammeBasicInfoUpdateSerializer(
@@ -89,10 +118,110 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    BRIEF_ONLY_FIELDS = {"estimatedCosts"}
+    COMPLETE_ONLY_FIELDS = {
+        "strategyGoals",
+        "costClass",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+        "specialConsiderations",
+        "otherConsiderations",
+    }
+    REQUIRED_IN_ALL_PROGRAMMES = {
+        "projectName",
+        "district",
+        "projectProgrammeCompiler",
+        "personsInvolved",
+    }
+    REQUIRED_IN_BRIEF_PROGRAMMES = {"inspector", "estimatedCosts"}
+    REQUIRED_IN_COMPLETE_PROGRAMMES = {
+        "summary",
+        "strategyGoals",
+        "costClass",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+    }
+
     class Meta:
         model = ProjectProgrammeBasicInfo
         fields = "__all__"
         read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+
+    def _get_project_programme(self):
+        if self.instance:
+            return self.instance.project_programme
+
+        project_programme_id = self.initial_data.get("project_programme")
+        if not project_programme_id:
+            return None
+        return ProjectProgramme.objects.filter(pk=project_programme_id).first()
+
+    def _required_fields_for(self, programme):
+        is_brief = programme.briefProjectProgramme
+        return self.REQUIRED_IN_ALL_PROGRAMMES | (
+            self.REQUIRED_IN_BRIEF_PROGRAMMES
+            if is_brief
+            else self.REQUIRED_IN_COMPLETE_PROGRAMMES
+        )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        programme = self._get_project_programme()
+        if not programme:
+            return fields
+
+        is_brief = programme.briefProjectProgramme
+        hidden_fields = self.COMPLETE_ONLY_FIELDS if is_brief else self.BRIEF_ONLY_FIELDS
+        required_fields = self._required_fields_for(programme)
+        for name in hidden_fields:
+            fields.pop(name, None)
+        if self.instance:
+            for name, field in fields.items():
+                field.required = name in required_fields
+        return fields
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        if not instance:
+            return attrs
+
+        programme = self._get_project_programme()
+        if not programme:
+            return attrs
+
+        errors = {}
+        for name in self._required_fields_for(programme):
+            value = attrs.get(name, getattr(instance, name, None))
+            if value in (None, ""):
+                errors[name] = "This field is required."
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return attrs
+
+    def to_internal_value(self, data):
+        # Prefill from the linked project only on create; on update this must not
+        # override values already saved (or silently fail required checks when the
+        # project itself has no district).
+        if self.instance is not None:
+            return super().to_internal_value(data)
+
+        data = data.copy()
+        programme = self._get_project_programme()
+        project = getattr(programme, "project", None)
+        if project is not None:
+            data.setdefault("projectName", project.name or "")
+            data.setdefault(
+                "district",
+                project.projectDistrict.name if project.projectDistrict else "",
+            )
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         project_programme = validated_data.get("project_programme")
