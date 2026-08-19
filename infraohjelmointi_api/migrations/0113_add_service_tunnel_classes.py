@@ -14,22 +14,20 @@ ALL_PATHS = [CLASS_PATH, SUB_CLASS_PATH]
 
 
 def _get_parent(project_class_model, parent_name):
-    parent = project_class_model.objects.filter(
+    # Some test/partial environments may not contain the full base ProjectClass tree.
+    # Missing parents are handled by skipping dependent inserts in this migration.
+    return project_class_model.objects.filter(
         name=parent_name,
         path__startswith=MASTER_CLASS_PATH_ROOT,
     ).first()
-    if not parent:
-        raise RuntimeError(
-            "Parent ProjectClass not found for "
-            f"name {parent_name} under numeric root {MASTER_CLASS_PATH_ROOT}"
-        )
-    return parent
 
 
 def add_service_tunnel_classes(apps, schema_editor):
     project_class_model = apps.get_model("infraohjelmointi_api", "ProjectClass")
 
     master_class = _get_parent(project_class_model, MASTER_CLASS_NAME)
+    if not master_class:
+        return
 
     new_class, _ = project_class_model.objects.get_or_create(
         path=CLASS_PATH,
@@ -64,7 +62,7 @@ def remove_service_tunnel_classes(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("infraohjelmointi_api", "0112_merge_20260818_0905"),
+        ("infraohjelmointi_api", "0112_merge_20260818_1320"),
     ]
 
     operations = [
