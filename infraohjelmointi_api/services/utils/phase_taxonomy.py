@@ -94,14 +94,13 @@ SUSPENDED_DETAIL_VALUE = "suspended"  # label "Keskeytetty toistaiseksi", under 
 #   otherReason                    -> "Muu syy"
 #   constructionStage              -> "Rakentaminen"
 #   warranty                       -> "Takuuaika"
-#   warrantyIncomplete             -> "Takuuaika/keskeneräinen"
 NEW_DETAILS = {
     # IO-863: the demoted suspended state — "Keskeytetty toistaiseksi" as a detail
     # under Suunnittelu (designPlanning) rather than a standalone phase.
     PLANNING_PHASE_VALUE: [SUSPENDED_DETAIL_VALUE],
     "constructionWait": ["firstPhaseCompleteOrIncomplete", "otherReason"],
     "construction": ["constructionStage"],
-    "warrantyPeriod": ["warranty", "warrantyIncomplete"],
+    "warrantyPeriod": ["warranty"],
 }
 
 # IO-863 spec op 4 ("Rakentamishankkeet"): construction projects whose detail is
