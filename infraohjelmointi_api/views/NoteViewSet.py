@@ -20,6 +20,9 @@ from rest_framework.response import Response
 from rest_framework import status
 
 
+INVALID_UUID_MESSAGE = "Invalid UUID"
+
+
 class NoteViewSet(BaseViewSet):
 
     """
@@ -73,7 +76,7 @@ class NoteViewSet(BaseViewSet):
             return Response(serializer.data)
         except ValueError:
             return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+                data={"message": INVALID_UUID_MESSAGE}, status=status.HTTP_400_BAD_REQUEST
             )
 
     @override
@@ -149,22 +152,22 @@ class NoteViewSet(BaseViewSet):
     @action(
         methods=["delete"],
         detail=True,
-        url_path=r"images/(?P<imageId>[-\w]+)",
+        url_path=r"images/(?P<image_id>[-\w]+)",
         name="delete_note_image",
     )
-    def delete_image(self, request, pk, imageId):
+    def delete_image(self, request, pk, image_id):
         """Hard-delete a single note image (IO-812).
 
         DELETE /notes/<noteId>/images/<imageId>/  -> 204
         """
         try:
-            uuid.UUID(str(imageId))
+            uuid.UUID(str(image_id))
         except ValueError:
             return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+                data={"message": INVALID_UUID_MESSAGE}, status=status.HTTP_400_BAD_REQUEST
             )
         note = self.get_object()
-        img = get_object_or_404(NoteImage, pk=imageId, note=note)
+        img = get_object_or_404(NoteImage, pk=image_id, note=note)
         # Remove the underlying blob/file before the row, so a failed delete
         # doesn't leave orphaned bytes referenced by a stale row.
         img.file.delete(save=False)
@@ -208,5 +211,5 @@ class NoteViewSet(BaseViewSet):
 
         except ValueError:
             return Response(
-                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+                data={"message": INVALID_UUID_MESSAGE}, status=status.HTTP_400_BAD_REQUEST
             )
