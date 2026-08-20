@@ -95,7 +95,6 @@ PROJECT_TYPE_MAP = {
 #   otherReason                     -> "Muu syy"
 #   constructionStage               -> "Rakentaminen"
 #   warranty                        -> "Takuuaika"
-#   warrantyIncomplete              -> "Takuuaika/keskeneräinen"
 #
 # movedToConstruction: IO-863 relabels it "Siirretty rakennuttamiseen" (UI) and moves
 # it under "Odottaa rakentamista". The PW label here is kept as the existing

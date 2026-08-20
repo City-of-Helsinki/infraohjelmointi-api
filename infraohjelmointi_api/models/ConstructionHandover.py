@@ -41,6 +41,9 @@ class ConstructionHandover(HistoricalModel):
     previousProjectPhase = models.ForeignKey(
         "ProjectPhase", related_name="handovers_previous_phase", on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    previousProjectPhaseDetail = models.ForeignKey(
+        "ProjectPhaseDetail", related_name="handovers_previous_phase_detail", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
@@ -55,7 +58,7 @@ class ConstructionHandover(HistoricalModel):
         "status", "name", "description", "constructionProcurementMethod", "constructionStart",
         "constructionEnd", "otherTimelineNotes", "totalCost", "personPlanning", "personFinancing",
         "linkDesignDrawings", "linkCostAllocation", "linkContractBoundaries", "_history_user",
-        "constructionProjectManager", "previousProjectPhase"
+        "constructionProjectManager", "previousProjectPhase", "previousProjectPhaseDetail"
     ]
 
     @property

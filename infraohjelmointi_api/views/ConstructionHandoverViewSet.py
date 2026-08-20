@@ -1,29 +1,42 @@
+import logging
+import uuid
+
 from overrides import override
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 
 from infraohjelmointi_api.models import ConstructionHandover
+from infraohjelmointi_api.services.ConstructionHandoverHistoryService import (
+    build_history,
+)
 
 from .BaseViewSet import BaseViewSet
+from ..models import ProjectPhase, ProjectPhaseDetail
 from ..permissions import IsConstructionManagementLead, IsPlanner, IsProjectManager
 from ..services.ConstructionHandoverTransitionPermissionService import (
     ConstructionHandoverTransitionPermissionService,
 )
+from ..services.ProjectPhaseService import ProjectPhaseService
+from ..services.ProjectPhaseDetailService import ProjectPhaseDetailService
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
     ConstructionHandoverCreateSerializer,
     ConstructionHandoverUpdateSerializer
 )
 
+
+logger = logging.getLogger(__name__)
+
 class ConstructionHandoverViewSet(BaseViewSet):
     ALLOWED_STATUS_TRANSITIONS = {
         "DRAFT": ["SUBMITTED_TO_PROGRAMMER"],
         "SUBMITTED_TO_PROGRAMMER": ["SUBMITTED_TO_CONSTRUCTION"],
-        "SUBMITTED_TO_CONSTRUCTION": ["PROJECT_MANAGER_NAMED"],
-        "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION"],
-        "MOVED_TO_CONSTRUCTION_PREPARATION": [],
+        "SUBMITTED_TO_CONSTRUCTION": ["PROJECT_MANAGER_NAMED", "DRAFT"],
+        "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION", "DRAFT"],
+        "MOVED_TO_CONSTRUCTION_PREPARATION": ["DRAFT"],
     }
     
     """
@@ -176,6 +189,187 @@ class ConstructionHandoverViewSet(BaseViewSet):
         incoming_fields = self._get_incoming_patch_fields(request)
         return incoming_fields == {"constructionProcurementMethod"}
 
+    def _get_project_phase_or_none(self, phase_value):
+        try:
+            return ProjectPhaseService.get_by_value(value=phase_value)
+        except ProjectPhase.DoesNotExist:
+            logger.warning(
+                "Skipping project phase sync for missing ProjectPhase value '%s'.",
+                phase_value,
+            )
+            return None
+
+    def _get_project_phase_detail_or_none(self, phase_detail_value):
+        return ProjectPhaseDetailService.find_by_value(value=phase_detail_value)
+
+    def _sync_procurement_method(self, project, instance, project_update_fields):
+        # Keep project's procurement method aligned with the handover value.
+        if (
+            project.constructionProcurementMethod_id
+            != instance.constructionProcurementMethod_id
+        ):
+            project.constructionProcurementMethod = instance.constructionProcurementMethod
+            project_update_fields.append("constructionProcurementMethod")
+
+    def _sync_submitted_to_construction(
+        self,
+        project,
+        instance,
+        project_update_fields,
+        handover_update_fields,
+    ):
+        # Move project to construction-wait state and store previous values for rollback to DRAFT.
+        construction_wait_phase = self._get_project_phase_or_none("constructionWait")
+        construction_wait_phase_detail = self._get_project_phase_detail_or_none("otherReason")
+
+        if construction_wait_phase and project.phase_id != construction_wait_phase.id:
+            instance.previousProjectPhase = project.phase
+            handover_update_fields.append("previousProjectPhase")
+            project.phase = construction_wait_phase
+            project_update_fields.append("phase")
+
+        if (
+            construction_wait_phase_detail
+            and project.phaseDetail_id != construction_wait_phase_detail.id
+        ):
+            instance.previousProjectPhaseDetail = project.phaseDetail
+            handover_update_fields.append("previousProjectPhaseDetail")
+            project.phaseDetail = construction_wait_phase_detail
+            project_update_fields.append("phaseDetail")
+
+    def _sync_project_manager_named(
+        self,
+        project,
+        instance,
+        project_update_fields,
+    ):
+        # Mirror selected construction project manager to the project.
+        if project.personConstruction_id != instance.constructionProjectManager_id:
+            project.personConstruction = instance.constructionProjectManager
+            project_update_fields.append("personConstruction")
+
+        self._sync_procurement_method(
+            project=project,
+            instance=instance,
+            project_update_fields=project_update_fields,
+        )
+
+    def _sync_moved_to_construction_preparation(
+        self,
+        project,
+        instance,
+        project_update_fields,
+    ):
+        # Advance project to construction-preparation phase and contract-preparation detail.
+        construction_preparation_phase = self._get_project_phase_or_none(
+            "constructionPreparation"
+        )
+        construction_preparation_phase_detail = self._get_project_phase_detail_or_none(
+            "contractPreparation"
+        )
+
+        if (
+            construction_preparation_phase
+            and project.phase_id != construction_preparation_phase.id
+        ):
+            project.phase = construction_preparation_phase
+            project_update_fields.append("phase")
+
+        if (
+            construction_preparation_phase_detail
+            and project.phaseDetail_id != construction_preparation_phase_detail.id
+        ):
+            project.phaseDetail = construction_preparation_phase_detail
+            project_update_fields.append("phaseDetail")
+
+        self._sync_procurement_method(
+            project=project,
+            instance=instance,
+            project_update_fields=project_update_fields,
+        )
+
+    def _sync_draft(
+        self,
+        project,
+        instance,
+        project_update_fields,
+        handover_update_fields,
+    ):
+        # Restore previously saved phase values when transition returns to DRAFT.
+        # PersonConstruction and constructionProcurementMethod are not reverted to previous values.
+        
+        if not instance.previousProjectPhase_id:
+            return
+
+        project.phase = instance.previousProjectPhase
+        project_update_fields.append("phase")
+
+        # previousProjectPhaseDetail may intentionally be None.
+        # Restore it whenever we have a saved previous phase.
+        if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
+            project.phaseDetail = instance.previousProjectPhaseDetail
+            project_update_fields.append("phaseDetail")
+
+        instance.previousProjectPhase = None
+        handover_update_fields.append("previousProjectPhase")
+        instance.previousProjectPhaseDetail = None
+        handover_update_fields.append("previousProjectPhaseDetail")
+
+    def _persist_synced_transition_fields(
+        self,
+        project,
+        instance,
+        project_update_fields,
+        handover_update_fields,
+    ):
+        # Persist only changed fields to avoid unnecessary writes.
+        if project_update_fields:
+            project.save(update_fields=project_update_fields)
+
+        if handover_update_fields:
+            instance.save(update_fields=handover_update_fields)
+
+    def _sync_project_fields_for_transition(self, instance, requested_status):
+        project = instance.project
+        project_update_fields = []
+        handover_update_fields = []
+
+        transition_sync_handlers = {
+            "SUBMITTED_TO_CONSTRUCTION": lambda: self._sync_submitted_to_construction(
+                project=project,
+                instance=instance,
+                project_update_fields=project_update_fields,
+                handover_update_fields=handover_update_fields,
+            ),
+            "PROJECT_MANAGER_NAMED": lambda: self._sync_project_manager_named(
+                project=project,
+                instance=instance,
+                project_update_fields=project_update_fields,
+            ),
+            "MOVED_TO_CONSTRUCTION_PREPARATION": lambda: self._sync_moved_to_construction_preparation(
+                project=project,
+                instance=instance,
+                project_update_fields=project_update_fields,
+            ),
+            "DRAFT": lambda: self._sync_draft(
+                project=project,
+                instance=instance,
+                project_update_fields=project_update_fields,
+                handover_update_fields=handover_update_fields,
+            ),
+        }
+
+        sync_handler = transition_sync_handlers.get(requested_status)
+        if sync_handler:
+            sync_handler()
+
+        self._persist_synced_transition_fields(
+            project=project,
+            instance=instance,
+            project_update_fields=project_update_fields,
+            handover_update_fields=handover_update_fields,
+        )
+
     def _transition_to_status(self, request, instance, requested_status):
         possible_statuses = self._get_possible_status_transitions(instance.status)
 
@@ -244,10 +438,15 @@ class ConstructionHandoverViewSet(BaseViewSet):
             )
 
         user = self._get_authenticated_user(request)
-        instance.status = requested_status
-        if user:
-            instance.updatedBy = user
-        instance.save()
+        with transaction.atomic():
+            instance.status = requested_status
+            if user:
+                instance.updatedBy = user
+            instance.save()
+            self._sync_project_fields_for_transition(
+                instance=instance,
+                requested_status=requested_status,
+            )
 
         return None
     
@@ -282,3 +481,33 @@ class ConstructionHandoverViewSet(BaseViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"history",
+        name="get_construction_handover_history",
+    )
+    def get_construction_handover_history(self, request, pk=None):
+        """
+        Change history for a single handover, reconstructed from its
+        django-simple-history records and returned newest-first as
+        who-changed-what-when events (same shape as the project history feed).
+        """
+        try:
+            uuid.UUID(str(pk))
+        except (ValueError, TypeError):
+            return Response(
+                {"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        handover = self.get_object()
+
+        events = build_history(handover)
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 100
+        paginator.page_size_query_param = "pageSize"
+        paginator.max_page_size = 500
+        page = paginator.paginate_queryset(events, request, view=self)
+        return paginator.get_paginated_response(page)

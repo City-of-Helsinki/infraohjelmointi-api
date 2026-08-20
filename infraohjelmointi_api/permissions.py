@@ -194,7 +194,12 @@ PROJECT_GROUP_ALL_GET_ACTIONS = [
 PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 
 #### Construction handover custom actions ####
-CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
+# The per-handover change-history feed rides along with the regular handover
+# read permission: every role that can view a handover can view its history.
+CONSTRUCTION_HANDOVER_GET_ACTIONS = [
+    "get_construction_handovers",
+    "get_construction_handover_history",
+]
 CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
 
 #### Project programme custom actions ####

@@ -143,7 +143,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = update_serializer_class(existing_section, data=request.data, partial=True)
+        serializer = update_serializer_class(
+            existing_section,
+            data=request.data,
+            partial=True,
+        )
         serializer.is_valid(raise_exception=True)
         user = self._get_authenticated_user(request)
         save_kwargs = {"updatedBy": user} if user else {}

@@ -14,6 +14,7 @@ class ProjectProgrammeBasicInfo(ProjectProgrammeBase):
     projectProgrammeCompiler = models.CharField(max_length=100, blank=True)
     personsInvolved = models.CharField(max_length=200, blank=True)
     inspector = models.CharField(max_length=100, blank=True)
+    estimatedCosts = models.TextField(blank=True)
     summary = models.TextField(blank=True)
     strategyGoals = models.TextField(blank=True)
     costClass = models.TextField(blank=True)
@@ -31,6 +32,7 @@ class ProjectProgrammeBasicInfo(ProjectProgrammeBase):
         "projectProgrammeCompiler",
         "personsInvolved",
         "inspector",
+        "estimatedCosts",
         "summary",
         "strategyGoals",
         "costClass",
