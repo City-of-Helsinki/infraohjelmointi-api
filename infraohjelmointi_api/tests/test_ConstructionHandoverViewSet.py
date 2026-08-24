@@ -19,6 +19,7 @@ from infraohjelmointi_api.models import (
     ProjectPhaseDetail,
     ProjectProgrammer,
     ProjectTypeQualifier,
+    StaraProcurementReason,
 )
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverCreateSerializer,
@@ -915,15 +916,25 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         old_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Yhteistoiminnalliset",
         )
+        old_stara_procurement_reason = None
         self.project.personConstruction = old_project_manager
         self.project.constructionProcurementMethod = old_procurement_method
-        self.project.save(update_fields=["personConstruction", "constructionProcurementMethod"])
+        self.project.staraProcurementReason = old_stara_procurement_reason
+        self.project.save(update_fields=["personConstruction", "constructionProcurementMethod", "staraProcurementReason"])
+
+        construction_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Stara",
+        )
+        stara_procurement_reason = StaraProcurementReason.objects.create(
+            value="smallWork",
+        )
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="SUBMITTED_TO_CONSTRUCTION",
             constructionProjectManager=self.person_construction,
-            constructionProcurementMethod=self.construction_procurement_method,
+            constructionProcurementMethod=construction_procurement_method,
+            staraProcurementReason=stara_procurement_reason,
         )
 
         viewset = ConstructionHandoverViewSet()
@@ -936,7 +947,11 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(self.project.personConstruction_id, self.person_construction.id)
         self.assertEqual(
             self.project.constructionProcurementMethod_id,
-            self.construction_procurement_method.id,
+            construction_procurement_method.id,
+        )
+        self.assertEqual(
+            self.project.staraProcurementReason_id,
+            stara_procurement_reason.id,
         )
 
     def test_sync_project_fields_for_transition_moved_to_construction_preparation_updates_phase_detail_and_procurement(self):
@@ -951,15 +966,25 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         old_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Yhteistoiminnalliset",
         )
+        old_stara_procurement_reason = None
         self.project.phase = proposal_phase
         self.project.phaseDetail = old_phase_detail
         self.project.constructionProcurementMethod = old_procurement_method
-        self.project.save(update_fields=["phase", "phaseDetail", "constructionProcurementMethod"])
+        self.project.staraProcurementReason = old_stara_procurement_reason
+        self.project.save(update_fields=["phase", "phaseDetail", "constructionProcurementMethod", "staraProcurementReason"])
+
+        construction_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Stara",
+        )
+        stara_procurement_reason = StaraProcurementReason.objects.create(
+            value="smallWork",
+        )
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="PROJECT_MANAGER_NAMED",
-            constructionProcurementMethod=self.construction_procurement_method,
+            constructionProcurementMethod=construction_procurement_method,
+            staraProcurementReason=stara_procurement_reason
         )
 
         viewset = ConstructionHandoverViewSet()
@@ -973,7 +998,11 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(self.project.phaseDetail_id, contract_preparation_phase_detail.id)
         self.assertEqual(
             self.project.constructionProcurementMethod_id,
-            self.construction_procurement_method.id,
+            construction_procurement_method.id,
+        )
+        self.assertEqual(
+            self.project.staraProcurementReason_id,
+            stara_procurement_reason.id,
         )
 
     def test_sync_project_fields_for_transition_draft_restores_previous_phase_values_and_clears_handover_previous_fields(self):

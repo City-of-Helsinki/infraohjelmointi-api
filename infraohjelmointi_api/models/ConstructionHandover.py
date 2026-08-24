@@ -22,6 +22,9 @@ class ConstructionHandover(HistoricalModel):
     constructionProcurementMethod = models.ForeignKey(
         "ConstructionProcurementMethod", on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    staraProcurementReason = models.ForeignKey(
+        "StaraProcurementReason", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     constructionStart = models.DateField(blank=True, null=True)
     constructionEnd = models.DateField(blank=True, null=True)
     otherTimelineNotes = models.TextField(blank=True, null=True)
@@ -58,7 +61,8 @@ class ConstructionHandover(HistoricalModel):
         "status", "name", "description", "constructionProcurementMethod", "constructionStart",
         "constructionEnd", "otherTimelineNotes", "totalCost", "personPlanning", "personFinancing",
         "linkDesignDrawings", "linkCostAllocation", "linkContractBoundaries", "_history_user",
-        "constructionProjectManager", "previousProjectPhase", "previousProjectPhaseDetail"
+        "constructionProjectManager", "previousProjectPhase", "previousProjectPhaseDetail",
+        "staraProcurementReason"
     ]
 
     @property

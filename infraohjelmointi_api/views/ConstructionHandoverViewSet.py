@@ -187,7 +187,11 @@ class ConstructionHandoverViewSet(BaseViewSet):
             return False
 
         incoming_fields = self._get_incoming_patch_fields(request)
-        return incoming_fields == {"constructionProcurementMethod"}
+        allowed_fields = {"constructionProcurementMethod", "staraProcurementReason"}
+        return (
+            "constructionProcurementMethod" in incoming_fields
+            and incoming_fields.issubset(allowed_fields)
+        )
 
     def _get_project_phase_or_none(self, phase_value):
         try:
@@ -210,6 +214,14 @@ class ConstructionHandoverViewSet(BaseViewSet):
         ):
             project.constructionProcurementMethod = instance.constructionProcurementMethod
             project_update_fields.append("constructionProcurementMethod")
+
+        # Keep project's staraProcurementReason aligned with the handover value.
+        if (
+            project.staraProcurementReason_id
+            != instance.staraProcurementReason_id
+        ):
+            project.staraProcurementReason = instance.staraProcurementReason
+            project_update_fields.append("staraProcurementReason")
 
     def _sync_submitted_to_construction(
         self,

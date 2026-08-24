@@ -4,13 +4,15 @@ from infraohjelmointi_api.serializers.ConstructionHandoverFinancingSerializer im
 from infraohjelmointi_api.serializers import (
   ConstructionProcurementMethodSerializer,
   PersonSerializer,
-  ProjectProgrammerSerializer
+  ProjectProgrammerSerializer,
+  StaraProcurementReasonSerializer
 )
 
 class ConstructionHandoverGetSerializer(serializers.ModelSerializer):
     personPlanning = PersonSerializer(read_only=True)
     personFinancing = ProjectProgrammerSerializer(read_only=True)
     constructionProcurementMethod = ConstructionProcurementMethodSerializer(read_only=True)
+    staraProcurementReason = StaraProcurementReasonSerializer(read_only=True)
     constructionProjectManager = PersonSerializer(read_only=True)
     constructionHandoverFinancing = ConstructionHandoverFinancingSerializer(
         many=True, read_only=True, source='financing'
