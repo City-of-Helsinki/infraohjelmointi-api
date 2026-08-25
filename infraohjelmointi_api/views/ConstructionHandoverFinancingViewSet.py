@@ -11,7 +11,9 @@ from infraohjelmointi_api.serializers import ConstructionHandoverFinancingSerial
 from .BaseViewSet import BaseViewSet
 
 
-LOCKED_HANDOVER_EDIT_ERROR = "Only construction handovers in DRAFT status can be edited."
+LOCKED_HANDOVER_EDIT_ERROR = (
+    "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited."
+)
 
 
 class ConstructionHandoverFinancingViewSet(BaseViewSet):

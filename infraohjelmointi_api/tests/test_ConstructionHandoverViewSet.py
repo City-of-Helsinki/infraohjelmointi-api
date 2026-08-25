@@ -368,10 +368,10 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             1,
         )
 
-    def test_partial_update_returns_409_for_non_draft(self):
+    def test_partial_update_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
             name="Before update",
         )
 
@@ -384,7 +384,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
         handover.refresh_from_db()
@@ -413,10 +413,10 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.createdBy_id, self.user_1.uuid)
         self.assertEqual(handover.updatedBy_id, self.user_2.uuid)
 
-    def test_destroy_returns_409_for_non_draft(self):
+    def test_destroy_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
         )
 
         response = self.client.delete(f"/construction-handovers/{handover.id}/")
@@ -424,7 +424,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be deleted.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be deleted.",
         )
         self.assertTrue(ConstructionHandover.objects.filter(id=handover.id).exists())
 
@@ -736,7 +736,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
         handover.refresh_from_db()
@@ -816,7 +816,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
         handover.refresh_from_db()
