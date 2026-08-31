@@ -101,7 +101,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
     @override
     def partial_update(self, request, *args, **kwargs):
         """
-        Overriden ModelViewSet class method to prevent updates if the handover is locked (not in DRAFT status)
+        Overriden ModelViewSet class method to prevent updates if the handover is locked (not in DRAFT or SUBMITTED_TO_PROGRAMMER status)
         """
         instance = self.get_object()
         auto_transition_target_status = self._get_auto_transition_target_status(
@@ -112,7 +112,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
 
         if instance.is_locked and not should_auto_transition:
             return Response(
-                {"detail": "Only construction handovers in DRAFT status can be edited."},
+                {"detail": "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited."},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -138,12 +138,12 @@ class ConstructionHandoverViewSet(BaseViewSet):
     @override
     def destroy(self, request, *args, **kwargs):
         """
-        Overriden ModelViewSet class method to prevent deletion if the handover is not in DRAFT status
+        Overriden ModelViewSet class method to prevent deletion if the handover is not in DRAFT or SUBMITTED_TO_PROGRAMMER status
         """
         instance = self.get_object()
         if instance.is_locked:
             return Response(
-                {"detail": "Only construction handovers in DRAFT status can be deleted."},
+                {"detail": "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be deleted."},
                 status=status.HTTP_409_CONFLICT,
             )
         return super().destroy(request, *args, **kwargs)
@@ -187,7 +187,11 @@ class ConstructionHandoverViewSet(BaseViewSet):
             return False
 
         incoming_fields = self._get_incoming_patch_fields(request)
-        return incoming_fields == {"constructionProcurementMethod"}
+        allowed_fields = {"constructionProcurementMethod", "staraProcurementReason"}
+        return (
+            "constructionProcurementMethod" in incoming_fields
+            and incoming_fields.issubset(allowed_fields)
+        )
 
     def _get_project_phase_or_none(self, phase_value):
         try:
@@ -210,6 +214,14 @@ class ConstructionHandoverViewSet(BaseViewSet):
         ):
             project.constructionProcurementMethod = instance.constructionProcurementMethod
             project_update_fields.append("constructionProcurementMethod")
+
+        # Keep project's staraProcurementReason aligned with the handover value.
+        if (
+            project.staraProcurementReason_id
+            != instance.staraProcurementReason_id
+        ):
+            project.staraProcurementReason = instance.staraProcurementReason
+            project_update_fields.append("staraProcurementReason")
 
     def _sync_submitted_to_construction(
         self,

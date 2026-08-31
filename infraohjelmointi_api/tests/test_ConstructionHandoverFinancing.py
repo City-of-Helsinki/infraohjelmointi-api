@@ -464,7 +464,7 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
     def test_create_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
         )
 
         response = self.client.post(
@@ -482,13 +482,13 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
     def test_update_returns_409_for_locked_handover(self):
         locked_handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
         )
         financing = ConstructionHandoverFinancing.objects.create(
             handover=locked_handover,
@@ -506,13 +506,13 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
     def test_destroy_returns_409_for_locked_handover(self):
         locked_handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
         )
         financing = ConstructionHandoverFinancing.objects.create(
             handover=locked_handover,
@@ -526,7 +526,7 @@ class ConstructionHandoverFinancingViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
     def test_patch_non_kymp_financing_without_budget_item_id_succeeds(self):
