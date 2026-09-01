@@ -539,6 +539,9 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             project_programme=programme,
             status="DRAFT",
             summary="Original",
+            projectName=self.project.name,
+            district=self.project_district.name,
+            **self._basic_info_payload(),
         )
         content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
         ProjectProgrammeLink.objects.create(

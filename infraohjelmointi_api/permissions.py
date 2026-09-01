@@ -20,7 +20,7 @@ def get_project_programme_contributor_group_name():
     return getattr(
         settings,
         "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
-        "sg_kymp_sso_io_projektiohjelman_osallistujat",
+        "sl_dyn_kymp_sso_io_liikenne-maisemasuunnittelijat",
     )
 
 

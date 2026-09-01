@@ -9,10 +9,11 @@ class ProjectProgrammeLink(models.Model):
     contentType = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
+        help_text="References to any type of a section (basic info, design criteria, etc.)",
     )
     objectId = models.UUIDField()
     sectionObject = GenericForeignKey("contentType", "objectId")
-    value = models.URLField(max_length=500, blank=True, null=True)
+    value = models.URLField(max_length=500, help_text="link URL-address")
     createdDate = models.DateTimeField(auto_now_add=True)
     updatedDate = models.DateTimeField(auto_now=True)
 
