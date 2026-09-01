@@ -24,6 +24,8 @@ from infraohjelmointi_api.models import (
 from infraohjelmointi_api.permissions import (
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
+    get_restricted_user_assigned_class_paths,
+    target_path_matches_assigned_paths,
 )
 from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
     ProjectPersonAuthorizationService,
@@ -262,6 +264,18 @@ class ProjectProgrammeViewSet(BaseViewSet):
             "Only the responsible project programme person can create a project programme."
         )
 
+    def _restricted_programmer_matches_project(self, user, project):
+        """IO-756: restricted programmers are limited to their assigned project classes."""
+        project_class = getattr(project, "projectClass", None)
+        if not project_class:
+            return False
+
+        assigned_paths = get_restricted_user_assigned_class_paths(user)
+        if not assigned_paths:
+            return False
+
+        return target_path_matches_assigned_paths(project_class.path, assigned_paths)
+
     def _assert_can_edit_or_complete(self, request, project):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
@@ -273,11 +287,16 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 "Commissioning managers can only return a project programme to DRAFT."
             )
 
-        reviewer_groups = {*self.REVIEWER_GROUPS, get_restricted_programmer_group_name()}
-        if group_names.intersection(reviewer_groups):
+        if group_names.intersection(self.REVIEWER_GROUPS):
             return
 
         if get_project_programme_contributor_group_name() in group_names:
+            return
+
+        if (
+            get_restricted_programmer_group_name() in group_names
+            and self._restricted_programmer_matches_project(user, project)
+        ):
             return
 
         if self._is_responsible_for_project_programme(user, project):
@@ -287,14 +306,19 @@ class ProjectProgrammeViewSet(BaseViewSet):
             "You do not have permission to edit or complete this project programme."
         )
 
-    def _assert_can_return_to_draft(self, request):
+    def _assert_can_return_to_draft(self, request, project):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
         if self.ADMIN_GROUP in group_names:
             return
 
-        reviewer_groups = {*self.REVIEWER_GROUPS, get_restricted_programmer_group_name()}
-        if group_names.intersection(reviewer_groups):
+        if group_names.intersection(self.REVIEWER_GROUPS):
+            return
+
+        if (
+            get_restricted_programmer_group_name() in group_names
+            and self._restricted_programmer_matches_project(user, project)
+        ):
             return
 
         if self.COMMISSIONING_MANAGER_GROUP in group_names:
@@ -451,7 +475,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
 
         if requested_status == "DRAFT":
-            self._assert_can_return_to_draft(request)
+            self._assert_can_return_to_draft(request, instance.project)
         else:
             self._assert_can_edit_or_complete(request, instance.project)
 
@@ -645,7 +669,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
 
         if requested_status == "DRAFT":
-            self._assert_can_return_to_draft(request)
+            self._assert_can_return_to_draft(request, programme.project)
         else:
             self._assert_can_edit_or_complete(request, programme.project)
 
