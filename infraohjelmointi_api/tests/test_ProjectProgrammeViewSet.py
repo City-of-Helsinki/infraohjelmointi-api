@@ -566,6 +566,25 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             1,
         )
 
+    def test_patch_section_basic_info_rejects_invalid_link_url(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            summary="Original",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {
+                "links": ["not-a-url"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ProjectProgrammeLink.objects.exists())
+
     def test_patch_section_basic_info_returns_404_if_not_exists(self):
         programme = self._create_project_programme()
 
@@ -712,6 +731,75 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(str(response.data["project_programme"]), str(programme.id))
+
+    def test_post_section_design_criteria_creates_links(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/design-criteria/",
+            {
+                "guidingZoningRegulations": "Some text",
+                "links": ["https://example.com", "https://hel.fi"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["links"]), 2)
+        self.assertEqual(response.data["links"][0]["value"], "https://example.com")
+        self.assertEqual(response.data["links"][1]["value"], "https://hel.fi")
+
+    def test_patch_section_design_criteria_replaces_links(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        design_criteria = ProjectProgrammeDesignCriteria.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            guidingZoningRegulations="Original",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeDesignCriteria)
+        ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=design_criteria.id,
+            value="https://old-link.fi",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/design-criteria/",
+            {
+                "links": ["https://new-link.fi"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["links"]), 1)
+        self.assertEqual(response.data["links"][0]["value"], "https://new-link.fi")
+        self.assertEqual(
+            ProjectProgrammeLink.objects.filter(
+                contentType=content_type,
+                objectId=design_criteria.id,
+            ).count(),
+            1,
+        )
+
+    def test_patch_section_design_criteria_rejects_invalid_link_url(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        ProjectProgrammeDesignCriteria.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+            guidingZoningRegulations="Original",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/design-criteria/",
+            {
+                "links": ["not-a-url"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ProjectProgrammeLink.objects.exists())
 
     def test_post_section_traffic_planning_criteria_creates_section(self):
         programme = self._create_project_programme(briefProjectProgramme=False)

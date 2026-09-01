@@ -87,6 +87,49 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
 
+def get_section_links(instance):
+    content_type = ContentType.objects.get_for_model(instance.__class__)
+    links = ProjectProgrammeLink.objects.filter(
+        contentType=content_type,
+        objectId=instance.id,
+    )
+    return ProjectProgrammeLinkGetSerializer(links, many=True).data
+
+
+def sync_section_links(instance, links):
+    if links is None:
+        return
+
+    content_type = ContentType.objects.get_for_model(instance.__class__)
+    ProjectProgrammeLink.objects.filter(
+        contentType=content_type,
+        objectId=instance.id,
+    ).delete()
+
+    cleaned_links = [
+        link.strip() for link in links if isinstance(link, str) and link.strip()
+    ]
+
+    if not cleaned_links:
+        return
+
+    ProjectProgrammeLink.objects.bulk_create(
+        [
+            ProjectProgrammeLink(
+                contentType=content_type,
+                objectId=instance.id,
+                value=link,
+            )
+            for link in cleaned_links
+        ]
+    )
+
+
+class ProjectProgrammeSectionLinksUpdateMixin:
+    def sync_links(self, instance, links):
+        sync_section_links(instance, links)
+
+
 class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
     BRIEF_ONLY_FIELDS = {"estimatedCosts"}
     COMPLETE_ONLY_FIELDS = {
@@ -123,15 +166,11 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
         return fields
 
     def get_links(self, instance):
-        content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
-        links = ProjectProgrammeLink.objects.filter(
-            contentType=content_type,
-            objectId=instance.id,
-        )
-        return ProjectProgrammeLinkGetSerializer(links, many=True).data
+        return get_section_links(instance)
 
 
 class ProjectProgrammeBasicInfoUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
@@ -164,7 +203,7 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         "planningAndImplementationFeasibility",
     }
     links = serializers.ListField(
-        child=serializers.CharField(allow_blank=True),
+        child=serializers.URLField(allow_blank=True),
         required=False,
         write_only=True,
     )
@@ -246,34 +285,6 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
             )
         return super().to_internal_value(data)
 
-    def _sync_links(self, basic_info, links):
-        if links is None:
-            return
-
-        content_type = ContentType.objects.get_for_model(ProjectProgrammeBasicInfo)
-        ProjectProgrammeLink.objects.filter(
-            contentType=content_type,
-            objectId=basic_info.id,
-        ).delete()
-
-        cleaned_links = [
-            link.strip() for link in links if isinstance(link, str) and link.strip()
-        ]
-
-        if not cleaned_links:
-            return
-
-        ProjectProgrammeLink.objects.bulk_create(
-            [
-                ProjectProgrammeLink(
-                    contentType=content_type,
-                    objectId=basic_info.id,
-                    value=link,
-                )
-                for link in cleaned_links
-            ]
-        )
-
     def create(self, validated_data):
         links = validated_data.pop("links", None)
         project_programme = validated_data.get("project_programme")
@@ -286,31 +297,55 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
             )
 
         basic_info = super().create(validated_data)
-        self._sync_links(basic_info, links)
+        self.sync_links(basic_info, links)
         return basic_info
 
     def update(self, instance, validated_data):
         links = validated_data.pop("links", None)
         basic_info = super().update(instance, validated_data)
-        self._sync_links(basic_info, links)
+        self.sync_links(basic_info, links)
         return basic_info
 
 
 class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeDesignCriteria
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
 
 class ProjectProgrammeDesignCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeDesignCriteria
         fields = "__all__"
         read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+
+    def create(self, validated_data):
+        links = validated_data.pop("links", None)
+        design_criteria = super().create(validated_data)
+        self.sync_links(design_criteria, links)
+        return design_criteria
+
+    def update(self, instance, validated_data):
+        links = validated_data.pop("links", None)
+        design_criteria = super().update(instance, validated_data)
+        self.sync_links(design_criteria, links)
+        return design_criteria
 
 
 class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSerializer):
