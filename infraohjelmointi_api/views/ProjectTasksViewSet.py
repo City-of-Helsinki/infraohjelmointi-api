@@ -45,7 +45,7 @@ class ProjectTasksViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                     taskType=Value(
                         TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER, output_field=CharField()
                     )
-                )
+                ).select_related("constructionProcurementMethod")
             )
         
         return Project.objects.none()
