@@ -26,7 +26,7 @@ class ProjectTasksViewSetTestCase(TestCase):
             estPlanningEnd=date(2026, 3, 31),
             estConstructionStart=date(2026, 6, 1),
             estConstructionEnd=date(2026, 12, 31),
-            budget=150000,
+            costForecast=150000,
             constructionProcurementMethod=self.procurement_method,
         )
         self.non_submitted_project = Project.objects.create(
@@ -60,7 +60,7 @@ class ProjectTasksViewSetTestCase(TestCase):
         self.assertEqual(item["id"], str(self.submitted_project.id))
         self.assertEqual(item["name"], self.submitted_project.name)
         self.assertEqual(item["taskType"], TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER)
-        self.assertEqual(item["budget"], self.submitted_project.budget)
+        self.assertEqual(item["costForecast"], self.submitted_project.costForecast)
         self.assertEqual(
             item["constructionProcurementMethod"]["id"],
             str(self.procurement_method.id),
