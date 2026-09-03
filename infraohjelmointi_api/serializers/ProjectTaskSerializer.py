@@ -27,7 +27,7 @@ class ProjectTaskSerializer(serializers.ModelSerializer):
             'estPlanningEnd', 
             'estConstructionStart',
             'estConstructionEnd',
-            'budget',
+            'costForecast',
             'constructionProcurementMethod',
             'taskType'
         )
