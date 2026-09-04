@@ -15,6 +15,15 @@ def get_restricted_programmer_group_name():
     )
 
 
+def get_project_programme_contributor_group_name():
+    """AD group for users allowed to edit any existing project programme."""
+    return getattr(
+        settings,
+        "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
+        "sl_dyn_kymp_sso_io_liikenne-maisemasuunnittelijat",
+    )
+
+
 def user_in_restricted_programmer_group(request):
     """True if the authenticated user is in the restricted programmer AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
@@ -22,6 +31,15 @@ def user_in_restricted_programmer_group(request):
     return get_restricted_programmer_group_name() in request.user.ad_groups.all().values_list(
         "name", flat=True
     )
+
+
+def user_in_project_programme_contributor_group(request):
+    """True if the authenticated user is in the project programme contributor AD group."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    return request.user.ad_groups.filter(
+        name=get_project_programme_contributor_group_name()
+    ).exists()
 
 
 def _get_legacy_class_paths_from_email(user_email):
@@ -216,6 +234,7 @@ PROJECT_PROGRAMME_POST_ACTIONS = [
     "section_other_attachments",
     "section_links",
     "section_link_detail",
+    "section_transitions",
 ]
 
 #### Project change-history custom actions (IO-879) ####
@@ -274,6 +293,33 @@ class IsViewer(permissions.BasePermission):
     def has_permission(self, request, view):
         if (
             request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and request.method in SAFE_METHODS
+            and view.action
+            in [
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        ):
+            return True
+
+        if (
+            request.user.is_authenticated
+            and self.user_in_viewer_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and request.method in SAFE_METHODS
+            and view.action
+            in [
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+            ]
+        ):
+            return True
+
+        if (
+            request.user.is_authenticated
             and self.user_in_viewer_group(request=request)
             and request.method == GET
             and view.action
@@ -296,6 +342,9 @@ class IsViewer(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Viewer can only access project object, to be able to see the project card
         _type = obj._meta.model.__name__
+
+        if _type == "ProjectProgramme":
+            return True
 
         if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
             return True

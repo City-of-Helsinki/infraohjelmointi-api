@@ -1,8 +1,13 @@
 import uuid
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
+from django.db import transaction
 from overrides import override
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from infraohjelmointi_api.models import (
@@ -15,6 +20,15 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeOtherAttachments,
     ProjectProgrammeTrafficPlanningCriteria,
     ProjectProgrammeUrbanSpacingPlanningCriteria,
+)
+from infraohjelmointi_api.permissions import (
+    get_project_programme_contributor_group_name,
+    get_restricted_programmer_group_name,
+    get_restricted_user_assigned_class_paths,
+    target_path_matches_assigned_paths,
+)
+from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
+    ProjectPersonAuthorizationService,
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeBasicInfoGetSerializer,
@@ -57,11 +71,27 @@ class ProjectProgrammeViewSet(BaseViewSet):
         ProjectProgrammeInteractionAndRelatedProjects,
         ProjectProgrammeOtherAttachments,
     )
+    SECTION_RELATIONS = {
+        "basicinfo": "basicInfo",
+        "designcriteria": "designCriteria",
+        "trafficplanningcriteria": "trafficPlanningCriteria",
+        "urbanspacingplanningcriteria": "urbanSpacingPlanningCriteria",
+        "maintenanceneeds": "maintenanceNeeds",
+        "interactionandrelatedprojects": "interactionAndRelatedProjects",
+        "otherattachments": "otherAttachments",
+    }
+    REVIEWER_GROUPS = {
+        "sg_kymp_sso_io_koordinaattorit",
+        "sg_kymp_sso_io_ohjelmoijat",
+        "sg_kymp_sso_io_projektialueiden_ohjelmoijat",
+    }
+    COMMISSIONING_MANAGER_GROUP = "sg_kymp_sso_io_projektipaallikot"
+    ADMIN_GROUP = "sg_kymp_sso_io_admin"
 
     @override
     def get_queryset(self):
         queryset = ProjectProgramme.objects.all()
-        if self.action in ["list", "retrieve", "get_by_project"]:
+        if self.action in ["list", "retrieve", "get_by_project", "transitions", "section_transitions"]:
             return queryset.select_related(
                 "project",
                 "basicInfo",
@@ -157,8 +187,223 @@ class ProjectProgrammeViewSet(BaseViewSet):
             status=status.HTTP_200_OK,
         )
 
+    def _normalize_section_key(self, section_key):
+        return "".join(char for char in str(section_key or "") if char.isalnum()).lower()
+
+    def _resolve_section_relation_name(self, section_key):
+        normalized_key = self._normalize_section_key(section_key)
+        return self.SECTION_RELATIONS.get(normalized_key)
+
+    def _get_user_group_names(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return set()
+        return set(user.ad_groups.all().values_list("name", flat=True))
+
+    def _matches_programmer_name_from_email(self, user_email, project_programmer):
+        if not user_email or not project_programmer:
+            return False
+
+        local_part = user_email.split("@")[0]
+        name_parts = [part.strip().lower() for part in local_part.split(".") if part.strip()]
+        if len(name_parts) < 2:
+            return False
+
+        first_name = (project_programmer.firstName or "").strip().lower()
+        last_name = (project_programmer.lastName or "").strip().lower()
+        return name_parts[0] == first_name and name_parts[1] == last_name
+
+    def _is_responsible_for_project_programme(self, user, project):
+        if not user or not getattr(user, "is_authenticated", False) or not project:
+            return False
+
+        if ProjectPersonAuthorizationService.is_person_planning_for_project(user, project):
+            return True
+
+        if ProjectPersonAuthorizationService.is_person_construction_for_project(user, project):
+            return True
+
+        project_programmer = getattr(project, "personProgramming", None)
+        programmer_person = getattr(project_programmer, "person", None)
+        if ProjectPersonAuthorizationService.is_matching_project_person_email(
+            user, programmer_person
+        ):
+            return True
+
+        user_email = (getattr(user, "email", "") or "").strip().lower()
+        if not user_email:
+            return False
+
+        if self._matches_programmer_name_from_email(user_email, project_programmer):
+            return True
+
+        project_set = getattr(project, "projectSet", None)
+        project_set_responsible = getattr(project_set, "responsiblePerson", None)
+        if ProjectPersonAuthorizationService.is_matching_project_person_email(
+            user, project_set_responsible
+        ):
+            return True
+
+        if project.otherPersons.filter(email__iexact=user_email).exists():
+            return True
+
+        if project.favPersons.filter(email__iexact=user_email).exists():
+            return True
+
+        return False
+
+    def _assert_can_create_programme(self, request, project):
+        user = self._get_authenticated_user(request)
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
+            return
+
+        if self._is_responsible_for_project_programme(user, project):
+            return
+
+        raise PermissionDenied(
+            "Only the responsible project programme person can create a project programme."
+        )
+
+    def _restricted_programmer_matches_project(self, user, project):
+        """IO-756: restricted programmers are limited to their assigned project classes."""
+        project_class = getattr(project, "projectClass", None)
+        if not project_class:
+            return False
+
+        assigned_paths = get_restricted_user_assigned_class_paths(user)
+        if not assigned_paths:
+            return False
+
+        return target_path_matches_assigned_paths(project_class.path, assigned_paths)
+
+    def _assert_can_edit_or_complete(self, request, project):
+        user = self._get_authenticated_user(request)
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
+            return
+
+        if self.COMMISSIONING_MANAGER_GROUP in group_names:
+            raise PermissionDenied(
+                "Commissioning managers can only return a project programme to DRAFT."
+            )
+
+        if group_names.intersection(self.REVIEWER_GROUPS):
+            return
+
+        if get_project_programme_contributor_group_name() in group_names:
+            return
+
+        if (
+            get_restricted_programmer_group_name() in group_names
+            and self._restricted_programmer_matches_project(user, project)
+        ):
+            return
+
+        if self._is_responsible_for_project_programme(user, project):
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to edit or complete this project programme."
+        )
+
+    def _assert_can_return_to_draft(self, request, project):
+        user = self._get_authenticated_user(request)
+        group_names = self._get_user_group_names(user)
+        if self.ADMIN_GROUP in group_names:
+            return
+
+        if group_names.intersection(self.REVIEWER_GROUPS):
+            return
+
+        if (
+            get_restricted_programmer_group_name() in group_names
+            and self._restricted_programmer_matches_project(user, project)
+        ):
+            return
+
+        if self.COMMISSIONING_MANAGER_GROUP in group_names:
+            return
+
+        raise PermissionDenied(
+            "Only reviewers or commissioning managers can return a project programme to DRAFT."
+        )
+
+    def _validate_for_complete(self, instance, entity_name):
+        try:
+            instance.full_clean()
+        except DjangoValidationError as error:
+            raise ValidationError(
+                {
+                    "detail": f"Cannot mark {entity_name} as COMPLETE.",
+                    "errors": error.message_dict,
+                }
+            )
+
+    def _validate_programme_and_draft_sections_for_complete(self, programme):
+        self._validate_for_complete(programme, "project programme")
+
+        draft_sections = []
+        for relation_name in self.SECTION_RELATIONS.values():
+            if not hasattr(programme, relation_name):
+                continue
+
+            section = getattr(programme, relation_name)
+            if section.status != "DRAFT":
+                continue
+
+            self._validate_for_complete(section, f"section '{relation_name}'")
+            draft_sections.append(section)
+
+        return draft_sections
+
+    def _get_section_instance(self, programme, section_key):
+        relation_name = self._resolve_section_relation_name(section_key)
+        if not relation_name:
+            return None, None
+
+        if not hasattr(programme, relation_name):
+            return relation_name, None
+
+        return relation_name, getattr(programme, relation_name)
+
+    @override
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        project = serializer.validated_data.get("project")
+        existing = ProjectProgramme.objects.filter(project=project).first()
+        if existing is not None:
+            return Response(
+                {
+                    "detail": "Project programme already exists for this project.",
+                    "id": str(existing.id),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            self.perform_create(serializer)
+        except IntegrityError:
+            existing_after_race = ProjectProgramme.objects.filter(project=project).first()
+            if existing_after_race is not None:
+                return Response(
+                    {
+                        "detail": "Project programme already exists for this project.",
+                        "id": str(existing_after_race.id),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            raise
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     @override
     def perform_create(self, serializer):
+        project = serializer.validated_data.get("project")
+        self._assert_can_create_programme(self.request, project)
+
         user = self._get_authenticated_user(self.request)
         if user:
             serializer.save(createdBy=user, updatedBy=user)
@@ -167,6 +412,9 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     @override
     def perform_update(self, serializer):
+        project = getattr(serializer.instance, "project", None)
+        self._assert_can_edit_or_complete(self.request, project)
+
         user = self._get_authenticated_user(self.request)
         if user:
             serializer.save(updatedBy=user)
@@ -226,11 +474,29 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        instance.status = requested_status
+        if requested_status == "DRAFT":
+            self._assert_can_return_to_draft(request, instance.project)
+        else:
+            self._assert_can_edit_or_complete(request, instance.project)
+
         user = self._get_authenticated_user(request)
-        if user:
-            instance.updatedBy = user
-        instance.save()
+        with transaction.atomic():
+            draft_sections = []
+            if requested_status == "COMPLETE":
+                draft_sections = self._validate_programme_and_draft_sections_for_complete(
+                    instance
+                )
+
+            instance.status = requested_status
+            if user:
+                instance.updatedBy = user
+            instance.save()
+
+            for section in draft_sections:
+                section.status = "COMPLETE"
+                if user:
+                    section.updatedBy = user
+                section.save()
 
         return Response(
             {
@@ -355,5 +621,71 @@ class ProjectProgrammeViewSet(BaseViewSet):
         serializer.save()
         return Response(
             ProjectProgrammeLinkGetSerializer(serializer.instance).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        methods=["post"],
+        detail=True,
+        url_path=r"sections/(?P<section_key>[^/.]+)/transitions",
+    )
+    def section_transitions(self, request, pk=None, section_key=None):
+        programme = self.get_object()
+        relation_name, section_instance = self._get_section_instance(programme, section_key)
+
+        if not relation_name:
+            return Response(
+                {"detail": "Unknown section key."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not section_instance:
+            return Response(
+                {
+                    "detail": f"Section '{relation_name}' was not found for this project programme."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = ProjectProgrammeStatusTransitionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        requested_status = serializer.validated_data["to"]
+        if section_instance.status == requested_status:
+            return Response(
+                {"detail": "Section is already in the requested status."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if programme.status != "DRAFT":
+            return Response(
+                {
+                    "detail": (
+                        "Sections can only be transitioned when the project programme "
+                        "is in DRAFT status."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if requested_status == "DRAFT":
+            self._assert_can_return_to_draft(request, programme.project)
+        else:
+            self._assert_can_edit_or_complete(request, programme.project)
+
+        if requested_status == "COMPLETE":
+            self._validate_for_complete(section_instance, f"section '{relation_name}'")
+
+        user = self._get_authenticated_user(request)
+        section_instance.status = requested_status
+        if user:
+            section_instance.updatedBy = user
+        section_instance.save()
+
+        return Response(
+            {
+                "section": relation_name,
+                "currentStatus": section_instance.status,
+            },
             status=status.HTTP_200_OK,
         )
