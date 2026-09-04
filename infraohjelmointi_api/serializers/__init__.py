@@ -77,3 +77,4 @@ from .ProjectProgrammeSerializer import (
     ProjectProgrammeLinkUpdateSerializer,
     ProjectProgrammeStatusTransitionSerializer,
 )
+from .ProjectTaskSerializer import ProjectTaskSerializer

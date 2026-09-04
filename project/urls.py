@@ -224,6 +224,12 @@ router.register(
     basename="projectProgrammes"
 )
 
+router.register(
+    r"project-tasks",
+    views.ProjectTasksViewSet,
+    basename="projectTasks"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
