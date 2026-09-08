@@ -14,8 +14,14 @@ from infraohjelmointi_api.services.ConstructionHandoverHistoryService import (
 )
 
 from .BaseViewSet import BaseViewSet
-from ..models import ProjectPhase, ProjectPhaseDetail
-from ..permissions import IsConstructionManagementLead, IsPlanner, IsProjectManager
+from ..models import ProjectPhase
+from ..permissions import (
+    IsAdmin,
+    IsConstructionManagementLead,
+    IsCoordinator,
+    IsPlanner,
+    IsProjectManager,
+)
 from ..services.ConstructionHandoverTransitionPermissionService import (
     ConstructionHandoverTransitionPermissionService,
 )
@@ -462,7 +468,18 @@ class ConstructionHandoverViewSet(BaseViewSet):
 
         return None
     
-    @action(methods=["post"], detail=True, url_path=r"transitions")
+    @action(
+        methods=["post"],
+        detail=True,
+        url_path=r"transitions",
+        permission_classes=[
+            IsCoordinator
+            | IsPlanner 
+            | IsProjectManager 
+            | IsConstructionManagementLead
+            | IsAdmin
+        ],
+    )
     def transitions(self, request, pk=None):
         instance = self.get_object()
         possible_statuses = self._get_possible_status_transitions(instance.status)
