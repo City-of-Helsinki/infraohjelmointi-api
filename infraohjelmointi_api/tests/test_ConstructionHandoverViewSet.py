@@ -480,6 +480,35 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "DRAFT")
 
+    def test_transitions_denies_action_for_user_without_allowed_role(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+        )
+
+        with patch(
+            "infraohjelmointi_api.views.ConstructionHandoverViewSet."
+            "ConstructionHandoverTransitionPermissionService.is_transition_allowed",
+            return_value=True,
+        ) as mocked_transition_permission:
+            response = self.client.post(
+                f"/construction-handovers/{handover.id}/transitions/",
+                {"to": "SUBMITTED_TO_PROGRAMMER"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            str(response.data["detail"]),
+            "You do not have permission to perform this action.",
+        )
+        mocked_transition_permission.assert_not_called()
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+
     def test_transitions_allows_submitted_to_construction_for_programmer(self):
         self.client.force_authenticate(user=self.user_4)
 
@@ -626,6 +655,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
 
     def test_transitions_returns_400_when_target_status_missing(self):
+        self.client.force_authenticate(user=self.user_2)
+
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="DRAFT",
@@ -643,6 +674,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_PROGRAMMER"])
 
     def test_transitions_rejects_skipping_status(self):
+        self.client.force_authenticate(user=self.user_2)
+
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="DRAFT",
@@ -663,6 +696,8 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.status, "DRAFT")
 
     def test_transitions_rejects_unknown_status(self):
+        self.client.force_authenticate(user=self.user_2)
+
         handover = ConstructionHandover.objects.create(
             project=self.project,
             status="DRAFT",
