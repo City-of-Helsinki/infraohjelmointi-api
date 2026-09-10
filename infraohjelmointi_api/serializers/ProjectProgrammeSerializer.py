@@ -184,57 +184,6 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
                 field.required = name in required_fields
         return fields
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-
-        instance = getattr(self, "instance", None)
-        if not instance:
-            return attrs
-
-        programme = self._get_project_programme()
-        if not programme:
-            return attrs
-
-        errors = {}
-        for name in self._required_fields_for(programme):
-            value = attrs.get(name, getattr(instance, name, None))
-            if value in (None, ""):
-                errors[name] = "This field is required."
-        if errors:
-            raise serializers.ValidationError(errors)
-
-        return attrs
-
-    def to_internal_value(self, data):
-        # Prefill from the linked project only on create; on update this must not
-        # override values already saved (or silently fail required checks when the
-        # project itself has no district).
-        if self.instance is not None:
-            return super().to_internal_value(data)
-
-        data = data.copy()
-        programme = self._get_project_programme()
-        project = getattr(programme, "project", None)
-        if project is not None:
-            data.setdefault("projectName", project.name or "")
-            data.setdefault(
-                "district",
-                project.projectDistrict.name if project.projectDistrict else "",
-            )
-        return super().to_internal_value(data)
-
-    def create(self, validated_data):
-        project_programme = validated_data.get("project_programme")
-        project = getattr(project_programme, "project", None)
-
-        if project is not None:
-            validated_data["projectName"] = project.name or ""
-            validated_data["district"] = (
-                project.projectDistrict.name if project.projectDistrict else ""
-            )
-
-        return super().create(validated_data)
-
 
 class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
     class Meta:
