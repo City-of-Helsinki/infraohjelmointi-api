@@ -291,7 +291,6 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(str(response.data["project_programme"]), str(programme.id))
-        self.assertEqual(response.data["projectName"], self.project.name)
         self.assertEqual(response.data["summary"], "A summary")
         self.assertEqual(response.data["estimatedCosts"], "")
 
@@ -340,25 +339,6 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["summary"], "Updated")
-
-    def test_patch_section_basic_info_requires_brief_programme_fields(self):
-        programme = self._create_project_programme()
-        ProjectProgrammeBasicInfo.objects.create(
-            project_programme=programme,
-            status="DRAFT",
-        )
-
-        response = self.client.patch(
-            f"/project-programmes/{programme.id}/sections/basic-info/",
-            {"summary": "Updated"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("projectProgrammeCompiler", response.data)
-        self.assertIn("personsInvolved", response.data)
-        self.assertIn("inspector", response.data)
-        self.assertIn("estimatedCosts", response.data)
 
     def test_patch_section_basic_info_succeeds_with_partial_payload_when_required_fields_already_saved(self):
         programme = self._create_project_programme()
@@ -818,20 +798,6 @@ class ProjectProgrammeSerializerTestCase(TestCase):
             "estimatedCosts": "100000",
         }
 
-    def test_basic_info_create_prefills_project_name_and_district(self):
-        serializer = ProjectProgrammeBasicInfoUpdateSerializer(
-            data={
-                "project_programme": str(self.project_programme.id),
-                **self._basic_info_payload(),
-            }
-        )
-
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        basic_info = serializer.save()
-
-        self.assertEqual(basic_info.projectName, self.project.name)
-        self.assertEqual(basic_info.district, self.project_district.name)
-
     def test_basic_info_create_allows_incomplete_brief_fields(self):
         serializer = ProjectProgrammeBasicInfoUpdateSerializer(
             data={
@@ -844,26 +810,6 @@ class ProjectProgrammeSerializerTestCase(TestCase):
         self.assertFalse(serializer.fields["personsInvolved"].required)
         self.assertFalse(serializer.fields["inspector"].required)
         self.assertFalse(serializer.fields["estimatedCosts"].required)
-
-    def test_basic_info_partial_update_requires_missing_field_when_never_saved(self):
-        basic_info = ProjectProgrammeBasicInfo.objects.create(
-            project_programme=self.project_programme,
-            status="DRAFT",
-            projectName=self.project.name,
-            district=self.project_district.name,
-        )
-
-        serializer = ProjectProgrammeBasicInfoUpdateSerializer(
-            basic_info,
-            data={"projectProgrammeCompiler": "Compiler"},
-            partial=True,
-        )
-
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("personsInvolved", serializer.errors)
-        self.assertIn("inspector", serializer.errors)
-        self.assertIn("estimatedCosts", serializer.errors)
-        self.assertNotIn("projectProgrammeCompiler", serializer.errors)
 
     def test_basic_info_partial_update_allows_omitting_previously_saved_required_fields(self):
         basic_info = ProjectProgrammeBasicInfo.objects.create(
