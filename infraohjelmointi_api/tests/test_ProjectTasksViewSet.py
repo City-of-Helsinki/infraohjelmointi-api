@@ -1,11 +1,18 @@
 from datetime import date
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from infraohjelmointi_api.models import ConstructionHandover, ConstructionProcurementMethod, Project
+from infraohjelmointi_api.models import (
+    ConstructionHandover,
+    ConstructionHandoverFinancing,
+    ConstructionProcurementMethod,
+    FinancingParty,
+    Project,
+)
 from infraohjelmointi_api.serializers.ProjectTaskSerializer import TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER
 from infraohjelmointi_api.views.ProjectTasksViewSet import ProjectTasksViewSet
 
@@ -15,8 +22,11 @@ from infraohjelmointi_api.views.ProjectTasksViewSet import ProjectTasksViewSet
 class ProjectTasksViewSetTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.procurement_method = ConstructionProcurementMethod.objects.create(
+        self.project_procurement_method = ConstructionProcurementMethod.objects.create(
             value="Kilpailutus"
+        )
+        self.handover_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Puite"
         )
 
         self.submitted_project = Project.objects.create(
@@ -27,7 +37,7 @@ class ProjectTasksViewSetTestCase(TestCase):
             estConstructionStart=date(2026, 6, 1),
             estConstructionEnd=date(2026, 12, 31),
             costForecast=150000,
-            constructionProcurementMethod=self.procurement_method,
+            constructionProcurementMethod=self.project_procurement_method,
         )
         self.non_submitted_project = Project.objects.create(
             name="Draft handover project",
@@ -38,15 +48,32 @@ class ProjectTasksViewSetTestCase(TestCase):
             description="Not included in project tasks",
         )
 
-        ConstructionHandover.objects.create(
+        submitted_handover = ConstructionHandover.objects.create(
             project=self.submitted_project,
             status="SUBMITTED_TO_CONSTRUCTION",
             name="Submitted handover",
+            constructionProcurementMethod=self.handover_procurement_method,
         )
         ConstructionHandover.objects.create(
             project=self.non_submitted_project,
             status="DRAFT",
             name="Draft handover",
+        )
+
+        ConstructionHandoverFinancing.objects.create(
+            handover=submitted_handover,
+            financingParty=FinancingParty.KYMP,
+            budget=Decimal("100000.00"),
+        )
+        ConstructionHandoverFinancing.objects.create(
+            handover=submitted_handover,
+            financingParty=FinancingParty.KYMP,
+            budget=Decimal("50000.00"),
+        )
+        ConstructionHandoverFinancing.objects.create(
+            handover=submitted_handover,
+            financingParty=FinancingParty.OTHER,
+            budget=Decimal("999999.00"),
         )
 
     @patch.object(ProjectTasksViewSet, "_is_construction_management_lead", return_value=True)
@@ -63,8 +90,9 @@ class ProjectTasksViewSetTestCase(TestCase):
         self.assertEqual(item["costForecast"], self.submitted_project.costForecast)
         self.assertEqual(
             item["constructionProcurementMethod"]["id"],
-            str(self.procurement_method.id),
+            str(self.handover_procurement_method.id),
         )
+        self.assertEqual(Decimal(item["budget"]), Decimal("150000.00"))
 
     @patch.object(ProjectTasksViewSet, "_is_construction_management_lead", return_value=False)
     def test_list_returns_empty_for_non_lead(self, _mock_is_lead):
