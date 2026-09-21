@@ -129,9 +129,9 @@ PROJECT_LOCATION_ALL_ACTIONS = [
 ]
 
 #### Project Notes custom actions ####
-PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
-PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
-PROJECT_NOTE_BASIC_ACTIONS = ["create"]
+PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes", "images",]
+PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes", "images",]
+PROJECT_NOTE_BASIC_ACTIONS = ["create", "images", "delete_image"]
 PROJECT_NOTE_ALL_GET_ACTIONS = [
     *PROJECT_NOTE_PLANNING_GET_ACTIONS,
     *PROJECT_NOTE_COORDINATOR_GET_ACTIONS,

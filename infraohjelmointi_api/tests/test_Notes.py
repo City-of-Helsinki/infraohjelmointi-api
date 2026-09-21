@@ -507,3 +507,107 @@ class NoteImageTestCase(TestCase):
         by_id = {n["id"]: n for n in response.json()}
         self.assertEqual(len(by_id[str(self.note_Id)]["images"]), 3)
         self.assertEqual(len(by_id[str(self.other_note_Id)]["images"]), 1)
+
+
+# IO-812: Verify that note image endpoints work with the REAL permission stack
+# (no @patch on permission_classes or authentication_classes). This catches the
+# bug where new @action names are forgotten in the allowlists in permissions.py.
+class NoteImagePermissionTestCase(TestCase):
+    """Note image endpoints must pass the real permission check, not just a
+    patched-away one.  A coordinator should be able to GET, POST and DELETE
+    images; an unauthenticated user should get 403."""
+
+    @classmethod
+    @override
+    def setUpTestData(cls):
+        from helusers.models import ADGroup
+
+        cls.projectType = ProjectType.objects.create(
+            id=uuid.uuid4(), value="projectComplex"
+        )
+        cls.person = User.objects.create(
+            uuid=uuid.uuid4(), first_name="Perm", last_name="Tester"
+        )
+        cls.project = Project.objects.create(
+            id=uuid.uuid4(),
+            hkrId=99812,
+            type=cls.projectType,
+            name="IO-812 permission test project",
+            description="d",
+            phase=None,
+            programmed=True,
+        )
+        cls.note = Note.objects.create(
+            id=uuid.uuid4(),
+            content="Permission test note",
+            updatedBy=cls.person,
+            project=cls.project,
+        )
+
+        # Create a user in the coordinator AD group (full access).
+        cls.coord_user = User.objects.create_user(
+            username="coord_perm_test", password="testpass"
+        )
+        coord_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_koordinaattorit",
+            display_name="Coordinators",
+        )
+        cls.coord_user.ad_groups.add(coord_group)
+
+    def _jpeg(self, name="perm.jpg"):
+        return SimpleUploadedFile(name, JPEG_BYTES, content_type="image/jpeg")
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="io812-perm-"))
+    def test_coordinator_can_list_images(self):
+        self.client.force_login(self.coord_user)
+        url = "/notes/{}/images/".format(self.note.id)
+        response = self.client.get(url)
+        self.assertIn(
+            response.status_code, (200,),
+            msg="GET /notes/<id>/images/ should return 200 for a coordinator, got {}".format(
+                response.status_code
+            ),
+        )
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="io812-perm-"))
+    def test_coordinator_can_upload_image(self):
+        self.client.force_login(self.coord_user)
+        url = "/notes/{}/images/".format(self.note.id)
+        response = self.client.post(url, {"file": self._jpeg()}, format="multipart")
+        self.assertEqual(
+            response.status_code, 201,
+            msg="POST /notes/<id>/images/ should return 201 for a coordinator, got {}".format(
+                response.status_code
+            ),
+        )
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="io812-perm-"))
+    def test_coordinator_can_delete_image(self):
+        self.client.force_login(self.coord_user)
+        # Upload first
+        upload_url = "/notes/{}/images/".format(self.note.id)
+        upload_resp = self.client.post(
+            upload_url, {"file": self._jpeg()}, format="multipart"
+        )
+        self.assertEqual(upload_resp.status_code, 201)
+        image_id = upload_resp.json()[0]["id"]
+
+        delete_url = "/notes/{}/images/{}/".format(self.note.id, image_id)
+        response = self.client.delete(delete_url)
+        self.assertEqual(
+            response.status_code, 204,
+            msg="DELETE /notes/<id>/images/<imgId>/ should return 204 for a coordinator, got {}".format(
+                response.status_code
+            ),
+        )
+
+    def test_unauthenticated_user_gets_403(self):
+        self.client.logout()
+        url = "/notes/{}/images/".format(self.note.id)
+        response = self.client.get(url)
+        self.assertIn(
+            response.status_code, (401, 403),
+            msg="GET /notes/<id>/images/ should return 401/403 for unauthenticated, got {}".format(
+                response.status_code
+            ),
+        )
