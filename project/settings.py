@@ -46,10 +46,6 @@ env = environ.Env(
     MEDIA_ROOT=(str, str(BASE_DIR / "media")),
     MEDIA_URL=(str, "/media/"),
     NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
-    # IO-857: Figma states "500Kb max tiedostokoko" for handover attachments.
-    # If PDF support is confirmed (see the ticket's note to Vesa/Kati) this needs to
-    # grow to ~25 MB, and the ingress body-size limit has to be checked to match.
-    HANDOVER_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
     # IO-812 phase 2: Azure Blob storage for uploaded files. Empty by default so
     # local/CI keep using FileSystemStorage; Platta sets these in the deploy env.
     #
@@ -324,12 +320,6 @@ STORAGES = {
 # spec of 10 MB. The discrepancy is an open product question on the ticket.
 NOTE_IMAGE_MAX_BYTES = env.int("NOTE_IMAGE_MAX_BYTES")
 NOTE_IMAGE_ALLOWED_TYPES = ("image/jpeg", "image/png")
-
-# IO-857 handover attachments. Per Figma: "Vain .jpg ja .png tiedostot", 500 KB.
-# Adding "application/pdf" here plus raising HANDOVER_ATTACHMENT_MAX_BYTES is the
-# whole change if PDF support is confirmed.
-HANDOVER_ATTACHMENT_MAX_BYTES = env.int("HANDOVER_ATTACHMENT_MAX_BYTES")
-HANDOVER_ATTACHMENT_ALLOWED_TYPES = ("image/jpeg", "image/png")
 
 
 # Default primary key field type

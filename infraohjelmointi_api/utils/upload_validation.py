@@ -1,9 +1,8 @@
 """Shared validation for user-uploaded files.
 
-Introduced for IO-812 (note images) and reused by IO-857 (construction handover
-attachments). IO-914 will want the same for hankeohjelma attachments, so the rules
-are parameterised by (allowed content types, max bytes) rather than hard-wired to
-one feature.
+Introduced for IO-812 (note images). The rules are parameterised by
+(allowed content types, max bytes) so IO-857 and IO-914 can reuse
+the same validate_upload() with their own constraints.
 
 The exceptions surface as drf-standardized-errors responses, so the UI can branch on
 stable string codes ("unsupported_media_type", "payload_too_large") instead of
@@ -62,11 +61,3 @@ def validate_note_image(uploaded_file) -> None:
         settings.NOTE_IMAGE_MAX_BYTES,
     )
 
-
-def validate_handover_attachment(uploaded_file) -> None:
-    """IO-857: validate a construction handover attachment upload."""
-    validate_upload(
-        uploaded_file,
-        settings.HANDOVER_ATTACHMENT_ALLOWED_TYPES,
-        settings.HANDOVER_ATTACHMENT_MAX_BYTES,
-    )

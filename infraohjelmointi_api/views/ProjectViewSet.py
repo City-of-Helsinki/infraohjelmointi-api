@@ -1271,7 +1271,9 @@ class ProjectViewSet(BaseViewSet):
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
             qs = ProjectNoteGetSerializer(
-                instance.note_set.exclude(deleted=True), many=True
+                instance.note_set.exclude(deleted=True).prefetch_related("images"),
+                many=True,
+                context={"request": request},
             ).data
             return Response(qs)
         except ValueError:
