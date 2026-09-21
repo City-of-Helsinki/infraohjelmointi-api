@@ -10,7 +10,7 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('infraohjelmointi_api', '0111_phase_taxonomy'),
+        ('infraohjelmointi_api', '0116_fix_service_tunnel_coordinator_parent'),
     ]
 
     operations = [
