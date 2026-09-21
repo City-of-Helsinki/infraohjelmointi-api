@@ -243,12 +243,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
         ):
             return True
 
-        if project.otherPersons.filter(email__iexact=user_email).exists():
-            return True
-
-        if project.favPersons.filter(email__iexact=user_email).exists():
-            return True
-
         return False
 
     def _assert_can_create_programme(self, request, project):
@@ -442,6 +436,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if not instance:
             return Response({"detail": self.NOT_FOUND_DETAIL}, status=status.HTTP_404_NOT_FOUND)
 
+        self.check_object_permissions(request, instance)
         return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)
 
     @action(methods=["post"], detail=True, url_path=r"switch-type")
@@ -631,6 +626,16 @@ class ProjectProgrammeViewSet(BaseViewSet):
     )
     def section_transitions(self, request, pk=None, section_key=None):
         programme = self.get_object()
+        if programme.status != "DRAFT":
+            return Response(
+                {
+                    "detail": (
+                        "Sections can only be transitioned when the project programme "
+                        "is in DRAFT status."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         relation_name, section_instance = self._get_section_instance(programme, section_key)
 
         if not relation_name:
@@ -654,17 +659,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if section_instance.status == requested_status:
             return Response(
                 {"detail": "Section is already in the requested status."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        if programme.status != "DRAFT":
-            return Response(
-                {
-                    "detail": (
-                        "Sections can only be transitioned when the project programme "
-                        "is in DRAFT status."
-                    )
-                },
                 status=status.HTTP_409_CONFLICT,
             )
 

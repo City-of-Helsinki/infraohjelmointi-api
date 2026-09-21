@@ -1574,6 +1574,17 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_viewer_cannot_update_project_programme(self):
+        self.client.force_authenticate(user=self.responsible_viewer_user)
+
+        response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_project_manager_cannot_edit_project_programme_data(self):
         self.client.force_authenticate(user=self.project_manager_user)
 

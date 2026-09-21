@@ -293,21 +293,6 @@ class IsViewer(permissions.BasePermission):
     def has_permission(self, request, view):
         if (
             request.user.is_authenticated
-            and user_in_project_programme_contributor_group(request=request)
-            and getattr(view, "basename", None) == "projectProgrammes"
-            and request.method in SAFE_METHODS
-            and view.action
-            in [
-                *DJANGO_BASE_READ_ONLY_ACTIONS,
-                *PROJECT_PROGRAMME_GET_ACTIONS,
-                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                *PROJECT_PROGRAMME_POST_ACTIONS,
-            ]
-        ):
-            return True
-
-        if (
-            request.user.is_authenticated
             and self.user_in_viewer_group(request=request)
             and getattr(view, "basename", None) == "projectProgrammes"
             and request.method in SAFE_METHODS
@@ -350,6 +335,26 @@ class IsViewer(permissions.BasePermission):
             return True
 
         return False
+
+
+class IsProjectProgrammeContributor(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and view.action
+            in [
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        )
+
+    def has_object_permission(self, request, view, obj):
+        return obj._meta.model.__name__ == "ProjectProgramme"
+
 
 class IsCoordinator(permissions.BasePermission):
     def user_coordinator_group(self, request):
