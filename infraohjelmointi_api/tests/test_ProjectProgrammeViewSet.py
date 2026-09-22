@@ -45,6 +45,11 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             last_name="Programme",
             email="projectprogramme@example.com",
         )
+        self.planner_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_ohjelmoijat",
+            display_name="Planners",
+        )
+        self.user.ad_groups.add(self.planner_group)
         self.client.force_authenticate(user=self.user)
 
         self.responsible_person = Person.objects.create(
@@ -1327,6 +1332,10 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name=get_project_programme_contributor_group_name(),
             display_name="Project programme contributors",
         )
+        self.planner_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_ohjelmoijat",
+            display_name="Planners",
+        )
 
         self.allowed_user = User.objects.create_user(
             username="allowed.programmer@test.fi",
@@ -1357,6 +1366,12 @@ class ProjectProgrammePermissionTestCase(TestCase):
             email="contributor.user@test.fi",
         )
         self.contributor_user.ad_groups.add(self.project_programme_contributor_group)
+
+        self.planner_user = User.objects.create_user(
+            username="planner.user@test.fi",
+            email="planner.user@test.fi",
+        )
+        self.planner_user.ad_groups.add(self.planner_group)
 
         self.responsible_person = Person.objects.create(
             firstName="Responsible",
@@ -1521,8 +1536,25 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_responsible_viewer_can_create_project_programme(self):
-        self.client.force_authenticate(user=self.responsible_viewer_user)
+    def test_restricted_programmer_cannot_create_project_programme(self):
+        project = Project.objects.create(
+            name="Assigned class project without programme",
+            description="Project in assigned class with no existing programme",
+            projectDistrict=self.district,
+            projectClass=self.allowed_class,
+        )
+        self.client.force_authenticate(user=self.allowed_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_planner_can_create_project_programme(self):
+        self.client.force_authenticate(user=self.planner_user)
 
         response = self.client.post(
             "/project-programmes/",
@@ -1532,7 +1564,29 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_programmer_name_match_can_create_project_programme(self):
+    def test_contributor_group_user_can_create_project_programme(self):
+        self.client.force_authenticate(user=self.contributor_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_responsible_viewer_cannot_create_project_programme(self):
+        self.client.force_authenticate(user=self.responsible_viewer_user)
+
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_programmer_name_match_cannot_create_project_programme(self):
         user = User.objects.create_user(
             username="fallback.programmer@test.fi",
             email="fallback.programmer@test.fi",
@@ -1556,7 +1610,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_non_responsible_viewer_cannot_create_project_programme(self):
         non_responsible_viewer = User.objects.create_user(
@@ -1662,17 +1716,6 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         basic_info.refresh_from_db()
         self.assertEqual(basic_info.status, "COMPLETE")
-
-    def test_contributor_group_user_cannot_create_project_programme(self):
-        self.client.force_authenticate(user=self.contributor_user)
-
-        response = self.client.post(
-            "/project-programmes/",
-            {"project": str(self.responsible_project.id)},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_project_programme_endpoint_requires_authentication(self):
         response = self.client.get(f"/project-programmes/{self.allowed_programme.id}/")

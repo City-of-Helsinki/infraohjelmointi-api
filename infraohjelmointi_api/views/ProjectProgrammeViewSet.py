@@ -22,6 +22,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeUrbanSpacingPlanningCriteria,
 )
 from infraohjelmointi_api.permissions import (
+    get_planner_group_name,
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
@@ -251,11 +252,14 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if self.ADMIN_GROUP in group_names:
             return
 
-        if self._is_responsible_for_project_programme(user, project):
+        if get_planner_group_name() in group_names:
+            return
+
+        if get_project_programme_contributor_group_name() in group_names:
             return
 
         raise PermissionDenied(
-            "Only the responsible project programme person can create a project programme."
+            "Only planners or project programme contributors can create a project programme."
         )
 
     def _restricted_programmer_matches_project(self, user, project):

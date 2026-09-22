@@ -24,6 +24,15 @@ def get_project_programme_contributor_group_name():
     )
 
 
+def get_planner_group_name():
+    """AD group for planners, also allowed to start a new project programme."""
+    return getattr(
+        settings,
+        "PLANNER_AD_GROUP",
+        "sg_kymp_sso_io_ohjelmoijat",
+    )
+
+
 def user_in_restricted_programmer_group(request):
     """True if the authenticated user is in the restricted programmer AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
@@ -347,6 +356,7 @@ class IsProjectProgrammeContributor(permissions.BasePermission):
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
@@ -396,7 +406,7 @@ class IsCoordinator(permissions.BasePermission):
 
 class IsPlanner(permissions.BasePermission):
     def user_in_planner_group(self, request):
-        if "sg_kymp_sso_io_ohjelmoijat" in request.user.ad_groups.all().values_list(
+        if get_planner_group_name() in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
