@@ -184,6 +184,8 @@ class ProjectViewSet(BaseViewSet):
             "presenceEnd",
             "visibilityStart",
             "visibilityEnd",
+            "type",
+            "sapProject",
         ]
         old_values_for_audit_log = {
             field: self._serialize_audit_value(project, field)
