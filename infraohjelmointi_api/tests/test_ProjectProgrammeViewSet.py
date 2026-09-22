@@ -969,6 +969,29 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(ProjectProgrammeLink.objects.filter(id=link.id).exists())
 
+    def test_delete_link_rejects_link_from_completed_section(self):
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="COMPLETE"
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=other_attachments.id,
+            value="https://example.com",
+        )
+
+        response = self.client.delete(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"],
+            "Links can only be modified for entities in DRAFT status.",
+        )
+        self.assertTrue(ProjectProgrammeLink.objects.filter(id=link.id).exists())
+
     def test_patch_link_rejects_link_from_different_programme(self):
         programme = self._create_project_programme(project=self.project)
         second_programme = self._create_project_programme(project=self.second_project)

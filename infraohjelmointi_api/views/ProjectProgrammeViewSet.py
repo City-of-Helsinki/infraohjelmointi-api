@@ -246,7 +246,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
         return False
 
-    def _assert_can_create_programme(self, request, project):
+    def _assert_can_create_programme(self, request):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
         if self.ADMIN_GROUP in group_names:
@@ -399,8 +399,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     @override
     def perform_create(self, serializer):
-        project = serializer.validated_data.get("project")
-        self._assert_can_create_programme(self.request, project)
+        self._assert_can_create_programme(self.request)
 
         user = self._get_authenticated_user(self.request)
         if user:
@@ -612,6 +611,21 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return Response({"detail": self.NOT_FOUND_DETAIL}, status=status.HTTP_404_NOT_FOUND)
 
         if request.method == "DELETE":
+            section_instance = link.sectionObject
+            if (
+                section_instance is not None
+                and (
+                    getattr(section_instance, "is_locked", False)
+                    or (
+                        hasattr(section_instance, "status")
+                        and section_instance.status != "DRAFT"
+                    )
+                )
+            ):
+                return Response(
+                    {"detail": "Links can only be modified for entities in DRAFT status."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             link.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
