@@ -6,6 +6,16 @@ from rest_framework import permissions
 from django.conf import settings
 
 
+def parse_name_from_email(email):
+    """Return lowercase first and last names from a firstname.lastname email."""
+    if not email or "@" not in email:
+        return None, None
+    parts = [part.strip().lower() for part in email.split("@", 1)[0].split(".") if part.strip()]
+    if len(parts) < 2:
+        return None, None
+    return parts[0], parts[1]
+
+
 def get_restricted_programmer_group_name():
     """AD group name used for restricted programmers (IO-756)."""
     return getattr(
@@ -53,12 +63,7 @@ def user_in_project_programme_contributor_group(request):
 
 def _get_legacy_class_paths_from_email(user_email):
     """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
-    if not user_email or "@" not in user_email:
-        return set()
-    parts = [p.strip() for p in user_email.split("@")[0].split(".") if p.strip()]
-    if len(parts) < 2:
-        return set()
-    first_name, last_name = parts[0].capitalize(), parts[1].capitalize()
+    first_name, last_name = parse_name_from_email(user_email)
     if not first_name or not last_name:
         return set()
     programmer = ProjectProgrammer.objects.filter(

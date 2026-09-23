@@ -26,6 +26,7 @@ from infraohjelmointi_api.permissions import (
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
+    parse_name_from_email,
     target_path_matches_assigned_paths,
 )
 from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
@@ -201,17 +202,14 @@ class ProjectProgrammeViewSet(BaseViewSet):
         return set(user.ad_groups.all().values_list("name", flat=True))
 
     def _matches_programmer_name_from_email(self, user_email, project_programmer):
-        if not user_email or not project_programmer:
+        first_name, last_name = parse_name_from_email(user_email)
+        if not first_name or not project_programmer:
             return False
 
-        local_part = user_email.split("@")[0]
-        name_parts = [part.strip().lower() for part in local_part.split(".") if part.strip()]
-        if len(name_parts) < 2:
-            return False
-
-        first_name = (project_programmer.firstName or "").strip().lower()
-        last_name = (project_programmer.lastName or "").strip().lower()
-        return name_parts[0] == first_name and name_parts[1] == last_name
+        return (
+            first_name == (project_programmer.firstName or "").strip().lower()
+            and last_name == (project_programmer.lastName or "").strip().lower()
+        )
 
     def _is_responsible_for_project_programme(self, user, project):
         if not user or not getattr(user, "is_authenticated", False) or not project:
