@@ -6,12 +6,40 @@ from rest_framework import permissions
 from django.conf import settings
 
 
+def parse_name_from_email(email):
+    """Return lowercase first and last names from a firstname.lastname email."""
+    if not email or "@" not in email:
+        return None, None
+    parts = [part.strip().lower() for part in email.split("@", 1)[0].split(".") if part.strip()]
+    if len(parts) < 2:
+        return None, None
+    return parts[0], parts[1]
+
+
 def get_restricted_programmer_group_name():
     """AD group name used for restricted programmers (IO-756)."""
     return getattr(
         settings,
         "RESTRICTED_PROGRAMMER_AD_GROUP",
         "sg_kymp_sso_io_rajoitetut_ohjelmoijat",
+    )
+
+
+def get_project_programme_contributor_group_name():
+    """AD group for users allowed to edit any existing project programme."""
+    return getattr(
+        settings,
+        "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
+        "sl_dyn_kymp_sso_io_liikenne-maisemasuunnittelijat",
+    )
+
+
+def get_planner_group_name():
+    """AD group for planners, also allowed to start a new project programme."""
+    return getattr(
+        settings,
+        "PLANNER_AD_GROUP",
+        "sg_kymp_sso_io_ohjelmoijat",
     )
 
 
@@ -24,14 +52,18 @@ def user_in_restricted_programmer_group(request):
     )
 
 
+def user_in_project_programme_contributor_group(request):
+    """True if the authenticated user is in the project programme contributor AD group."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    return request.user.ad_groups.filter(
+        name=get_project_programme_contributor_group_name()
+    ).exists()
+
+
 def _get_legacy_class_paths_from_email(user_email):
     """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
-    if not user_email or "@" not in user_email:
-        return set()
-    parts = [p.strip() for p in user_email.split("@")[0].split(".") if p.strip()]
-    if len(parts) < 2:
-        return set()
-    first_name, last_name = parts[0].capitalize(), parts[1].capitalize()
+    first_name, last_name = parse_name_from_email(user_email)
     if not first_name or not last_name:
         return set()
     programmer = ProjectProgrammer.objects.filter(
@@ -216,6 +248,7 @@ PROJECT_PROGRAMME_POST_ACTIONS = [
     "section_other_attachments",
     "section_links",
     "section_link_detail",
+    "section_transitions",
 ]
 
 #### Project change-history custom actions (IO-879) ####
@@ -297,10 +330,34 @@ class IsViewer(permissions.BasePermission):
         # Viewer can only access project object, to be able to see the project card
         _type = obj._meta.model.__name__
 
+        if _type == "ProjectProgramme":
+            return True
+
         if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
             return True
 
         return False
+
+
+class IsProjectProgrammeContributor(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and view.action
+            in [
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        )
+
+    def has_object_permission(self, request, view, obj):
+        return obj._meta.model.__name__ == "ProjectProgramme"
+
 
 class IsCoordinator(permissions.BasePermission):
     def user_coordinator_group(self, request):
@@ -342,7 +399,7 @@ class IsCoordinator(permissions.BasePermission):
 
 class IsPlanner(permissions.BasePermission):
     def user_in_planner_group(self, request):
-        if "sg_kymp_sso_io_ohjelmoijat" in request.user.ad_groups.all().values_list(
+        if get_planner_group_name() in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
