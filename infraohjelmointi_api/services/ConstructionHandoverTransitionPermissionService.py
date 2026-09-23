@@ -11,28 +11,29 @@ class ConstructionHandoverTransitionPermissionService:
         is_programmer,
         is_construction_management_lead,
     ):
+        # Rule: must be planning person; role gate is handled by endpoint permission classes.
         if requested_status == "SUBMITTED_TO_PROGRAMMER":
-            return (
-                is_project_manager
-                and ProjectPersonAuthorizationService.is_person_planning_for_project(
-                    user=user,
-                    project=project,
-                )
+            return ProjectPersonAuthorizationService.is_person_planning_for_project(
+                user=user,
+                project=project,
             )
 
+        # Rule: explicit role-based transition.
         if requested_status == "SUBMITTED_TO_CONSTRUCTION":
-            return is_programmer
+            return bool(is_programmer)
 
+        # Rule: explicit role-based transition.
         if requested_status == "PROJECT_MANAGER_NAMED":
-            return is_construction_management_lead
+            return bool(is_construction_management_lead)
 
+        # Rule: explicit role-based transition.
         if requested_status == "MOVED_TO_CONSTRUCTION_PREPARATION":
             return (
-                is_project_manager
+                bool(is_project_manager)
                 and ProjectPersonAuthorizationService.is_person_construction_for_project(
                     user=user,
                     project=project,
                 )
             )
 
-        return True
+        return False
