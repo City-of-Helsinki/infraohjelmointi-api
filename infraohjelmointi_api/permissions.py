@@ -308,18 +308,6 @@ class IsViewer(permissions.BasePermission):
         if (
             request.user.is_authenticated
             and self.user_in_viewer_group(request=request)
-            and getattr(view, "basename", None) == "projectProgrammes"
-            and request.method in SAFE_METHODS
-            and view.action
-            in [
-                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
-            ]
-        ):
-            return True
-
-        if (
-            request.user.is_authenticated
-            and self.user_in_viewer_group(request=request)
             and request.method == GET
             and view.action
             in [

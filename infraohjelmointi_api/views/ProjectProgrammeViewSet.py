@@ -235,13 +235,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if self._matches_programmer_name_from_email(user_email, project_programmer):
             return True
 
-        project_set = getattr(project, "projectSet", None)
-        project_set_responsible = getattr(project_set, "responsiblePerson", None)
-        if ProjectPersonAuthorizationService.is_matching_project_person_email(
-            user, project_set_responsible
-        ):
-            return True
-
         return False
 
     def _assert_can_create_programme(self, request):
