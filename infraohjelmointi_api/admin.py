@@ -3,6 +3,18 @@ from django.contrib import admin
 from infraohjelmointi_api import models
 from infraohjelmointi_api.models.ClassProgrammerAssignment import ClassProgrammerAssignmentAdmin
 
+
+class NoteImageInline(admin.TabularInline):
+    model = models.NoteImage
+    extra = 0
+    readonly_fields = ("fileName", "contentType", "size", "createdDate", "uploadedBy")
+
+
+class NoteAdmin(admin.ModelAdmin):
+    inlines = [NoteImageInline]
+    list_display = ("id", "project", "updatedBy", "updatedDate", "deleted")
+
+
 admin.site.register(models.Project)
 admin.site.register(models.ProjectArea)
 admin.site.register(models.ProjectSet)
@@ -17,7 +29,8 @@ admin.site.register(models.ConstructionPhase)
 admin.site.register(models.ProjectPhaseDetail)
 admin.site.register(models.ConstructionProcurementMethod)
 admin.site.register(models.StaraProcurementReason)
-admin.site.register(models.Note)
+admin.site.register(models.Note, NoteAdmin)
+admin.site.register(models.NoteImage)
 admin.site.register(models.PlanningPhase)
 admin.site.register(models.ProjectCategory)
 admin.site.register(models.ProjectFinancial)
