@@ -14,8 +14,8 @@ TASK_TYPES = [
 
 TASK_TYPE_CHOICES = [(task_type, task_type) for task_type in TASK_TYPES]
 
-class ProjectTaskSerializer(serializers.ModelSerializer):
-    constructionProcurementMethod = ConstructionProcurementMethodSerializer(read_only=True)
+
+class BaseProjectTaskSerializer(serializers.ModelSerializer):
     taskType = serializers.ChoiceField(choices=TASK_TYPE_CHOICES, read_only=True)
 
     class Meta:
@@ -24,10 +24,48 @@ class ProjectTaskSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'estPlanningStart',
-            'estPlanningEnd', 
+            'estPlanningEnd',
             'estConstructionStart',
             'estConstructionEnd',
             'costForecast',
             'constructionProcurementMethod',
             'taskType'
         )
+
+
+class ConstructionProjectManagerTaskSerializer(BaseProjectTaskSerializer):
+    constructionProcurementMethod = serializers.SerializerMethodField()
+    budget = serializers.SerializerMethodField()
+
+    def get_constructionProcurementMethod(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+
+        method = submitted_handovers[0].constructionProcurementMethod
+        if method is None:
+            return None
+
+        return ConstructionProcurementMethodSerializer(method).data
+
+    def get_budget(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+        return getattr(submitted_handovers[0], "budget", None)
+
+    class Meta:
+        model = Project
+        fields = BaseProjectTaskSerializer.Meta.fields + (
+            'budget',
+        )
+
+
+class ProjectTaskSerializer(serializers.BaseSerializer):
+    TASK_TYPE_SERIALIZER_MAP = {
+        TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER: ConstructionProjectManagerTaskSerializer,
+    }
+
+    def to_representation(self, instance):
+        serializer_class = self.TASK_TYPE_SERIALIZER_MAP.get(instance.taskType, BaseProjectTaskSerializer)
+        return serializer_class(instance, context=self.context).data
