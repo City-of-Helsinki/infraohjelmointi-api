@@ -141,6 +141,11 @@ class ProjectViewSet(BaseViewSet):
         )
         return Response({"id": project_id})
 
+    @override
+    def create(self, request, *args, **kwargs):
+        self._require_pw_link_confirmation(request.data, current_hkr_id=None)
+        return super().create(request, *args, **kwargs)
+
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
@@ -161,6 +166,7 @@ class ProjectViewSet(BaseViewSet):
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
+        self._require_pw_link_confirmation(request.data, current_hkr_id=project.hkrId)
 
         # chcking if request contains any data changes that needs to be audit logged
         # and getting the previous values from the project object before it changes
@@ -1522,6 +1528,11 @@ class ProjectViewSet(BaseViewSet):
                 # IO-775: Capture original values BEFORE update for PW sync detection
                 original_hkr_ids = {str(p.id): p.hkrId for p in qs}
                 original_programmed = {str(p.id): p.programmed for p in qs}
+                for projectData in data:
+                    self._require_pw_link_confirmation(
+                        projectData["data"],
+                        current_hkr_id=original_hkr_ids.get(str(projectData["id"])),
+                    )
                 # Also capture which projects are getting hkrId in this request
                 hkr_ids_in_request = {
                     projectData["id"]: projectData["data"].get("hkrId")
@@ -1901,6 +1912,82 @@ class ProjectViewSet(BaseViewSet):
             qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         return qs
+
+    def _require_pw_link_confirmation(self, data: dict, current_hkr_id) -> None:
+        """
+        IO-935: refuse to set or change a project's hkrId unless the client has
+        confirmed which PW project it points to.
+
+        Every save of a programmed project overwrites PW fields (including
+        PROJECT_Kohde), so a mistyped hkrId would silently overwrite another
+        project in PW. The UI looks the PW project up with get_pw_project_name,
+        shows its name to the user and, on OK, sends the same id back as
+        `confirmedHkrId`. Clearing the hkrId or re-sending the current one
+        needs no confirmation. Skipped when PW sync is disabled, since nothing
+        is written to PW then.
+
+        `confirmedHkrId` is always removed from `data` so it never reaches the
+        serializer.
+        """
+        confirmed_hkr_id = data.pop("confirmedHkrId", None)
+
+        if not self.projectWiseService.pw_sync_enabled or "hkrId" not in data:
+            return
+
+        new_hkr_id = str(data.get("hkrId") or "").strip()
+        if new_hkr_id == "" or new_hkr_id == str(current_hkr_id or ""):
+            return
+
+        if str(confirmed_hkr_id or "").strip() != new_hkr_id:
+            logger.warning(
+                f"PW link blocked: hkrId '{new_hkr_id}' was not confirmed by the client"
+            )
+            raise ValidationError({"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"pw-project-name",
+        name="get_pw_project_name",
+    )
+    def get_pw_project_name(self, request):
+        """
+        IO-935: look up the PW project an hkrId points to, so the user can
+        confirm it before the hkrId is saved.
+
+            Usage
+            ----------
+
+            projects/pw-project-name/?hkrId=<PW hanketunnus>
+
+            Returns
+            -------
+
+            JSON
+                {"hkrId": str, "name": PW "Kohde" or null, "syncEnabled": bool}
+                404 {"hkrId": ["PW_PROJECT_NOT_FOUND"]} if PW has no such project
+                502 {"hkrId": ["PW_UNAVAILABLE"]} if PW could not be reached
+        """
+        hkr_id = str(request.query_params.get("hkrId", "")).strip()
+        if not hkr_id.isdigit():
+            raise ValidationError({"hkrId": ["INVALID_HKR_ID"]})
+
+        if not self.projectWiseService.pw_sync_enabled:
+            return Response({"hkrId": hkr_id, "name": None, "syncEnabled": False})
+
+        try:
+            name = self.projectWiseService.get_project_name_from_pw(hkr_id)
+        except PWProjectNotFoundError:
+            return Response(
+                {"hkrId": ["PW_PROJECT_NOT_FOUND"]}, status=status.HTTP_404_NOT_FOUND
+            )
+        except PWProjectResponseError as e:
+            logger.warning(f"PW project name lookup failed for HKR ID '{hkr_id}': {e}")
+            return Response(
+                {"hkrId": ["PW_UNAVAILABLE"]}, status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        return Response({"hkrId": hkr_id, "name": name, "syncEnabled": True})
 
     def _sync_project_to_projectwise(self, request_data: dict, original_project: Project, updated_project: Project):
         """
