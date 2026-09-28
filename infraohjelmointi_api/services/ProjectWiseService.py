@@ -28,6 +28,7 @@ from .utils import (
     ProjectWiseDataMapper,
     create_comprehensive_project_data,
 )
+from .utils.FieldMappingConfig import FieldMappingConfig
 from .utils.PWConfig import PWConfig
 from .utils.PWLogger import PWLogger
 
@@ -677,13 +678,13 @@ class ProjectWiseService:
         PWLogger.log_data_processing(project.name, "Built project data", len(data))
         return data
 
-    def get_project_from_pw(self, id: str):
+    def get_project_from_pw(self, id: str, timeout: float | None = None):
         """Method to fetch project from PW with given PW project id"""
         start_time = time.perf_counter()
         api_url = f"{self.pw_api_url}{self.pw_api_project_metadata_endpoint}{id}"
 
         PWLogger.log_api_request(api_url, "PW Project")
-        response = self.session.get(api_url)
+        response = self.session.get(api_url, timeout=timeout)
         response_time = time.perf_counter() - start_time
 
         PWLogger.log_api_response(response_time, operation="PW Project")
@@ -703,19 +704,35 @@ class ProjectWiseService:
 
         return json_response[0]
 
+    @staticmethod
+    def _pw_project_properties(pw_project: dict) -> dict:
+        """The properties of a PW project as returned by get_project_from_pw, or {}."""
+        relationship_instances = pw_project.get("relationshipInstances") or [{}]
+        return relationship_instances[0].get("relatedInstance", {}).get("properties", {})
+
+    # IO-935: the lookup runs while the user waits on a save, so don't let a
+    # hanging PW hold the request (and a worker) indefinitely.
+    PW_NAME_LOOKUP_TIMEOUT_SECONDS = 15
+
     def get_project_name_from_pw(self, id: str) -> str | None:
         """IO-935: return the PW 'Kohde' of the project with given PW project id.
 
         Used to let the user confirm which PW project an hkrId points to before
-        anything is written to it. Raises the same errors as get_project_from_pw.
+        anything is written to it. Reads the same PW field that sync writes the
+        project name to. Raises PWProjectNotFoundError if PW has no such project
+        and PWProjectResponseError if PW could not be reached or answered with
+        something unexpected.
         """
-        pw_project = self.get_project_from_pw(id)
-        properties = (
-            pw_project.get("relationshipInstances", [{}])[0]
-            .get("relatedInstance", {})
-            .get("properties", {})
-        )
-        return properties.get("PROJECT_Kohde")
+        try:
+            pw_project = self.get_project_from_pw(
+                id, timeout=self.PW_NAME_LOOKUP_TIMEOUT_SECONDS
+            )
+            properties = self._pw_project_properties(pw_project)
+        except (requests.RequestException, ValueError, KeyError, AttributeError) as e:
+            raise PWProjectResponseError(
+                f"PW project lookup failed for given id '{id}': {e}"
+            ) from e
+        return properties.get(FieldMappingConfig.BASIC_FIELDS["name"])
 
     def fetch_locations(self):
         """
