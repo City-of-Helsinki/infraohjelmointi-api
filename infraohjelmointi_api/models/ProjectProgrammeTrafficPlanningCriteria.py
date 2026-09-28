@@ -9,8 +9,10 @@ class ProjectProgrammeTrafficPlanningCriteria(ProjectProgrammeBase):
     project_programme = models.OneToOneField(
         ProjectProgramme, on_delete=models.CASCADE, related_name="trafficPlanningCriteria"
     )
+    targetTrafficChanges = models.TextField(blank=True)
     pedestrianTraffic = models.TextField(blank=True)
     bicycleTraffic = models.TextField(blank=True)
+    carTraffic = models.TextField(blank=True)
     serviceAndPickupTraffic = models.TextField(blank=True)
     otherTraffic = models.TextField(blank=True)
     accessibility = models.TextField(blank=True)
@@ -18,9 +20,11 @@ class ProjectProgrammeTrafficPlanningCriteria(ProjectProgrammeBase):
     winterMaintenance = models.TextField(blank=True)
 
     history_fields = [
+        "targetTrafficChanges",
         "status",
         "pedestrianTraffic",
         "bicycleTraffic",
+        "carTraffic",
         "serviceAndPickupTraffic",
         "otherTraffic",
         "accessibility",
