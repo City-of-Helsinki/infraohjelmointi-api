@@ -703,6 +703,20 @@ class ProjectWiseService:
 
         return json_response[0]
 
+    def get_project_name_from_pw(self, id: str) -> str | None:
+        """IO-935: return the PW 'Kohde' of the project with given PW project id.
+
+        Used to let the user confirm which PW project an hkrId points to before
+        anything is written to it. Raises the same errors as get_project_from_pw.
+        """
+        pw_project = self.get_project_from_pw(id)
+        properties = (
+            pw_project.get("relationshipInstances", [{}])[0]
+            .get("relatedInstance", {})
+            .get("properties", {})
+        )
+        return properties.get("PROJECT_Kohde")
+
     def fetch_locations(self):
         """
         Currently fetches only sub divisions from PW.
