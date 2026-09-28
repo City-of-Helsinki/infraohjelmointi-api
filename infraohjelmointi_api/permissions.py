@@ -190,9 +190,14 @@ PROJECT_PLANNING_GET_ACTIONS = [
     "get_project_by_financial_year",
     "get_search_results",
 ]
+# IO-935: PW project name lookup used to confirm an hkrId before it is saved.
+# Deliberately left out of PROJECT_PLANNING_GET_ACTIONS so plain viewers,
+# who cannot set an hkrId, do not get it.
+PROJECT_PW_LINK_GET_ACTIONS = ["get_pw_project_name"]
 PROJECT_ALL_GET_ACTIONS = [
     *PROJECT_COORDINATOR_GET_ACTIONS,
     *PROJECT_PLANNING_GET_ACTIONS,
+    *PROJECT_PW_LINK_GET_ACTIONS,
 ]
 PROJECT_COORDINATOR_PATCH_ACTIONS = []
 PROJECT_PLANNING_PATCH_ACTIONS = [
