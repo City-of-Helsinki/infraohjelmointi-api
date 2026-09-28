@@ -146,6 +146,16 @@ class ProjectViewSet(BaseViewSet):
         self._require_pw_link_confirmation(request.data, current_hkr_id=None)
         return super().create(request, *args, **kwargs)
 
+    @override
+    def update(self, request, *args, **kwargs):
+        # IO-935: PUT must not be a way around the PW link confirmation. PATCH
+        # is handled by the partial_update override, which does not call this.
+        if not kwargs.get("partial", False):
+            self._require_pw_link_confirmation(
+                request.data, current_hkr_id=self.get_object().hkrId
+            )
+        return super().update(request, *args, **kwargs)
+
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
@@ -1913,6 +1923,12 @@ class ProjectViewSet(BaseViewSet):
 
         return qs
 
+    @staticmethod
+    def _parse_hkr_id(value) -> int | None:
+        """An hkrId as the int it is stored as, or None if empty or not a valid id."""
+        value = str(value if value is not None else "").strip()
+        return int(value) if value.isascii() and value.isdigit() else None
+
     def _require_pw_link_confirmation(self, data: dict, current_hkr_id) -> None:
         """
         IO-935: refuse to set or change a project's hkrId unless the client has
@@ -1926,6 +1942,7 @@ class ProjectViewSet(BaseViewSet):
         needs no confirmation. Skipped when PW sync is disabled, since nothing
         is written to PW then.
 
+        Ids are compared as numbers, so "0123" and 123 are the same id.
         `confirmedHkrId` is always removed from `data` so it never reaches the
         serializer.
         """
@@ -1934,11 +1951,13 @@ class ProjectViewSet(BaseViewSet):
         if not self.projectWiseService.pw_sync_enabled or "hkrId" not in data:
             return
 
-        new_hkr_id = str(data.get("hkrId") or "").strip()
-        if new_hkr_id == "" or new_hkr_id == str(current_hkr_id or ""):
+        new_hkr_id = self._parse_hkr_id(data.get("hkrId"))
+        # None: cleared, or malformed, which the serializer then rejects with
+        # a proper validation error
+        if new_hkr_id is None or new_hkr_id == self._parse_hkr_id(current_hkr_id):
             return
 
-        if str(confirmed_hkr_id or "").strip() != new_hkr_id:
+        if self._parse_hkr_id(confirmed_hkr_id) != new_hkr_id:
             logger.warning(
                 f"PW link blocked: hkrId '{new_hkr_id}' was not confirmed by the client"
             )
@@ -1967,10 +1986,12 @@ class ProjectViewSet(BaseViewSet):
                 {"hkrId": str, "name": PW "Kohde" or null, "syncEnabled": bool}
                 404 {"hkrId": ["PW_PROJECT_NOT_FOUND"]} if PW has no such project
                 502 {"hkrId": ["PW_UNAVAILABLE"]} if PW could not be reached
+                400 {"hkrId": ["INVALID_HKR_ID"]} if hkrId is not a valid id
         """
-        hkr_id = str(request.query_params.get("hkrId", "")).strip()
-        if not hkr_id.isdigit():
+        parsed_hkr_id = self._parse_hkr_id(request.query_params.get("hkrId"))
+        if parsed_hkr_id is None:
             raise ValidationError({"hkrId": ["INVALID_HKR_ID"]})
+        hkr_id = str(parsed_hkr_id)
 
         if not self.projectWiseService.pw_sync_enabled:
             return Response({"hkrId": hkr_id, "name": None, "syncEnabled": False})
