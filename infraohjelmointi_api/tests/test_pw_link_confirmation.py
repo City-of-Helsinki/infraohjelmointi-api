@@ -8,8 +8,9 @@ an hkrId without that confirmation while PW sync is enabled.
 """
 import os
 import uuid
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import requests
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from helusers.models import ADGroup
@@ -179,6 +180,57 @@ class PWLinkConfirmationGuardTestCase(_ProjectFixtureMixin, TestCase):
         self.project_without_hkr.refresh_from_db()
         self.assertEqual(self.project_without_hkr.hkrId, 8080)
 
+    def test_put_with_unconfirmed_hkr_id_is_refused(self, mock_sync):
+        response = self.client.put(
+            f"/projects/{self.project_without_hkr.id}/",
+            {"name": "Link Test Project", "description": "Put", "hkrId": 9090},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
+        self.project_without_hkr.refresh_from_db()
+        self.assertIsNone(self.project_without_hkr.hkrId)
+
+    def test_put_with_confirmed_hkr_id_is_saved(self, mock_sync):
+        response = self.client.put(
+            f"/projects/{self.project_without_hkr.id}/",
+            {
+                "name": "Link Test Project",
+                "description": "Put",
+                "hkrId": 9090,
+                "confirmedHkrId": 9090,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.hkrId, 9090)
+
+    def test_the_same_id_with_a_leading_zero_is_not_a_change(self, mock_sync):
+        response = self._patch(self.project_with_hkr, {"hkrId": "05050"})
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_with_hkr.refresh_from_db()
+        self.assertEqual(self.project_with_hkr.hkrId, 5050)
+
+    def test_confirmation_is_compared_as_a_number(self, mock_sync):
+        response = self._patch(
+            self.project_without_hkr, {"hkrId": 1234, "confirmedHkrId": " 01234 "}
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.hkrId, 1234)
+
+    def test_malformed_hkr_id_gets_the_serializer_error_not_the_pw_code(self, mock_sync):
+        response = self._patch(self.project_without_hkr, {"hkrId": "abc"})
+
+        self.assertEqual(response.status_code, 400, msg=response.content)
+        self.assertNotIn("PW_LINK_NOT_CONFIRMED", response.json().get("hkrId", []))
+        mock_sync.assert_not_called()
+
 
 @patch(SYNC_TO_PW)
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -232,9 +284,29 @@ class PWProjectNameLookupTestCase(TestCase):
         self.assertEqual(response.status_code, 502, msg=response.content)
         self.assertEqual(response.json(), {"hkrId": ["PW_UNAVAILABLE"]})
 
+    @patch.dict(os.environ, PW_SYNC_ON)
+    @patch(NAME_FROM_PW, return_value="Kohde")
+    def test_looks_up_the_id_without_leading_zeros(self, mock_name):
+        response = self.client.get(self.URL, {"hkrId": "01234"})
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.assertEqual(response.json()["hkrId"], "1234")
+        mock_name.assert_called_once_with("1234")
+
+    @patch.dict(os.environ, PW_SYNC_ON)
+    @patch(
+        "infraohjelmointi_api.views.ProjectViewSet.ProjectWiseService.get_project_from_pw",
+        side_effect=requests.ConnectionError("PW host unreachable"),
+    )
+    def test_pw_connection_error_returns_502_not_500(self, mock_get):
+        response = self.client.get(self.URL, {"hkrId": "1234"})
+
+        self.assertEqual(response.status_code, 502, msg=response.content)
+        self.assertEqual(response.json(), {"hkrId": ["PW_UNAVAILABLE"]})
+
     @patch(NAME_FROM_PW)
     def test_invalid_hkr_id_returns_400_without_calling_pw(self, mock_name):
-        for value in ["", "abc", "-5", "12.5"]:
+        for value in ["", "abc", "-5", "12.5", "²"]:
             with self.subTest(value=value):
                 response = self.client.get(self.URL, {"hkrId": value})
                 self.assertEqual(response.status_code, 400, msg=response.content)
@@ -303,7 +375,42 @@ class GetProjectNameFromPWTestCase(TestCase):
             },
         ) as mock_get:
             self.assertEqual(self.service.get_project_name_from_pw("1234"), "Kohde X")
-        mock_get.assert_called_once_with("1234")
+        mock_get.assert_called_once_with(
+            "1234", timeout=ProjectWiseService.PW_NAME_LOOKUP_TIMEOUT_SECONDS
+        )
+
+    def test_passes_the_timeout_to_pw(self):
+        self.service.session = MagicMock()
+        self.service.session.get.return_value.status_code = 200
+        self.service.session.get.return_value.json.return_value = {
+            "instances": [
+                {"relationshipInstances": [{"relatedInstance": {"properties": {"PROJECT_Kohde": "K"}}}]}
+            ]
+        }
+
+        self.assertEqual(self.service.get_project_name_from_pw("1234"), "K")
+        self.assertEqual(
+            self.service.session.get.call_args.kwargs["timeout"],
+            ProjectWiseService.PW_NAME_LOOKUP_TIMEOUT_SECONDS,
+        )
+
+    def test_returns_none_when_pw_has_no_relationship_instances(self):
+        with patch.object(
+            self.service, "get_project_from_pw", return_value={"relationshipInstances": []}
+        ):
+            self.assertIsNone(self.service.get_project_name_from_pw("1234"))
+
+    def test_outages_and_malformed_responses_become_response_errors(self):
+        for error in [
+            requests.ConnectionError("down"),
+            requests.Timeout("slow"),
+            ValueError("not json"),
+            KeyError("instances"),
+        ]:
+            with self.subTest(error=type(error).__name__):
+                with patch.object(self.service, "get_project_from_pw", side_effect=error):
+                    with self.assertRaises(PWProjectResponseError):
+                        self.service.get_project_name_from_pw("1234")
 
     def test_returns_none_when_kohde_is_missing(self):
         with patch.object(
