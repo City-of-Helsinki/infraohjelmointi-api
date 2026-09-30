@@ -141,21 +141,6 @@ class ProjectViewSet(BaseViewSet):
         )
         return Response({"id": project_id})
 
-    @override
-    def create(self, request, *args, **kwargs):
-        self._require_pw_link_confirmation(request.data, current_hkr_id=None)
-        return super().create(request, *args, **kwargs)
-
-    @override
-    def update(self, request, *args, **kwargs):
-        # IO-935: PUT must not be a way around the PW link confirmation. PATCH
-        # is handled by the partial_update override, which does not call this.
-        if not kwargs.get("partial", False):
-            self._require_pw_link_confirmation(
-                request.data, current_hkr_id=self.get_object().hkrId
-            )
-        return super().update(request, *args, **kwargs)
-
     @transaction.atomic
     @override
     def partial_update(self, request, *args, **kwargs):
@@ -176,7 +161,6 @@ class ProjectViewSet(BaseViewSet):
         # finances data appear with field names, convert to year to update
         finances = request.data.pop("finances", None)
         project = self.get_object()
-        self._require_pw_link_confirmation(request.data, current_hkr_id=project.hkrId)
 
         # chcking if request contains any data changes that needs to be audit logged
         # and getting the previous values from the project object before it changes
@@ -1538,13 +1522,6 @@ class ProjectViewSet(BaseViewSet):
                 # IO-775: Capture original values BEFORE update for PW sync detection
                 original_hkr_ids = {str(p.id): p.hkrId for p in qs}
                 original_programmed = {str(p.id): p.programmed for p in qs}
-                for projectData in data:
-                    self._require_pw_link_confirmation(
-                        projectData["data"],
-                        # ids are validated UUIDs, but may differ from str(p.id)
-                        # in case or hyphenation
-                        current_hkr_id=original_hkr_ids.get(str(uuid.UUID(projectData["id"]))),
-                    )
                 # Also capture which projects are getting hkrId in this request
                 hkr_ids_in_request = {
                     projectData["id"]: projectData["data"].get("hkrId")
@@ -1925,56 +1902,11 @@ class ProjectViewSet(BaseViewSet):
 
         return qs
 
-    # IO-935: parse hkrIds exactly as ProjectCreateSerializer does
-    # (PositiveBigIntegerField -> IntegerField), so every value the serializer
-    # would save ("1234.0", "+1234", "1_234", ...) is also seen by the guard.
+    # IO-935: parse the lookup's hkrId exactly as ProjectCreateSerializer parses
+    # hkrId (PositiveBigIntegerField -> IntegerField)
     _HKR_ID_FIELD = serializers.IntegerField(
         min_value=0, max_value=9223372036854775807
     )
-
-    @classmethod
-    def _parse_hkr_id(cls, value) -> int | None:
-        """An hkrId as the int it is stored as, or None if empty or not a valid id."""
-        if value is None or str(value).strip() == "":
-            return None
-        try:
-            return cls._HKR_ID_FIELD.run_validation(value)
-        except ValidationError:
-            return None
-
-    def _require_pw_link_confirmation(self, data: dict, current_hkr_id) -> None:
-        """
-        IO-935: refuse to set or change a project's hkrId unless the client has
-        confirmed which PW project it points to.
-
-        Every save of a programmed project overwrites PW fields (including
-        PROJECT_Kohde), so a mistyped hkrId would silently overwrite another
-        project in PW. The UI looks the PW project up with get_pw_project_name,
-        shows its name to the user and, on OK, sends the same id back as
-        `confirmedHkrId`. Clearing the hkrId or re-sending the current one
-        needs no confirmation. Skipped when PW sync is disabled, since nothing
-        is written to PW then.
-
-        Ids are compared as numbers, so "0123" and 123 are the same id.
-        `confirmedHkrId` is always removed from `data` so it never reaches the
-        serializer.
-        """
-        confirmed_hkr_id = data.pop("confirmedHkrId", None)
-
-        if not self.projectWiseService.pw_sync_enabled or "hkrId" not in data:
-            return
-
-        new_hkr_id = self._parse_hkr_id(data.get("hkrId"))
-        # None: cleared, or malformed, which the serializer then rejects with
-        # a proper validation error
-        if new_hkr_id is None or new_hkr_id == self._parse_hkr_id(current_hkr_id):
-            return
-
-        if self._parse_hkr_id(confirmed_hkr_id) != new_hkr_id:
-            logger.warning(
-                f"PW link blocked: hkrId '{new_hkr_id}' was not confirmed by the client"
-            )
-            raise ValidationError({"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
 
     @action(
         methods=["get"],
@@ -2001,10 +1933,10 @@ class ProjectViewSet(BaseViewSet):
                 502 {"hkrId": ["PW_UNAVAILABLE"]} if PW could not be reached
                 400 {"hkrId": ["INVALID_HKR_ID"]} if hkrId is not a valid id
         """
-        parsed_hkr_id = self._parse_hkr_id(request.query_params.get("hkrId"))
-        if parsed_hkr_id is None:
+        try:
+            hkr_id = str(self._HKR_ID_FIELD.run_validation(request.query_params.get("hkrId")))
+        except ValidationError:
             raise ValidationError({"hkrId": ["INVALID_HKR_ID"]})
-        hkr_id = str(parsed_hkr_id)
 
         if not self.projectWiseService.pw_sync_enabled:
             return Response({"hkrId": hkr_id, "name": None, "syncEnabled": False})

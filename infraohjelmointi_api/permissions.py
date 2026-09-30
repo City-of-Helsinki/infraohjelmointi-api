@@ -190,15 +190,16 @@ PROJECT_PLANNING_GET_ACTIONS = [
     "get_project_by_financial_year",
     "get_search_results",
 ]
-# IO-935: PW project name lookup used to confirm an hkrId before it is saved.
-# Deliberately left out of PROJECT_PLANNING_GET_ACTIONS so plain viewers,
-# who cannot set an hkrId, do not get it.
-PROJECT_PW_LINK_GET_ACTIONS = ["get_pw_project_name"]
 PROJECT_ALL_GET_ACTIONS = [
     *PROJECT_COORDINATOR_GET_ACTIONS,
     *PROJECT_PLANNING_GET_ACTIONS,
-    *PROJECT_PW_LINK_GET_ACTIONS,
 ]
+# IO-935: PW project name lookup used to confirm an hkrId before it is saved.
+# Granted explicitly, and only, to the roles that can set an hkrId: coordinator,
+# planner, project area planner, admin and restricted class programmer. Not to
+# viewers, project managers (hkrId is a denied field for them) or construction
+# management leads (read-only).
+PROJECT_PW_LINK_GET_ACTIONS = ["get_pw_project_name"]
 PROJECT_COORDINATOR_PATCH_ACTIONS = []
 PROJECT_PLANNING_PATCH_ACTIONS = [
     "patch_bulk_projects",
@@ -386,6 +387,7 @@ class IsCoordinator(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
@@ -428,6 +430,7 @@ class IsPlanner(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
@@ -467,9 +470,7 @@ class IsProjectManager(permissions.BasePermission):
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                # IO-935: project managers cannot set an hkrId, so they don't
-                # get the PW project name lookup either
-                *[a for a in PROJECT_ALL_ACTIONS if a not in PROJECT_PW_LINK_GET_ACTIONS],
+                *PROJECT_ALL_ACTIONS,
                 *PROJECT_CLASS_ALL_GET_ACTIONS,
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
@@ -565,6 +566,7 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
@@ -633,6 +635,7 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_FORCED_TO_FRAME_PATCH,
@@ -699,6 +702,7 @@ class IsClassProgrammer(permissions.BasePermission):
         if view.action in [
             *DJANGO_BASE_READ_ONLY_ACTIONS,
             *PROJECT_ALL_GET_ACTIONS,
+            *PROJECT_PW_LINK_GET_ACTIONS,
             *PROJECT_CLASS_ALL_GET_ACTIONS,
             *PROJECT_LOCATION_ALL_GET_ACTIONS,
             *PROJECT_FINANCES_ALL_GET_ACTIONS,
