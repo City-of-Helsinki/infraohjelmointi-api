@@ -136,6 +136,16 @@ class PWLinkConfirmationGuardTestCase(_ProjectFixtureMixin, TestCase):
         self.assertEqual(response.json(), {"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
         self.assertFalse(Project.objects.filter(name="New Project").exists())
 
+    def test_create_with_a_non_object_body_is_a_400_not_a_500(self, mock_sync):
+        array_body = self.client.post(
+            "/projects/", [{"name": "x", "hkrId": 1}], content_type="application/json"
+        )
+        # multipart/form-data arrives as an immutable QueryDict
+        form_body = self.client.post("/projects/", {"name": "x", "hkrId": "1"})
+
+        self.assertEqual(array_body.status_code, 400, msg=array_body.content)
+        self.assertEqual(form_body.status_code, 400, msg=form_body.content)
+
     def test_create_with_confirmed_hkr_id_succeeds(self, mock_sync):
         response = self.client.post(
             "/projects/",
@@ -159,7 +169,8 @@ class PWLinkConfirmationGuardTestCase(_ProjectFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 400, msg=response.content)
-        self.assertEqual(response.json(), {"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
+        # One error object per project, as for any bulk validation error
+        self.assertEqual(response.json(), [{"hkrId": ["PW_LINK_NOT_CONFIRMED"]}])
         mock_sync.assert_not_called()
         self.project_without_hkr.refresh_from_db()
         self.assertIsNone(self.project_without_hkr.hkrId)
@@ -399,6 +410,18 @@ class PWProjectNameLookupPermissionTestCase(TestCase):
                 display_name="Project area planners",
             )
         )
+        self.users_by_group = {}
+        for group_name in [
+            "sg_kymp_sso_io_koordinaattorit",
+            "sg_kymp_sso_io_admin",
+            "sg_kymp_sso_io_rajoitetut_ohjelmoijat",
+            "sg_kymp_sso_io_rakennuttamisen_esihenkilot",
+        ]:
+            user = User.objects.create_user(
+                username=f"{group_name}@test.fi", email=f"{group_name}@test.fi"
+            )
+            user.ad_groups.add(ADGroup.objects.create(name=group_name, display_name=group_name))
+            self.users_by_group[group_name] = user
 
     def _call_as(self, user):
         request = self.factory.get("/projects/pw-project-name/", {"hkrId": "1234"})
@@ -420,6 +443,24 @@ class PWProjectNameLookupPermissionTestCase(TestCase):
     @patch.dict(os.environ, {"PW_SYNC_ENABLED": "False"})
     def test_project_area_planner_can_look_up(self):
         self.assertEqual(self._call_as(self.area_planner).status_code, 200)
+
+    @patch.dict(os.environ, {"PW_SYNC_ENABLED": "False"})
+    def test_other_roles_that_can_set_an_hkr_id_can_look_up(self):
+        for group_name in [
+            "sg_kymp_sso_io_koordinaattorit",
+            "sg_kymp_sso_io_admin",
+            "sg_kymp_sso_io_rajoitetut_ohjelmoijat",
+        ]:
+            with self.subTest(group=group_name):
+                response = self._call_as(self.users_by_group[group_name])
+                self.assertEqual(response.status_code, 200)
+
+    def test_construction_management_lead_is_denied(self):
+        # Read-only on projects, so cannot set an hkrId
+        response = self._call_as(
+            self.users_by_group["sg_kymp_sso_io_rakennuttamisen_esihenkilot"]
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_anonymous_is_denied(self):
         self.assertIn(self._call_as(None).status_code, (401, 403))

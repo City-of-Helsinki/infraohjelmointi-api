@@ -92,7 +92,7 @@ class ProjectWiseService:
         self.pw_api_project_metadata_endpoint = env("PW_API_PROJECT_META_ENDPOINT")
         self.pw_api_project_update_endpoint = env("PW_PROJECT_UPDATE_ENDPOINT")
         
-        self.pw_sync_enabled = env.bool("PW_SYNC_ENABLED", default=False)
+        self.pw_sync_enabled = self.is_sync_enabled()
         
         self.project_wise_data_mapper = ProjectWiseDataMapper()
 
@@ -703,6 +703,11 @@ class ProjectWiseService:
             )
 
         return json_response[0]
+
+    @staticmethod
+    def is_sync_enabled() -> bool:
+        """Whether project changes are written to PW (PW_SYNC_ENABLED)."""
+        return env.bool("PW_SYNC_ENABLED", default=False)
 
     @staticmethod
     def _pw_project_properties(pw_project: dict) -> dict:
