@@ -708,7 +708,8 @@ class ProjectWiseService:
     def _pw_project_properties(pw_project: dict) -> dict:
         """The properties of a PW project as returned by get_project_from_pw, or {}."""
         relationship_instances = pw_project.get("relationshipInstances") or [{}]
-        return relationship_instances[0].get("relatedInstance", {}).get("properties", {})
+        related_instance = relationship_instances[0].get("relatedInstance") or {}
+        return related_instance.get("properties") or {}
 
     # IO-935: the lookup runs while the user waits on a save, so don't let a
     # hanging PW hold the request (and a worker) indefinitely.
@@ -728,11 +729,18 @@ class ProjectWiseService:
                 id, timeout=self.PW_NAME_LOOKUP_TIMEOUT_SECONDS
             )
             properties = self._pw_project_properties(pw_project)
-        except (requests.RequestException, ValueError, KeyError, AttributeError) as e:
+            return properties.get(FieldMappingConfig.BASIC_FIELDS["name"])
+        except (
+            requests.RequestException,
+            ValueError,
+            KeyError,
+            IndexError,
+            TypeError,
+            AttributeError,
+        ) as e:
             raise PWProjectResponseError(
                 f"PW project lookup failed for given id '{id}': {e}"
             ) from e
-        return properties.get(FieldMappingConfig.BASIC_FIELDS["name"])
 
     def fetch_locations(self):
         """

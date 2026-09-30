@@ -467,7 +467,9 @@ class IsProjectManager(permissions.BasePermission):
             in [
                 *DJANGO_BASE_READ_ONLY_ACTIONS,
                 *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
-                *PROJECT_ALL_ACTIONS,
+                # IO-935: project managers cannot set an hkrId, so they don't
+                # get the PW project name lookup either
+                *[a for a in PROJECT_ALL_ACTIONS if a not in PROJECT_PW_LINK_GET_ACTIONS],
                 *PROJECT_CLASS_ALL_GET_ACTIONS,
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,

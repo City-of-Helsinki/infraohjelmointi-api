@@ -224,6 +224,42 @@ class PWLinkConfirmationGuardTestCase(_ProjectFixtureMixin, TestCase):
         self.project_without_hkr.refresh_from_db()
         self.assertEqual(self.project_without_hkr.hkrId, 1234)
 
+    def test_every_format_the_serializer_accepts_needs_confirmation(self, mock_sync):
+        # DRF's IntegerField saves all of these as 1234
+        for value in [1234.0, "1234.0", "+1234", "1_234", "１２３４"]:
+            with self.subTest(value=value):
+                response = self._patch(self.project_without_hkr, {"hkrId": value})
+
+                self.assertEqual(response.status_code, 400, msg=response.content)
+                self.assertEqual(response.json(), {"hkrId": ["PW_LINK_NOT_CONFIRMED"]})
+        mock_sync.assert_not_called()
+        self.project_without_hkr.refresh_from_db()
+        self.assertIsNone(self.project_without_hkr.hkrId)
+
+    def test_a_non_canonical_format_can_be_confirmed(self, mock_sync):
+        response = self._patch(
+            self.project_without_hkr, {"hkrId": "1234.0", "confirmedHkrId": 1234}
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.project_without_hkr.refresh_from_db()
+        self.assertEqual(self.project_without_hkr.hkrId, 1234)
+
+    def test_an_overlong_hkr_id_is_a_validation_error_not_a_500(self, mock_sync):
+        response = self._patch(self.project_without_hkr, {"hkrId": "9" * 5000})
+
+        self.assertEqual(response.status_code, 400, msg=response.content[:300])
+        self.assertNotIn("PW_LINK_NOT_CONFIRMED", response.json().get("hkrId", []))
+
+    def test_bulk_update_matches_the_project_id_regardless_of_case(self, mock_sync):
+        response = self.client.patch(
+            "/projects/bulk-update/",
+            [{"id": str(self.project_with_hkr.id).upper(), "data": {"hkrId": 5050}}],
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.content)
+
     def test_malformed_hkr_id_gets_the_serializer_error_not_the_pw_code(self, mock_sync):
         response = self._patch(self.project_without_hkr, {"hkrId": "abc"})
 
@@ -287,11 +323,14 @@ class PWProjectNameLookupTestCase(TestCase):
     @patch.dict(os.environ, PW_SYNC_ON)
     @patch(NAME_FROM_PW, return_value="Kohde")
     def test_looks_up_the_id_without_leading_zeros(self, mock_name):
-        response = self.client.get(self.URL, {"hkrId": "01234"})
+        """Also covers other formats the serializer accepts, like "1234.0"."""
+        for value in ["01234", "1234.0"]:
+            with self.subTest(value=value):
+                response = self.client.get(self.URL, {"hkrId": value})
 
-        self.assertEqual(response.status_code, 200, msg=response.content)
-        self.assertEqual(response.json()["hkrId"], "1234")
-        mock_name.assert_called_once_with("1234")
+                self.assertEqual(response.status_code, 200, msg=response.content)
+                self.assertEqual(response.json()["hkrId"], "1234")
+        self.assertEqual([c.args for c in mock_name.call_args_list], [("1234",), ("1234",)])
 
     @patch.dict(os.environ, PW_SYNC_ON)
     @patch(
@@ -306,7 +345,7 @@ class PWProjectNameLookupTestCase(TestCase):
 
     @patch(NAME_FROM_PW)
     def test_invalid_hkr_id_returns_400_without_calling_pw(self, mock_name):
-        for value in ["", "abc", "-5", "12.5", "²"]:
+        for value in ["", "abc", "-5", "12.5", "²", "9" * 5000]:
             with self.subTest(value=value):
                 response = self.client.get(self.URL, {"hkrId": value})
                 self.assertEqual(response.status_code, 400, msg=response.content)
@@ -342,6 +381,24 @@ class PWProjectNameLookupPermissionTestCase(TestCase):
             username="planner@test.fi", email="planner@test.fi"
         )
         self.planner.ad_groups.add(planner_group)
+        self.project_manager = User.objects.create_user(
+            username="pm@test.fi", email="pm@test.fi"
+        )
+        self.project_manager.ad_groups.add(
+            ADGroup.objects.create(
+                name="sg_kymp_sso_io_projektipaallikot", display_name="Project managers"
+            )
+        )
+        # Can set hkrIds on 8 08 projects
+        self.area_planner = User.objects.create_user(
+            username="area@test.fi", email="area@test.fi"
+        )
+        self.area_planner.ad_groups.add(
+            ADGroup.objects.create(
+                name="sg_kymp_sso_io_projektialueiden_ohjelmoijat",
+                display_name="Project area planners",
+            )
+        )
 
     def _call_as(self, user):
         request = self.factory.get("/projects/pw-project-name/", {"hkrId": "1234"})
@@ -355,6 +412,14 @@ class PWProjectNameLookupPermissionTestCase(TestCase):
 
     def test_viewer_is_denied(self):
         self.assertEqual(self._call_as(self.viewer).status_code, 403)
+
+    def test_project_manager_is_denied(self):
+        # Project managers may not edit hkrId (LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER)
+        self.assertEqual(self._call_as(self.project_manager).status_code, 403)
+
+    @patch.dict(os.environ, {"PW_SYNC_ENABLED": "False"})
+    def test_project_area_planner_can_look_up(self):
+        self.assertEqual(self._call_as(self.area_planner).status_code, 200)
 
     def test_anonymous_is_denied(self):
         self.assertIn(self._call_as(None).status_code, (401, 403))
@@ -399,6 +464,25 @@ class GetProjectNameFromPWTestCase(TestCase):
             self.service, "get_project_from_pw", return_value={"relationshipInstances": []}
         ):
             self.assertIsNone(self.service.get_project_name_from_pw("1234"))
+
+    def test_malformed_pw_bodies_become_response_errors(self):
+        for body in [[], {"instances": None}, {"instances": [None]}, "not an object"]:
+            with self.subTest(body=body):
+                self.service.session = MagicMock()
+                self.service.session.get.return_value.status_code = 200
+                self.service.session.get.return_value.json.return_value = body
+                with self.assertRaises(PWProjectResponseError):
+                    self.service.get_project_name_from_pw("1234")
+
+    def test_null_pw_properties_mean_no_name(self):
+        for pw_project in [
+            {"relationshipInstances": None},
+            {"relationshipInstances": [{"relatedInstance": None}]},
+            {"relationshipInstances": [{"relatedInstance": {"properties": None}}]},
+        ]:
+            with self.subTest(pw_project=pw_project):
+                with patch.object(self.service, "get_project_from_pw", return_value=pw_project):
+                    self.assertIsNone(self.service.get_project_name_from_pw("1234"))
 
     def test_outages_and_malformed_responses_become_response_errors(self):
         for error in [
