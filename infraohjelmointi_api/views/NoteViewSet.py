@@ -136,17 +136,18 @@ class NoteViewSet(BaseViewSet):
             current_max = note.images.aggregate(Max("order"))["order__max"]
             base_order = 0 if current_max is None else current_max + 1
             for i, f in enumerate(files):
-                created.append(
-                    NoteImage.objects.create(
-                        note=note,
-                        file=f,
-                        fileName=display_file_name(f.name),
-                        contentType=(f.content_type or "").lower(),
-                        size=f.size or 0,
-                        order=base_order + i,
-                        uploadedBy=uploader,
-                    )
+                image = NoteImage(
+                    note=note,
+                    file=f,
+                    fileName=display_file_name(f.name),
+                    contentType=(f.content_type or "").lower(),
+                    size=f.size or 0,
+                    order=base_order + i,
+                    uploadedBy=uploader,
                 )
+                # Track before saving: the file is written ahead of the INSERT.
+                created.append(image)
+                image.save()
         return Response(
             NoteImageSerializer(
                 created, many=True, context={"request": request}

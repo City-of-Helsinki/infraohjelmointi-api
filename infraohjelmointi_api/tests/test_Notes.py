@@ -487,33 +487,41 @@ class NoteImageTestCase(TestCase):
         self.assertTrue(stored.endswith(".jpg"))
 
     def test_failed_batch_upload_leaves_no_files_behind(self):
-        """Each file is written to storage when its row is saved; if a later row in
-        the batch fails, the rollback drops the rows and the files must go too."""
-        real_create = NoteImage.objects.create
+        """Django writes each file to storage in pre_save, before the INSERT. If the
+        INSERT of a later file fails, the rollback drops the rows and every file
+        already written, including that one, must be removed too."""
+        from django.db import IntegrityError
+        from django.db.models.sql.compiler import SQLInsertCompiler
+
+        real_as_sql = SQLInsertCompiler.as_sql
         calls = {"n": 0}
 
-        def create_then_fail(**kwargs):
-            calls["n"] += 1
-            if calls["n"] == 2:
-                raise RuntimeError("simulated storage/DB failure")
-            return real_create(**kwargs)
+        def insert_then_fail(compiler, *args, **kwargs):
+            # as_sql runs FileField.pre_save, which writes the file to storage;
+            # failing after it reproduces an INSERT that fails once the bytes exist.
+            sql = real_as_sql(compiler, *args, **kwargs)
+            if compiler.query.model is NoteImage:
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise IntegrityError("simulated INSERT failure after the file was written")
+            return sql
 
         def stored_files():
-            found = []
+            found = set()
             for root, _dirs, files in os.walk(self._tmp_media):
-                found.extend(os.path.join(root, f) for f in files)
-            return set(found)
+                found.update(os.path.join(root, f) for f in files)
+            return found
 
         before = stored_files()
-        with patch.object(NoteImage.objects, "create", side_effect=create_then_fail):
-            with self.assertRaises(RuntimeError):
+        with patch.object(SQLInsertCompiler, "as_sql", autospec=True, side_effect=insert_then_fail):
+            with self.assertRaises(IntegrityError):
                 self.client.post(
                     "/notes/{}/images/".format(self.note_Id),
                     {"file": [self._jpeg("one.jpg"), self._jpeg("two.jpg")]},
                     format="multipart",
                 )
         self.assertEqual(calls["n"], 2)
-        self.assertFalse(NoteImage.objects.filter(note_id=self.note_Id).exists())
+        self.assertFalse(NoteImage.objects.exists())
         self.assertEqual(stored_files(), before)
 
     def test_GET_image_file_streams_bytes_with_headers(self):
@@ -560,6 +568,15 @@ class NoteImageTestCase(TestCase):
             "/notes/{}/images/not-a-uuid/file/".format(self.note_Id)
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_POST_image_rejects_name_that_does_not_match_the_declared_type(self):
+        response = self.client.post(
+            "/notes/{}/images/".format(self.note_Id),
+            {"file": SimpleUploadedFile("x.html", PNG_BYTES, content_type="image/png")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 415)
+        self.assertFalse(NoteImage.objects.filter(note_id=self.note_Id).exists())
 
     def test_POST_image_rejects_unsupported_content_type(self):
         bad = SimpleUploadedFile(
