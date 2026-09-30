@@ -61,3 +61,12 @@ def validate_note_image(uploaded_file) -> None:
         settings.NOTE_IMAGE_MAX_BYTES,
     )
 
+
+
+def validate_handover_attachment(uploaded_file) -> None:
+    """IO-857: validate a construction handover attachment upload."""
+    validate_upload(
+        uploaded_file,
+        settings.HANDOVER_ATTACHMENT_ALLOWED_TYPES,
+        settings.HANDOVER_ATTACHMENT_MAX_BYTES,
+    )

@@ -231,8 +231,17 @@ PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 CONSTRUCTION_HANDOVER_GET_ACTIONS = [
     "get_construction_handovers",
     "get_construction_handover_history",
+    # IO-857: listing and downloading attachments follow read access. Both are
+    # GET-only actions, so granting them never grants a write.
+    "attachments",
+    "download_attachment",
 ]
 CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
+# IO-857: uploading and deleting are content edits, so they go to the roles that can
+# edit a handover, not to construction management leads, whose write rights are
+# limited to update/transition. The viewset additionally rejects both with 409 while
+# the handover is locked.
+CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS = ["upload_attachment", "delete_attachment"]
 
 #### Project programme custom actions ####
 PROJECT_PROGRAMME_GET_ACTIONS = ["get_by_project"]
@@ -386,6 +395,7 @@ class IsCoordinator(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
@@ -428,6 +438,7 @@ class IsPlanner(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
@@ -472,6 +483,7 @@ class IsProjectManager(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
@@ -632,6 +644,7 @@ class IsAdmin(permissions.BasePermission):
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
                 *PROJECT_HISTORY_GET_ACTIONS,
                 *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
                 *PROJECT_PROGRAMME_GET_ACTIONS,
                 *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
