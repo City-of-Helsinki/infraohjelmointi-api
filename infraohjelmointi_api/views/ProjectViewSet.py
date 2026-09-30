@@ -59,7 +59,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework.pagination import PageNumberPagination
 import uuid
-from rest_framework import status
+from rest_framework import serializers, status
 from itertools import chain
 from django.db.models import Count, Case, When, Q, F
 from django.db.models.signals import post_save
@@ -1899,6 +1899,59 @@ class ProjectViewSet(BaseViewSet):
             qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         return qs
+
+    # IO-935: parse the lookup's hkrId exactly as ProjectCreateSerializer parses
+    # hkrId (PositiveBigIntegerField -> IntegerField)
+    _HKR_ID_FIELD = serializers.IntegerField(
+        min_value=0, max_value=9223372036854775807
+    )
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"pw-project-name",
+        name="get_pw_project_name",
+    )
+    def get_pw_project_name(self, request):
+        """
+        IO-935: look up the PW project an hkrId points to, so the user can
+        confirm it before the hkrId is saved.
+
+            Usage
+            ----------
+
+            projects/pw-project-name/?hkrId=<PW hanketunnus>
+
+            Returns
+            -------
+
+            JSON
+                {"hkrId": str, "name": PW "Kohde" or null, "syncEnabled": bool}
+                404 {"hkrId": ["PW_PROJECT_NOT_FOUND"]} if PW has no such project
+                502 {"hkrId": ["PW_UNAVAILABLE"]} if PW could not be reached
+                400 {"hkrId": ["INVALID_HKR_ID"]} if hkrId is not a valid id
+        """
+        try:
+            hkr_id = str(self._HKR_ID_FIELD.run_validation(request.query_params.get("hkrId")))
+        except ValidationError:
+            raise ValidationError({"hkrId": ["INVALID_HKR_ID"]})
+
+        if not self.projectWiseService.pw_sync_enabled:
+            return Response({"hkrId": hkr_id, "name": None, "syncEnabled": False})
+
+        try:
+            name = self.projectWiseService.get_project_name_from_pw(hkr_id)
+        except PWProjectNotFoundError:
+            return Response(
+                {"hkrId": ["PW_PROJECT_NOT_FOUND"]}, status=status.HTTP_404_NOT_FOUND
+            )
+        except PWProjectResponseError as e:
+            logger.warning(f"PW project name lookup failed for HKR ID '{hkr_id}': {e}")
+            return Response(
+                {"hkrId": ["PW_UNAVAILABLE"]}, status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        return Response({"hkrId": hkr_id, "name": name, "syncEnabled": True})
 
     def _sync_project_to_projectwise(self, request_data: dict, original_project: Project, updated_project: Project):
         """
