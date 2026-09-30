@@ -252,3 +252,6 @@ urlpatterns = [
     path("helauth/", include("helusers.urls")),
     path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+# MEDIA_URL is deliberately not served: uploaded files are only reachable through
+# the permission-checked API download endpoints (static() would expose MEDIA_ROOT
+# without auth whenever DEBUG is on, as it is in the testing environment).

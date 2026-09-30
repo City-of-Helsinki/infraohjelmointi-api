@@ -30,6 +30,32 @@ services:
       timeout: 3s
       retries: 3
 
+  # Local stand-in for Azure Blob Storage (IO-812 / IO-857). Off the critical path:
+  # with no AZURE_BLOB_STORAGE_* env vars set the API just uses FileSystemStorage, so
+  # this only matters when you want to exercise the real blob code path locally.
+  # Platta documents Azurite as the supported local emulator.
+  #
+  # To use it, set in .env (well-known Azurite dev account, not a secret):
+  #   AZURE_BLOB_STORAGE_NAME=devstoreaccount1
+  #   AZURE_BLOB_STORAGE_CONTAINER=infraohjelmointi-media
+  #   AZURE_BLOB_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+  # then create the container once, e.g. via Azure Storage Explorer or az CLI.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: infraohjelmointi-azurite
+    command:
+      - azurite-blob
+      - --blobHost
+      - 0.0.0.0
+      - --blobPort
+      - "10000"
+      - --location
+      - /data
+    ports:
+      - "127.0.0.1:10000:10000"
+    volumes:
+      - azurite-data:/data
+
   api:
     image: infraohjelmointi_api
     build:
@@ -51,6 +77,7 @@ services:
 volumes:
   database-volume: {}
   redis-data: {}
+  azurite-data: {}
 
 networks:
   default:

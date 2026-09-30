@@ -1,6 +1,7 @@
 from infraohjelmointi_api.models import Note
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.NoteHistorySerializer import NoteHistorySerializer
+from infraohjelmointi_api.serializers.NoteImageSerializer import NoteImageSerializer
 from infraohjelmointi_api.serializers.NotePersonSerializer import NotePersonSerializer
 from rest_framework import serializers
 from overrides import override
@@ -28,5 +29,9 @@ class NoteUpdateSerializer(serializers.ModelSerializer):
             if instance.history
             else None
         )
+
+        rep["images"] = NoteImageSerializer(
+            instance.images.all(), many=True, context=self.context
+        ).data
 
         return rep
