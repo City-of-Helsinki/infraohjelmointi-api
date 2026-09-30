@@ -2075,7 +2075,11 @@ class ProjectViewSet(BaseViewSet):
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
             qs = ConstructionHandoverGetSerializer(
-                instance.constructionhandover_set.all(),
+                # Same prefetch as ConstructionHandoverViewSet.get_queryset, so the
+                # embedded financing rows and attachments are not one query each.
+                instance.constructionhandover_set.prefetch_related(
+                    "financing", "financing__budgetItem", "attachments"
+                ),
                 many=True
             ).data
             return Response(qs)

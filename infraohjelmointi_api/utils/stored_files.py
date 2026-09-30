@@ -74,12 +74,18 @@ def cleanup_files_on_error(saved_rows):
     """Delete the stored files of rows created inside a block that then fails.
 
     Use outside transaction.atomic(): the rollback discards the rows, but each
-    file was already written to storage when its row was saved.
+    file was already written to storage when its row was saved. Append each row
+    *before* saving it: Django writes the file in pre_save, ahead of the INSERT,
+    so a row whose INSERT fails still has a file to remove. Files that never
+    reached storage (_committed is False) still carry the client's original
+    name and are skipped.
     """
     try:
         yield
     except Exception:
         for row in saved_rows:
+            if not row.file or not row.file._committed:
+                continue
             try:
                 row.file.storage.delete(row.file.name)
             except Exception:
