@@ -3,12 +3,15 @@ import uuid
 
 from overrides import override
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, MultiPartParser
 
-from infraohjelmointi_api.models import ConstructionHandover
+from infraohjelmointi_api.models import ConstructionHandover, ConstructionHandoverAttachment
 from infraohjelmointi_api.services.ConstructionHandoverHistoryService import (
     build_history,
 )
@@ -27,14 +30,29 @@ from ..services.ConstructionHandoverTransitionPermissionService import (
 )
 from ..services.ProjectPhaseService import ProjectPhaseService
 from ..services.ProjectPhaseDetailService import ProjectPhaseDetailService
+from ..utils.stored_files import (
+    cleanup_files_on_error,
+    display_file_name,
+    stored_file_response,
+)
+from ..utils.upload_validation import validate_handover_attachment
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
     ConstructionHandoverCreateSerializer,
-    ConstructionHandoverUpdateSerializer
+    ConstructionHandoverUpdateSerializer,
+    ConstructionHandoverAttachmentSerializer,
 )
 
 
 logger = logging.getLogger(__name__)
+# Mirrors LOCKED_HANDOVER_EDIT_ERROR in ConstructionHandoverFinancingViewSet: the
+# ticket asks attachments to follow the same rule as financing rows, which is
+# ConstructionHandover.is_locked (editable in DRAFT and SUBMITTED_TO_PROGRAMMER).
+LOCKED_HANDOVER_ATTACHMENT_ERROR = (
+    "Attachments can only be added or removed while the construction handover is in "
+    "DRAFT or SUBMITTED_TO_PROGRAMMER status."
+)
+
 
 class ConstructionHandoverViewSet(BaseViewSet):
     ALLOWED_STATUS_TRANSITIONS = {
@@ -53,7 +71,11 @@ class ConstructionHandoverViewSet(BaseViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action in ["list", "retrieve"]:
-            return queryset.prefetch_related("financing", "financing__budgetItem")
+            # attachments is prefetched too, else embedding it in the GET serializer
+            # is an N+1 across a handover list.
+            return queryset.prefetch_related(
+                "financing", "financing__budgetItem", "attachments"
+            )
         return queryset
 
     @override
@@ -153,6 +175,141 @@ class ConstructionHandoverViewSet(BaseViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         return super().destroy(request, *args, **kwargs)
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"attachments",
+        url_name="attachments",
+        name="handover_attachments",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def attachments(self, request, pk):
+        """List the attachments of a handover (IO-857).
+
+        GET /construction-handovers/<id>/attachments/  -> ConstructionHandoverAttachment[]
+        """
+        handover = self.get_object()
+        return Response(
+            ConstructionHandoverAttachmentSerializer(
+                handover.attachments.all(), many=True, context={"request": request}
+            ).data
+        )
+
+    # A separate action name for POST on the same URL keeps the permission
+    # allowlists honest: granting "attachments" (read) never grants uploads,
+    # even in role classes that do not check the HTTP method.
+    @attachments.mapping.post
+    def upload_attachment(self, request, pk):
+        """Upload attachments to a handover (IO-857).
+
+        POST /construction-handovers/<id>/attachments/  -> created rows (multipart, field 'file' x N)
+        """
+        handover = self.get_object()
+        # Same rule as financing rows: ConstructionHandover.is_locked.
+        if handover.is_locked:
+            return Response(
+                {"detail": LOCKED_HANDOVER_ATTACHMENT_ERROR},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        files = request.FILES.getlist("file")
+        if not files:
+            raise ValidationError({"file": "At least one file is required."})
+
+        # Validate the whole batch first so one bad file rejects the request before
+        # any row or blob is written, rather than leaving a half-applied upload.
+        for f in files:
+            validate_handover_attachment(f)
+
+        uploader = self._get_authenticated_user(request)
+        created = []
+        with cleanup_files_on_error(created), transaction.atomic():
+            for f in files:
+                attachment = ConstructionHandoverAttachment(
+                    handover=handover,
+                    file=f,
+                    originalName=display_file_name(f.name),
+                    contentType=(f.content_type or "").lower(),
+                    size=f.size or 0,
+                    uploadedBy=uploader,
+                )
+                # Track before saving: the file is written ahead of the INSERT.
+                created.append(attachment)
+                attachment.save()
+        return Response(
+            ConstructionHandoverAttachmentSerializer(
+                created, many=True, context={"request": request}
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"attachments/(?P<attachment_id>[^/.]+)/download",
+        url_name="download-attachment",
+        name="download_handover_attachment",
+    )
+    def download_attachment(self, request, pk, attachment_id):
+        """Stream one attachment back to the caller (IO-857).
+
+        GET /construction-handovers/<id>/attachments/<aid>/download/
+
+        Always proxied through the API, never a storage URL: see
+        utils/stored_files.py for why (the container SAS token must stay
+        server-side, and short-lived per-blob SAS links are not possible with
+        SAS-only auth).
+        """
+        attachment = self._get_attachment_or_404(pk, attachment_id)
+        if not attachment.file:
+            raise NotFound("Attachment has no stored file.")
+
+        return stored_file_response(
+            attachment.file,
+            attachment.contentType,
+            attachment.originalName,
+            as_attachment=True,
+        )
+
+    @action(
+        methods=["delete"],
+        detail=True,
+        url_path=r"attachments/(?P<attachment_id>[^/.]+)",
+        url_name="delete-attachment",
+        name="delete_handover_attachment",
+    )
+    def delete_attachment(self, request, pk, attachment_id):
+        """Delete one attachment (IO-857).
+
+        DELETE /construction-handovers/<id>/attachments/<aid>/  -> 204
+        """
+        handover = self.get_object()
+        if handover.is_locked:
+            return Response(
+                {"detail": LOCKED_HANDOVER_ATTACHMENT_ERROR},
+                status=status.HTTP_409_CONFLICT,
+            )
+        attachment = self._get_attachment_or_404(pk, attachment_id, handover=handover)
+        # The file is removed on commit by the post_delete signal in signals.py.
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _get_attachment_or_404(self, pk, attachment_id, handover=None):
+        """Resolve an attachment scoped to its handover, validating the UUID first.
+
+        Scoping by handover matters: without it, a caller who can read one handover
+        could pass another handover's attachment id and get its file.
+        """
+        try:
+            uuid.UUID(str(attachment_id))
+        except ValueError:
+            raise ValidationError({"attachmentId": "Invalid UUID."})
+        if handover is None:
+            handover = self.get_object()
+        return get_object_or_404(
+            ConstructionHandoverAttachment, pk=attachment_id, handover=handover
+        )
 
     def _get_possible_status_transitions(self, current_status):
         return self.ALLOWED_STATUS_TRANSITIONS.get(current_status, [])

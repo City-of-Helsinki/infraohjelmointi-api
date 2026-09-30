@@ -9,6 +9,8 @@ stable string codes ("unsupported_media_type", "payload_too_large") instead of
 parsing prose.
 """
 
+import os
+
 from django.conf import settings
 from rest_framework import status
 from rest_framework.exceptions import APIException
@@ -26,6 +28,15 @@ class UploadTooLarge(APIException):
     default_code = "payload_too_large"
 
 
+# File extensions accepted for each content type. The declared content type comes
+# from the client, so the name must agree with it: otherwise e.g. "x.html" sent as
+# image/png would be stored and later downloaded under its .html name.
+EXTENSIONS_BY_TYPE = {
+    "image/jpeg": (".jpg", ".jpeg"),
+    "image/png": (".png",),
+}
+
+
 def _describe_types(allowed_types) -> str:
     """Render MIME types the way the UI shows them ("jpg, png")."""
     return ", ".join(t.rsplit("/", 1)[-1] for t in allowed_types)
@@ -39,6 +50,15 @@ def validate_upload(uploaded_file, allowed_types, max_bytes) -> None:
             detail=(
                 f"Tiedostotyyppi '{content_type or 'tuntematon'}' ei ole sallittu. "
                 f"Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
+            )
+        )
+
+    extension = os.path.splitext(uploaded_file.name or "")[1].lower()
+    if extension not in EXTENSIONS_BY_TYPE.get(content_type, ()):
+        raise UnsupportedUploadType(
+            detail=(
+                f"Tiedostopääte '{extension or 'puuttuu'}' ei vastaa tiedostotyyppiä "
+                f"'{content_type}'. Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
             )
         )
 
@@ -61,3 +81,12 @@ def validate_note_image(uploaded_file) -> None:
         settings.NOTE_IMAGE_MAX_BYTES,
     )
 
+
+
+def validate_handover_attachment(uploaded_file) -> None:
+    """IO-857: validate a construction handover attachment upload."""
+    validate_upload(
+        uploaded_file,
+        settings.HANDOVER_ATTACHMENT_ALLOWED_TYPES,
+        settings.HANDOVER_ATTACHMENT_MAX_BYTES,
+    )
