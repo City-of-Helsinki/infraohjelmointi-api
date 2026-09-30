@@ -59,7 +59,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework.pagination import PageNumberPagination
 import uuid
-from rest_framework import status
+from rest_framework import serializers, status
 from itertools import chain
 from django.db.models import Count, Case, When, Q, F
 from django.db.models.signals import post_save
@@ -1539,7 +1539,9 @@ class ProjectViewSet(BaseViewSet):
                 for projectData in data:
                     self._require_pw_link_confirmation(
                         projectData["data"],
-                        current_hkr_id=original_hkr_ids.get(str(projectData["id"])),
+                        # ids are validated UUIDs, but may differ from str(p.id)
+                        # in case or hyphenation
+                        current_hkr_id=original_hkr_ids.get(str(uuid.UUID(projectData["id"]))),
                     )
                 # Also capture which projects are getting hkrId in this request
                 hkr_ids_in_request = {
@@ -1921,11 +1923,22 @@ class ProjectViewSet(BaseViewSet):
 
         return qs
 
-    @staticmethod
-    def _parse_hkr_id(value) -> int | None:
+    # IO-935: parse hkrIds exactly as ProjectCreateSerializer does
+    # (PositiveBigIntegerField -> IntegerField), so every value the serializer
+    # would save ("1234.0", "+1234", "1_234", ...) is also seen by the guard.
+    _HKR_ID_FIELD = serializers.IntegerField(
+        min_value=0, max_value=9223372036854775807
+    )
+
+    @classmethod
+    def _parse_hkr_id(cls, value) -> int | None:
         """An hkrId as the int it is stored as, or None if empty or not a valid id."""
-        value = str(value if value is not None else "").strip()
-        return int(value) if value.isascii() and value.isdigit() else None
+        if value is None or str(value).strip() == "":
+            return None
+        try:
+            return cls._HKR_ID_FIELD.run_validation(value)
+        except ValidationError:
+            return None
 
     def _require_pw_link_confirmation(self, data: dict, current_hkr_id) -> None:
         """
