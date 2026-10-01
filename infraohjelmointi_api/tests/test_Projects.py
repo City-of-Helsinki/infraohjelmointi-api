@@ -734,7 +734,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             "hashTags": [],
             "projectLocation": None,
             "projectClass": None,
-            "projectProgram": None,
+            "additionalInformation": None,
             "responsibleZone": None,
             "bridgeNumber": None,
             "masterPlanAreaNumber": None,
