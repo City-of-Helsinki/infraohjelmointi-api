@@ -5,7 +5,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "infraohjelmointi_api",
-            "0118_historicalprojectprogrammetrafficplanningcriteria_cartraffic_and_more",
+            "0119_noteimage",
         ),
     ]
 
