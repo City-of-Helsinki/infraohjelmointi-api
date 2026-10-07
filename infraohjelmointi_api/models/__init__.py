@@ -57,3 +57,4 @@ from .ProjectProgrammeMaintenanceNeeds import ProjectProgrammeMaintenanceNeeds
 from .ProjectProgrammeInteractionAndRelatedProjects import ProjectProgrammeInteractionAndRelatedProjects
 from .ProjectProgrammeOtherAttachments import ProjectProgrammeOtherAttachments
 from .ProjectProgrammeLink import ProjectProgrammeLink
+from .ProjectProgrammeAttachment import ProjectProgrammeAttachment

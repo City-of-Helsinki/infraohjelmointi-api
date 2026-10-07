@@ -17,7 +17,11 @@ from django.dispatch import receiver
 from django.db.models.signals import post_delete, pre_save
 from django_eventstream import send_event
 from .models import ProjectFinancial, ProjectCategory
-from .models import ConstructionHandoverAttachment, NoteImage
+from .models import (
+    ConstructionHandoverAttachment,
+    NoteImage,
+    ProjectProgrammeAttachment,
+)
 
 logger = logging.getLogger("infraohjelmointi_api")
 
@@ -763,14 +767,16 @@ def reconcile_finances_on_schedule_change(sender, instance, **kwargs):
             )
 
 
-# IO-812 / IO-857: an uploaded file must not outlive its row. Rows are deleted by the
-# API's delete endpoints, by CASCADE (Note -> Project, attachment -> handover) and
+# IO-812 / IO-857 / IO-914: an uploaded file must not outlive its row. Rows are
+# deleted by the API's delete endpoints, by CASCADE (Note -> Project, attachment ->
+# handover, programme -> section -> attachment) and
 # from the admin, so the storage cleanup lives here rather than in the views. It runs
 # on commit: if the surrounding transaction rolls back, the row comes back and so
 # must its file. robust=True logs a storage failure instead of failing a delete that
 # already committed; the cost of that failure is an orphaned blob, not a broken row.
 @receiver(post_delete, sender=NoteImage)
 @receiver(post_delete, sender=ConstructionHandoverAttachment)
+@receiver(post_delete, sender=ProjectProgrammeAttachment)
 def delete_uploaded_file(sender, instance, **kwargs):
     if not instance.file:
         return
