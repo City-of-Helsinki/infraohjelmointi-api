@@ -20,6 +20,7 @@ from infraohjelmointi_api.models import (
     ProjectProgramme,
     ProjectProgrammeAttachment,
     ProjectProgrammeLink,
+    ProjectProgrammeLocationMap,
     ProjectProgrammeMaintenanceNeeds,
     ProjectProgrammeOtherAttachments,
     ProjectProgrammeTrafficPlanningCriteria,
@@ -38,6 +39,7 @@ from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
 )
 from infraohjelmointi_api.serializers import (
     ProjectProgrammeAttachmentSerializer,
+    ProjectProgrammeLocationMapSerializer,
     ProjectProgrammeBasicInfoGetSerializer,
     ProjectProgrammeBasicInfoUpdateSerializer,
     ProjectProgrammeCreateSerializer,
@@ -66,14 +68,18 @@ from infraohjelmointi_api.utils.stored_files import (
 )
 from infraohjelmointi_api.utils.upload_validation import (
     validate_project_programme_attachment,
+    validate_project_programme_location_map,
 )
 
 from .BaseViewSet import BaseViewSet
 
-# IO-914: files follow the same DRAFT-only rule as the content they belong to.
+# IO-914 / IO-936: files follow the same DRAFT-only rule as the content they belong to.
 LOCKED_SECTION_ATTACHMENT_ERROR = (
     "Attachments can only be added or removed while the project programme and the "
     "section are in DRAFT status."
+)
+LOCKED_LOCATION_MAP_ERROR = (
+    "The location map can only be changed while the project programme is in DRAFT status."
 )
 
 
@@ -122,6 +128,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 "maintenanceNeeds",
                 "interactionAndRelatedProjects",
                 "otherAttachments",
+                "locationMap",
             )
         if self.action in ["list", "retrieve", "get_by_project"]:
             # IO-914: each section's GET serializer embeds its attachments.
@@ -849,4 +856,96 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
         # The file is removed on commit by the post_delete signal in signals.py.
         attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path="location-map",
+        url_name="location-map",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def location_map(self, request, pk=None):
+        """Serve the programme's location map image (IO-936).
+
+        GET /project-programmes/<id>/location-map/ -> the image, or 404 if none
+        """
+        programme = self.get_object()
+        location_map = getattr(programme, "locationMap", None)
+        if location_map is None or not location_map.file:
+            raise NotFound("Project programme has no location map.")
+        return stored_file_response(
+            location_map.file,
+            location_map.contentType,
+            location_map.originalName,
+        )
+
+    # POST rather than PUT: the viewset does not allow PUT (http_method_names), and
+    # enabling it would also open PUT on the default update route. The map is
+    # programme-level content, so writes need the same rights as a programme PATCH
+    # (_assert_can_edit_or_complete), not just the role allowlist.
+    @location_map.mapping.post
+    def upload_location_map(self, request, pk=None):
+        """Set or replace the programme's location map (IO-936).
+
+        POST /project-programmes/<id>/location-map/ (multipart, one 'file')
+        -> 201 when added, 200 when replaced
+        """
+        programme = self.get_object()
+        self._assert_can_edit_or_complete(request, programme.project)
+        if programme.is_locked:
+            return Response(
+                {"detail": LOCKED_LOCATION_MAP_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+
+        files = request.FILES.getlist("file")
+        if len(files) != 1:
+            raise ValidationError({"file": "Exactly one file is required."})
+        uploaded = files[0]
+        validate_project_programme_location_map(uploaded)
+
+        new_map = ProjectProgrammeLocationMap(
+            project_programme=programme,
+            file=uploaded,
+            originalName=display_file_name(uploaded.name),
+            contentType=(uploaded.content_type or "").lower(),
+            size=uploaded.size or 0,
+            uploadedBy=self._get_authenticated_user(request),
+        )
+        saved = []
+        with cleanup_files_on_error(saved), transaction.atomic():
+            # Lock the programme row so concurrent replacements queue up instead of
+            # colliding on the one-to-one constraint.
+            list(ProjectProgramme.objects.select_for_update().filter(pk=programme.pk))
+            # The old file is removed on commit by the post_delete signal, so a
+            # failed replacement keeps the previous map and its file intact.
+            replaced, _ = ProjectProgrammeLocationMap.objects.filter(
+                project_programme=programme
+            ).delete()
+            # Track before saving: the file is written ahead of the INSERT.
+            saved.append(new_map)
+            new_map.save()
+
+        return Response(
+            ProjectProgrammeLocationMapSerializer(new_map).data,
+            status=status.HTTP_200_OK if replaced else status.HTTP_201_CREATED,
+        )
+
+    @location_map.mapping.delete
+    def delete_location_map(self, request, pk=None):
+        """Remove the programme's location map (IO-936).
+
+        DELETE /project-programmes/<id>/location-map/ -> 204
+        """
+        programme = self.get_object()
+        self._assert_can_edit_or_complete(request, programme.project)
+        if programme.is_locked:
+            return Response(
+                {"detail": LOCKED_LOCATION_MAP_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+        location_map = getattr(programme, "locationMap", None)
+        if location_map is None:
+            raise NotFound("Project programme has no location map.")
+        # The file is removed on commit by the post_delete signal in signals.py.
+        location_map.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

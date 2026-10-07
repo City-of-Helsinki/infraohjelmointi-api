@@ -1,7 +1,7 @@
 """Shared validation for user-uploaded files.
 
 Introduced for IO-812 (note images). The rules are parameterised by
-(allowed content types, max bytes) so IO-857 and IO-914 reuse
+(allowed content types, max bytes) so IO-857, IO-914 and IO-936 reuse
 the same validate_upload() with their own constraints.
 
 The exceptions surface as drf-standardized-errors responses, so the UI can branch on
@@ -103,4 +103,13 @@ def validate_project_programme_attachment(uploaded_file) -> None:
         uploaded_file,
         settings.PROJECT_PROGRAMME_ATTACHMENT_ALLOWED_TYPES,
         settings.PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES,
+    )
+
+
+def validate_project_programme_location_map(uploaded_file) -> None:
+    """IO-936: validate a project programme location map upload."""
+    validate_upload(
+        uploaded_file,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_ALLOWED_TYPES,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES,
     )

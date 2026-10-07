@@ -1,7 +1,8 @@
-"""IO-914: project programme section attachments.
+"""IO-914 / IO-936: project programme section attachments and location map.
 
-Covers upload, list, download and delete, validation, the DRAFT lock, scoping to the
-programme, cleanup of stored files, and the real role permissions
+Covers upload, list, download and delete of section attachments, the location map's
+set/replace/serve/delete cycle, validation, the DRAFT lock, scoping to the programme,
+cleanup of stored files, and the real role permissions
 (ProjectProgrammeAttachmentPermissionTestCase).
 """
 
@@ -24,6 +25,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeAttachment,
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
+    ProjectProgrammeLocationMap,
     User,
 )
 from infraohjelmointi_api.views import BaseViewSet
@@ -256,6 +258,7 @@ class ProjectProgrammeSectionAttachmentTestCase(_TempMediaMixin, APITestCase):
             [a["originalName"] for a in body["designCriteria"]["attachments"]],
             ["kriteerit.png"],
         )
+        self.assertIsNone(body["locationMap"])
 
     def _attachment_query_count(self, url):
         table = ProjectProgrammeAttachment._meta.db_table
@@ -399,6 +402,147 @@ class ProjectProgrammeSectionAttachmentTestCase(_TempMediaMixin, APITestCase):
         self.assertEqual(download.status_code, status.HTTP_200_OK)
 
 
+@patch.object(BaseViewSet, "authentication_classes", new=[])
+@patch.object(BaseViewSet, "permission_classes", new=[])
+class ProjectProgrammeLocationMapTestCase(_TempMediaMixin, APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="IO-936 project", description="d")
+        self.programme = ProjectProgramme.objects.create(project=self.project)
+        self.url = "/project-programmes/{}/location-map/".format(self.programme.id)
+        # Map writes check programme edit rights in the view itself
+        # (_assert_can_edit_or_complete), which the patched permissions do not skip.
+        from helusers.models import ADGroup
+
+        admin = User.objects.create_user(username="io936_admin", password="x")
+        admin.ad_groups.add(ADGroup.objects.create(name="sg_kymp_sso_io_admin", display_name="a"))
+        self.client.force_authenticate(user=admin)
+
+    def _post(self, *files):
+        return self.client.post(self.url, data={"file": list(files)}, format="multipart")
+
+    def test_POST_sets_the_map_and_returns_201(self):
+        response = self._post(_png())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+
+        location_map = ProjectProgrammeLocationMap.objects.get()
+        self.assertEqual(location_map.project_programme, self.programme)
+        self.assertEqual(location_map.originalName, "kartta.png")
+        self.assertTrue(location_map.file.name.startswith("project_programme_location_maps/"))
+        self.assertEqual(response.json()["url"], self.url)
+
+    def test_POST_replaces_the_previous_map_and_its_file(self):
+        self._post(_png("vanha.png"))
+        old_path = ProjectProgrammeLocationMap.objects.get().file.path
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._post(_jpeg("uusi.jpg"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(ProjectProgrammeLocationMap.objects.get().originalName, "uusi.jpg")
+        self.assertFalse(os.path.exists(old_path))
+
+    def test_failed_replacement_keeps_the_previous_map(self):
+        from django.db import IntegrityError
+        from django.db.models.sql.compiler import SQLInsertCompiler
+
+        self._post(_png("vanha.png"))
+        old = ProjectProgrammeLocationMap.objects.get()
+        files_before = self._stored_files()
+        real_as_sql = SQLInsertCompiler.as_sql
+
+        def fail_map_insert(compiler, *args, **kwargs):
+            sql = real_as_sql(compiler, *args, **kwargs)
+            if compiler.query.model is ProjectProgrammeLocationMap:
+                raise IntegrityError("simulated INSERT failure after the file was written")
+            return sql
+
+        with self.captureOnCommitCallbacks(execute=True):
+            with patch.object(SQLInsertCompiler, "as_sql", autospec=True, side_effect=fail_map_insert):
+                with self.assertRaises(IntegrityError):
+                    self._post(_jpeg("uusi.jpg"))
+        self.assertEqual(ProjectProgrammeLocationMap.objects.get().pk, old.pk)
+        self.assertTrue(os.path.exists(old.file.path))
+        self.assertEqual(self._stored_files(), files_before)
+
+    def test_POST_accepts_images_only(self):
+        response = self._post(
+            SimpleUploadedFile("kartta.pdf", PDF_BYTES, content_type="application/pdf")
+        )
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+        self.assertFalse(ProjectProgrammeLocationMap.objects.exists())
+
+    def test_POST_rejects_file_over_size_limit(self):
+        with self.settings(PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES=len(PNG_BYTES) - 1):
+            response = self._post(_png())
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+    def test_POST_requires_exactly_one_file(self):
+        self.assertEqual(
+            self.client.post(self.url, data={}, format="multipart").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(self._post(_png("a.png"), _png("b.png")).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ProjectProgrammeLocationMap.objects.exists())
+
+    def test_GET_serves_the_image_inline(self):
+        self._post(_png())
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertNotIn("attachment", response.get("Content-Disposition", ""))
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(b"".join(response.streaming_content), PNG_BYTES)
+
+    def test_GET_without_map_returns_404(self):
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_programme_GET_embeds_the_map(self):
+        self._post(_png())
+        body = self.client.get("/project-programmes/{}/".format(self.programme.id)).json()
+        self.assertEqual(body["locationMap"]["originalName"], "kartta.png")
+        self.assertEqual(body["locationMap"]["url"], self.url)
+
+    def test_DELETE_removes_row_and_file(self):
+        self._post(_png())
+        stored_path = ProjectProgrammeLocationMap.objects.get().file.path
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(ProjectProgrammeLocationMap.objects.exists())
+        self.assertFalse(os.path.exists(stored_path))
+
+    def test_DELETE_without_map_returns_404(self):
+        self.assertEqual(self.client.delete(self.url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_POST_and_DELETE_are_rejected_when_programme_is_locked(self):
+        self._post(_png())
+        self.programme.status = "COMPLETE"
+        self.programme.save()
+
+        self.assertEqual(self._post(_jpeg()).status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(self.client.delete(self.url).status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(ProjectProgrammeLocationMap.objects.get().originalName, "kartta.png")
+        # Reading still works.
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_200_OK)
+
+    def test_completing_without_a_map_is_allowed(self):
+        """Required-ness is a UI form rule, like the other required programme fields."""
+        response = self.client.post(
+            "/project-programmes/{}/transitions/".format(self.programme.id),
+            {"to": "COMPLETE"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+
+    def test_deleting_programme_removes_the_map_file(self):
+        self._post(_png())
+        stored_path = ProjectProgrammeLocationMap.objects.get().file.path
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.programme.delete()
+        self.assertFalse(os.path.exists(stored_path))
+
+
 class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase):
     """The endpoints must pass the real permission classes: a missing allowlist entry
     is a 403 for real users that permission-patched tests cannot see (IO-812)."""
@@ -412,6 +556,7 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
         self.section_url = "/project-programmes/{}/sections/basic-info/attachments/".format(
             self.programme.id
         )
+        self.map_url = "/project-programmes/{}/location-map/".format(self.programme.id)
 
     def _user_in_group(self, group_name):
         from helusers.models import ADGroup
@@ -429,13 +574,21 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
         )
 
     def _seed(self):
-        return ProjectProgrammeAttachment.objects.create(
+        attachment = ProjectProgrammeAttachment.objects.create(
             sectionObject=self.basic_info,
             file=_jpeg(),
             originalName="kuva.jpg",
             contentType="image/jpeg",
             size=len(JPEG_BYTES),
         )
+        ProjectProgrammeLocationMap.objects.create(
+            project_programme=self.programme,
+            file=_png(),
+            originalName="kartta.png",
+            contentType="image/png",
+            size=len(PNG_BYTES),
+        )
+        return attachment
 
     def test_every_editing_role_can_upload_and_delete(self):
         from infraohjelmointi_api.permissions import (
@@ -451,6 +604,7 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
         ):
             with self.subTest(group=group_name):
                 self.client.force_login(self._user_in_group(group_name))
+                can_edit_programme = group_name != "sg_kymp_sso_io_projektipaallikot"
 
                 upload = self.client.post(self.section_url, {"file": _jpeg()}, format="multipart")
                 self.assertEqual(upload.status_code, status.HTTP_201_CREATED, upload.content)
@@ -460,6 +614,27 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
                 self.assertEqual(download.status_code, status.HTTP_200_OK)
                 delete = self.client.delete(self._attachment_url(upload.json()[0]["id"]))
                 self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
+
+                if not can_edit_programme:
+                    continue  # see test_commissioning_manager_cannot_change_the_location_map
+                upload_map = self.client.post(self.map_url, {"file": _png()}, format="multipart")
+                self.assertIn(upload_map.status_code, (200, 201), upload_map.content)
+                self.assertEqual(self.client.get(self.map_url).status_code, status.HTTP_200_OK)
+                delete_map = self.client.delete(self.map_url)
+                self.assertEqual(delete_map.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_commissioning_manager_cannot_change_the_location_map(self):
+        """The map is programme-level content, so it follows programme PATCH rights:
+        commissioning managers may only return a programme to DRAFT. They can still
+        add section attachments, like they can edit sections and links."""
+        self._seed()
+        self.client.force_login(self._user_in_group("sg_kymp_sso_io_projektipaallikot"))
+
+        self.assertEqual(self.client.get(self.map_url).status_code, status.HTTP_200_OK)
+        upload_map = self.client.post(self.map_url, {"file": _png()}, format="multipart")
+        self.assertEqual(upload_map.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.delete(self.map_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(ProjectProgrammeLocationMap.objects.get().originalName, "kartta.png")
 
     def test_read_only_roles_can_read_but_not_write(self):
         attachment = self._seed()
@@ -473,19 +648,27 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
                 self.assertEqual(self.client.get(self.section_url).status_code, status.HTTP_200_OK)
                 download = self.client.get(self._attachment_url(attachment.id, "download/"))
                 self.assertEqual(download.status_code, status.HTTP_200_OK)
+                self.assertEqual(self.client.get(self.map_url).status_code, status.HTTP_200_OK)
 
                 upload = self.client.post(self.section_url, {"file": _jpeg()}, format="multipart")
                 self.assertEqual(upload.status_code, status.HTTP_403_FORBIDDEN)
                 delete = self.client.delete(self._attachment_url(attachment.id))
                 self.assertEqual(delete.status_code, status.HTTP_403_FORBIDDEN)
+                upload_map = self.client.post(self.map_url, {"file": _png()}, format="multipart")
+                self.assertEqual(upload_map.status_code, status.HTTP_403_FORBIDDEN)
+                delete_map = self.client.delete(self.map_url)
+                self.assertEqual(delete_map.status_code, status.HTTP_403_FORBIDDEN)
 
         self.assertEqual(ProjectProgrammeAttachment.objects.count(), 1)
+        self.assertTrue(ProjectProgrammeLocationMap.objects.exists())
 
     def test_unauthenticated_user_is_rejected(self):
         attachment = self._seed()
         for response in (
             self.client.get(self.section_url),
             self.client.get(self._attachment_url(attachment.id, "download/")),
+            self.client.get(self.map_url),
             self.client.post(self.section_url, {"file": _jpeg()}, format="multipart"),
+            self.client.post(self.map_url, {"file": _png()}, format="multipart"),
         ):
             self.assertIn(response.status_code, (401, 403))

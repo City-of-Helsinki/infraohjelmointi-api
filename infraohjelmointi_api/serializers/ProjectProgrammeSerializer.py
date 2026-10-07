@@ -13,7 +13,10 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeUrbanSpacingPlanningCriteria,
 )
 
-from .ProjectProgrammeAttachmentSerializer import get_section_attachments
+from .ProjectProgrammeAttachmentSerializer import (
+    ProjectProgrammeLocationMapSerializer,
+    get_section_attachments,
+)
 
 
 class ProjectProgrammeDraftOnlyUpdateMixin:
@@ -444,6 +447,7 @@ class ProjectProgrammeGetSerializer(serializers.ModelSerializer):
         ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(read_only=True)
     )
     otherAttachments = ProjectProgrammeOtherAttachmentsGetSerializer(read_only=True)
+    locationMap = ProjectProgrammeLocationMapSerializer(read_only=True)
 
     class Meta:
         model = ProjectProgramme

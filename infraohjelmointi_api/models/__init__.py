@@ -58,3 +58,4 @@ from .ProjectProgrammeInteractionAndRelatedProjects import ProjectProgrammeInter
 from .ProjectProgrammeOtherAttachments import ProjectProgrammeOtherAttachments
 from .ProjectProgrammeLink import ProjectProgrammeLink
 from .ProjectProgrammeAttachment import ProjectProgrammeAttachment
+from .ProjectProgrammeLocationMap import ProjectProgrammeLocationMap
