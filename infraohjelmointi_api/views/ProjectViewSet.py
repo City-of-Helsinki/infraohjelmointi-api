@@ -1722,6 +1722,74 @@ class ProjectViewSet(BaseViewSet):
         else:
             return False
 
+    def _filter_projects_directly_by_hierarchy(
+        self, qs, search_ids, model_class, for_coordinator
+    ):
+        if model_class.__name__ == "ProjectLocation":
+            if for_coordinator:
+                return qs.filter(
+                    Q(projectLocation__coordinatorLocation__in=search_ids)
+                    | Q(projectLocation__parent__coordinatorLocation__in=search_ids)
+                    | Q(
+                        projectLocation__parent__parent__coordinatorLocation__in=search_ids
+                    )
+                )
+            return qs.filter(projectLocation__in=search_ids)
+
+        if model_class.__name__ == "ProjectClass":
+            if for_coordinator:
+                return qs.filter(projectClass__coordinatorClass__in=search_ids)
+            return qs.filter(
+                projectClass__in=search_ids, projectLocation__isnull=True
+            )
+
+        return None
+
+    def _get_hierarchy_ids(
+        self,
+        search_ids,
+        model_class,
+        has_parent,
+        has_parent_parent,
+        has_parent_parent_parent,
+        has_parent_parent_parent_parent,
+        for_coordinator,
+    ):
+        matching_nodes = model_class.objects.filter(
+            id__in=search_ids,
+            parent__isnull=not has_parent,
+            parent__parent__isnull=not has_parent_parent,
+            parent__parent__parent__isnull=not has_parent_parent_parent,
+            parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+            forCoordinatorOnly=for_coordinator,
+        ).distinct()
+
+        if model_class.__name__ == "ProjectClass":
+            ids = list(matching_nodes.values_list("id", flat=True))
+            frontier_ids = ids
+
+            while frontier_ids:
+                child_ids = list(
+                    model_class.objects.filter(
+                        parent__in=frontier_ids,
+                        forCoordinatorOnly=for_coordinator,
+                    )
+                    .exclude(id__in=ids)
+                    .values_list("id", flat=True)
+                )
+                ids.extend(child_ids)
+                frontier_ids = child_ids
+            return ids
+
+        paths = list(matching_nodes.values_list("path", flat=True))
+        if not paths:
+            return []
+
+        return model_class.objects.filter(
+            Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
+            forCoordinatorOnly=for_coordinator,
+        ).distinct().values_list("id", flat=True)
+
     def _filter_projects_by_hierarchy(
         self,
         qs,
@@ -1774,65 +1842,28 @@ class ProjectViewSet(BaseViewSet):
             Queryset
                 Filtered Project Queryset
         """
-        # All coordinator locations are fetched with direct=True since only districts exist in coordinator view without any further location children
-        if direct == True:
-            if model_class.__name__ == "ProjectLocation":
-                if for_coordinator == True:
-                    return qs.filter(
-                        Q(projectLocation__coordinatorLocation__in=search_ids)
-                        | Q(projectLocation__parent__coordinatorLocation__in=search_ids)
-                        | Q(
-                            projectLocation__parent__parent__coordinatorLocation__in=search_ids
-                        )
-                    )
-                return qs.filter(projectLocation__in=search_ids)
-            elif model_class.__name__ == "ProjectClass":
-                if for_coordinator == True:
-                    return qs.filter(projectClass__coordinatorClass__in=search_ids)
-                return qs.filter(
-                    projectClass__in=search_ids, projectLocation__isnull=True
-                )
-        matching_nodes = model_class.objects.filter(
-            id__in=search_ids,
-            parent__isnull=not has_parent,
-            parent__parent__isnull=not has_parent_parent,
-            parent__parent__parent__isnull=not has_parent_parent_parent,
-            parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
-            forCoordinatorOnly=for_coordinator,
-        ).distinct()
-
-        if model_class.__name__ == "ProjectClass":
-            ids = list(matching_nodes.values_list("id", flat=True))
-            frontier_ids = ids
-
-            while frontier_ids:
-                child_ids = list(
-                    model_class.objects.filter(
-                        parent__in=frontier_ids,
-                        forCoordinatorOnly=for_coordinator,
-                    )
-                    .exclude(id__in=ids)
-                    .values_list("id", flat=True)
-                )
-                ids.extend(child_ids)
-                frontier_ids = child_ids
-        else:
-            paths = matching_nodes.values_list("path", flat=True)
-            ids = (
-                model_class.objects.filter(
-                    Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
-                    forCoordinatorOnly=for_coordinator,
-                )
-                .distinct()
-                .values_list("id", flat=True)
-                if paths
-                else []
+        # Coordinator locations use a direct relation because their hierarchy only has districts.
+        if direct:
+            direct_queryset = self._filter_projects_directly_by_hierarchy(
+                qs, search_ids, model_class, for_coordinator
             )
+            if direct_queryset is not None:
+                return direct_queryset
+
+        ids = self._get_hierarchy_ids(
+            search_ids,
+            model_class,
+            has_parent,
+            has_parent_parent,
+            has_parent_parent_parent,
+            has_parent_parent_parent_parent,
+            for_coordinator,
+        )
 
         if model_class.__name__ == "ProjectLocation":
             return qs.filter(projectLocation__in=ids)
-        elif model_class.__name__ == "ProjectClass":
-            if for_coordinator == True:
+        if model_class.__name__ == "ProjectClass":
+            if for_coordinator:
                 return qs.filter(projectClass__coordinatorClass__in=ids)
             return qs.filter(projectClass__in=ids)
 
