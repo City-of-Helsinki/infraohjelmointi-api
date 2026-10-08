@@ -1792,31 +1792,42 @@ class ProjectViewSet(BaseViewSet):
                 return qs.filter(
                     projectClass__in=search_ids, projectLocation__isnull=True
                 )
-        paths = []
+        matching_nodes = model_class.objects.filter(
+            id__in=search_ids,
+            parent__isnull=not has_parent,
+            parent__parent__isnull=not has_parent_parent,
+            parent__parent__parent__isnull=not has_parent_parent_parent,
+            parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+            forCoordinatorOnly=for_coordinator,
+        ).distinct()
 
-        paths = (
-            model_class.objects.filter(
-                id__in=search_ids,
-                parent__isnull=not has_parent,
-                parent__parent__isnull=not has_parent_parent,
-                parent__parent__parent__isnull=not has_parent_parent_parent,
-                parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
-                forCoordinatorOnly=for_coordinator,
-            )
-            .distinct()
-            .values_list("path", flat=True)
-        )
+        if model_class.__name__ == "ProjectClass":
+            ids = list(matching_nodes.values_list("id", flat=True))
+            frontier_ids = ids
 
-        ids = (
-            model_class.objects.filter(
-                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
-                forCoordinatorOnly=for_coordinator,
+            while frontier_ids:
+                child_ids = list(
+                    model_class.objects.filter(
+                        parent__in=frontier_ids,
+                        forCoordinatorOnly=for_coordinator,
+                    )
+                    .exclude(id__in=ids)
+                    .values_list("id", flat=True)
+                )
+                ids.extend(child_ids)
+                frontier_ids = child_ids
+        else:
+            paths = matching_nodes.values_list("path", flat=True)
+            ids = (
+                model_class.objects.filter(
+                    Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
+                    forCoordinatorOnly=for_coordinator,
+                )
+                .distinct()
+                .values_list("id", flat=True)
+                if paths
+                else []
             )
-            .distinct()
-            .values_list("id", flat=True)
-            if len(paths) > 0
-            else []
-        )
 
         if model_class.__name__ == "ProjectLocation":
             return qs.filter(projectLocation__in=ids)
