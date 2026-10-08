@@ -49,6 +49,9 @@ env = environ.Env(
     NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
     # IO-857: matches the Figma copy ("500kb max tiedostokoko").
     HANDOVER_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
+    # IO-914 / IO-936: matches the Figma copy ("max 500 kb").
+    PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
+    PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES=(int, 500 * 1024),
     # IO-812 phase 2: Azure Blob storage for uploaded files. Empty by default so
     # local/CI keep using FileSystemStorage; Platta sets these in the deploy env.
     #
@@ -337,6 +340,21 @@ NOTE_IMAGE_ALLOWED_TYPES = ("image/jpeg", "image/png")
 # (ConstructionHandover.link* URL fields), so PDF is deliberately not accepted.
 HANDOVER_ATTACHMENT_MAX_BYTES = env.int("HANDOVER_ATTACHMENT_MAX_BYTES")
 HANDOVER_ATTACHMENT_ALLOWED_TYPES = ("image/jpeg", "image/png")
+
+# IO-914 hankeohjelma section attachments, per the Figma copy: ".jpeg/.png/pdf/word,
+# max 500 kb". Word means .docx only: legacy .doc can carry macros and uploads are
+# not virus scanned.
+PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES = env.int("PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES")
+PROJECT_PROGRAMME_ATTACHMENT_ALLOWED_TYPES = (
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+)
+
+# IO-936 hankeohjelma location map: a single image ("kuvatiedosto") per programme.
+PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES = env.int("PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES")
+PROJECT_PROGRAMME_LOCATION_MAP_ALLOWED_TYPES = ("image/jpeg", "image/png")
 
 
 # Default primary key field type

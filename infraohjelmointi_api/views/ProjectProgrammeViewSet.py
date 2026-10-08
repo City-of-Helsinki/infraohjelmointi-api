@@ -3,11 +3,14 @@ import uuid
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from overrides import override
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from infraohjelmointi_api.models import (
@@ -15,7 +18,9 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeDesignCriteria,
     ProjectProgrammeInteractionAndRelatedProjects,
     ProjectProgramme,
+    ProjectProgrammeAttachment,
     ProjectProgrammeLink,
+    ProjectProgrammeLocationMap,
     ProjectProgrammeMaintenanceNeeds,
     ProjectProgrammeOtherAttachments,
     ProjectProgrammeTrafficPlanningCriteria,
@@ -33,6 +38,8 @@ from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
     ProjectPersonAuthorizationService,
 )
 from infraohjelmointi_api.serializers import (
+    ProjectProgrammeAttachmentSerializer,
+    ProjectProgrammeLocationMapSerializer,
     ProjectProgrammeBasicInfoGetSerializer,
     ProjectProgrammeBasicInfoUpdateSerializer,
     ProjectProgrammeCreateSerializer,
@@ -54,8 +61,26 @@ from infraohjelmointi_api.serializers import (
     ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer,
     ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer,
 )
+from infraohjelmointi_api.utils.stored_files import (
+    cleanup_files_on_error,
+    display_file_name,
+    stored_file_response,
+)
+from infraohjelmointi_api.utils.upload_validation import (
+    validate_project_programme_attachment,
+    validate_project_programme_location_map,
+)
 
 from .BaseViewSet import BaseViewSet
+
+# IO-914 / IO-936: files follow the same DRAFT-only rule as the content they belong to.
+LOCKED_SECTION_ATTACHMENT_ERROR = (
+    "Attachments can only be added or removed while the project programme and the "
+    "section are in DRAFT status."
+)
+LOCKED_LOCATION_MAP_ERROR = (
+    "The location map can only be changed while the project programme is in DRAFT status."
+)
 
 
 class ProjectProgrammeViewSet(BaseViewSet):
@@ -94,7 +119,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
     def get_queryset(self):
         queryset = ProjectProgramme.objects.all()
         if self.action in ["list", "retrieve", "get_by_project", "transitions", "section_transitions"]:
-            return queryset.select_related(
+            queryset = queryset.select_related(
                 "project",
                 "basicInfo",
                 "designCriteria",
@@ -103,6 +128,12 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 "maintenanceNeeds",
                 "interactionAndRelatedProjects",
                 "otherAttachments",
+                "locationMap",
+            )
+        if self.action in ["list", "retrieve", "get_by_project"]:
+            # IO-914: each section's GET serializer embeds its attachments.
+            queryset = queryset.prefetch_related(
+                *(f"{relation}__attachments" for relation in self.SECTION_RELATIONS.values())
             )
         return queryset
 
@@ -692,3 +723,229 @@ class ProjectProgrammeViewSet(BaseViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    def _get_section_or_404(self, programme, section_key):
+        relation_name, section_instance = self._get_section_instance(programme, section_key)
+        if not relation_name:
+            raise NotFound("Unknown section key.")
+        if not section_instance:
+            raise NotFound(f"Section '{relation_name}' was not found for this project programme.")
+        return section_instance
+
+    def _get_section_attachment_or_404(self, programme, attachment_id):
+        """Resolve an attachment scoped to the programme, validating the UUID first.
+
+        Scoping matters: without it, a caller who can read one programme could pass
+        another programme's attachment id and get its file.
+        """
+        try:
+            uuid.UUID(str(attachment_id))
+        except ValueError:
+            raise ValidationError({"attachmentId": "Invalid UUID."})
+        attachment = get_object_or_404(ProjectProgrammeAttachment, pk=attachment_id)
+        if not self._section_belongs_to_programme(attachment.sectionObject, programme):
+            raise NotFound(self.NOT_FOUND_DETAIL)
+        return attachment
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"sections/(?P<section_key>[^/.]+)/attachments",
+        url_name="section-attachments",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def section_attachments(self, request, pk=None, section_key=None):
+        """List a section's attachments (IO-914).
+
+        GET /project-programmes/<id>/sections/<section-key>/attachments/
+        """
+        programme = self.get_object()
+        section = self._get_section_or_404(programme, section_key)
+        return Response(
+            ProjectProgrammeAttachmentSerializer(
+                section.attachments.all(), many=True, context={"programme_id": programme.id}
+            ).data
+        )
+
+    # A separate action name for POST on the same URL keeps the permission
+    # allowlists honest: granting "section_attachments" (read) never grants uploads.
+    @section_attachments.mapping.post
+    def upload_section_attachment(self, request, pk=None, section_key=None):
+        """Upload attachments to a section (IO-914).
+
+        POST /project-programmes/<id>/sections/<section-key>/attachments/
+        (multipart, field 'file' x N) -> created rows
+        """
+        programme = self.get_object()
+        section = self._get_section_or_404(programme, section_key)
+        if programme.is_locked or section.is_locked:
+            return Response(
+                {"detail": LOCKED_SECTION_ATTACHMENT_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+
+        files = request.FILES.getlist("file")
+        if not files:
+            raise ValidationError({"file": "At least one file is required."})
+        # Validate the whole batch first so one bad file rejects the request before
+        # any row or file is written.
+        for f in files:
+            validate_project_programme_attachment(f)
+
+        uploader = self._get_authenticated_user(request)
+        created = []
+        with cleanup_files_on_error(created), transaction.atomic():
+            for f in files:
+                attachment = ProjectProgrammeAttachment(
+                    sectionObject=section,
+                    file=f,
+                    originalName=display_file_name(f.name),
+                    contentType=(f.content_type or "").lower(),
+                    size=f.size or 0,
+                    uploadedBy=uploader,
+                )
+                # Track before saving: the file is written ahead of the INSERT.
+                created.append(attachment)
+                attachment.save()
+        return Response(
+            ProjectProgrammeAttachmentSerializer(
+                created, many=True, context={"programme_id": programme.id}
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path=r"attachments/(?P<attachment_id>[^/.]+)/download",
+        url_name="download-section-attachment",
+    )
+    def download_section_attachment(self, request, pk=None, attachment_id=None):
+        """Stream one section attachment back to the caller (IO-914).
+
+        GET /project-programmes/<id>/attachments/<aid>/download/
+
+        Always proxied through the API, never a storage URL: see utils/stored_files.py.
+        """
+        programme = self.get_object()
+        attachment = self._get_section_attachment_or_404(programme, attachment_id)
+        if not attachment.file:
+            raise NotFound("Attachment has no stored file.")
+        return stored_file_response(
+            attachment.file,
+            attachment.contentType,
+            attachment.originalName,
+            as_attachment=True,
+        )
+
+    @action(
+        methods=["delete"],
+        detail=True,
+        url_path=r"attachments/(?P<attachment_id>[^/.]+)",
+        url_name="delete-section-attachment",
+    )
+    def delete_section_attachment(self, request, pk=None, attachment_id=None):
+        """Delete one section attachment (IO-914).
+
+        DELETE /project-programmes/<id>/attachments/<aid>/ -> 204
+        """
+        programme = self.get_object()
+        attachment = self._get_section_attachment_or_404(programme, attachment_id)
+        if programme.is_locked or attachment.sectionObject.is_locked:
+            return Response(
+                {"detail": LOCKED_SECTION_ATTACHMENT_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+        # The file is removed on commit by the post_delete signal in signals.py.
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        methods=["get"],
+        detail=True,
+        url_path="location-map",
+        url_name="location-map",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def location_map(self, request, pk=None):
+        """Serve the programme's location map image (IO-936).
+
+        GET /project-programmes/<id>/location-map/ -> the image, or 404 if none
+        """
+        programme = self.get_object()
+        location_map = getattr(programme, "locationMap", None)
+        if location_map is None or not location_map.file:
+            raise NotFound("Project programme has no location map.")
+        return stored_file_response(
+            location_map.file,
+            location_map.contentType,
+            location_map.originalName,
+        )
+
+    # POST rather than PUT: the viewset does not allow PUT (http_method_names), and
+    # enabling it would also open PUT on the default update route. The map is
+    # programme-level content, so writes need the same rights as a programme PATCH
+    # (_assert_can_edit_or_complete), not just the role allowlist.
+    @location_map.mapping.post
+    def upload_location_map(self, request, pk=None):
+        """Set or replace the programme's location map (IO-936).
+
+        POST /project-programmes/<id>/location-map/ (multipart, one 'file')
+        -> 201 when added, 200 when replaced
+        """
+        programme = self.get_object()
+        self._assert_can_edit_or_complete(request, programme.project)
+        if programme.is_locked:
+            return Response(
+                {"detail": LOCKED_LOCATION_MAP_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+
+        files = request.FILES.getlist("file")
+        if len(files) != 1:
+            raise ValidationError({"file": "Exactly one file is required."})
+        uploaded = files[0]
+        validate_project_programme_location_map(uploaded)
+
+        new_map = ProjectProgrammeLocationMap(
+            project_programme=programme,
+            file=uploaded,
+            originalName=display_file_name(uploaded.name),
+            contentType=(uploaded.content_type or "").lower(),
+            size=uploaded.size or 0,
+            uploadedBy=self._get_authenticated_user(request),
+        )
+        saved = []
+        with cleanup_files_on_error(saved), transaction.atomic():
+            # Lock the programme row so concurrent replacements queue up instead of
+            # colliding on the one-to-one constraint.
+            list(ProjectProgramme.objects.select_for_update().filter(pk=programme.pk))
+            # The old file is removed on commit by the post_delete signal, so a
+            # failed replacement keeps the previous map and its file intact.
+            replaced, _ = ProjectProgrammeLocationMap.objects.filter(
+                project_programme=programme
+            ).delete()
+            # Track before saving: the file is written ahead of the INSERT.
+            saved.append(new_map)
+            new_map.save()
+
+        return Response(
+            ProjectProgrammeLocationMapSerializer(new_map).data,
+            status=status.HTTP_200_OK if replaced else status.HTTP_201_CREATED,
+        )
+
+    @location_map.mapping.delete
+    def delete_location_map(self, request, pk=None):
+        """Remove the programme's location map (IO-936).
+
+        DELETE /project-programmes/<id>/location-map/ -> 204
+        """
+        programme = self.get_object()
+        self._assert_can_edit_or_complete(request, programme.project)
+        if programme.is_locked:
+            return Response(
+                {"detail": LOCKED_LOCATION_MAP_ERROR}, status=status.HTTP_409_CONFLICT
+            )
+        location_map = getattr(programme, "locationMap", None)
+        if location_map is None:
+            raise NotFound("Project programme has no location map.")
+        # The file is removed on commit by the post_delete signal in signals.py.
+        location_map.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

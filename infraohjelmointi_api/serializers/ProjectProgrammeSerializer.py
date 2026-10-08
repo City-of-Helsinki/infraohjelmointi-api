@@ -13,6 +13,11 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeUrbanSpacingPlanningCriteria,
 )
 
+from .ProjectProgrammeAttachmentSerializer import (
+    ProjectProgrammeLocationMapSerializer,
+    get_section_attachments,
+)
+
 
 class ProjectProgrammeDraftOnlyUpdateMixin:
     def validate(self, attrs):
@@ -143,6 +148,7 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
         "otherConsiderations",
     }
     links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeBasicInfo
@@ -167,6 +173,9 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
 
     def get_links(self, instance):
         return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeBasicInfoUpdateSerializer(
@@ -261,6 +270,7 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
 
 class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
     links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeDesignCriteria
@@ -268,6 +278,9 @@ class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
 
     def get_links(self, instance):
         return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeDesignCriteriaUpdateSerializer(
@@ -301,9 +314,14 @@ class ProjectProgrammeDesignCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
@@ -318,9 +336,14 @@ class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
@@ -335,9 +358,14 @@ class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
@@ -352,9 +380,14 @@ class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
@@ -370,6 +403,7 @@ class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
 
 class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer):
     links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeOtherAttachments
@@ -383,6 +417,9 @@ class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer)
             objectId=instance.id,
         )
         return ProjectProgrammeLinkGetSerializer(links, many=True).data
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
 
 
 class ProjectProgrammeOtherAttachmentsUpdateSerializer(
@@ -410,6 +447,7 @@ class ProjectProgrammeGetSerializer(serializers.ModelSerializer):
         ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(read_only=True)
     )
     otherAttachments = ProjectProgrammeOtherAttachmentsGetSerializer(read_only=True)
+    locationMap = ProjectProgrammeLocationMapSerializer(read_only=True)
 
     class Meta:
         model = ProjectProgramme
