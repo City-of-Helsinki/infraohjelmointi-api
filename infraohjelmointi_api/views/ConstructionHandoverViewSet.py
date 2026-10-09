@@ -319,14 +319,20 @@ class ConstructionHandoverViewSet(BaseViewSet):
         if not instance.previousProjectPhase_id:
             return
 
-        project.phase = instance.previousProjectPhase
-        project_update_fields.append("phase")
+        # Don't overwrite a phase that was changed manually after the handover set it.
+        project_still_in_handover_phase = project.phase is not None and project.phase.value in {
+            "constructionWait",
+            "constructionPreparation",
+        }
 
-        # previousProjectPhaseDetail may intentionally be None.
-        # Restore it whenever we have a saved previous phase.
-        if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
-            project.phaseDetail = instance.previousProjectPhaseDetail
-            project_update_fields.append("phaseDetail")
+        if project_still_in_handover_phase:
+            project.phase = instance.previousProjectPhase
+            project_update_fields.append("phase")
+
+            # previousProjectPhaseDetail may intentionally be None.
+            if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
+                project.phaseDetail = instance.previousProjectPhaseDetail
+                project_update_fields.append("phaseDetail")
 
         instance.previousProjectPhase = None
         handover_update_fields.append("previousProjectPhase")

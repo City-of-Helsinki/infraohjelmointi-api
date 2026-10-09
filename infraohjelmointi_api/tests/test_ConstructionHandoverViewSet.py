@@ -1072,3 +1072,27 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(self.project.phaseDetail, old_phase_detail)
         self.assertIsNone(handover.previousProjectPhase_id)
         self.assertIsNone(handover.previousProjectPhaseDetail_id)
+
+    def test_sync_project_fields_for_transition_draft_keeps_manually_changed_phase(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
+        self.project.phase = construction_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_phase.id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
