@@ -184,6 +184,23 @@ class ConstructionHandoverAttachmentTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
         self.assertEqual(ConstructionHandoverAttachment.objects.count(), 0)
 
+    def test_POST_rejects_bytes_that_do_not_match_the_declared_type(self):
+        """Valid name and content type are not enough: the bytes must be that type."""
+        for name, content, content_type in (
+            ("kuva.jpg", b"<html><script>alert(1)</script></html>", "image/jpeg"),
+            ("kuva.jpg", PNG_BYTES, "image/jpeg"),
+            ("kuva.png", b"", "image/png"),
+        ):
+            with self.subTest(name=name, content=content[:8]):
+                response = self._upload(
+                    SimpleUploadedFile(name, content, content_type=content_type)
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+                )
+                self.assertIn("sisältö", response.json()["detail"])
+        self.assertEqual(ConstructionHandoverAttachment.objects.count(), 0)
+
     def test_POST_accepts_jpeg_extension_variants(self):
         response = self._upload(self._jpeg("kuva.jpeg"), self._jpeg("KUVA.JPG"))
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
