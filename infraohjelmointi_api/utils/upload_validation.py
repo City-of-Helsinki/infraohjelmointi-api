@@ -36,10 +36,27 @@ EXTENSIONS_BY_TYPE = {
     "image/png": (".png",),
 }
 
+# Leading bytes ("magic numbers") each content type must start with. Both the
+# declared type and the name come from the client, so this is what ties the
+# accepted type to the actual bytes, e.g. rejects arbitrary data named x.jpg.
+SIGNATURES_BY_TYPE = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+}
+_SIGNATURE_BYTES = 8
+
 
 def _describe_types(allowed_types) -> str:
     """Render MIME types the way the UI shows them ("jpg, png")."""
     return ", ".join(t.rsplit("/", 1)[-1] for t in allowed_types)
+
+
+def _read_head(uploaded_file, size) -> bytes:
+    """Read the first bytes of an upload and rewind, so the file still saves whole."""
+    uploaded_file.seek(0)
+    head = uploaded_file.read(size)
+    uploaded_file.seek(0)
+    return head
 
 
 def validate_upload(uploaded_file, allowed_types, max_bytes) -> None:
@@ -59,6 +76,15 @@ def validate_upload(uploaded_file, allowed_types, max_bytes) -> None:
             detail=(
                 f"Tiedostopääte '{extension or 'puuttuu'}' ei vastaa tiedostotyyppiä "
                 f"'{content_type}'. Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
+            )
+        )
+
+    head = _read_head(uploaded_file, _SIGNATURE_BYTES)
+    if not any(head.startswith(sig) for sig in SIGNATURES_BY_TYPE.get(content_type, ())):
+        raise UnsupportedUploadType(
+            detail=(
+                f"Tiedoston sisältö ei vastaa tiedostotyyppiä '{content_type}'. "
+                f"Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
             )
         )
 
