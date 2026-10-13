@@ -56,6 +56,7 @@ from infraohjelmointi_api.serializers import (
 )
 
 from .BaseViewSet import BaseViewSet
+from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_missing_required_fields
 
 
 class ProjectProgrammeViewSet(BaseViewSet):
@@ -329,6 +330,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
 
     def _validate_programme_and_draft_sections_for_complete(self, programme):
+        self._validate_required_fields_for_complete(programme)
         self._validate_for_complete(programme, "project programme")
 
         draft_sections = []
@@ -344,6 +346,14 @@ class ProjectProgrammeViewSet(BaseViewSet):
             draft_sections.append(section)
 
         return draft_sections
+
+    def _validate_required_fields_for_complete(self, programme, section_name=None):
+        errors = get_missing_required_fields(programme, section_name)
+        if errors:
+            raise ValidationError({
+                "detail": "Required fields are missing.",
+                "errors": errors,
+            })
 
     def _get_section_instance(self, programme, section_key):
         relation_name = self._resolve_section_relation_name(section_key)
@@ -438,7 +448,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
         instance = self.get_object()
         serializer = ProjectProgrammeUpdateSerializer(
             instance,
-            data={"briefProjectProgramme": not instance.briefProjectProgramme},
+            data={"briefProjectProgramme": instance.briefProjectProgramme is False},
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
@@ -677,6 +687,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             self._assert_can_edit_or_complete(request, programme.project)
 
         if requested_status == "COMPLETE":
+            self._validate_required_fields_for_complete(programme, relation_name)
             self._validate_for_complete(section_instance, f"section '{relation_name}'")
 
         user = self._get_authenticated_user(request)
