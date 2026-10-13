@@ -4,6 +4,7 @@ from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssignment
 from rest_framework import permissions
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 
 def parse_name_from_email(email):
@@ -698,6 +699,10 @@ class IsClassProgrammer(permissions.BasePermission):
         if not self.user_in_restricted_programmer_group(request):
             return False
 
+        # DRF runs no object-level check on create, so scope it here.
+        if view.action in DJANGO_BASE_CREATE_ONLY_ACTIONS:
+            return self._can_create(request, view)
+
         # Allow read actions
         if view.action in [
             *DJANGO_BASE_READ_ONLY_ACTIONS,
@@ -746,6 +751,54 @@ class IsClassProgrammer(permissions.BasePermission):
         return None
 
     @staticmethod
+    def _get_class_path_by_id(class_id):
+        if not class_id:
+            return None
+        try:
+            project_class = ProjectClass.objects.filter(id=class_id).first()
+        except (ValidationError, ValueError):
+            return None
+        return project_class.path if project_class else None
+
+    @staticmethod
+    def _get_project_class_path_by_id(project_id):
+        if not project_id:
+            return None
+        try:
+            project = (
+                Project.objects.filter(id=project_id)
+                .select_related("projectClass")
+                .first()
+            )
+        except (ValidationError, ValueError):
+            return None
+        if not project or not project.projectClass:
+            return None
+        return project.projectClass.path
+
+    def _can_create(self, request, view):
+        """Restricted programmers may only create projects and notes inside
+        their assigned classes. Project programme creation is decided by
+        ProjectProgrammeViewSet itself."""
+        basename = getattr(view, "basename", None)
+        if basename == "projectProgrammes":
+            return True
+        if basename == "projects":
+            target_class_path = self._get_class_path_by_id(
+                request.data.get("projectClass")
+            )
+        elif basename == "notes":
+            target_class_path = self._get_project_class_path_by_id(
+                request.data.get("project")
+            )
+        else:
+            return False
+
+        return self._target_path_matches_assigned_paths(
+            target_class_path, self.get_user_assigned_classes_paths(request)
+        )
+
+    @staticmethod
     def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
         """True if target equals or is a child of an assigned path (paths use '/')."""
         return target_path_matches_assigned_paths(target_class_path, assigned_paths)
@@ -766,9 +819,19 @@ class IsClassProgrammer(permissions.BasePermission):
         if not assigned_paths:
             return False
 
-        return self._target_path_matches_assigned_paths(
+        if not self._target_path_matches_assigned_paths(
             target_class_path, assigned_paths
-        )
+        ):
+            return False
+
+        # A project must not be moved out of the user's classes either.
+        if obj._meta.model.__name__ == "Project" and "projectClass" in request.data:
+            return self._target_path_matches_assigned_paths(
+                self._get_class_path_by_id(request.data.get("projectClass")),
+                assigned_paths,
+            )
+
+        return True
     
 class IsConstructionManagementLead(permissions.BasePermission):
     """Permission class for construction management leads (Rakennuttamisen esihenkilöt)."""

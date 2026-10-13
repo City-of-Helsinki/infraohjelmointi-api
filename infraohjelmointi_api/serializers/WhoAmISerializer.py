@@ -1,9 +1,14 @@
 from infraohjelmointi_api.models import User
+from infraohjelmointi_api.permissions import (
+    get_restricted_programmer_group_name,
+    get_restricted_user_assigned_class_paths,
+)
 from rest_framework import serializers
 
 
 class WhoAmISerializer(serializers.ModelSerializer):
     ad_groups = serializers.SerializerMethodField()
+    restricted_class_paths = serializers.SerializerMethodField()
 
     group_to_uuid_mapping = {
         "sg_kymp_sso_io_koordinaattorit": "86b826df-589c-40f9-898f-1584e80b5482",
@@ -33,10 +38,12 @@ class WhoAmISerializer(serializers.ModelSerializer):
             "department_name",
             "uuid",
             "ad_groups",
+            "restricted_class_paths",
         )
 
     def get_ad_groups(self, current_user):
         groups = []
+        restricted_group_name = get_restricted_programmer_group_name()
         for group in current_user.ad_groups.all():
             if group.name in self.group_to_uuid_mapping:
                 groups.append(
@@ -46,5 +53,22 @@ class WhoAmISerializer(serializers.ModelSerializer):
                         "display_name": group.display_name,
                     }
                 )
+            elif group.name == restricted_group_name:
+                # IO-756: the group name is configurable, so it is not in the map
+                groups.append(
+                    {
+                        "id": group.name,
+                        "name": group.name,
+                        "display_name": group.display_name,
+                    }
+                )
 
         return groups
+
+    def get_restricted_class_paths(self, current_user):
+        """Class paths a restricted programmer may edit (IO-756), else empty."""
+        if not current_user.ad_groups.filter(
+            name=get_restricted_programmer_group_name()
+        ).exists():
+            return []
+        return sorted(get_restricted_user_assigned_class_paths(current_user))
