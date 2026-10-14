@@ -30,6 +30,7 @@ from infraohjelmointi_api.serializers import (
 )
 from infraohjelmointi_api.permissions import get_project_programme_contributor_group_name
 from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
+from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_required_section_fields
 
 User = get_user_model()
 
@@ -96,6 +97,161 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             "inspector": "Inspector",
             "estimatedCosts": "100000",
         }
+
+    def _fill_required_sections(self, programme):
+        for relation_name, fields in get_required_section_fields(programme).items():
+            model = ProjectProgramme._meta.get_field(relation_name).related_model
+            model.objects.update_or_create(
+                project_programme=programme,
+                defaults={field: "Filled" for field in fields},
+            )
+
+    def test_completion_rejects_missing_required_sections(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(set(response.data["errors"]), set(get_required_section_fields(programme)))
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "DRAFT")
+
+    def test_completion_rejects_whitespace_in_draft_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+        section = programme.maintenanceNeeds
+        section.maintenanceNeeds = "   "
+        section.save()
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(set(response.data["errors"]), {"maintenanceNeeds"})
+        programme.refresh_from_db()
+        programme.basicInfo.refresh_from_db()
+        self.assertEqual(programme.status, "DRAFT")
+        self.assertEqual(programme.basicInfo.status, "DRAFT")
+
+    def test_completion_does_not_revalidate_completed_sections(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+        basic_info = programme.basicInfo
+        basic_info.status = "COMPLETE"
+        basic_info.summary = ""
+        basic_info.save()
+        section = programme.maintenanceNeeds
+        section.status = "COMPLETE"
+        section.maintenanceNeeds = "   "
+        section.save()
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "COMPLETE")
+        programme.designCriteria.refresh_from_db()
+        self.assertEqual(programme.designCriteria.status, "COMPLETE")
+
+    def test_completion_marks_all_filled_draft_sections_ready(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "COMPLETE")
+        for relation_name in get_required_section_fields(programme):
+            section = getattr(programme, relation_name)
+            self.assertEqual(section.status, "COMPLETE")
+            self.assertEqual(section.updatedBy_id, self.user.uuid)
+
+    def test_completion_brief_ignores_optional_fields_and_extended_sections(self):
+        programme = self._create_project_programme()
+        self._fill_required_sections(programme)
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_completion_null_programme_type_uses_brief_requirements(self):
+        programme = self._create_project_programme(briefProjectProgramme=None)
+        self._fill_required_sections(programme)
+        response = self.client.get(f"/project-programmes/{programme.id}/")
+        self.assertIn("estimatedCosts", response.data["basicInfo"])
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_completion_section_rejects_missing_required_fields(self):
+        programme = self._create_project_programme()
+        ProjectProgrammeBasicInfo.objects.create(project_programme=programme)
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("summary", response.data["errors"]["basicInfo"])
+
+    def test_section_completion_rejects_whitespace_for_each_required_section(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+        sections = (
+            ("basicInfo", "basic-info", "summary"),
+            ("designCriteria", "design-criteria", "relationshipToPublicAreaServices"),
+            ("trafficPlanningCriteria", "traffic-planning-criteria", "targetTrafficChanges"),
+            ("urbanSpacingPlanningCriteria", "urban-spacing-planning-criteria", "targetUrbanAppearance"),
+            ("maintenanceNeeds", "maintenance-needs", "maintenanceNeeds"),
+            ("interactionAndRelatedProjects", "interaction-and-related-projects", "interactionNotes"),
+        )
+
+        for relation_name, section_key, field in sections:
+            with self.subTest(section=relation_name):
+                section = getattr(programme, relation_name)
+                setattr(section, field, "   ")
+                section.save()
+
+                response = self.client.post(
+                    f"/project-programmes/{programme.id}/sections/{section_key}/transitions/",
+                    {"to": "COMPLETE"}, format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn(field, response.data["errors"][relation_name])
+                section.refresh_from_db()
+                self.assertEqual(section.status, "DRAFT")
+
+    def test_completion_cannot_be_bypassed_by_direct_status_writes(self):
+        response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.project.id), "status": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        programme = ProjectProgramme.objects.get(pk=response.data["id"])
+        self.assertEqual(programme.status, "DRAFT")
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"status": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        programme.refresh_from_db()
+        self.assertEqual(programme.basicInfo.status, "DRAFT")
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/basic-info/",
+            {"status": "COMPLETE"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.basicInfo.refresh_from_db()
+        self.assertEqual(programme.basicInfo.status, "DRAFT")
 
     def test_create_project_programme(self):
         self.client.force_authenticate(user=self.user)
@@ -225,6 +381,19 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         programme.refresh_from_db()
         self.assertFalse(programme.briefProjectProgramme)
 
+    def test_switch_type_treats_null_as_brief_project_programme(self):
+        programme = self._create_project_programme(briefProjectProgramme=None)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/switch-type/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertIs(programme.briefProjectProgramme, False)
+
     def test_switch_type_rejects_extensive_to_brief_when_content_exists(self):
         programme = self._create_project_programme(briefProjectProgramme=False)
         ProjectProgrammeDesignCriteria.objects.create(
@@ -259,6 +428,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
     def test_transitions_updates_status(self):
         programme = self._create_project_programme(status="DRAFT")
+        self._fill_required_sections(programme)
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/transitions/",
@@ -300,6 +470,9 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             status="DRAFT",
             projectName="Test name",
             district="Test district",
+            projectProgrammeCompiler="Compiler",
+            summary="Summary",
+            estimatedCosts="100000",
         )
         design_criteria = ProjectProgrammeDesignCriteria.objects.create(
             project_programme=programme,
@@ -328,6 +501,9 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             status="DRAFT",
             projectName="Test name",
             district="Test district",
+            projectProgrammeCompiler="Compiler",
+            summary="Summary",
+            estimatedCosts="100000",
         )
 
         response = self.client.post(
@@ -1464,6 +1640,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
     def test_restricted_programmer_can_transition_assigned_project_programme_to_complete(self):
         self.client.force_authenticate(user=self.allowed_user)
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, self.allowed_programme)
 
         response = self.client.post(
             f"/project-programmes/{self.allowed_programme.id}/transitions/",
@@ -1482,6 +1659,9 @@ class ProjectProgrammePermissionTestCase(TestCase):
             status="DRAFT",
             projectName="Allowed",
             district="District",
+            projectProgrammeCompiler="Compiler",
+            summary="Summary",
+            estimatedCosts="100000",
         )
 
         response = self.client.post(
@@ -1658,6 +1838,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
     def test_contributor_group_user_can_mark_project_programme_complete_without_membership(self):
         self.client.force_authenticate(user=self.contributor_user)
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, self.unassigned_programme)
 
         response = self.client.post(
             f"/project-programmes/{self.unassigned_programme.id}/transitions/",
@@ -1674,6 +1855,9 @@ class ProjectProgrammePermissionTestCase(TestCase):
             status="DRAFT",
             projectName="Unassigned",
             district="District",
+            projectProgrammeCompiler="Compiler",
+            summary="Summary",
+            estimatedCosts="100000",
         )
 
         response = self.client.post(

@@ -1,5 +1,10 @@
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
+from infraohjelmointi_api.validators.ProjectProgrammeValidator import (
+    BASIC_INFO_REQUIRED_FIELDS,
+    BRIEF_BASIC_INFO_REQUIRED_FIELDS,
+    EXTENDED_BASIC_INFO_REQUIRED_FIELDS,
+)
 
 from infraohjelmointi_api.models import (
     ProjectProgramme,
@@ -151,7 +156,7 @@ class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
     def get_fields(self):
         fields = super().get_fields()
         programme = getattr(self.instance, "project_programme", None)
-        if programme and programme.briefProjectProgramme:
+        if programme and programme.briefProjectProgramme is not False:
             fields = {
                 name: field
                 for name, field in fields.items()
@@ -186,22 +191,9 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         "specialConsiderations",
         "otherConsiderations",
     }
-    REQUIRED_IN_ALL_PROGRAMMES = {
-        "projectName",
-        "district",
-        "projectProgrammeCompiler",
-        "personsInvolved",
-    }
-    REQUIRED_IN_BRIEF_PROGRAMMES = {"inspector", "estimatedCosts"}
-    REQUIRED_IN_COMPLETE_PROGRAMMES = {
-        "summary",
-        "strategyGoals",
-        "costClass",
-        "projectSize",
-        "risks",
-        "studyAndPlanningNeeds",
-        "planningAndImplementationFeasibility",
-    }
+    REQUIRED_IN_ALL_PROGRAMMES = set(BASIC_INFO_REQUIRED_FIELDS)
+    REQUIRED_IN_BRIEF_PROGRAMMES = set(BRIEF_BASIC_INFO_REQUIRED_FIELDS)
+    REQUIRED_IN_COMPLETE_PROGRAMMES = set(EXTENDED_BASIC_INFO_REQUIRED_FIELDS)
     links = serializers.ListField(
         child=serializers.URLField(allow_blank=True),
         required=False,
@@ -211,7 +203,7 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
     class Meta:
         model = ProjectProgrammeBasicInfo
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
     def _get_project_programme(self):
         if self.instance:
@@ -223,7 +215,7 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         return ProjectProgramme.objects.filter(pk=project_programme_id).first()
 
     def _required_fields_for(self, programme):
-        is_brief = programme.briefProjectProgramme
+        is_brief = programme.briefProjectProgramme is not False
         return self.REQUIRED_IN_ALL_PROGRAMMES | (
             self.REQUIRED_IN_BRIEF_PROGRAMMES
             if is_brief
@@ -236,7 +228,7 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
         if not programme:
             return fields
 
-        is_brief = programme.briefProjectProgramme
+        is_brief = programme.briefProjectProgramme is not False
         hidden_fields = self.COMPLETE_ONLY_FIELDS if is_brief else self.BRIEF_ONLY_FIELDS
         required_fields = self._required_fields_for(programme)
         for name in hidden_fields:
@@ -285,7 +277,7 @@ class ProjectProgrammeDesignCriteriaUpdateSerializer(
     class Meta:
         model = ProjectProgrammeDesignCriteria
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
     def create(self, validated_data):
         links = validated_data.pop("links", None)
@@ -314,7 +306,7 @@ class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.ModelSerializer):
@@ -331,7 +323,7 @@ class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
 
 class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer):
@@ -348,7 +340,7 @@ class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.ModelSerializer):
@@ -365,7 +357,7 @@ class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
 
 class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer):
@@ -393,7 +385,7 @@ class ProjectProgrammeOtherAttachmentsUpdateSerializer(
     class Meta:
         model = ProjectProgrammeOtherAttachments
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
 
 class ProjectProgrammeGetSerializer(serializers.ModelSerializer):
@@ -420,7 +412,7 @@ class ProjectProgrammeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectProgramme
         fields = "__all__"
-        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy"]
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
         extra_kwargs = {
             "project": {"validators": []},
         }
