@@ -62,6 +62,13 @@ class ConstructionHandoverViewSet(BaseViewSet):
         "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION", "DRAFT"],
         "MOVED_TO_CONSTRUCTION_PREPARATION": ["DRAFT"],
     }
+
+    # Project phase the handover sets when it enters each status.
+    HANDOVER_SET_PROJECT_PHASES = {
+        "SUBMITTED_TO_CONSTRUCTION": "constructionWait",
+        "PROJECT_MANAGER_NAMED": "constructionWait",
+        "MOVED_TO_CONSTRUCTION_PREPARATION": "constructionPreparation",
+    }
     
     """
     API endpoint that allows construction handovers to be viewed or edited.
@@ -467,6 +474,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
         self,
         project,
         instance,
+        previous_status,
         project_update_fields,
         handover_update_fields,
     ):
@@ -476,14 +484,22 @@ class ConstructionHandoverViewSet(BaseViewSet):
         if not instance.previousProjectPhase_id:
             return
 
-        project.phase = instance.previousProjectPhase
-        project_update_fields.append("phase")
+        # Don't overwrite a phase that was changed manually after the handover set it.
+        handover_set_phase_value = self.HANDOVER_SET_PROJECT_PHASES.get(previous_status)
+        project_still_in_handover_phase = (
+            handover_set_phase_value is not None
+            and project.phase is not None
+            and project.phase.value == handover_set_phase_value
+        )
 
-        # previousProjectPhaseDetail may intentionally be None.
-        # Restore it whenever we have a saved previous phase.
-        if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
-            project.phaseDetail = instance.previousProjectPhaseDetail
-            project_update_fields.append("phaseDetail")
+        if project_still_in_handover_phase:
+            project.phase = instance.previousProjectPhase
+            project_update_fields.append("phase")
+
+            # previousProjectPhaseDetail may intentionally be None.
+            if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
+                project.phaseDetail = instance.previousProjectPhaseDetail
+                project_update_fields.append("phaseDetail")
 
         instance.previousProjectPhase = None
         handover_update_fields.append("previousProjectPhase")
@@ -504,7 +520,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
         if handover_update_fields:
             instance.save(update_fields=handover_update_fields)
 
-    def _sync_project_fields_for_transition(self, instance, requested_status):
+    def _sync_project_fields_for_transition(self, instance, requested_status, previous_status):
         project = instance.project
         project_update_fields = []
         handover_update_fields = []
@@ -529,6 +545,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
             "DRAFT": lambda: self._sync_draft(
                 project=project,
                 instance=instance,
+                previous_status=previous_status,
                 project_update_fields=project_update_fields,
                 handover_update_fields=handover_update_fields,
             ),
@@ -613,6 +630,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
             )
 
         user = self._get_authenticated_user(request)
+        previous_status = instance.status
         with transaction.atomic():
             instance.status = requested_status
             if user:
@@ -621,6 +639,7 @@ class ConstructionHandoverViewSet(BaseViewSet):
             self._sync_project_fields_for_transition(
                 instance=instance,
                 requested_status=requested_status,
+                previous_status=previous_status,
             )
 
         return None

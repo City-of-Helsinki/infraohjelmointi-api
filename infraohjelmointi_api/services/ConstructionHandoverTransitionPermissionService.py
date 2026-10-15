@@ -36,4 +36,8 @@ class ConstructionHandoverTransitionPermissionService:
                 )
             )
 
+        # Rule: any handover editor may return to draft; role gate is handled by endpoint permission classes.
+        if requested_status == "DRAFT":
+            return True
+
         return False

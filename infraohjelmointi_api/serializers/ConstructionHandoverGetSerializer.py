@@ -24,4 +24,4 @@ class ConstructionHandoverGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConstructionHandover
-        fields = "__all__"
+        exclude = ["previousProjectPhase", "previousProjectPhaseDetail", "createdBy", "updatedBy"]

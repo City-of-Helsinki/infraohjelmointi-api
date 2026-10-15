@@ -36,6 +36,7 @@ class BaseProjectTaskSerializer(serializers.ModelSerializer):
 class ConstructionProjectManagerTaskSerializer(BaseProjectTaskSerializer):
     constructionProcurementMethod = serializers.SerializerMethodField()
     budget = serializers.SerializerMethodField()
+    totalCost = serializers.SerializerMethodField()
 
     def get_constructionProcurementMethod(self, obj):
         submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
@@ -54,10 +55,17 @@ class ConstructionProjectManagerTaskSerializer(BaseProjectTaskSerializer):
             return None
         return getattr(submitted_handovers[0], "budget", None)
 
+    def get_totalCost(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+        return getattr(submitted_handovers[0], "totalCost", None)
+
     class Meta:
         model = Project
         fields = BaseProjectTaskSerializer.Meta.fields + (
             'budget',
+            'totalCost',
         )
 
 
