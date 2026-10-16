@@ -250,7 +250,14 @@ CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
 CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS = ["upload_attachment", "delete_attachment"]
 
 #### Project programme custom actions ####
-PROJECT_PROGRAMME_GET_ACTIONS = ["get_by_project"]
+PROJECT_PROGRAMME_GET_ACTIONS = [
+    "get_by_project",
+    # IO-914 / IO-936: listing and downloading files follow read access. All three
+    # are GET-only actions, so granting them never grants a write.
+    "section_attachments",
+    "download_section_attachment",
+    "location_map",
+]
 PROJECT_PROGRAMME_POST_ACTIONS = [
     "switch_type",
     "transitions",
@@ -264,6 +271,12 @@ PROJECT_PROGRAMME_POST_ACTIONS = [
     "section_links",
     "section_link_detail",
     "section_transitions",
+    # IO-914 / IO-936: file uploads and deletes. The viewset additionally rejects
+    # them with 409 unless the programme (and section) is in DRAFT.
+    "upload_section_attachment",
+    "delete_section_attachment",
+    "upload_location_map",
+    "delete_location_map",
 ]
 
 #### Project change-history custom actions (IO-879) ####

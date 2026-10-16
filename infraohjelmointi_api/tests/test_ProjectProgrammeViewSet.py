@@ -19,6 +19,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
     ProjectProgrammeLink,
+    ProjectProgrammeLocationMap,
     ProjectProgrammeOtherAttachments,
     ProjectProgrammer,
 )
@@ -33,6 +34,18 @@ from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
 from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_required_section_fields
 
 User = get_user_model()
+
+
+def add_location_map(programme):
+    """IO-936: completing a programme also requires its location map."""
+    ProjectProgrammeLocationMap.objects.get_or_create(
+        project_programme=programme,
+        defaults={
+            "file": "project_programme_location_maps/map.png",
+            "originalName": "map.png",
+            "contentType": "image/png",
+        },
+    )
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -105,6 +118,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
                 project_programme=programme,
                 defaults={field: "Filled" for field in fields},
             )
+        add_location_map(programme)
 
     def test_completion_rejects_missing_required_sections(self):
         programme = self._create_project_programme(briefProjectProgramme=False)
@@ -113,7 +127,10 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             {"to": "COMPLETE"}, format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(set(response.data["errors"]), set(get_required_section_fields(programme)))
+        self.assertEqual(
+            set(response.data["errors"]),
+            set(get_required_section_fields(programme)) | {"locationMap"},
+        )
         programme.refresh_from_db()
         self.assertEqual(programme.status, "DRAFT")
 
@@ -479,6 +496,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             status="COMPLETE",
             guidingZoningRegulations="Existing",
         )
+        add_location_map(programme)
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/transitions/",
@@ -945,6 +963,37 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             ).count(),
             1,
         )
+
+    def test_every_section_saves_and_returns_links(self):
+        """IO-805: links used to be saved only for basic info and design criteria;
+        in the other sections they were silently dropped."""
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        for route, relation_name in (
+            ("traffic-planning-criteria", "trafficPlanningCriteria"),
+            ("urban-spacing-planning-criteria", "urbanSpacingPlanningCriteria"),
+            ("maintenance-needs", "maintenanceNeeds"),
+            ("interaction-and-related-projects", "interactionAndRelatedProjects"),
+            ("other-attachments", "otherAttachments"),
+        ):
+            with self.subTest(section=route):
+                url = f"/project-programmes/{programme.id}/sections/{route}/"
+                created = self.client.post(url, {"links": ["https://hel.fi"]}, format="json")
+                self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+                self.assertEqual([link["value"] for link in created.data["links"]], ["https://hel.fi"])
+
+                replaced = self.client.patch(
+                    url, {"links": ["https://example.com"]}, format="json"
+                )
+                self.assertEqual(replaced.status_code, status.HTTP_200_OK, replaced.data)
+                self.assertEqual(
+                    [link["value"] for link in replaced.data["links"]], ["https://example.com"]
+                )
+
+                embedded = self.client.get(f"/project-programmes/{programme.id}/").data
+                self.assertEqual(
+                    [link["value"] for link in embedded[relation_name]["links"]],
+                    ["https://example.com"],
+                )
 
     def test_patch_section_design_criteria_rejects_invalid_link_url(self):
         programme = self._create_project_programme(briefProjectProgramme=False)

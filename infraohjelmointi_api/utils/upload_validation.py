@@ -1,7 +1,7 @@
 """Shared validation for user-uploaded files.
 
 Introduced for IO-812 (note images). The rules are parameterised by
-(allowed content types, max bytes) so IO-857 and IO-914 can reuse
+(allowed content types, max bytes) so IO-857, IO-914 and IO-936 reuse
 the same validate_upload() with their own constraints.
 
 The exceptions surface as drf-standardized-errors responses, so the UI can branch on
@@ -34,6 +34,8 @@ class UploadTooLarge(APIException):
 EXTENSIONS_BY_TYPE = {
     "image/jpeg": (".jpg", ".jpeg"),
     "image/png": (".png",),
+    "application/pdf": (".pdf",),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (".docx",),
 }
 
 # Leading bytes ("magic numbers") each content type must start with. Both the
@@ -42,13 +44,19 @@ EXTENSIONS_BY_TYPE = {
 SIGNATURES_BY_TYPE = {
     "image/jpeg": (b"\xff\xd8\xff",),
     "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "application/pdf": (b"%PDF-",),
+    # A .docx is a zip container. Word itself refuses macro content in a .docx.
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (b"PK\x03\x04",),
 }
 _SIGNATURE_BYTES = 8
 
 
 def _describe_types(allowed_types) -> str:
-    """Render MIME types the way the UI shows them ("jpg, png")."""
-    return ", ".join(t.rsplit("/", 1)[-1] for t in allowed_types)
+    """Render allowed types the way the UI shows them ("jpg, png, pdf, docx")."""
+    return ", ".join(
+        EXTENSIONS_BY_TYPE.get(t, (t.rsplit("/", 1)[-1],))[0].lstrip(".")
+        for t in allowed_types
+    )
 
 
 def _read_head(uploaded_file, size) -> bytes:
@@ -115,4 +123,22 @@ def validate_handover_attachment(uploaded_file) -> None:
         uploaded_file,
         settings.HANDOVER_ATTACHMENT_ALLOWED_TYPES,
         settings.HANDOVER_ATTACHMENT_MAX_BYTES,
+    )
+
+
+def validate_project_programme_attachment(uploaded_file) -> None:
+    """IO-914: validate a project programme section attachment upload."""
+    validate_upload(
+        uploaded_file,
+        settings.PROJECT_PROGRAMME_ATTACHMENT_ALLOWED_TYPES,
+        settings.PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES,
+    )
+
+
+def validate_project_programme_location_map(uploaded_file) -> None:
+    """IO-936: validate a project programme location map upload."""
+    validate_upload(
+        uploaded_file,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_ALLOWED_TYPES,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES,
     )
