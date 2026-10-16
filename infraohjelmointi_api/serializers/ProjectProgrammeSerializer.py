@@ -140,6 +140,34 @@ class ProjectProgrammeSectionLinksUpdateMixin:
         sync_section_links(instance, links)
 
 
+class ProjectProgrammeSectionLinksSaveMixin(ProjectProgrammeSectionLinksUpdateMixin):
+    """Saves the write-only `links` list alongside the section's own fields.
+
+    The serializer must declare the `links` field itself: DRF only collects declared
+    fields from serializer classes, not from plain mixins.
+    """
+
+    def create(self, validated_data):
+        links = validated_data.pop("links", None)
+        section = super().create(validated_data)
+        self.sync_links(section, links)
+        return section
+
+    def update(self, instance, validated_data):
+        links = validated_data.pop("links", None)
+        section = super().update(instance, validated_data)
+        self.sync_links(section, links)
+        return section
+
+
+def _links_write_field():
+    return serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+
 class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
     BRIEF_ONLY_FIELDS = {"estimatedCosts"}
     COMPLETE_ONLY_FIELDS = {
@@ -306,21 +334,28 @@ class ProjectProgrammeDesignCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
     def get_attachments(self, instance):
         return get_section_attachments(instance)
 
 
 class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksSaveMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = _links_write_field()
+
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
@@ -328,21 +363,28 @@ class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
     def get_attachments(self, instance):
         return get_section_attachments(instance)
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksSaveMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = _links_write_field()
+
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
@@ -350,21 +392,28 @@ class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
     def get_attachments(self, instance):
         return get_section_attachments(instance)
 
 
 class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
+    ProjectProgrammeSectionLinksSaveMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = _links_write_field()
+
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
@@ -372,21 +421,28 @@ class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
     def get_attachments(self, instance):
         return get_section_attachments(instance)
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
+    ProjectProgrammeSectionLinksSaveMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = _links_write_field()
+
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
@@ -402,23 +458,20 @@ class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer)
         fields = "__all__"
 
     def get_links(self, instance):
-        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
-
-        links = ProjectProgrammeLink.objects.filter(
-            contentType=content_type,
-            objectId=instance.id,
-        )
-        return ProjectProgrammeLinkGetSerializer(links, many=True).data
+        return get_section_links(instance)
 
     def get_attachments(self, instance):
         return get_section_attachments(instance)
 
 
 class ProjectProgrammeOtherAttachmentsUpdateSerializer(
+    ProjectProgrammeSectionLinksSaveMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = _links_write_field()
+
     class Meta:
         model = ProjectProgrammeOtherAttachments
         fields = "__all__"

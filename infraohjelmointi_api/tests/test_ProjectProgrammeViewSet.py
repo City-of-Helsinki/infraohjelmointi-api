@@ -964,6 +964,37 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             1,
         )
 
+    def test_every_section_saves_and_returns_links(self):
+        """IO-805: links used to be saved only for basic info and design criteria;
+        in the other sections they were silently dropped."""
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        for route, relation_name in (
+            ("traffic-planning-criteria", "trafficPlanningCriteria"),
+            ("urban-spacing-planning-criteria", "urbanSpacingPlanningCriteria"),
+            ("maintenance-needs", "maintenanceNeeds"),
+            ("interaction-and-related-projects", "interactionAndRelatedProjects"),
+            ("other-attachments", "otherAttachments"),
+        ):
+            with self.subTest(section=route):
+                url = f"/project-programmes/{programme.id}/sections/{route}/"
+                created = self.client.post(url, {"links": ["https://hel.fi"]}, format="json")
+                self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+                self.assertEqual([link["value"] for link in created.data["links"]], ["https://hel.fi"])
+
+                replaced = self.client.patch(
+                    url, {"links": ["https://example.com"]}, format="json"
+                )
+                self.assertEqual(replaced.status_code, status.HTTP_200_OK, replaced.data)
+                self.assertEqual(
+                    [link["value"] for link in replaced.data["links"]], ["https://example.com"]
+                )
+
+                embedded = self.client.get(f"/project-programmes/{programme.id}/").data
+                self.assertEqual(
+                    [link["value"] for link in embedded[relation_name]["links"]],
+                    ["https://example.com"],
+                )
+
     def test_patch_section_design_criteria_rejects_invalid_link_url(self):
         programme = self._create_project_programme(briefProjectProgramme=False)
         ProjectProgrammeDesignCriteria.objects.create(
