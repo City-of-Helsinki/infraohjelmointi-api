@@ -19,6 +19,7 @@ from infraohjelmointi_api.models import (
     ProjectProgrammeBasicInfo,
     ProjectProgrammeDesignCriteria,
     ProjectProgrammeLink,
+    ProjectProgrammeLocationMap,
     ProjectProgrammeOtherAttachments,
     ProjectProgrammer,
 )
@@ -33,6 +34,18 @@ from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
 from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_required_section_fields
 
 User = get_user_model()
+
+
+def add_location_map(programme):
+    """IO-936: completing a programme also requires its location map."""
+    ProjectProgrammeLocationMap.objects.get_or_create(
+        project_programme=programme,
+        defaults={
+            "file": "project_programme_location_maps/map.png",
+            "originalName": "map.png",
+            "contentType": "image/png",
+        },
+    )
 
 
 @patch.object(BaseViewSet, "authentication_classes", new=[])
@@ -268,6 +281,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
                 project_programme=programme,
                 defaults={field: "Filled" for field in fields},
             )
+        add_location_map(programme)
 
     def test_completion_rejects_missing_required_sections(self):
         programme = self._create_project_programme(briefProjectProgramme=False)
@@ -276,7 +290,10 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             {"to": "COMPLETE"}, format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(set(response.data["errors"]), set(get_required_section_fields(programme)))
+        self.assertEqual(
+            set(response.data["errors"]),
+            set(get_required_section_fields(programme)) | {"locationMap"},
+        )
         programme.refresh_from_db()
         self.assertEqual(programme.status, "DRAFT")
 
@@ -642,6 +659,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             status="COMPLETE",
             guidingZoningRegulations="Existing",
         )
+        add_location_map(programme)
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/transitions/",
