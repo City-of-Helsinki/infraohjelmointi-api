@@ -318,8 +318,9 @@ class CacheServiceIntegrationTest(TransactionTestCase):
             name="Test Programming Class",
             path="TestProg",
             forCoordinatorOnly=False,
-            relatedTo=self.coord_class
         )
+        self.coord_class.relatedTo = prog_class
+        self.coord_class.save()
 
         # Create project
         project = Project.objects.create(
@@ -372,6 +373,162 @@ class CacheServiceIntegrationTest(TransactionTestCase):
             for_coordinator=False
         )
         self.assertIsNone(cached_after, "Cache should be invalidated after financial update")
+
+    def test_project_financial_save_invalidates_coordinator_class_cache(self):
+        """Planning-view finance edits must invalidate the coordination view's cached sums."""
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        prog_class = ProjectClass.objects.create(
+            name="Test Programming Class",
+            path="TestProg",
+            forCoordinatorOnly=False,
+        )
+        coord_sub_class = ProjectClass.objects.create(
+            name="Test Coordinator Sub Class",
+            path="TestCoord/Sub",
+            forCoordinatorOnly=True,
+            parent=self.coord_class,
+            relatedTo=prog_class,
+        )
+        project = Project.objects.create(
+            name="Test Project",
+            description="Test project description",
+            projectClass=prog_class,
+            programmed=True,
+            personProgramming=self.programmer,
+        )
+        pf = ProjectFinancial.objects.create(
+            project=project, year=self.current_year, value=50000, forFrameView=False
+        )
+
+        for coord in (self.coord_class, coord_sub_class):
+            CacheService.set_financial_sum(
+                instance_id=coord.id,
+                instance_type='ProjectClass',
+                year=self.current_year,
+                for_frame_view=False,
+                data={'stale': True},
+                for_coordinator=True,
+            )
+
+        pf.value = 60000
+        pf.save()
+
+        for coord in (self.coord_class, coord_sub_class):
+            self.assertIsNone(
+                CacheService.get_financial_sum(
+                    instance_id=coord.id,
+                    instance_type='ProjectClass',
+                    year=self.current_year,
+                    for_frame_view=False,
+                    for_coordinator=True,
+                ),
+                f"Coordinator class {coord.name} cache should be invalidated",
+            )
+
+    def _cache_stale(self, instance, instance_type):
+        CacheService.set_financial_sum(
+            instance_id=instance.id,
+            instance_type=instance_type,
+            year=self.current_year,
+            for_frame_view=False,
+            data={'stale': True},
+            for_coordinator=True,
+        )
+
+    def _cached(self, instance, instance_type):
+        return CacheService.get_financial_sum(
+            instance_id=instance.id,
+            instance_type=instance_type,
+            year=self.current_year,
+            for_frame_view=False,
+            for_coordinator=True,
+        )
+
+    def test_project_financial_save_invalidates_coordinator_location_cache(self):
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        planning_district = ProjectLocation.objects.create(
+            name="Test Planning District", path="PlanDistrict", forCoordinatorOnly=False,
+        )
+        planning_division = ProjectLocation.objects.create(
+            name="Test Planning Division", path="PlanDistrict/Division",
+            forCoordinatorOnly=False, parent=planning_district,
+        )
+        coord_district = ProjectLocation.objects.create(
+            name="Test Coordinator District", path="CoordDistrict",
+            forCoordinatorOnly=True, parentClass=self.coord_class,
+            relatedTo=planning_district,
+        )
+        project = Project.objects.create(
+            name="Test Project",
+            description="Test project description",
+            projectLocation=planning_division,
+            programmed=True,
+            personProgramming=self.programmer,
+        )
+        pf = ProjectFinancial.objects.create(
+            project=project, year=self.current_year, value=50000, forFrameView=False
+        )
+        self._cache_stale(coord_district, 'ProjectLocation')
+
+        pf.value = 60000
+        pf.save()
+
+        self.assertIsNone(self._cached(coord_district, 'ProjectLocation'))
+
+    def test_unprogramming_project_invalidates_coordinator_class_cache(self):
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        prog_class = ProjectClass.objects.create(
+            name="Test Programming Class", path="TestProg", forCoordinatorOnly=False,
+        )
+        self.coord_class.relatedTo = prog_class
+        self.coord_class.save()
+        project = Project.objects.create(
+            name="Test Project",
+            description="Test project description",
+            projectClass=prog_class,
+            programmed=True,
+            personProgramming=self.programmer,
+        )
+        self._cache_stale(self.coord_class, 'ProjectClass')
+
+        project.programmed = False
+        project.save()
+
+        self.assertIsNone(self._cached(self.coord_class, 'ProjectClass'))
+
+    def test_moving_project_invalidates_old_coordinator_class_cache(self):
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        old_class = ProjectClass.objects.create(
+            name="Old Programming Class", path="OldProg", forCoordinatorOnly=False,
+        )
+        new_class = ProjectClass.objects.create(
+            name="New Programming Class", path="NewProg", forCoordinatorOnly=False,
+        )
+        self.coord_class.relatedTo = old_class
+        self.coord_class.save()
+        new_coord_class = ProjectClass.objects.create(
+            name="New Coordinator Class", path="NewCoord",
+            forCoordinatorOnly=True, relatedTo=new_class,
+        )
+        project = Project.objects.create(
+            name="Test Project",
+            description="Test project description",
+            projectClass=old_class,
+            programmed=True,
+            personProgramming=self.programmer,
+        )
+        self._cache_stale(self.coord_class, 'ProjectClass')
+        self._cache_stale(new_coord_class, 'ProjectClass')
+
+        project.projectClass = new_class
+        project.save()
+
+        self.assertIsNone(self._cached(self.coord_class, 'ProjectClass'))
+        self.assertIsNone(self._cached(new_coord_class, 'ProjectClass'))
 
     def test_cache_invalidation_on_class_financial_save(self):
         """Test that cache is invalidated when ClassFinancial changes"""
@@ -426,8 +583,9 @@ class CacheServiceIntegrationTest(TransactionTestCase):
             name="Test Planning Class",
             path="TestProg",
             forCoordinatorOnly=False,
-            relatedTo=self.coord_class  # Link to coordinator
         )
+        self.coord_class.relatedTo = planning_class
+        self.coord_class.save()
 
         # Cache data for the planning class (which shows coordinator's finances)
         test_cache_data = {'year0': {'frameBudget': 999999}}
@@ -474,18 +632,17 @@ class CacheServiceIntegrationTest(TransactionTestCase):
         if self.cache_disabled:
             self.skipTest("Cache is disabled (Redis unavailable)")
 
-        coord_location = ProjectLocation.objects.create(
-            name="Test Coordinator Location",
-            path="CoordLoc",
-            forCoordinatorOnly=True
-        )
-
-        # Create planning location linked to coordinator location
         planning_location = ProjectLocation.objects.create(
             name="Test Planning Location",
             path="PlanLoc",
             forCoordinatorOnly=False,
-            relatedTo=coord_location  # Link to coordinator
+        )
+
+        coord_location = ProjectLocation.objects.create(
+            name="Test Coordinator Location",
+            path="CoordLoc",
+            forCoordinatorOnly=True,
+            relatedTo=planning_location,
         )
 
         # Add financial data to coordinator location
