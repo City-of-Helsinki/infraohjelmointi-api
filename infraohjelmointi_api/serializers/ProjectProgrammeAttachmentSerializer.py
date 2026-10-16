@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from infraohjelmointi_api.models import ProjectProgrammeAttachment
+from infraohjelmointi_api.models import ProjectProgrammeAttachment, ProjectProgrammeLocationMap
 
 
 class ProjectProgrammeAttachmentSerializer(serializers.ModelSerializer):
@@ -46,3 +46,33 @@ def get_section_attachments(section):
         many=True,
         context={"programme_id": section.project_programme_id},
     ).data
+
+
+class ProjectProgrammeLocationMapSerializer(serializers.ModelSerializer):
+    """Read-only representation of a programme's location map (IO-936).
+
+    `url` serves the image itself, through the same permission-checked endpoint that
+    handles POST/DELETE.
+    """
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeLocationMap
+        fields = [
+            "id",
+            "url",
+            "originalName",
+            "contentType",
+            "size",
+            "uploadedDate",
+        ]
+        read_only_fields = fields
+
+    def get_url(self, obj):
+        if not obj.file:
+            return None
+        return reverse(
+            "projectProgrammes-location-map",
+            kwargs={"pk": str(obj.project_programme_id)},
+        )

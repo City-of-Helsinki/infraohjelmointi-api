@@ -59,6 +59,7 @@ from .ConstructionHandoverAttachmentSerializer import ConstructionHandoverAttach
 from .FinancingPartySerializer import FinancingPartySerializer
 from .ProjectProgrammeAttachmentSerializer import (
     ProjectProgrammeAttachmentSerializer,
+    ProjectProgrammeLocationMapSerializer,
 )
 from .ProjectProgrammeSerializer import (
     ProjectProgrammeCreateSerializer,
