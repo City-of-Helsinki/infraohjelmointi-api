@@ -60,4 +60,10 @@ def get_missing_required_fields(programme, section_name=None):
                 missing[field] = ["This field is required."]
         if missing:
             errors[relation_name] = missing
+
+    # IO-936: the location map is required in brief and extended programmes alike.
+    # It has no status of its own, so it is checked only when the whole programme
+    # is completed, not when a single section is.
+    if section_name is None and getattr(programme, "locationMap", None) is None:
+        errors["locationMap"] = {"file": ["This field is required."]}
     return errors

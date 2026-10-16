@@ -21,6 +21,7 @@ from .models import (
     ConstructionHandoverAttachment,
     NoteImage,
     ProjectProgrammeAttachment,
+    ProjectProgrammeLocationMap,
 )
 
 logger = logging.getLogger("infraohjelmointi_api")
@@ -767,9 +768,9 @@ def reconcile_finances_on_schedule_change(sender, instance, **kwargs):
             )
 
 
-# IO-812 / IO-857 / IO-914: an uploaded file must not outlive its row. Rows are
-# deleted by the API's delete endpoints, by CASCADE (Note -> Project, attachment ->
-# handover, programme -> section -> attachment) and
+# IO-812 / IO-857 / IO-914 / IO-936: an uploaded file must not outlive its row. Rows
+# are deleted by the API's delete endpoints, by CASCADE (Note -> Project, attachment
+# -> handover, programme -> section -> attachment, programme -> location map) and
 # from the admin, so the storage cleanup lives here rather than in the views. It runs
 # on commit: if the surrounding transaction rolls back, the row comes back and so
 # must its file. robust=True logs a storage failure instead of failing a delete that
@@ -777,6 +778,7 @@ def reconcile_finances_on_schedule_change(sender, instance, **kwargs):
 @receiver(post_delete, sender=NoteImage)
 @receiver(post_delete, sender=ConstructionHandoverAttachment)
 @receiver(post_delete, sender=ProjectProgrammeAttachment)
+@receiver(post_delete, sender=ProjectProgrammeLocationMap)
 def delete_uploaded_file(sender, instance, **kwargs):
     if not instance.file:
         return
