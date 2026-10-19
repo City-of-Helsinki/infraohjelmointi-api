@@ -134,6 +134,18 @@ class ProjectProgrammeSectionLinksUpdateMixin:
     def sync_links(self, instance, links):
         sync_section_links(instance, links)
 
+    def create(self, validated_data):
+        links = validated_data.pop("links", None)
+        instance = super().create(validated_data)
+        self.sync_links(instance, links)
+        return instance
+
+    def update(self, instance, validated_data):
+        links = validated_data.pop("links", None)
+        instance = super().update(instance, validated_data)
+        self.sync_links(instance, links)
+        return instance
+
 
 class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
     BRIEF_ONLY_FIELDS = {"estimatedCosts"}
@@ -238,18 +250,6 @@ class ProjectProgrammeBasicInfoUpdateSerializer(
                 field.required = name in required_fields
         return fields
 
-    def create(self, validated_data):
-        links = validated_data.pop("links", None)
-        basic_info = super().create(validated_data)
-        self.sync_links(basic_info, links)
-        return basic_info
-
-    def update(self, instance, validated_data):
-        links = validated_data.pop("links", None)
-        basic_info = super().update(instance, validated_data)
-        self.sync_links(basic_info, links)
-        return basic_info
-
 
 class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
     links = serializers.SerializerMethodField()
@@ -279,30 +279,30 @@ class ProjectProgrammeDesignCriteriaUpdateSerializer(
         fields = "__all__"
         read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
 
-    def create(self, validated_data):
-        links = validated_data.pop("links", None)
-        design_criteria = super().create(validated_data)
-        self.sync_links(design_criteria, links)
-        return design_criteria
-
-    def update(self, instance, validated_data):
-        links = validated_data.pop("links", None)
-        design_criteria = super().update(instance, validated_data)
-        self.sync_links(design_criteria, links)
-        return design_criteria
-
 
 class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
 
 class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeTrafficPlanningCriteria
         fields = "__all__"
@@ -310,16 +310,28 @@ class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
 
 class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeUrbanSpacingPlanningCriteria
         fields = "__all__"
@@ -327,16 +339,28 @@ class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
 
 
 class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
 
 class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeMaintenanceNeeds
         fields = "__all__"
@@ -344,16 +368,28 @@ class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
 
 
 class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
 
+    def get_links(self, instance):
+        return get_section_links(instance)
+
 
 class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeInteractionAndRelatedProjects
         fields = "__all__"
@@ -368,20 +404,21 @@ class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer)
         fields = "__all__"
 
     def get_links(self, instance):
-        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
-
-        links = ProjectProgrammeLink.objects.filter(
-            contentType=content_type,
-            objectId=instance.id,
-        )
-        return ProjectProgrammeLinkGetSerializer(links, many=True).data
+        return get_section_links(instance)
 
 
 class ProjectProgrammeOtherAttachmentsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
     ProjectProgrammeSectionParentImmutableMixin,
     ProjectProgrammeDraftOnlyUpdateMixin,
     serializers.ModelSerializer,
 ):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = ProjectProgrammeOtherAttachments
         fields = "__all__"
