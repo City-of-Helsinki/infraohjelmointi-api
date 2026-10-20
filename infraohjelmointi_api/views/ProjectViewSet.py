@@ -867,8 +867,27 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
-        queryset = self.filter_queryset(
-            self.get_queryset(for_coordinator=for_coordinator)
+        # Preload the relations ProjectGetSerializer renders as nested objects to avoid per-project queries
+        queryset = (
+            self.filter_queryset(self.get_queryset(for_coordinator=for_coordinator))
+            .select_related(
+                "siteId",
+                "projectSet",
+                "area",
+                "type",
+                "typeQualifier",
+                "priority",
+                "phaseDetail__projectPhase",
+                "suspendedFromPhase",
+                "constructionProcurementMethod",
+                "staraProcurementReason",
+                "riskAssessment",
+                "constructionPhase",
+                "planningPhase",
+                "projectQualityLevel",
+                "responsibleZone",
+            )
+            .prefetch_related("otherPersons")
         )
 
         financeYear = request.query_params.get("year", None)
@@ -885,10 +904,14 @@ class ProjectViewSet(BaseViewSet):
         paginator = PageNumberPagination()
         paginator.page_size = limit
         page = paginator.paginate_queryset(queryset, request)
+        project_ids = (
+            [project.id for project in page] if page is not None else queryset.values("id")
+        )
 
         year = date.today().year if financeYear == None else int(financeYear)
         finances = ProjectFinancialSerializer(
             ProjectFinancial.objects.filter(
+                project_id__in=project_ids,
                 forFrameView=forFrameView,
                 year__in=range(year, year + 11)
             ),
@@ -901,7 +924,9 @@ class ProjectViewSet(BaseViewSet):
             projects_to_finances[f["project"]].append(f)
 
         current_year = dt_module.datetime.now().year
-        sap_values = SapCurrentYearService.get_by_year(current_year)
+        sap_values = SapCurrentYearService.get_by_year(current_year).filter(
+            project_id__in=project_ids
+        )
         projects_to_sap_values = defaultdict(list)
         for sap_value in sap_values:
             # Append the SAP value to the list of SAP values for the corresponding project_id
@@ -1023,7 +1048,6 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
-                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
                 .filter(
                     Q(projectClass__isnull=False) | Q(projectLocation__isnull=False)
@@ -1048,7 +1072,6 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
-                    "finances",  # Prefetch finances to prevent N+1 queries if accessed
                 )
             )
         masterClass = self.request.query_params.getlist("masterClass", [])

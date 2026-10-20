@@ -1,5 +1,8 @@
 from django.test import TestCase
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from datetime import (date, datetime)
+import json
 from infraohjelmointi_api.services import AppStateValueService
 from overrides import override
 from rest_framework.renderers import JSONRenderer
@@ -4245,6 +4248,74 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         self.assertEqual(
             [result["id"] for result in response.json()["results"]],
             [str(project.id)],
+        )
+
+    def _create_listed_project(self, name, year):
+        project = Project.objects.create(
+            name=name,
+            description="Project list performance test project",
+            programmed=True,
+            projectClass=self.projectClass,
+            siteId=self.budgetItem,
+            projectSet=self.projectSet,
+            area=self.projectArea,
+            type=self.projectType,
+            priority=self.projectPriority,
+            phase=self.projectPhase,
+            phaseDetail=self.conPhaseDetail,
+            category=self.projectCategory,
+            projectQualityLevel=self.projectQualityLevel,
+            planningPhase=self.planningPhase,
+            constructionPhase=self.constructionPhase,
+            personPlanning=self.person_2,
+        )
+        project.otherPersons.add(self.person_3)
+        ProjectFinancial.objects.create(project=project, year=year, value=100)
+        return project
+
+    def test_project_list_query_count_does_not_grow_with_project_count(self):
+        year = date.today().year
+        url = "/projects/?class={}&year={}".format(self.projectClass.id, year)
+        self._create_listed_project("Query count project 1", year)
+
+        with CaptureQueriesContext(connection) as few_projects:
+            self.client.get(url)
+
+        for i in range(2, 6):
+            self._create_listed_project("Query count project {}".format(i), year)
+
+        with CaptureQueriesContext(connection) as many_projects:
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 6)
+        self.assertEqual(len(many_projects), len(few_projects))
+
+    def test_project_list_matches_per_project_serialization(self):
+        year = date.today().year
+        self._create_listed_project("Serialized project", year)
+
+        response = self.client.get(
+            "/projects/?class={}&year={}".format(self.projectClass.id, year)
+        )
+        expected = ProjectGetSerializer(
+            Project.objects.filter(projectClass=self.projectClass),
+            many=True,
+            context={"finance_year": str(year)},
+        ).data
+
+        # Many-to-many relations have no defined order
+        def normalize(projects):
+            for project in projects:
+                project["hashTags"] = sorted(project["hashTags"])
+                project["favPersons"] = sorted(project["favPersons"])
+                project["otherPersons"] = sorted(project["otherPersons"], key=lambda p: p["id"])
+            return projects
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            normalize(response.json()["results"]),
+            normalize(json.loads(JSONRenderer().render(expected))),
         )
 
     def test_estDates_to_frameEstDates(self):
