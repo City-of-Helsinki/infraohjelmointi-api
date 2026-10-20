@@ -38,6 +38,16 @@ User = get_user_model()
 @patch.object(BaseViewSet, "authentication_classes", new=[])
 @patch.object(BaseViewSet, "permission_classes", new=[])
 class ProjectProgrammeViewSetTestCase(TestCase):
+    LINK_SECTIONS = (
+        ("basic-info", "basicInfo", "summary"),
+        ("design-criteria", "designCriteria", "guidingZoningRegulations"),
+        ("traffic-planning-criteria", "trafficPlanningCriteria", "targetTrafficChanges"),
+        ("urban-spacing-planning-criteria", "urbanSpacingPlanningCriteria", "targetUrbanAppearance"),
+        ("maintenance-needs", "maintenanceNeeds", "maintenanceNeeds"),
+        ("interaction-and-related-projects", "interactionAndRelatedProjects", "interactionNotes"),
+        ("other-attachments", "otherAttachments", None),
+    )
+
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create(
@@ -97,6 +107,159 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             "inspector": "Inspector",
             "estimatedCosts": "100000",
         }
+
+    def _create_section_with_link(self, programme, relation_name):
+        model = ProjectProgramme._meta.get_field(relation_name).related_model
+        section = model.objects.create(project_programme=programme)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=ContentType.objects.get_for_model(model),
+            objectId=section.id,
+            value="https://old-link.fi",
+        )
+        return section, link
+
+    def test_all_sections_create_and_return_links(self):
+        programme = self._create_project_programme()
+
+        for route, relation_name, field in self.LINK_SECTIONS:
+            with self.subTest(section=relation_name):
+                links = [f"https://example.com/{route}", "https://hel.fi"]
+                payload = {"links": links}
+                if field:
+                    payload[field] = "Section content"
+                response = self.client.post(
+                    f"/project-programmes/{programme.id}/sections/{route}/",
+                    payload,
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual([link["value"] for link in response.data["links"]], links)
+                section = getattr(ProjectProgramme.objects.get(pk=programme.pk), relation_name)
+                self.assertEqual(
+                    list(ProjectProgrammeLink.objects.filter(
+                        contentType=ContentType.objects.get_for_model(section),
+                        objectId=section.id,
+                    ).values_list("value", flat=True)),
+                    links,
+                )
+                if field:
+                    self.assertEqual(getattr(section, field), "Section content")
+
+        response = self.client.get(f"/project-programmes/{programme.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for route, relation_name, _ in self.LINK_SECTIONS:
+            with self.subTest(reloaded_section=relation_name):
+                self.assertEqual(
+                    [link["value"] for link in response.data[relation_name]["links"]],
+                    [f"https://example.com/{route}", "https://hel.fi"],
+                )
+
+    def test_all_sections_replace_links_without_affecting_other_sections(self):
+        programme = self._create_project_programme()
+        sections = {
+            relation_name: self._create_section_with_link(programme, relation_name)
+            for _, relation_name, _ in self.LINK_SECTIONS
+        }
+
+        for route, relation_name, _ in self.LINK_SECTIONS:
+            with self.subTest(section=relation_name):
+                section, old_link = sections[relation_name]
+                response = self.client.patch(
+                    f"/project-programmes/{programme.id}/sections/{route}/",
+                    {"links": [f"https://example.com/{route}"]},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    [link["value"] for link in response.data["links"]],
+                    [f"https://example.com/{route}"],
+                )
+                self.assertFalse(ProjectProgrammeLink.objects.filter(pk=old_link.pk).exists())
+                self.assertEqual(
+                    ProjectProgrammeLink.objects.filter(
+                        contentType=ContentType.objects.get_for_model(section),
+                        objectId=section.id,
+                    ).count(),
+                    1,
+                )
+                self.assertEqual(ProjectProgrammeLink.objects.count(), len(self.LINK_SECTIONS))
+
+    def test_all_sections_preserve_omitted_links_and_clear_empty_links(self):
+        programme = self._create_project_programme()
+
+        for route, relation_name, field in self.LINK_SECTIONS:
+            with self.subTest(section=relation_name):
+                section, link = self._create_section_with_link(programme, relation_name)
+                url = f"/project-programmes/{programme.id}/sections/{route}/"
+                payload = {field: "Updated content"} if field else {}
+                response = self.client.patch(url, payload, format="json")
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertTrue(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
+                self.assertEqual(response.data["links"][0]["value"], link.value)
+                if field:
+                    section.refresh_from_db()
+                    self.assertEqual(getattr(section, field), "Updated content")
+
+                response = self.client.patch(url, {"links": []}, format="json")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.data["links"], [])
+                self.assertFalse(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
+
+    def test_all_sections_reject_invalid_links_on_create_and_update(self):
+        programme = self._create_project_programme()
+
+        for route, relation_name, _ in self.LINK_SECTIONS:
+            for method in ("post", "patch"):
+                with self.subTest(section=relation_name, method=method):
+                    url = f"/project-programmes/{programme.id}/sections/{route}/"
+                    if method == "patch":
+                        _, link = self._create_section_with_link(programme, relation_name)
+                    response = getattr(self.client, method)(
+                        url, {"links": ["not-a-url"]}, format="json",
+                    )
+
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                    self.assertIn("links", response.data)
+                    if method == "post":
+                        model = ProjectProgramme._meta.get_field(relation_name).related_model
+                        self.assertFalse(model.objects.filter(project_programme=programme).exists())
+                    else:
+                        self.assertTrue(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
+
+    def test_all_sections_reject_link_changes_when_section_is_complete(self):
+        programme = self._create_project_programme()
+
+        for route, relation_name, _ in self.LINK_SECTIONS:
+            with self.subTest(section=relation_name):
+                section, link = self._create_section_with_link(programme, relation_name)
+                section.status = "COMPLETE"
+                section.save()
+                response = self.client.patch(
+                    f"/project-programmes/{programme.id}/sections/{route}/",
+                    {"links": ["https://new-link.fi"]},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertTrue(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
+
+    def test_all_sections_reject_link_changes_when_programme_is_complete(self):
+        programme = self._create_project_programme(status="COMPLETE")
+
+        for route, relation_name, _ in self.LINK_SECTIONS:
+            with self.subTest(section=relation_name):
+                _, link = self._create_section_with_link(programme, relation_name)
+                response = self.client.patch(
+                    f"/project-programmes/{programme.id}/sections/{route}/",
+                    {"links": []},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+                self.assertTrue(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
 
     def _fill_required_sections(self, programme):
         for relation_name, fields in get_required_section_fields(programme).items():
