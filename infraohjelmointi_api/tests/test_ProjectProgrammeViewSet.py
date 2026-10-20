@@ -1322,7 +1322,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             f"/project-programmes/{programme.id}/sections/links/{link.id}/",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
             "Links can only be modified for entities in DRAFT status.",
@@ -1413,7 +1413,49 @@ class ProjectProgrammeViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_link_on_locked_section_returns_400(self):
+    def test_patch_link_on_locked_section_returns_409(self):
+        """Every link write on a locked section answers 409, like section attachments."""
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="COMPLETE"
+        )
+        link = ProjectProgrammeLink.objects.create(
+            contentType=ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments),
+            objectId=other_attachments.id,
+            value="https://example.com",
+        )
+
+        response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+            {"value": "https://hel.fi"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        link.refresh_from_db()
+        self.assertEqual(link.value, "https://example.com")
+
+    def test_invalid_link_on_draft_section_still_returns_400(self):
+        programme = self._create_project_programme()
+        other_attachments = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme, status="DRAFT"
+        )
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": ContentType.objects.get_for_model(
+                    ProjectProgrammeOtherAttachments
+                ).id,
+                "objectId": str(other_attachments.id),
+                "value": "not a url",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_link_on_locked_section_returns_409(self):
         """Regression: link serializer must check section_instance.is_locked, not the undefined `instance`."""
         programme = self._create_project_programme()
         other_attachments = ProjectProgrammeOtherAttachments.objects.create(
@@ -1431,7 +1473,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
 class ProjectProgrammeSerializerTestCase(TestCase):
     def setUp(self):

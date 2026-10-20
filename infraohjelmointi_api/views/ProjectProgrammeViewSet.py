@@ -71,6 +71,11 @@ from infraohjelmointi_api.utils.upload_validation import (
     validate_project_programme_location_map,
 )
 
+from infraohjelmointi_api.serializers.ProjectProgrammeSerializer import (
+    LOCKED_LINK_ERROR,
+    LOCKED_LINK_ERROR_CODE,
+)
+
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_missing_required_fields
 
@@ -606,12 +611,27 @@ class ProjectProgrammeViewSet(BaseViewSet):
             get_serializer_class=ProjectProgrammeOtherAttachmentsGetSerializer,
         )
 
+    @staticmethod
+    def _validate_link_or_conflict(serializer):
+        """Validate a link serializer; a locked target section is a 409, as for
+        section attachments, while other invalid input stays a 400."""
+        if serializer.is_valid():
+            return None
+        if any(
+            getattr(error, "code", None) == LOCKED_LINK_ERROR_CODE
+            for error in serializer.errors.get("detail", [])
+        ):
+            return Response({"detail": LOCKED_LINK_ERROR}, status=status.HTTP_409_CONFLICT)
+        raise ValidationError(serializer.errors)
+
     @action(methods=["post"], detail=True, url_path="sections/links")
     def section_links(self, request, pk=None):
         # get_object() resolves programme and runs object-level permission checks
         programme = self.get_object()
         serializer = ProjectProgrammeLinkUpdateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        conflict = self._validate_link_or_conflict(serializer)
+        if conflict:
+            return conflict
 
         section_instance = self._get_section_instance_for_link(
             serializer.validated_data["contentType"],
@@ -655,14 +675,15 @@ class ProjectProgrammeViewSet(BaseViewSet):
                 )
             ):
                 return Response(
-                    {"detail": "Links can only be modified for entities in DRAFT status."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"detail": LOCKED_LINK_ERROR}, status=status.HTTP_409_CONFLICT
                 )
             link.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         serializer = ProjectProgrammeLinkUpdateSerializer(link, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
+        conflict = self._validate_link_or_conflict(serializer)
+        if conflict:
+            return conflict
         serializer.save()
         return Response(
             ProjectProgrammeLinkGetSerializer(serializer.instance).data,
