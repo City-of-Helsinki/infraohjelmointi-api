@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import connection
+from django.db import connection, transaction
 from django.test import TestCase, TransactionTestCase, override_settings
 
 from helusers.models import ADGroup
@@ -529,6 +529,38 @@ class CacheServiceIntegrationTest(TransactionTestCase):
 
         self.assertIsNone(self._cached(self.coord_class, 'ProjectClass'))
         self.assertIsNone(self._cached(new_coord_class, 'ProjectClass'))
+
+    def test_moving_project_twice_in_one_transaction_invalidates_original_class(self):
+        if self.cache_disabled:
+            self.skipTest("Cache is disabled (Redis unavailable)")
+        classes = [
+            ProjectClass.objects.create(name=f"Prog {n}", path=f"Prog{n}", forCoordinatorOnly=False)
+            for n in ("A", "B", "C")
+        ]
+        coords = [
+            ProjectClass.objects.create(
+                name=f"Coord {n}", path=f"Coord{n}", forCoordinatorOnly=True, relatedTo=c,
+            )
+            for n, c in zip(("A", "B", "C"), classes)
+        ]
+        project = Project.objects.create(
+            name="Test Project",
+            description="Test project description",
+            projectClass=classes[0],
+            programmed=True,
+            personProgramming=self.programmer,
+        )
+        for coord in coords:
+            self._cache_stale(coord, 'ProjectClass')
+
+        with transaction.atomic():
+            project.projectClass = classes[1]
+            project.save()
+            project.projectClass = classes[2]
+            project.save()
+
+        for coord in coords:
+            self.assertIsNone(self._cached(coord, 'ProjectClass'), coord.name)
 
     def test_cache_invalidation_on_class_financial_save(self):
         """Test that cache is invalidated when ClassFinancial changes"""
