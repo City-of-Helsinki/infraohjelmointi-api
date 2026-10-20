@@ -57,6 +57,11 @@ class ProjectProgrammeLinkGetSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+LOCKED_LINK_ERROR = "Links can only be modified for entities in DRAFT status."
+# Error code the views turn into 409 CONFLICT; other validation errors stay 400.
+LOCKED_LINK_ERROR_CODE = "locked"
+
+
 class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectProgrammeLink
@@ -89,9 +94,7 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
                     )
                 ):
                     raise serializers.ValidationError(
-                        {
-                            "detail": "Links can only be modified for entities in DRAFT status."
-                        }
+                        {"detail": LOCKED_LINK_ERROR}, code=LOCKED_LINK_ERROR_CODE
                     )
 
         return attrs
