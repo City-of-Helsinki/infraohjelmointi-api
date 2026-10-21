@@ -174,7 +174,7 @@ class ConstructionHandoverAttachmentTestCase(APITestCase):
     def test_default_size_limit_matches_figma(self):
         from django.conf import settings
 
-        self.assertEqual(settings.HANDOVER_ATTACHMENT_MAX_BYTES, 500 * 1024)
+        self.assertEqual(settings.HANDOVER_ATTACHMENT_MAX_BYTES, 2 * 1000 * 1024)
 
     def test_POST_rejects_name_that_does_not_match_the_declared_type(self):
         """The content type is client-declared; x.html sent as image/png must not be
