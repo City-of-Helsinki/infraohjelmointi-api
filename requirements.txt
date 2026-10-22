@@ -2,7 +2,7 @@ django==4.2.26                                 # web framework itself
 djangorestframework==3.14.0                    # creating rest APIs
 psycopg2-binary==2.9.6                         # postgres database adapter
 requests>=2.32.4
-django-cors-headers==3.13.0
+django-cors-headers==4.9.0
 django_db_logger==0.1.12
 tzdata==2022.6
 dj_database_url==1.0.0
