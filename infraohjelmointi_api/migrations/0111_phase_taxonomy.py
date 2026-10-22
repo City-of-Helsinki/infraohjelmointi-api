@@ -419,6 +419,7 @@ def reverse_restructure(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
+        # Must match main/prod, where this was applied right after 0108 (v1.11.0)
         ("infraohjelmointi_api", "0108_migrate_auditlog_to_resilient_logger"),
     ]
 

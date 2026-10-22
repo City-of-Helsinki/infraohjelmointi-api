@@ -1,10 +1,13 @@
 from unittest.mock import patch
 from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
+from helusers.models import ADGroup
 
 from infraohjelmointi_api.models import (
     ConstructionHandover,
@@ -12,7 +15,11 @@ from infraohjelmointi_api.models import (
     ConstructionProcurementMethod,
     Person,
     Project,
+    ProjectPhase,
+    ProjectPhaseDetail,
     ProjectProgrammer,
+    ProjectTypeQualifier,
+    StaraProcurementReason,
 )
 from infraohjelmointi_api.serializers import (
     ConstructionHandoverCreateSerializer,
@@ -71,8 +78,44 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             username="handover_user_2",
             first_name="Handover",
             last_name="User Two",
-            email="handover2@example.com",
+            email=self.person_planning.email,
         )
+        self.user_3 = User.objects.create(
+            username="handover_user_3",
+            first_name="Handover",
+            last_name="User Three",
+            email=self.person_construction.email,
+        )
+        self.project_manager_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_projektipaallikot",
+            display_name="Project Managers",
+        )
+        self.programmer_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_ohjelmoijat",
+            display_name="Programmers",
+        )
+        self.construction_management_lead_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_rakennuttamisen_esihenkilot",
+            display_name="Construction Management Leads",
+        )
+        self.user_2.ad_groups.add(self.project_manager_group)
+        self.user_3.ad_groups.add(self.project_manager_group)
+
+        self.user_4 = User.objects.create(
+            username="handover_user_4",
+            first_name="Handover",
+            last_name="User Four",
+            email="handover4@example.com",
+        )
+        self.user_4.ad_groups.add(self.programmer_group)
+
+        self.user_5 = User.objects.create(
+            username="handover_user_6",
+            first_name="Handover",
+            last_name="User Six",
+            email="handover6@example.com",
+        )
+        self.user_5.ad_groups.add(self.construction_management_lead_group)
 
     def test_get_serializer_class_by_action(self):
         viewset = ConstructionHandoverViewSet()
@@ -106,11 +149,55 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.data["name"], "Test handover")
         self.assertEqual(response.data["status"], "DRAFT")
 
+    def test_get_construction_handover_includes_financing_rows(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+        budget_item = ProjectTypeQualifier.objects.create(value="K1")
+        ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty="KYMP",
+            budgetItem=budget_item,
+            projectNumber="HEL-2024-001",
+            budget=Decimal("150000.00"),
+        )
+        ConstructionHandoverFinancing.objects.create(
+            handover=handover,
+            financingParty="OTHER",
+            description="Other financing source",
+            projectNumber="",
+            budget=Decimal("50000.00"),
+        )
+
+        response = self.client.get(f"/construction-handovers/{handover.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["constructionHandoverFinancing"]), 2)
+
+        financing_by_party = {
+            item["financingParty"]: item for item in response.data["constructionHandoverFinancing"]
+        }
+
+        kymp_financing = financing_by_party["KYMP"]
+        self.assertEqual(kymp_financing["financingParty"], "KYMP")
+        self.assertEqual(kymp_financing["projectNumber"], "HEL-2024-001")
+        self.assertEqual(str(kymp_financing["budget"]), "150000.00")
+        self.assertIsNotNone(kymp_financing["budgetItem"])
+
+        other_financing = financing_by_party["OTHER"]
+        self.assertEqual(other_financing["financingParty"], "OTHER")
+        self.assertEqual(other_financing["description"], "Other financing source")
+        self.assertEqual(str(other_financing["budget"]), "50000.00")
+
     def test_create_construction_handover(self):
         self.client.force_authenticate(user=self.user_1)
+        type_qualifier = ProjectTypeQualifier.objects.create(value="K1")
+        self.project.typeQualifier = type_qualifier
         self.project.sapProject = "SAP-123"
         self.project.costForecast = 123456
-        self.project.save(update_fields=["sapProject", "costForecast"])
+        self.project.save(update_fields=["typeQualifier", "sapProject", "costForecast"])
 
         response = self.client.post(
             "/construction-handovers/",
@@ -142,6 +229,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         financing_row = financing_rows.first()
         self.assertEqual(financing_row.financingParty, "KYMP")
+        self.assertEqual(financing_row.budgetItem_id, type_qualifier.id)
         self.assertEqual(financing_row.projectNumber, self.project.sapProject)
         self.assertEqual(financing_row.budget, self.project.costForecast)
 
@@ -280,10 +368,10 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             1,
         )
 
-    def test_partial_update_returns_409_for_non_draft(self):
+    def test_partial_update_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
             name="Before update",
         )
 
@@ -296,7 +384,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be edited.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
         )
 
         handover.refresh_from_db()
@@ -325,10 +413,10 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(handover.createdBy_id, self.user_1.uuid)
         self.assertEqual(handover.updatedBy_id, self.user_2.uuid)
 
-    def test_destroy_returns_409_for_non_draft(self):
+    def test_destroy_returns_409_for_locked_handover(self):
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_PROGRAMMER",
+            status="SUBMITTED_TO_CONSTRUCTION",
         )
 
         response = self.client.delete(f"/construction-handovers/{handover.id}/")
@@ -336,7 +424,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(
             response.data["detail"],
-            "Only construction handovers in DRAFT status can be deleted.",
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be deleted.",
         )
         self.assertTrue(ConstructionHandover.objects.filter(id=handover.id).exists())
 
@@ -350,3 +438,883 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(ConstructionHandover.objects.filter(id=handover.id).exists())
+
+    def test_transitions_allows_submitted_to_programmer_for_project_manager(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            updatedBy=self.user_1,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_PROGRAMMER"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["currentStatus"], "SUBMITTED_TO_PROGRAMMER")
+        self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_CONSTRUCTION"])
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
+        self.assertEqual(handover.updatedBy_id, self.user_2.uuid)
+
+    def test_transitions_denies_submitted_to_programmer_for_non_project_manager(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_PROGRAMMER"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+
+    def test_transitions_denies_action_for_user_without_allowed_role(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+        )
+
+        with patch(
+            "infraohjelmointi_api.views.ConstructionHandoverViewSet."
+            "ConstructionHandoverTransitionPermissionService.is_transition_allowed",
+            return_value=True,
+        ) as mocked_transition_permission:
+            response = self.client.post(
+                f"/construction-handovers/{handover.id}/transitions/",
+                {"to": "SUBMITTED_TO_PROGRAMMER"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            str(response.data["detail"]),
+            "You do not have permission to perform this action.",
+        )
+        mocked_transition_permission.assert_not_called()
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+
+    def test_transitions_allows_submitted_to_construction_for_programmer(self):
+        self.client.force_authenticate(user=self.user_4)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_CONSTRUCTION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+
+    def test_transitions_denies_submitted_to_construction_for_non_programmer(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_CONSTRUCTION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
+
+    def test_transitions_allows_project_manager_named_for_construction_management_lead(self):
+        self.client.force_authenticate(user=self.user_5)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "PROJECT_MANAGER_NAMED"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+        self.assertEqual(self.project.personConstruction_id, self.person_construction.id)
+        self.assertEqual(
+            self.project.constructionProcurementMethod_id,
+            self.construction_procurement_method.id,
+        )
+
+    def test_transitions_denies_project_manager_named_for_non_construction_management_lead(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "PROJECT_MANAGER_NAMED"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+
+    def test_transitions_denies_project_manager_named_when_construction_project_manager_missing(self):
+        self.client.force_authenticate(user=self.user_5)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=None,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "PROJECT_MANAGER_NAMED"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "constructionProjectManager is required for this transition.",
+        )
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+
+    def test_transitions_allows_moved_to_construction_preparation_for_matching_project_manager(self):
+        self.client.force_authenticate(user=self.user_3)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "MOVED_TO_CONSTRUCTION_PREPARATION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "MOVED_TO_CONSTRUCTION_PREPARATION")
+
+    def test_transitions_denies_moved_to_construction_preparation_for_non_matching_project_manager(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "MOVED_TO_CONSTRUCTION_PREPARATION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+
+    def test_transitions_return_to_draft_restores_project_phase_and_unlocks_handover(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        construction_wait_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        self.project.phase = construction_wait_phase
+        self.project.phaseDetail = construction_wait_phase_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+            previousProjectPhaseDetail=None,
+            updatedBy=self.user_1,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            {
+                "currentStatus": "DRAFT",
+                "possibleTransitions": ["SUBMITTED_TO_PROGRAMMER"],
+            },
+        )
+
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+        self.assertEqual(handover.updatedBy_id, self.user_2.uuid)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+        self.assertIsNone(self.project.phaseDetail_id)
+
+        patch_response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"name": "Edited after return to draft"},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+
+        get_response = self.client.get(f"/construction-handovers/{handover.id}/")
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(get_response.data["status"], "DRAFT")
+        self.assertNotIn("previousProjectPhase", get_response.data)
+        self.assertNotIn("previousProjectPhaseDetail", get_response.data)
+
+    def test_transitions_return_to_draft_allowed_for_handover_roles(self):
+        cases = [
+            ("project manager", self.user_2, "SUBMITTED_TO_CONSTRUCTION"),
+            ("programmer", self.user_4, "SUBMITTED_TO_CONSTRUCTION"),
+            ("construction management lead", self.user_5, "PROJECT_MANAGER_NAMED"),
+            ("project manager", self.user_3, "MOVED_TO_CONSTRUCTION_PREPARATION"),
+        ]
+
+        for role, user, from_status in cases:
+            with self.subTest(role=role, from_status=from_status):
+                self.client.force_authenticate(user=user)
+                handover = ConstructionHandover.objects.create(
+                    project=self.project,
+                    status=from_status,
+                )
+
+                response = self.client.post(
+                    f"/construction-handovers/{handover.id}/transitions/",
+                    {"to": "DRAFT"},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.data["currentStatus"], "DRAFT")
+                self.assertEqual(
+                    response.data["possibleTransitions"], ["SUBMITTED_TO_PROGRAMMER"]
+                )
+                handover.refresh_from_db()
+                self.assertEqual(handover.status, "DRAFT")
+                handover.delete()
+
+    def test_transitions_return_to_draft_denied_for_user_without_allowed_role(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        self.project.phase = construction_wait_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+        self.assertEqual(handover.previousProjectPhase_id, proposal_phase.id)
+        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+
+    def test_transitions_return_to_draft_rejected_from_submitted_to_programmer(self):
+        self.client.force_authenticate(user=self.user_4)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["detail"], "Invalid status transition.")
+        self.assertEqual(
+            response.data["possibleTransitions"], ["SUBMITTED_TO_CONSTRUCTION"]
+        )
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
+
+    def test_transitions_returns_400_when_target_status_missing(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Field 'to' is required.")
+        self.assertEqual(response.data["currentStatus"], "DRAFT")
+        self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_PROGRAMMER"])
+
+    def test_transitions_rejects_skipping_status(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            constructionProjectManager=self.person_construction,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_CONSTRUCTION"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["detail"], "Invalid status transition.")
+        self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_PROGRAMMER"])
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+
+    def test_transitions_rejects_unknown_status(self):
+        self.client.force_authenticate(user=self.user_2)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            constructionProjectManager=self.person_construction,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "INVALID_STATUS"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Invalid status 'INVALID_STATUS'.")
+
+    def test_partial_update_auto_transitions_to_project_manager_named_when_trigger_fields_are_updated(self):
+        self.client.force_authenticate(user=self.user_5)
+
+        updated_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+        self.project.personConstruction = self.person_construction
+        self.project.constructionProcurementMethod = self.construction_procurement_method
+        self.project.save(update_fields=["personConstruction", "constructionProcurementMethod"])
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {
+                "constructionProjectManager": str(self.person_planning.id),
+                "constructionProcurementMethod": str(updated_procurement_method.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+        self.assertEqual(handover.constructionProjectManager_id, self.person_planning.id)
+
+    def test_partial_update_does_not_auto_transition_to_project_manager_named_when_only_procurement_method_is_updated(self):
+        self.client.force_authenticate(user=self.user_5)
+
+        updated_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {
+                "constructionProcurementMethod": str(updated_procurement_method.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
+        )
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+        self.assertEqual(
+            handover.constructionProcurementMethod_id,
+            self.construction_procurement_method.id,
+        )
+
+    def test_partial_update_auto_transition_returns_403_for_non_construction_management_lead(self):
+        self.client.force_authenticate(user=self.user_1)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"constructionProjectManager": str(self.person_planning.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
+        self.assertEqual(handover.constructionProjectManager_id, self.person_construction.id)
+
+    def test_partial_update_auto_transitions_to_moved_to_construction_preparation_when_only_procurement_method_is_updated(self):
+        self.client.force_authenticate(user=self.user_3)
+
+        updated_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Kilpailutus",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"constructionProcurementMethod": str(updated_procurement_method.id)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "MOVED_TO_CONSTRUCTION_PREPARATION")
+        self.assertEqual(
+            handover.constructionProcurementMethod_id,
+            updated_procurement_method.id,
+        )
+
+    def test_partial_update_does_not_auto_transition_to_moved_to_construction_preparation_when_extra_fields_are_present(self):
+        self.client.force_authenticate(user=self.user_3)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            constructionProcurementMethod=self.construction_procurement_method,
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {
+                "constructionProcurementMethod": str(self.construction_procurement_method.id),
+                "otherTimelineNotes": "extra update",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Only construction handovers in DRAFT or SUBMITTED_TO_PROGRAMMER status can be edited.",
+        )
+
+        handover.refresh_from_db()
+        self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
+
+    def test_partial_update_saves_total_cost(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": "50000.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertEqual(handover.totalCost, Decimal("50000.00"))
+
+    def test_partial_update_saves_total_cost_as_integer(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": 75000},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertEqual(handover.totalCost, Decimal("75000"))
+
+    def test_partial_update_clears_total_cost(self):
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+            name="Test handover",
+            totalCost=Decimal("100000.00"),
+        )
+
+        response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"totalCost": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.assertIsNone(handover.totalCost)
+
+    def test_sync_project_fields_for_transition_submitted_to_construction_updates_phase_and_detail_and_stores_previous_values(self):
+        programming_phase, _ = ProjectPhase.objects.get_or_create(value="programming")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        old_phase_detail = ProjectPhaseDetail.objects.create(value="waitingProjectManager", projectPhase=programming_phase)
+        construction_wait_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        self.project.phase = programming_phase
+        self.project.phaseDetail = old_phase_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="SUBMITTED_TO_CONSTRUCTION",
+            previous_status="SUBMITTED_TO_PROGRAMMER",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+        self.assertEqual(self.project.phaseDetail_id, construction_wait_phase_detail.id)
+        self.assertEqual(handover.previousProjectPhase_id, programming_phase.id)
+        self.assertEqual(handover.previousProjectPhaseDetail_id, old_phase_detail.id)
+
+    def test_sync_project_fields_for_transition_project_manager_named_updates_project_manager_and_procurement_method(self):
+        old_project_manager = Person.objects.create(
+            firstName="Old",
+            lastName="Manager",
+            email="old-manager@example.com",
+            title="Old Manager",
+            phone="0500000000",
+        )
+        old_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+        old_stara_procurement_reason = None
+        self.project.personConstruction = old_project_manager
+        self.project.constructionProcurementMethod = old_procurement_method
+        self.project.staraProcurementReason = old_stara_procurement_reason
+        self.project.save(update_fields=["personConstruction", "constructionProcurementMethod", "staraProcurementReason"])
+
+        construction_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Stara",
+        )
+        stara_procurement_reason = StaraProcurementReason.objects.create(
+            value="smallWork",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            constructionProjectManager=self.person_construction,
+            constructionProcurementMethod=construction_procurement_method,
+            staraProcurementReason=stara_procurement_reason,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="PROJECT_MANAGER_NAMED",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.personConstruction_id, self.person_construction.id)
+        self.assertEqual(
+            self.project.constructionProcurementMethod_id,
+            construction_procurement_method.id,
+        )
+        self.assertEqual(
+            self.project.staraProcurementReason_id,
+            stara_procurement_reason.id,
+        )
+
+    def test_sync_project_fields_for_transition_moved_to_construction_preparation_updates_phase_detail_and_procurement(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        old_phase_detail = None
+        contract_preparation_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="contractPreparation"
+        )
+        old_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Yhteistoiminnalliset",
+        )
+        old_stara_procurement_reason = None
+        self.project.phase = proposal_phase
+        self.project.phaseDetail = old_phase_detail
+        self.project.constructionProcurementMethod = old_procurement_method
+        self.project.staraProcurementReason = old_stara_procurement_reason
+        self.project.save(update_fields=["phase", "phaseDetail", "constructionProcurementMethod", "staraProcurementReason"])
+
+        construction_procurement_method = ConstructionProcurementMethod.objects.create(
+            value="Stara",
+        )
+        stara_procurement_reason = StaraProcurementReason.objects.create(
+            value="smallWork",
+        )
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            constructionProcurementMethod=construction_procurement_method,
+            staraProcurementReason=stara_procurement_reason
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            previous_status="PROJECT_MANAGER_NAMED",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_preparation_phase.id)
+        self.assertEqual(self.project.phaseDetail_id, contract_preparation_phase_detail.id)
+        self.assertEqual(
+            self.project.constructionProcurementMethod_id,
+            construction_procurement_method.id,
+        )
+        self.assertEqual(
+            self.project.staraProcurementReason_id,
+            stara_procurement_reason.id,
+        )
+
+    def test_sync_project_fields_for_transition_draft_restores_previous_phase_values_and_clears_handover_previous_fields(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        old_phase_detail = None
+        construction_wait_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        self.project.phase = construction_wait_phase
+        self.project.phaseDetail = construction_wait_phase_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+            previousProjectPhaseDetail=old_phase_detail,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+        self.assertEqual(self.project.phaseDetail, old_phase_detail)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+
+    def test_sync_project_fields_for_transition_draft_keeps_manually_changed_phase(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
+        self.project.phase = construction_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_phase.id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+
+    def test_sync_project_fields_for_transition_draft_keeps_manual_change_from_wait_to_preparation(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        self.project.phase = construction_preparation_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="PROJECT_MANAGER_NAMED",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_preparation_phase.id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+
+    def test_sync_project_fields_for_transition_draft_keeps_manual_change_from_preparation_to_wait(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        self.project.phase = construction_wait_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+
+    def test_sync_project_fields_for_transition_draft_from_preparation_restores_previous_phase(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        self.project.phase = construction_preparation_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase_id, proposal_phase.id)

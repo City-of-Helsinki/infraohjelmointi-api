@@ -1,0 +1,144 @@
+"""Shared validation for user-uploaded files.
+
+Introduced for IO-812 (note images). The rules are parameterised by
+(allowed content types, max bytes) so IO-857, IO-914 and IO-936 reuse
+the same validate_upload() with their own constraints.
+
+The exceptions surface as drf-standardized-errors responses, so the UI can branch on
+stable string codes ("unsupported_media_type", "payload_too_large") instead of
+parsing prose.
+"""
+
+import os
+
+from django.conf import settings
+from rest_framework import status
+from rest_framework.exceptions import APIException
+
+
+class UnsupportedUploadType(APIException):
+    status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+    default_detail = "Tiedostotyyppi ei ole sallittu."
+    default_code = "unsupported_media_type"
+
+
+class UploadTooLarge(APIException):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    default_detail = "Tiedosto on liian suuri."
+    default_code = "payload_too_large"
+
+
+# File extensions accepted for each content type. The declared content type comes
+# from the client, so the name must agree with it: otherwise e.g. "x.html" sent as
+# image/png would be stored and later downloaded under its .html name.
+EXTENSIONS_BY_TYPE = {
+    "image/jpeg": (".jpg", ".jpeg"),
+    "image/png": (".png",),
+    "application/pdf": (".pdf",),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (".docx",),
+}
+
+# Leading bytes ("magic numbers") each content type must start with. Both the
+# declared type and the name come from the client, so this is what ties the
+# accepted type to the actual bytes, e.g. rejects arbitrary data named x.jpg.
+SIGNATURES_BY_TYPE = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "application/pdf": (b"%PDF-",),
+    # A .docx is a zip container. Word itself refuses macro content in a .docx.
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (b"PK\x03\x04",),
+}
+_SIGNATURE_BYTES = 8
+
+
+def _describe_types(allowed_types) -> str:
+    """Render allowed types the way the UI shows them ("jpg, png, pdf, docx")."""
+    return ", ".join(
+        EXTENSIONS_BY_TYPE.get(t, (t.rsplit("/", 1)[-1],))[0].lstrip(".")
+        for t in allowed_types
+    )
+
+
+def _read_head(uploaded_file, size) -> bytes:
+    """Read the first bytes of an upload and rewind, so the file still saves whole."""
+    uploaded_file.seek(0)
+    head = uploaded_file.read(size)
+    uploaded_file.seek(0)
+    return head
+
+
+def validate_upload(uploaded_file, allowed_types, max_bytes) -> None:
+    """Raise APIException if the uploaded file violates the given constraints."""
+    content_type = (uploaded_file.content_type or "").lower()
+    if content_type not in allowed_types:
+        raise UnsupportedUploadType(
+            detail=(
+                f"Tiedostotyyppi '{content_type or 'tuntematon'}' ei ole sallittu. "
+                f"Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
+            )
+        )
+
+    extension = os.path.splitext(uploaded_file.name or "")[1].lower()
+    if extension not in EXTENSIONS_BY_TYPE.get(content_type, ()):
+        raise UnsupportedUploadType(
+            detail=(
+                f"Tiedostopääte '{extension or 'puuttuu'}' ei vastaa tiedostotyyppiä "
+                f"'{content_type}'. Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
+            )
+        )
+
+    head = _read_head(uploaded_file, _SIGNATURE_BYTES)
+    if not any(head.startswith(sig) for sig in SIGNATURES_BY_TYPE.get(content_type, ())):
+        raise UnsupportedUploadType(
+            detail=(
+                f"Tiedoston sisältö ei vastaa tiedostotyyppiä '{content_type}'. "
+                f"Sallitut tiedostotyypit: {_describe_types(allowed_types)}."
+            )
+        )
+
+    # size is None for some exotic upload handlers; treat unknown size as acceptable
+    # here rather than rejecting, since the web server body limit is the real backstop.
+    if uploaded_file.size is not None and uploaded_file.size > max_bytes:
+        raise UploadTooLarge(
+            detail=(
+                f"Tiedosto on liian suuri ({uploaded_file.size} tavua). "
+                f"Maksimikoko on {max_bytes} tavua."
+            )
+        )
+
+
+def validate_note_image(uploaded_file) -> None:
+    """IO-812: validate a note image upload."""
+    validate_upload(
+        uploaded_file,
+        settings.NOTE_IMAGE_ALLOWED_TYPES,
+        settings.NOTE_IMAGE_MAX_BYTES,
+    )
+
+
+
+def validate_handover_attachment(uploaded_file) -> None:
+    """IO-857: validate a construction handover attachment upload."""
+    validate_upload(
+        uploaded_file,
+        settings.HANDOVER_ATTACHMENT_ALLOWED_TYPES,
+        settings.HANDOVER_ATTACHMENT_MAX_BYTES,
+    )
+
+
+def validate_project_programme_attachment(uploaded_file) -> None:
+    """IO-914: validate a project programme section attachment upload."""
+    validate_upload(
+        uploaded_file,
+        settings.PROJECT_PROGRAMME_ATTACHMENT_ALLOWED_TYPES,
+        settings.PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES,
+    )
+
+
+def validate_project_programme_location_map(uploaded_file) -> None:
+    """IO-936: validate a project programme location map upload."""
+    validate_upload(
+        uploaded_file,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_ALLOWED_TYPES,
+        settings.PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES,
+    )

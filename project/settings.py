@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 import dj_database_url
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Initialize logger early for use in settings configuration
 logger = logging.getLogger(__name__)
@@ -43,6 +44,28 @@ env = environ.Env(
     ALLOWED_CORS_ORIGINS=(list, ["http://localhost:4000", "http://localhost:3000"]),
     STATIC_ROOT=(str, BASE_DIR / "static"),
     STATIC_URL=(str, "/static/"),
+    MEDIA_ROOT=(str, str(BASE_DIR / "media")),
+    MEDIA_URL=(str, "/media/"),
+    NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
+    # IO-857: matches the Figma copy ("500kb max tiedostokoko").
+    HANDOVER_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
+    # IO-914 / IO-936: matches the Figma copy ("max 500 kb").
+    PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
+    PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES=(int, 500 * 1024),
+    # IO-812 phase 2: Azure Blob storage for uploaded files. Empty by default so
+    # local/CI keep using FileSystemStorage; Platta sets these in the deploy env.
+    #
+    # Names follow the Helsinki/Platta convention (AZURE_BLOB_STORAGE_*) rather than
+    # django-storages' own naming. This matters operationally: Platta rotates the SAS
+    # token annually into a Key Vault secret named AZURE-BLOB-STORAGE-SAS-TOKEN, and
+    # matching that name means the rotation automation needs no special-casing for us.
+    AZURE_BLOB_STORAGE_NAME=(str, ""),
+    AZURE_BLOB_STORAGE_CONTAINER=(str, ""),
+    AZURE_BLOB_STORAGE_SAS_TOKEN=(str, ""),
+    # Local/Azurite only - Platta forbids authenticating with account keys
+    # ("No application should authenticate directly with account keys"), so this is
+    # for the emulator, never for a deployed environment.
+    AZURE_BLOB_STORAGE_CONNECTION_STRING=(str, ""),
     DJANGO_LOG_LEVEL=(str, "INFO"),
     HELSINKI_TUNNISTUS_ISSUER=(
         str,
@@ -51,7 +74,6 @@ env = environ.Env(
     HELSINKI_TUNNISTUS_AUDIENCE=(str, "infraohjelmointi-api-dev"),
     HELUSERS_BACK_CHANNEL_LOGOUT_ENABLED=(bool, False),
     SOCIAL_AUTH_TUNNISTAMO_SCOPE=(str, "ad_group"),
-    TWISTED_MAX_LINE_LENGTH=(int, 32768),
     RESTRICTED_PROGRAMMER_AD_GROUP=(str, "sg_kymp_sso_io_rajoitetut_ohjelmoijat"),
     CACHE_TIMEOUT=(int, 43200),
 )
@@ -251,6 +273,88 @@ USE_TZ = True
 
 STATIC_URL = env("STATIC_URL")
 STATIC_ROOT = env("STATIC_ROOT")
+
+# Media (user-uploaded files). MEDIA_ROOT/URL are used by the local
+# FileSystemStorage backend (dev/CI); ignored when Azure Blob is active.
+MEDIA_URL = env("MEDIA_URL")
+MEDIA_ROOT = env("MEDIA_ROOT")
+
+# IO-812 phase 2: file storage backend for uploads (NoteImage, handover
+# attachments). Local FileSystemStorage by default; Azure Blob once Platta has
+# provisioned the storage account + container and set AZURE_BLOB_STORAGE_NAME +
+# AZURE_BLOB_STORAGE_CONTAINER (+ a credential). The Azure backend path is a
+# string, so django-storages is only imported when Azure is actually configured —
+# local and CI runs never need the dependency installed.
+_azure_account = env("AZURE_BLOB_STORAGE_NAME")
+_azure_container = env("AZURE_BLOB_STORAGE_CONTAINER")
+_use_azure_storage = bool(_azure_account and _azure_container)
+
+if _use_azure_storage:
+    _azure_options = {
+        "account_name": _azure_account,
+        "azure_container": _azure_container,
+    }
+    # SAS token is the mechanism Platta provisions for blob containers, so it wins.
+    # The connection string is a local/Azurite escape hatch only. Account keys are
+    # deliberately unsupported: Platta's guidance is that no application should
+    # authenticate directly with them.
+    if env("AZURE_BLOB_STORAGE_SAS_TOKEN"):
+        _azure_options["sas_token"] = env("AZURE_BLOB_STORAGE_SAS_TOKEN")
+    elif env("AZURE_BLOB_STORAGE_CONNECTION_STRING"):
+        _azure_options["connection_string"] = env("AZURE_BLOB_STORAGE_CONNECTION_STRING")
+    else:
+        # Without a credential django-storages would build an anonymous client: the
+        # app would boot and every upload/download would then fail at runtime.
+        raise ImproperlyConfigured(
+            "AZURE_BLOB_STORAGE_NAME and AZURE_BLOB_STORAGE_CONTAINER are set but "
+            "neither AZURE_BLOB_STORAGE_SAS_TOKEN nor "
+            "AZURE_BLOB_STORAGE_CONNECTION_STRING is."
+        )
+    _default_file_storage = {
+        "BACKEND": "storages.backends.azure_storage.AzureStorage",
+        "OPTIONS": _azure_options,
+    }
+else:
+    _default_file_storage = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
+# Both keys must be present: overriding STORAGES replaces the setting wholesale,
+# so re-declare the (unchanged) staticfiles backend used with whitenoise.
+STORAGES = {
+    "default": _default_file_storage,
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+# Upload constraints, one pair per feature. Size limits are env-overridable so
+# product can retune them without a code change; the allowed type tuples are
+# deliberately hard-coded, because widening them is a product/security decision
+# rather than configuration.
+#
+# IO-812 note images. Figma copy says 500 KB; this default is the older internal
+# spec of 10 MB. The discrepancy is an open product question on the ticket.
+NOTE_IMAGE_MAX_BYTES = env.int("NOTE_IMAGE_MAX_BYTES")
+_IMAGE_UPLOAD_TYPES = ("image/jpeg", "image/png")
+
+NOTE_IMAGE_ALLOWED_TYPES = _IMAGE_UPLOAD_TYPES
+
+# IO-857 handover attachments, per the Figma copy: "Vain .jpg ja .png tiedostot.
+# 500kb max tiedostokoko." Plans and cost estimates are linked, not uploaded
+# (ConstructionHandover.link* URL fields), so PDF is deliberately not accepted.
+HANDOVER_ATTACHMENT_MAX_BYTES = env.int("HANDOVER_ATTACHMENT_MAX_BYTES")
+HANDOVER_ATTACHMENT_ALLOWED_TYPES = _IMAGE_UPLOAD_TYPES
+
+# IO-914 hankeohjelma section attachments, per the Figma copy: ".jpeg/.png/pdf/word,
+# max 500 kb". Word means .docx only: legacy .doc can carry macros and uploads are
+# not virus scanned.
+PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES = env.int("PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES")
+PROJECT_PROGRAMME_ATTACHMENT_ALLOWED_TYPES = (
+    *_IMAGE_UPLOAD_TYPES,
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+)
+
+# IO-936 hankeohjelma location map: a single image ("kuvatiedosto") per programme.
+PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES = env.int("PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES")
+PROJECT_PROGRAMME_LOCATION_MAP_ALLOWED_TYPES = ("image/jpeg", "image/png")
 
 
 # Default primary key field type
@@ -510,20 +614,3 @@ SWAGGER_SETTINGS = {
     'SUPPORTED_SUBMIT_METHODS': ['get'],
     'USE_SESSION_AUTH': False,
 }
-
-TWISTED_MAX_LINE_LENGTH = env("TWISTED_MAX_LINE_LENGTH")
-
-def overwrite_twisted_max_line_length(max_line_length):
-    """
-    Twisted has a default max line length of 16384.
-    The following is used to override the default length which is necessary
-    for long headers - in the case of helsinki-tunnistus the Authentication
-    header can be rather long if the user has many AD groups.
-    """
-    from twisted.protocols.basic import LineReceiver
-    from twisted.web.http import HTTPChannel
-
-    LineReceiver.MAX_LENGTH = max_line_length
-    HTTPChannel.totalHeadersSize = max_line_length
-
-overwrite_twisted_max_line_length(TWISTED_MAX_LINE_LENGTH)

@@ -252,7 +252,7 @@ class Project(models.Model):
     budgetForecast4CurrentYear = models.DecimalField(
         max_digits=20, decimal_places=2, default=0.0, blank=True, null=True
     )
-    projectProgram = models.TextField(max_length=15000, blank=True, null=True)
+    additionalInformation = models.TextField(max_length=15000, blank=True, null=True)
 
     delays = models.CharField(max_length=200, blank=True, null=True)
     hashTags = models.ManyToManyField(

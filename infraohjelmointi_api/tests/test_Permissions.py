@@ -10,11 +10,25 @@ from infraohjelmointi_api.permissions import (
     IsPlanner,
     IsProjectManager,
     IsPlannerOfProjectAreas,
+    parse_name_from_email,
 )
 from infraohjelmointi_api.views import BaseViewSet
 from unittest.mock import Mock
 
 User = get_user_model()
+
+
+class ParseNameFromEmailTestCase(TestCase):
+    def test_returns_lowercase_first_and_last_names(self):
+        self.assertEqual(
+            parse_name_from_email(" First.Last.Extra@example.com "),
+            ("first", "last"),
+        )
+
+    def test_returns_none_for_unparseable_email(self):
+        for email in (None, "first.last", "first@example.com"):
+            with self.subTest(email=email):
+                self.assertEqual(parse_name_from_email(email), (None, None))
 
 
 class RestrictedProgrammerPermissionsTestCase(TestCase):

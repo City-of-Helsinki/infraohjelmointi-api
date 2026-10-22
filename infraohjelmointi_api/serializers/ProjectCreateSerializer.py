@@ -77,6 +77,7 @@ from infraohjelmointi_api.validators.ProjectValidators import (
     ProjectLocationValidator,
     ProjectPhaseDetailValidator,
     ProjectPhaseValidator,
+    PwLinkConfirmedValidator,
     VisibilityEndValidator,
     VisibilityStartValidator,
 )
@@ -206,6 +207,11 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
     # write only field used when updating multiple projects
     # helps during validation
     projectId = serializers.UUIDField(write_only=True, required=False)
+    # IO-935: the hkrId the user confirmed against its PW project; checked by
+    # PwLinkConfirmedValidator and never saved
+    confirmedHkrId = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True, min_value=0
+    )
 
     estFieldsRelations = [
         ("estPlanningStart", "frameEstPlanningStart"),
@@ -235,6 +241,7 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
             PlanningStartYearValidator(),
             ProgrammedValidator(),
             LockedFieldsValidator(),
+            PwLinkConfirmedValidator(),
         ]
 
     def get_pw_folder_link(self, project: Project):
@@ -274,8 +281,9 @@ class ProjectCreateSerializer(ProjectWithFinancesSerializer):
         return project_class, project_location
 
     def run_pre_create_update_validation(self, data: dict, instance=None):
-        # remove projectId as it does not exist on the Project model
+        # remove projectId and confirmedHkrId as they do not exist on the Project model
         data.pop("projectId", None)
+        data.pop("confirmedHkrId", None)
 
         # IO-411: only auto-assign personProgramming on create or on an update
         # that touches projectClass / projectLocation, and only when no

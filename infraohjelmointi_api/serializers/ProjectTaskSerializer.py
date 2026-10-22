@@ -1,0 +1,79 @@
+from rest_framework import serializers
+from infraohjelmointi_api.models import Project
+from infraohjelmointi_api.serializers import (
+  ConstructionProcurementMethodSerializer
+)
+  
+
+TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER = "NAME_CONSTRUCTION_PROJECT_MANAGER"
+
+# NOTE: It's planned that more task types will be added in the future
+TASK_TYPES = [
+    TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER,
+]
+
+TASK_TYPE_CHOICES = [(task_type, task_type) for task_type in TASK_TYPES]
+
+
+class BaseProjectTaskSerializer(serializers.ModelSerializer):
+    taskType = serializers.ChoiceField(choices=TASK_TYPE_CHOICES, read_only=True)
+
+    class Meta:
+        model = Project
+        fields = (
+            'id',
+            'name',
+            'estPlanningStart',
+            'estPlanningEnd',
+            'estConstructionStart',
+            'estConstructionEnd',
+            'costForecast',
+            'constructionProcurementMethod',
+            'taskType'
+        )
+
+
+class ConstructionProjectManagerTaskSerializer(BaseProjectTaskSerializer):
+    constructionProcurementMethod = serializers.SerializerMethodField()
+    budget = serializers.SerializerMethodField()
+    totalCost = serializers.SerializerMethodField()
+
+    def get_constructionProcurementMethod(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+
+        method = submitted_handovers[0].constructionProcurementMethod
+        if method is None:
+            return None
+
+        return ConstructionProcurementMethodSerializer(method).data
+
+    def get_budget(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+        return getattr(submitted_handovers[0], "budget", None)
+
+    def get_totalCost(self, obj):
+        submitted_handovers = getattr(obj, "submitted_construction_handovers", [])
+        if not submitted_handovers:
+            return None
+        return getattr(submitted_handovers[0], "totalCost", None)
+
+    class Meta:
+        model = Project
+        fields = BaseProjectTaskSerializer.Meta.fields + (
+            'budget',
+            'totalCost',
+        )
+
+
+class ProjectTaskSerializer(serializers.BaseSerializer):
+    TASK_TYPE_SERIALIZER_MAP = {
+        TASK_TYPE_NAME_CONSTRUCTION_PROJECT_MANAGER: ConstructionProjectManagerTaskSerializer,
+    }
+
+    def to_representation(self, instance):
+        serializer_class = self.TASK_TYPE_SERIALIZER_MAP.get(instance.taskType, BaseProjectTaskSerializer)
+        return serializer_class(instance, context=self.context).data

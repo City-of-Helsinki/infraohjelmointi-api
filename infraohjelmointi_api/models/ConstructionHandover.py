@@ -22,6 +22,9 @@ class ConstructionHandover(HistoricalModel):
     constructionProcurementMethod = models.ForeignKey(
         "ConstructionProcurementMethod", on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    staraProcurementReason = models.ForeignKey(
+        "StaraProcurementReason", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
     constructionStart = models.DateField(blank=True, null=True)
     constructionEnd = models.DateField(blank=True, null=True)
     otherTimelineNotes = models.TextField(blank=True, null=True)
@@ -41,6 +44,9 @@ class ConstructionHandover(HistoricalModel):
     previousProjectPhase = models.ForeignKey(
         "ProjectPhase", related_name="handovers_previous_phase", on_delete=models.DO_NOTHING, null=True, blank=True
     )
+    previousProjectPhaseDetail = models.ForeignKey(
+        "ProjectPhaseDetail", related_name="handovers_previous_phase_detail", on_delete=models.DO_NOTHING, null=True, blank=True
+    )
 
     createdDate = models.DateTimeField(auto_now_add=True, blank=True)
     updatedDate = models.DateTimeField(auto_now=True, blank=True)
@@ -55,7 +61,8 @@ class ConstructionHandover(HistoricalModel):
         "status", "name", "description", "constructionProcurementMethod", "constructionStart",
         "constructionEnd", "otherTimelineNotes", "totalCost", "personPlanning", "personFinancing",
         "linkDesignDrawings", "linkCostAllocation", "linkContractBoundaries", "_history_user",
-        "constructionProjectManager", "previousProjectPhase"
+        "constructionProjectManager", "previousProjectPhase", "previousProjectPhaseDetail",
+        "staraProcurementReason"
     ]
 
     @property
@@ -68,5 +75,5 @@ class ConstructionHandover(HistoricalModel):
 
     @property
     def is_locked(self):
-        """The handover is locked if it's not in DRAFT status"""
-        return self.status != "DRAFT"
+        """The handover is locked if it's not in DRAFT or SUBMITTED_TO_PROGRAMMER status"""
+        return self.status in ("SUBMITTED_TO_CONSTRUCTION", "PROJECT_MANAGER_NAMED", "MOVED_TO_CONSTRUCTION_PREPARATION")

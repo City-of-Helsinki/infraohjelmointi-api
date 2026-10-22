@@ -1,0 +1,550 @@
+from django.contrib.contenttypes.models import ContentType
+from rest_framework import serializers
+from infraohjelmointi_api.validators.ProjectProgrammeValidator import (
+    BASIC_INFO_REQUIRED_FIELDS,
+    BRIEF_BASIC_INFO_REQUIRED_FIELDS,
+    EXTENDED_BASIC_INFO_REQUIRED_FIELDS,
+)
+
+from infraohjelmointi_api.models import (
+    ProjectProgramme,
+    ProjectProgrammeBasicInfo,
+    ProjectProgrammeDesignCriteria,
+    ProjectProgrammeInteractionAndRelatedProjects,
+    ProjectProgrammeLink,
+    ProjectProgrammeMaintenanceNeeds,
+    ProjectProgrammeOtherAttachments,
+    ProjectProgrammeTrafficPlanningCriteria,
+    ProjectProgrammeUrbanSpacingPlanningCriteria,
+)
+
+from .ProjectProgrammeAttachmentSerializer import (
+    ProjectProgrammeLocationMapSerializer,
+    get_section_attachments,
+)
+
+
+class ProjectProgrammeDraftOnlyUpdateMixin:
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        if getattr(instance, "is_locked", False):
+            raise serializers.ValidationError(
+                {"status": "Only entities in DRAFT status can be saved."}
+            )
+
+        return attrs
+
+
+class ProjectProgrammeSectionParentImmutableMixin:
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        parent = attrs.get("project_programme")
+        if instance and parent and parent != instance.project_programme:
+            raise serializers.ValidationError(
+                {"project_programme": "Section parent project programme cannot be changed."}
+            )
+
+        return attrs
+
+
+class ProjectProgrammeLinkGetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectProgrammeLink
+        fields = "__all__"
+
+
+LOCKED_LINK_ERROR = "Links can only be modified for entities in DRAFT status."
+# Error code the views turn into 409 CONFLICT; other validation errors stay 400.
+LOCKED_LINK_ERROR_CODE = "locked"
+
+
+class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectProgrammeLink
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        if self.instance and ("contentType" in attrs or "objectId" in attrs):
+            raise serializers.ValidationError(
+                {"detail": "Link target cannot be changed."}
+            )
+
+        content_type = attrs.get("contentType", getattr(self.instance, "contentType", None))
+        object_id = attrs.get("objectId", getattr(self.instance, "objectId", None))
+
+        if content_type and object_id:
+            model_class = content_type.model_class()
+            if model_class is not None:
+                section_instance = model_class.objects.filter(pk=object_id).first()
+                if (
+                    section_instance
+                    and (
+                        getattr(section_instance, "is_locked", False)
+                        or (
+                            hasattr(section_instance, "status")
+                            and section_instance.status != "DRAFT"
+                        )
+                    )
+                ):
+                    raise serializers.ValidationError(
+                        {"detail": LOCKED_LINK_ERROR}, code=LOCKED_LINK_ERROR_CODE
+                    )
+
+        return attrs
+
+
+def get_section_links(instance):
+    content_type = ContentType.objects.get_for_model(instance.__class__)
+    links = ProjectProgrammeLink.objects.filter(
+        contentType=content_type,
+        objectId=instance.id,
+    )
+    return ProjectProgrammeLinkGetSerializer(links, many=True).data
+
+
+def sync_section_links(instance, links):
+    if links is None:
+        return
+
+    content_type = ContentType.objects.get_for_model(instance.__class__)
+    ProjectProgrammeLink.objects.filter(
+        contentType=content_type,
+        objectId=instance.id,
+    ).delete()
+
+    cleaned_links = [
+        link.strip() for link in links if isinstance(link, str) and link.strip()
+    ]
+
+    if not cleaned_links:
+        return
+
+    ProjectProgrammeLink.objects.bulk_create(
+        [
+            ProjectProgrammeLink(
+                contentType=content_type,
+                objectId=instance.id,
+                value=link,
+            )
+            for link in cleaned_links
+        ]
+    )
+
+
+class ProjectProgrammeSectionLinksUpdateMixin:
+    def sync_links(self, instance, links):
+        sync_section_links(instance, links)
+
+    def create(self, validated_data):
+        links = validated_data.pop("links", None)
+        instance = super().create(validated_data)
+        self.sync_links(instance, links)
+        return instance
+
+    def update(self, instance, validated_data):
+        links = validated_data.pop("links", None)
+        instance = super().update(instance, validated_data)
+        self.sync_links(instance, links)
+        return instance
+
+
+class ProjectProgrammeBasicInfoGetSerializer(serializers.ModelSerializer):
+    BRIEF_ONLY_FIELDS = {"estimatedCosts"}
+    COMPLETE_ONLY_FIELDS = {
+        "strategyGoals",
+        "costClass",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+        "specialConsiderations",
+        "otherConsiderations",
+    }
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeBasicInfo
+        fields = "__all__"
+
+    def get_fields(self):
+        fields = super().get_fields()
+        programme = getattr(self.instance, "project_programme", None)
+        if programme and programme.briefProjectProgramme is not False:
+            fields = {
+                name: field
+                for name, field in fields.items()
+                if name not in self.COMPLETE_ONLY_FIELDS
+            }
+        elif programme:
+            fields = {
+                name: field
+                for name, field in fields.items()
+                if name not in self.BRIEF_ONLY_FIELDS
+            }
+        return fields
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeBasicInfoUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    BRIEF_ONLY_FIELDS = {"estimatedCosts"}
+    COMPLETE_ONLY_FIELDS = {
+        "strategyGoals",
+        "costClass",
+        "projectSize",
+        "risks",
+        "studyAndPlanningNeeds",
+        "planningAndImplementationFeasibility",
+        "specialConsiderations",
+        "otherConsiderations",
+    }
+    REQUIRED_IN_ALL_PROGRAMMES = set(BASIC_INFO_REQUIRED_FIELDS)
+    REQUIRED_IN_BRIEF_PROGRAMMES = set(BRIEF_BASIC_INFO_REQUIRED_FIELDS)
+    REQUIRED_IN_COMPLETE_PROGRAMMES = set(EXTENDED_BASIC_INFO_REQUIRED_FIELDS)
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeBasicInfo
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+    def _get_project_programme(self):
+        if self.instance:
+            return self.instance.project_programme
+
+        project_programme_id = self.initial_data.get("project_programme")
+        if not project_programme_id:
+            return None
+        return ProjectProgramme.objects.filter(pk=project_programme_id).first()
+
+    def _required_fields_for(self, programme):
+        is_brief = programme.briefProjectProgramme is not False
+        return self.REQUIRED_IN_ALL_PROGRAMMES | (
+            self.REQUIRED_IN_BRIEF_PROGRAMMES
+            if is_brief
+            else self.REQUIRED_IN_COMPLETE_PROGRAMMES
+        )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        programme = self._get_project_programme()
+        if not programme:
+            return fields
+
+        is_brief = programme.briefProjectProgramme is not False
+        hidden_fields = self.COMPLETE_ONLY_FIELDS if is_brief else self.BRIEF_ONLY_FIELDS
+        required_fields = self._required_fields_for(programme)
+        for name in hidden_fields:
+            fields.pop(name, None)
+        if self.instance:
+            for name, field in fields.items():
+                field.required = name in required_fields
+        return fields
+
+
+class ProjectProgrammeDesignCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeDesignCriteria
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeDesignCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeDesignCriteria
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeTrafficPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeTrafficPlanningCriteria
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeTrafficPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeTrafficPlanningCriteria
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeUrbanSpacingPlanningCriteria
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeUrbanSpacingPlanningCriteriaUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeUrbanSpacingPlanningCriteria
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeMaintenanceNeedsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeMaintenanceNeeds
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeMaintenanceNeedsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeMaintenanceNeeds
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeInteractionAndRelatedProjects
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeInteractionAndRelatedProjectsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeInteractionAndRelatedProjects
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeOtherAttachmentsGetSerializer(serializers.ModelSerializer):
+    links = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectProgrammeOtherAttachments
+        fields = "__all__"
+
+    def get_links(self, instance):
+        return get_section_links(instance)
+
+    def get_attachments(self, instance):
+        return get_section_attachments(instance)
+
+
+class ProjectProgrammeOtherAttachmentsUpdateSerializer(
+    ProjectProgrammeSectionLinksUpdateMixin,
+    ProjectProgrammeSectionParentImmutableMixin,
+    ProjectProgrammeDraftOnlyUpdateMixin,
+    serializers.ModelSerializer,
+):
+    links = serializers.ListField(
+        child=serializers.URLField(allow_blank=True),
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = ProjectProgrammeOtherAttachments
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+
+class ProjectProgrammeGetSerializer(serializers.ModelSerializer):
+    basicInfo = ProjectProgrammeBasicInfoGetSerializer(read_only=True)
+    designCriteria = ProjectProgrammeDesignCriteriaGetSerializer(read_only=True)
+    trafficPlanningCriteria = ProjectProgrammeTrafficPlanningCriteriaGetSerializer(
+        read_only=True
+    )
+    urbanSpacingPlanningCriteria = (
+        ProjectProgrammeUrbanSpacingPlanningCriteriaGetSerializer(read_only=True)
+    )
+    maintenanceNeeds = ProjectProgrammeMaintenanceNeedsGetSerializer(read_only=True)
+    interactionAndRelatedProjects = (
+        ProjectProgrammeInteractionAndRelatedProjectsGetSerializer(read_only=True)
+    )
+    otherAttachments = ProjectProgrammeOtherAttachmentsGetSerializer(read_only=True)
+    locationMap = ProjectProgrammeLocationMapSerializer(read_only=True)
+
+    class Meta:
+        model = ProjectProgramme
+        fields = "__all__"
+
+
+class ProjectProgrammeCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectProgramme
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+        extra_kwargs = {
+            "project": {"validators": []},
+        }
+
+
+class ProjectProgrammeUpdateSerializer(
+    ProjectProgrammeDraftOnlyUpdateMixin, serializers.ModelSerializer
+):
+    class Meta:
+        model = ProjectProgramme
+        fields = "__all__"
+        read_only_fields = ["createdDate", "updatedDate", "createdBy", "updatedBy", "status"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        if not instance:
+            return attrs
+
+        if "project" in getattr(self, "initial_data", {}):
+            raise serializers.ValidationError(
+                {"project": "Project programme project cannot be changed."}
+            )
+
+        if "project" in attrs and attrs["project"] != instance.project:
+            raise serializers.ValidationError(
+                {"project": "Project programme project cannot be changed."}
+            )
+
+        current_is_brief = instance.briefProjectProgramme
+        new_is_brief = attrs.get("briefProjectProgramme", current_is_brief)
+
+        if current_is_brief is False and new_is_brief is True:
+            has_content_entities = any(
+                hasattr(instance, relation_name)
+                for relation_name in [
+                    "designCriteria",
+                    "trafficPlanningCriteria",
+                    "urbanSpacingPlanningCriteria",
+                    "maintenanceNeeds",
+                    "interactionAndRelatedProjects",
+                    "otherAttachments",
+                ]
+            )
+
+            if has_content_entities:
+                raise serializers.ValidationError(
+                    {
+                        "briefProjectProgramme": (
+                            "Cannot switch from extensive to brief project programme "
+                            "after content has been created."
+                        )
+                    }
+                )
+
+        return attrs
+
+
+class ProjectProgrammeStatusTransitionSerializer(serializers.Serializer):
+    to = serializers.ChoiceField(choices=[("DRAFT", "DRAFT"), ("COMPLETE", "COMPLETE")])

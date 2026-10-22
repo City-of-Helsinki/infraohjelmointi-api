@@ -31,6 +31,7 @@ from infraohjelmointi_api.models import (
     Person,
     Task,
     TalpaProjectOpening,
+    FinancingParty,
 )
 from infraohjelmointi_api.serializers import ProjectClassSerializer
 from infraohjelmointi_api.serializers.FinancialSumSerializer import FinancialSumSerializer
@@ -869,6 +870,22 @@ class AllLookupViewSetsTest(TestCase):
         response = self.client.get('/task-status/')
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(CacheService.get_lookup('TaskStatus'))
+
+    def test_financing_parties_viewset_is_cached_and_has_expected_shape(self):
+        """Test FinancingPartyViewSet response and cache behavior."""
+        response = self.client.get('/financing-parties/')
+        self.assertEqual(response.status_code, 200)
+
+        expected = [{"id": party.value, "value": party.label} for party in FinancingParty]
+        self.assertEqual(response.json(), expected)
+
+        cached = CacheService.get_lookup('FinancingParty')
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached, expected)
+
+        second_response = self.client.get('/financing-parties/')
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(second_response.json(), expected)
 
 
 @override_settings(CACHES=LOCMEM_CACHE)

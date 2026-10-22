@@ -15,6 +15,7 @@ from infraohjelmointi_api.serializers import (
     SearchResultSerializer,
     ProjectNoteGetSerializer,
     ConstructionHandoverGetSerializer,
+    AuditLogSerializer,
 )
 from infraohjelmointi_api.models import (
     AuditLog,
@@ -41,8 +42,9 @@ from infraohjelmointi_api.services.ProjectWiseService import (
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.permissions import (
-    user_in_restricted_programmer_group,
+    class_path_by_id,
     get_restricted_user_assigned_class_paths,
+    is_restricted_programmer,
     target_path_matches_assigned_paths,
 )
 import json
@@ -58,7 +60,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError, ValidationError
 from rest_framework.pagination import PageNumberPagination
 import uuid
-from rest_framework import status
+from rest_framework import serializers, status
 from itertools import chain
 from django.db.models import Count, Case, When, Q, F
 from django.db.models.signals import post_save
@@ -167,8 +169,10 @@ class ProjectViewSet(BaseViewSet):
             "category",
             "projectClass",
             "name",
+            "description",
             "phase",
             "phaseDetail",
+            "constructionProcurementMethod",
             "planningStartYear",
             "constructionEndYear",
             "estPlanningStart",
@@ -181,13 +185,11 @@ class ProjectViewSet(BaseViewSet):
             "presenceEnd",
             "visibilityStart",
             "visibilityEnd",
+            "type",
+            "sapProject",
         ]
         old_values_for_audit_log = {
-            field: (
-                str(getattr(getattr(project, field), 'id', None))
-                if hasattr(getattr(project, field), 'id')
-                else str(getattr(project, field))
-            )
+            field: self._serialize_audit_value(project, field)
             for field in audit_loggable_fields
             if field in request.data
         }
@@ -331,7 +333,14 @@ class ProjectViewSet(BaseViewSet):
 
         # saving audit logs after project data was changed
         if (old_values_for_audit_log):
-            new_values_for_audit_log = {field: request.data[field] for field in audit_loggable_fields if field in request.data}
+            # Read new values from the saved project rather than request.data so
+            # relations are stored consistently as their id (matching old_values),
+            # regardless of how the client sent them.
+            new_values_for_audit_log = {
+                field: self._serialize_audit_value(updated_project, field)
+                for field in audit_loggable_fields
+                if field in request.data
+            }
             self.audit_log_project_card_changes(
                 old_values_for_audit_log,
                 new_values_for_audit_log,
@@ -349,6 +358,18 @@ class ProjectViewSet(BaseViewSet):
         if isinstance(date, str):
             return datetime.strptime(date, '%d.%m.%Y').date()
         return date
+
+    def _serialize_audit_value(self, instance, field):
+        # Relations are stored as their id, scalars as a string, and an absent
+        # value as null (not the string "None") so the Muutoshistoria UI can show
+        # an empty previous/next value cleanly.
+        value = getattr(instance, field)
+        if value is None:
+            return None
+        related_id = getattr(value, 'id', None)
+        if related_id is not None:
+            return str(related_id)
+        return str(value)
 
     def audit_log_project_card_changes(self, old_values, new_values, project, user, url, operation):
         # Existing local AuditLog write — kept so /audit-logs/ (used by the
@@ -1253,7 +1274,9 @@ class ProjectViewSet(BaseViewSet):
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
             qs = ProjectNoteGetSerializer(
-                instance.note_set.exclude(deleted=True), many=True
+                instance.note_set.exclude(deleted=True).prefetch_related("images"),
+                many=True,
+                context={"request": request},
             ).data
             return Response(qs)
         except ValueError:
@@ -1293,8 +1316,12 @@ class ProjectViewSet(BaseViewSet):
                 yield queryset[start:end]
 
         bulk_size = 100
+        current_year = date.today().year
 
         new_project_finances, update_project_finances = self.update_forced_to_frame_projects()
+        # Filter out the finances for the current year as they should not be updated
+        new_project_finances = [finance for finance in new_project_finances if finance.year != current_year]
+        update_project_finances = [finance for finance in update_project_finances if finance.year != current_year]
 
         # Bulk create new ProjectFinancial entries
         ProjectFinancial.objects.bulk_create(new_project_finances, bulk_size)
@@ -1305,6 +1332,9 @@ class ProjectViewSet(BaseViewSet):
                 ProjectFinancial.objects.bulk_update(batch, ['value'])
 
         new_class_finances, update_class_finances = self.update_forced_to_frame_classes()
+        # Filter out the finances for the current year as they should not be updated
+        new_class_finances = [finance for finance in new_class_finances if finance.year != current_year]
+        update_class_finances = [finance for finance in update_class_finances if finance.year != current_year]
 
         # Bulk create new ClassFinancial entries
         ClassFinancial.objects.bulk_create(new_class_finances, bulk_size)
@@ -1315,6 +1345,9 @@ class ProjectViewSet(BaseViewSet):
                 ClassFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
         new_location_finances, update_location_finances = self.update_forced_to_frame_locations()
+        # Filter out the finances for the current year as they should not be updated
+        new_location_finances = [finance for finance in new_location_finances if finance.year != current_year]
+        update_location_finances = [finance for finance in update_location_finances if finance.year != current_year]
 
         # Bulk create new LocationFinancial entries
         LocationFinancial.objects.bulk_create(new_location_finances, bulk_size)
@@ -1324,7 +1357,6 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
-        current_year = date.today().year
         for year_offset in range(-2, 13):
             year = current_year + year_offset
             CacheService.invalidate_frame_budgets(year=year)
@@ -1476,7 +1508,14 @@ class ProjectViewSet(BaseViewSet):
                 # IO-756: enforce per-project class assignments here; DRF
                 # does not call check_object_permissions for bulk actions.
                 forbidden_response = self._enforce_restricted_bulk_update_access(
-                    request, projectIds
+                    request,
+                    projectIds,
+                    target_class_ids=[
+                        projectData["data"].get("projectClass")
+                        for projectData in data
+                        if isinstance(projectData.get("data"), dict)
+                        and "projectClass" in projectData["data"]
+                    ],
                 )
                 if forbidden_response is not None:
                     return forbidden_response
@@ -1622,10 +1661,11 @@ class ProjectViewSet(BaseViewSet):
         except ValueError:
             return False
 
-    def _enforce_restricted_bulk_update_access(self, request, project_ids):
+    def _enforce_restricted_bulk_update_access(self, request, project_ids, target_class_ids=()):
         """Return a 403 Response if a restricted programmer is bulk-updating
-        projects outside their assigned classes, otherwise None (IO-756)."""
-        if not user_in_restricted_programmer_group(request):
+        projects outside their assigned classes, or moving projects to a class
+        outside them, otherwise None (IO-756)."""
+        if not is_restricted_programmer(request.user):
             return None
 
         assigned_paths = get_restricted_user_assigned_class_paths(request.user)
@@ -1672,6 +1712,15 @@ class ProjectViewSet(BaseViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if any(
+            not target_path_matches_assigned_paths(class_path_by_id(class_id), assigned_paths)
+            for class_id in target_class_ids
+        ):
+            return Response(
+                data={"message": "Not allowed to move projects outside your assigned classes."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         return None
 
     def _is_bulk_project_update_data_valid(self, data):
@@ -1690,6 +1739,74 @@ class ProjectViewSet(BaseViewSet):
             return True
         else:
             return False
+
+    def _filter_projects_directly_by_hierarchy(
+        self, qs, search_ids, model_class, for_coordinator
+    ):
+        if model_class.__name__ == "ProjectLocation":
+            if for_coordinator:
+                return qs.filter(
+                    Q(projectLocation__coordinatorLocation__in=search_ids)
+                    | Q(projectLocation__parent__coordinatorLocation__in=search_ids)
+                    | Q(
+                        projectLocation__parent__parent__coordinatorLocation__in=search_ids
+                    )
+                )
+            return qs.filter(projectLocation__in=search_ids)
+
+        if model_class.__name__ == "ProjectClass":
+            if for_coordinator:
+                return qs.filter(projectClass__coordinatorClass__in=search_ids)
+            return qs.filter(
+                projectClass__in=search_ids, projectLocation__isnull=True
+            )
+
+        return None
+
+    def _get_hierarchy_ids(
+        self,
+        search_ids,
+        model_class,
+        has_parent,
+        has_parent_parent,
+        has_parent_parent_parent,
+        has_parent_parent_parent_parent,
+        for_coordinator,
+    ):
+        matching_nodes = model_class.objects.filter(
+            id__in=search_ids,
+            parent__isnull=not has_parent,
+            parent__parent__isnull=not has_parent_parent,
+            parent__parent__parent__isnull=not has_parent_parent_parent,
+            parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
+            forCoordinatorOnly=for_coordinator,
+        ).distinct()
+
+        if model_class.__name__ == "ProjectClass":
+            ids = list(matching_nodes.values_list("id", flat=True))
+            frontier_ids = ids
+
+            while frontier_ids:
+                child_ids = list(
+                    model_class.objects.filter(
+                        parent__in=frontier_ids,
+                        forCoordinatorOnly=for_coordinator,
+                    )
+                    .exclude(id__in=ids)
+                    .values_list("id", flat=True)
+                )
+                ids.extend(child_ids)
+                frontier_ids = child_ids
+            return ids
+
+        paths = list(matching_nodes.values_list("path", flat=True))
+        if not paths:
+            return []
+
+        return model_class.objects.filter(
+            Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
+            forCoordinatorOnly=for_coordinator,
+        ).distinct().values_list("id", flat=True)
 
     def _filter_projects_by_hierarchy(
         self,
@@ -1743,54 +1860,28 @@ class ProjectViewSet(BaseViewSet):
             Queryset
                 Filtered Project Queryset
         """
-        # All coordinator locations are fetched with direct=True since only districts exist in coordinator view without any further location children
-        if direct == True:
-            if model_class.__name__ == "ProjectLocation":
-                if for_coordinator == True:
-                    return qs.filter(
-                        Q(projectLocation__coordinatorLocation__in=search_ids)
-                        | Q(projectLocation__parent__coordinatorLocation__in=search_ids)
-                        | Q(
-                            projectLocation__parent__parent__coordinatorLocation__in=search_ids
-                        )
-                    )
-                return qs.filter(projectLocation__in=search_ids)
-            elif model_class.__name__ == "ProjectClass":
-                if for_coordinator == True:
-                    return qs.filter(projectClass__coordinatorClass__in=search_ids)
-                return qs.filter(
-                    projectClass__in=search_ids, projectLocation__isnull=True
-                )
-        paths = []
-
-        paths = (
-            model_class.objects.filter(
-                id__in=search_ids,
-                parent__isnull=not has_parent,
-                parent__parent__isnull=not has_parent_parent,
-                parent__parent__parent__isnull=not has_parent_parent_parent,
-                parent__parent__parent__parent__isnull=not has_parent_parent_parent_parent,
-                forCoordinatorOnly=for_coordinator,
+        # Coordinator locations use a direct relation because their hierarchy only has districts.
+        if direct:
+            direct_queryset = self._filter_projects_directly_by_hierarchy(
+                qs, search_ids, model_class, for_coordinator
             )
-            .distinct()
-            .values_list("path", flat=True)
-        )
+            if direct_queryset is not None:
+                return direct_queryset
 
-        ids = (
-            model_class.objects.filter(
-                Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
-                forCoordinatorOnly=for_coordinator,
-            )
-            .distinct()
-            .values_list("id", flat=True)
-            if len(paths) > 0
-            else []
+        ids = self._get_hierarchy_ids(
+            search_ids,
+            model_class,
+            has_parent,
+            has_parent_parent,
+            has_parent_parent_parent,
+            has_parent_parent_parent_parent,
+            for_coordinator,
         )
 
         if model_class.__name__ == "ProjectLocation":
             return qs.filter(projectLocation__in=ids)
-        elif model_class.__name__ == "ProjectClass":
-            if for_coordinator == True:
+        if model_class.__name__ == "ProjectClass":
+            if for_coordinator:
                 return qs.filter(projectClass__coordinatorClass__in=ids)
             return qs.filter(projectClass__in=ids)
 
@@ -1870,6 +1961,59 @@ class ProjectViewSet(BaseViewSet):
             qs = qs.filter(Q(id__in=financialProjectIds) & Q(programmed=True))
 
         return qs
+
+    # IO-935: parse the lookup's hkrId exactly as ProjectCreateSerializer parses
+    # hkrId (PositiveBigIntegerField -> IntegerField)
+    _HKR_ID_FIELD = serializers.IntegerField(
+        min_value=0, max_value=9223372036854775807
+    )
+
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path=r"pw-project-name",
+        name="get_pw_project_name",
+    )
+    def get_pw_project_name(self, request):
+        """
+        IO-935: look up the PW project an hkrId points to, so the user can
+        confirm it before the hkrId is saved.
+
+            Usage
+            ----------
+
+            projects/pw-project-name/?hkrId=<PW hanketunnus>
+
+            Returns
+            -------
+
+            JSON
+                {"hkrId": str, "name": PW "Kohde" or null, "syncEnabled": bool}
+                404 {"hkrId": ["PW_PROJECT_NOT_FOUND"]} if PW has no such project
+                502 {"hkrId": ["PW_UNAVAILABLE"]} if PW could not be reached
+                400 {"hkrId": ["INVALID_HKR_ID"]} if hkrId is not a valid id
+        """
+        try:
+            hkr_id = str(self._HKR_ID_FIELD.run_validation(request.query_params.get("hkrId")))
+        except ValidationError:
+            raise ValidationError({"hkrId": ["INVALID_HKR_ID"]})
+
+        if not self.projectWiseService.pw_sync_enabled:
+            return Response({"hkrId": hkr_id, "name": None, "syncEnabled": False})
+
+        try:
+            name = self.projectWiseService.get_project_name_from_pw(hkr_id)
+        except PWProjectNotFoundError:
+            return Response(
+                {"hkrId": ["PW_PROJECT_NOT_FOUND"]}, status=status.HTTP_404_NOT_FOUND
+            )
+        except PWProjectResponseError as e:
+            logger.warning(f"PW project name lookup failed for HKR ID '{hkr_id}': {e}")
+            return Response(
+                {"hkrId": ["PW_UNAVAILABLE"]}, status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        return Response({"hkrId": hkr_id, "name": name, "syncEnabled": True})
 
     def _sync_project_to_projectwise(self, request_data: dict, original_project: Project, updated_project: Project):
         """
@@ -1991,7 +2135,11 @@ class ProjectViewSet(BaseViewSet):
             uuid.UUID(str(pk))  # validating UUID
             instance = self.get_object()
             qs = ConstructionHandoverGetSerializer(
-                instance.constructionhandover_set.all(),
+                # Same prefetch as ConstructionHandoverViewSet.get_queryset, so the
+                # embedded financing rows and attachments are not one query each.
+                instance.constructionhandover_set.prefetch_related(
+                    "financing", "financing__budgetItem", "attachments"
+                ),
                 many=True
             ).data
             return Response(qs)
@@ -1999,4 +2147,86 @@ class ProjectViewSet(BaseViewSet):
             return Response(
                 data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(methods=["get"], detail=True, url_path=r"history", name="get_project_history")
+    def get_project_history(self, request, pk):
+        """
+        Custom action returning the change history (audit log) of a single
+        project, powering the "Muutoshistoria" UI (IO-879).
+
+        Unlike the admin-only /audit-logs/ endpoint, this is scoped to one
+        project, so it is available to any user allowed to view that project
+        (the same role-based permissions as the rest of ProjectViewSet).
+
+            URL Parameters
+            ----------
+
+            project_id : UUID string
+
+            Query Parameters
+            ----------
+
+            year : keep only entries whose old/new values touch that year.
+                   Financial figures are stored keyed by year, so this narrows
+                   the history to a single budget cell (IO-880).
+            field : keep only entries whose old/new values touch that field
+                    name. Form fields are stored keyed by field name, so this
+                    narrows the history to a single form field (IO-882).
+            operation : CREATE / UPDATE / DELETE passthrough filter.
+
+            Usage
+            ----------
+
+            projects/<project_id>/history/
+
+            Returns
+            -------
+
+            JSON
+                Paginated list of AuditLog entries for the project, newest first
+        """
+        try:
+            uuid.UUID(str(pk))  # validating UUID
+        except ValueError:
+            return Response(
+                data={"message": "Invalid UUID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        project = Project.objects.filter(pk=pk).first()
+        if project is None:
+            return Response(
+                data={"message": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        queryset = (
+            AuditLog.objects.select_related("actor")
+            .filter(project=project)
+            .order_by("-createdDate")
+        )
+
+        operation = request.query_params.get("operation")
+        if operation:
+            queryset = queryset.filter(operation=operation)
+
+        # Financial figures and form fields are both stored as JSON objects in
+        # old_values / new_values - financial ones keyed by year ("2026"), form
+        # ones keyed by field name ("phase"). A JSONB key-existence match on
+        # either side narrows the history to a single budget cell or a single
+        # form field without unpacking the JSON in Python.
+        year = request.query_params.get("year")
+        if year:
+            queryset = queryset.filter(
+                Q(old_values__has_key=year) | Q(new_values__has_key=year)
+            )
+
+        field = request.query_params.get("field")
+        if field:
+            queryset = queryset.filter(
+                Q(old_values__has_key=field) | Q(new_values__has_key=field)
+            )
+
+        page = self.paginate_queryset(queryset)
+        serializer = AuditLogSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 

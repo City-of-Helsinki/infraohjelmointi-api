@@ -1,6 +1,7 @@
 from infraohjelmointi_api.models import Note
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.NoteHistorySerializer import NoteHistorySerializer
+from infraohjelmointi_api.serializers.NoteImageSerializer import NoteImageSerializer
 from infraohjelmointi_api.serializers.NotePersonSerializer import NotePersonSerializer
 from rest_framework import serializers
 from overrides import override
@@ -18,5 +19,8 @@ class ProjectNoteGetSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["history"] = NoteHistorySerializer(instance.history.all(), many=True).data
+        rep["images"] = NoteImageSerializer(
+            instance.images.all(), many=True, context=self.context
+        ).data
 
         return rep

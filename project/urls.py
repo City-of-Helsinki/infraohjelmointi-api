@@ -206,6 +206,30 @@ router.register(
     basename="constructionHandovers"
 )
 
+router.register(
+    r"construction-handover-financings",
+    views.ConstructionHandoverFinancingViewSet,
+    basename="constructionHandoverFinancings"
+)
+
+router.register(
+    r"financing-parties",
+    views.FinancingPartyViewSet,
+    basename="financingParties"
+)
+
+router.register(
+    r"project-programmes",
+    views.ProjectProgrammeViewSet,
+    basename="projectProgrammes"
+)
+
+router.register(
+    r"project-tasks",
+    views.ProjectTasksViewSet,
+    basename="projectTasks"
+)
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Infraohjelmointi API",
@@ -228,3 +252,6 @@ urlpatterns = [
     path("helauth/", include("helusers.urls")),
     path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+# MEDIA_URL is deliberately not served: uploaded files are only reachable through
+# the permission-checked API download endpoints (static() would expose MEDIA_ROOT
+# without auth whenever DEBUG is on, as it is in the testing environment).

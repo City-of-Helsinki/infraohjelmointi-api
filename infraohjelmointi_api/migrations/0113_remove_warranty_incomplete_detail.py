@@ -22,6 +22,7 @@ def remove_warranty_incomplete(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
+        # Must match main/prod, where this was applied right after 0111_phase_taxonomy (v1.11.0)
         ("infraohjelmointi_api", "0111_phase_taxonomy"),
     ]
 

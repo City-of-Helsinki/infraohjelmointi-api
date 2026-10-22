@@ -4,6 +4,18 @@ from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssignment
 from rest_framework import permissions
 from django.conf import settings
+from collections.abc import Mapping
+from django.core.exceptions import ValidationError
+
+
+def parse_name_from_email(email):
+    """Return lowercase first and last names from a firstname.lastname email."""
+    if not email or "@" not in email:
+        return None, None
+    parts = [part.strip().lower() for part in email.split("@", 1)[0].split(".") if part.strip()]
+    if len(parts) < 2:
+        return None, None
+    return parts[0], parts[1]
 
 
 def get_restricted_programmer_group_name():
@@ -12,6 +24,24 @@ def get_restricted_programmer_group_name():
         settings,
         "RESTRICTED_PROGRAMMER_AD_GROUP",
         "sg_kymp_sso_io_rajoitetut_ohjelmoijat",
+    )
+
+
+def get_project_programme_contributor_group_name():
+    """AD group for users allowed to edit any existing project programme."""
+    return getattr(
+        settings,
+        "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
+        "sl_dyn_kymp_sso_io_liikenne-maisemasuunnittelijat",
+    )
+
+
+def get_planner_group_name():
+    """AD group for planners, also allowed to start a new project programme."""
+    return getattr(
+        settings,
+        "PLANNER_AD_GROUP",
+        "sg_kymp_sso_io_ohjelmoijat",
     )
 
 
@@ -24,14 +54,34 @@ def user_in_restricted_programmer_group(request):
     )
 
 
+# Groups that bypass the restricted programmer rules (IO-756).
+RESTRICTION_BYPASS_GROUPS = ("sg_kymp_sso_io_koordinaattorit", "sg_kymp_sso_io_admin")
+
+
+def is_restricted_programmer(user):
+    """True if IsClassProgrammer restricts this user: in the restricted
+    programmer group and not a coordinator or admin (IO-756)."""
+    if not user or not user.is_authenticated:
+        return False
+    group_names = set(user.ad_groups.values_list("name", flat=True))
+    return (
+        get_restricted_programmer_group_name() in group_names
+        and not group_names.intersection(RESTRICTION_BYPASS_GROUPS)
+    )
+
+
+def user_in_project_programme_contributor_group(request):
+    """True if the authenticated user is in the project programme contributor AD group."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    return request.user.ad_groups.filter(
+        name=get_project_programme_contributor_group_name()
+    ).exists()
+
+
 def _get_legacy_class_paths_from_email(user_email):
     """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
-    if not user_email or "@" not in user_email:
-        return set()
-    parts = [p.strip() for p in user_email.split("@")[0].split(".") if p.strip()]
-    if len(parts) < 2:
-        return set()
-    first_name, last_name = parts[0].capitalize(), parts[1].capitalize()
+    first_name, last_name = parse_name_from_email(user_email)
     if not first_name or not last_name:
         return set()
     programmer = ProjectProgrammer.objects.filter(
@@ -66,6 +116,30 @@ def target_path_matches_assigned_paths(target_class_path, assigned_paths):
         if target_class_path == path or target_class_path.startswith(path + "/"):
             return True
     return False
+
+
+def class_path_by_id(class_id):
+    """Path of the ProjectClass with this id, or None if missing or not a valid id."""
+    if not class_id or not isinstance(class_id, str):
+        return None
+    try:
+        project_class = ProjectClass.objects.filter(id=class_id).first()
+    except (ValidationError, ValueError):
+        return None
+    return project_class.path if project_class else None
+
+
+def project_class_path_by_id(project_id):
+    """Class path of the Project with this id, or None if missing or not a valid id."""
+    if not project_id or not isinstance(project_id, str):
+        return None
+    try:
+        project = Project.objects.filter(id=project_id).select_related("projectClass").first()
+    except (ValidationError, ValueError):
+        return None
+    if not project or not project.projectClass:
+        return None
+    return project.projectClass.path
 
 GET = "GET"
 POST = "POST"
@@ -129,9 +203,9 @@ PROJECT_LOCATION_ALL_ACTIONS = [
 ]
 
 #### Project Notes custom actions ####
-PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
-PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes",]
-PROJECT_NOTE_BASIC_ACTIONS = ["create"]
+PROJECT_NOTE_COORDINATOR_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes", "images", "image_file",]
+PROJECT_NOTE_PLANNING_GET_ACTIONS = ["get_note_history", "get_note_history_by_user", "get_project_notes", "images", "image_file",]
+PROJECT_NOTE_BASIC_ACTIONS = ["create", "images", "delete_image"]
 PROJECT_NOTE_ALL_GET_ACTIONS = [
     *PROJECT_NOTE_PLANNING_GET_ACTIONS,
     *PROJECT_NOTE_COORDINATOR_GET_ACTIONS,
@@ -162,6 +236,12 @@ PROJECT_ALL_GET_ACTIONS = [
     *PROJECT_COORDINATOR_GET_ACTIONS,
     *PROJECT_PLANNING_GET_ACTIONS,
 ]
+# IO-935: PW project name lookup used to confirm an hkrId before it is saved.
+# Granted explicitly, and only, to the roles that can set an hkrId: coordinator,
+# planner, project area planner, admin and restricted class programmer. Not to
+# viewers, project managers (hkrId is a denied field for them) or construction
+# management leads (read-only).
+PROJECT_PW_LINK_GET_ACTIONS = ["get_pw_project_name"]
 PROJECT_COORDINATOR_PATCH_ACTIONS = []
 PROJECT_PLANNING_PATCH_ACTIONS = [
     "patch_bulk_projects",
@@ -194,7 +274,58 @@ PROJECT_GROUP_ALL_GET_ACTIONS = [
 PROJECT_GROUP_ALL_ACTIONS = [*PROJECT_GROUP_ALL_GET_ACTIONS]
 
 #### Construction handover custom actions ####
-CONSTRUCTION_HANDOVER_GET_ACTIONS = ["get_construction_handovers"]
+# The per-handover change-history feed rides along with the regular handover
+# read permission: every role that can view a handover can view its history.
+CONSTRUCTION_HANDOVER_GET_ACTIONS = [
+    "get_construction_handovers",
+    "get_construction_handover_history",
+    # IO-857: listing and downloading attachments follow read access. Both are
+    # GET-only actions, so granting them never grants a write.
+    "attachments",
+    "download_attachment",
+]
+CONSTRUCTION_HANDOVER_POST_ACTIONS = ["transitions"]
+# IO-857: uploading and deleting are content edits, so they go to the roles that can
+# edit a handover, not to construction management leads, whose write rights are
+# limited to update/transition. The viewset additionally rejects both with 409 while
+# the handover is locked.
+CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS = ["upload_attachment", "delete_attachment"]
+
+#### Project programme custom actions ####
+PROJECT_PROGRAMME_GET_ACTIONS = [
+    "get_by_project",
+    # IO-914 / IO-936: listing and downloading files follow read access. All three
+    # are GET-only actions, so granting them never grants a write.
+    "section_attachments",
+    "download_section_attachment",
+    "location_map",
+]
+PROJECT_PROGRAMME_POST_ACTIONS = [
+    "switch_type",
+    "transitions",
+    "section_basic_info",
+    "section_design_criteria",
+    "section_traffic_planning_criteria",
+    "section_urban_spacing_planning_criteria",
+    "section_maintenance_needs",
+    "section_interaction_and_related_projects",
+    "section_other_attachments",
+    "section_links",
+    "section_link_detail",
+    "section_transitions",
+    # IO-914 / IO-936: file uploads and deletes. The viewset additionally rejects
+    # them with 409 unless the programme (and section) is in DRAFT.
+    "upload_section_attachment",
+    "delete_section_attachment",
+    "upload_location_map",
+    "delete_location_map",
+]
+
+#### Project change-history custom actions (IO-879) ####
+# Per-project audit-log history powering the "Näytä muutoshistoria" UI.
+# Read-only and scoped to a single project, so it is granted to every role
+# that can view a project (including plain viewers and restricted programmers).
+PROJECT_HISTORY_GET_ACTIONS = ["get_project_history"]
 
 LIST_OF_DENIED_FIELDS_FOR_PROJECT_MANAGER = [
     "finances",
@@ -257,6 +388,8 @@ class IsViewer(permissions.BasePermission):
                 *PROJECT_FINANCES_PLANNING_GET_ACTIONS,
                 *PROJECT_GROUP_PLANNING_GET_ACTIONS,
                 *SAP_COST_PLANNING_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
             ]
         ):
             return True
@@ -267,10 +400,34 @@ class IsViewer(permissions.BasePermission):
         # Viewer can only access project object, to be able to see the project card
         _type = obj._meta.model.__name__
 
+        if _type == "ProjectProgramme":
+            return True
+
         if view.action in [*DJANGO_BASE_READ_ONLY_ACTIONS] and _type == "Project":
             return True
 
         return False
+
+
+class IsProjectProgrammeContributor(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "projectProgrammes"
+            and view.action
+            in [
+                *DJANGO_BASE_READ_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *DJANGO_BASE_CREATE_ONLY_ACTIONS,
+                *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
+            ]
+        )
+
+    def has_object_permission(self, request, view, obj):
+        return obj._meta.model.__name__ == "ProjectProgramme"
+
 
 class IsCoordinator(permissions.BasePermission):
     def user_coordinator_group(self, request):
@@ -294,9 +451,15 @@ class IsCoordinator(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -308,7 +471,7 @@ class IsCoordinator(permissions.BasePermission):
 
 class IsPlanner(permissions.BasePermission):
     def user_in_planner_group(self, request):
-        if "sg_kymp_sso_io_ohjelmoijat" in request.user.ad_groups.all().values_list(
+        if get_planner_group_name() in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
@@ -332,9 +495,15 @@ class IsPlanner(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -375,6 +544,11 @@ class IsProjectManager(permissions.BasePermission):
                 *SAP_COST_ALL_GET_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -459,9 +633,13 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                 *PROJECT_LOCATION_ALL_GET_ACTIONS,
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *PROJECT_FINANCES_ALL_GET_ACTIONS,
                 *SAP_COST_ALL_GET_ACTIONS,
-                *PROJECT_NOTE_ALL_ACTIONS
+                *PROJECT_NOTE_ALL_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -524,10 +702,16 @@ class IsAdmin(permissions.BasePermission):
                 *PROJECT_GROUP_ALL_ACTIONS,
                 *PROJECT_FINANCES_ALL_ACTIONS,
                 *PROJECT_ALL_ACTIONS,
+                *PROJECT_PW_LINK_GET_ACTIONS,
                 *SAP_COST_ALL_ACTIONS,
                 *PROJECT_NOTE_ALL_ACTIONS,
                 *PROJECT_FORCED_TO_FRAME_PATCH,
                 *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+                *PROJECT_HISTORY_GET_ACTIONS,
+                *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+                *CONSTRUCTION_HANDOVER_ATTACHMENT_WRITE_ACTIONS,
+                *PROJECT_PROGRAMME_GET_ACTIONS,
+                *PROJECT_PROGRAMME_POST_ACTIONS,
             ]
         ):
             return True
@@ -558,11 +742,7 @@ class IsClassProgrammer(permissions.BasePermission):
 
     def user_is_coordinator_or_admin(self, request):
         """Check if user is coordinator or admin (bypass restrictions)"""
-        ad_groups = request.user.ad_groups.all().values_list("name", flat=True)
-        return (
-            "sg_kymp_sso_io_koordinaattorit" in ad_groups
-            or "sg_kymp_sso_io_admin" in ad_groups
-        )
+        return request.user.ad_groups.filter(name__in=RESTRICTION_BYPASS_GROUPS).exists()
 
     def get_user_assigned_classes_paths(self, request):
         """Get project class paths assigned to this user."""
@@ -582,16 +762,23 @@ class IsClassProgrammer(permissions.BasePermission):
         if not self.user_in_restricted_programmer_group(request):
             return False
 
+        # DRF runs no object-level check on create, so scope it here.
+        if view.action in DJANGO_BASE_CREATE_ONLY_ACTIONS:
+            return self._can_create(request, view)
+
         # Allow read actions
         if view.action in [
             *DJANGO_BASE_READ_ONLY_ACTIONS,
             *PROJECT_ALL_GET_ACTIONS,
+            *PROJECT_PW_LINK_GET_ACTIONS,
             *PROJECT_CLASS_ALL_GET_ACTIONS,
             *PROJECT_LOCATION_ALL_GET_ACTIONS,
             *PROJECT_FINANCES_ALL_GET_ACTIONS,
             *PROJECT_GROUP_ALL_GET_ACTIONS,
             *SAP_COST_ALL_GET_ACTIONS,
             *PROJECT_NOTE_ALL_GET_ACTIONS,
+            *PROJECT_HISTORY_GET_ACTIONS,
+            *PROJECT_PROGRAMME_GET_ACTIONS,
         ]:
             return True
 
@@ -601,6 +788,7 @@ class IsClassProgrammer(permissions.BasePermission):
             *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
             *PROJECT_NOTE_ALL_ACTIONS,
             "patch_bulk_projects",
+            *PROJECT_PROGRAMME_POST_ACTIONS,
         ]:
             return True
 
@@ -611,6 +799,11 @@ class IsClassProgrammer(permissions.BasePermission):
         _type = obj._meta.model.__name__
         if _type == "Project":
             return obj.projectClass.path if obj.projectClass else None
+        if _type == "ProjectProgramme":
+            target_project = getattr(obj, "project", None)
+            if target_project and target_project.projectClass:
+                return target_project.projectClass.path
+            return None
         if _type == "Note":
             target_project = obj.project
             if target_project and target_project.projectClass:
@@ -619,6 +812,26 @@ class IsClassProgrammer(permissions.BasePermission):
         if _type == "ProjectGroup":
             return obj.classRelation.path if obj.classRelation else None
         return None
+
+    def _can_create(self, request, view):
+        """Restricted programmers may only create projects and notes inside
+        their assigned classes. Project programme creation is decided by
+        ProjectProgrammeViewSet itself."""
+        basename = getattr(view, "basename", None)
+        if basename == "projectProgrammes":
+            return True
+        if not isinstance(request.data, Mapping):
+            return False
+        if basename == "projects":
+            target_class_path = class_path_by_id(request.data.get("projectClass"))
+        elif basename == "notes":
+            target_class_path = project_class_path_by_id(request.data.get("project"))
+        else:
+            return False
+
+        return self._target_path_matches_assigned_paths(
+            target_class_path, self.get_user_assigned_classes_paths(request)
+        )
 
     @staticmethod
     def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
@@ -630,7 +843,13 @@ class IsClassProgrammer(permissions.BasePermission):
         if self.user_is_coordinator_or_admin(request):
             return True
 
-        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+        # Restricted programmers may read everything, including custom read
+        # actions such as history and note images. (permissions.SAFE_METHODS is
+        # DRF's GET/HEAD/OPTIONS, not this module's SAFE_METHODS.)
+        if (
+            view.action in DJANGO_BASE_READ_ONLY_ACTIONS
+            or request.method in permissions.SAFE_METHODS
+        ):
             return True
 
         target_class_path = self._get_target_class_path_for_restricted_edit(obj)
@@ -641,6 +860,96 @@ class IsClassProgrammer(permissions.BasePermission):
         if not assigned_paths:
             return False
 
-        return self._target_path_matches_assigned_paths(
+        if not self._target_path_matches_assigned_paths(
             target_class_path, assigned_paths
-        )
+        ):
+            return False
+
+        return self._edit_stays_in_scope(request, obj, assigned_paths)
+
+    def _edit_stays_in_scope(self, request, obj, assigned_paths):
+        """An in-scope object must not be moved, or pull other projects, out
+        of the user's classes."""
+        data = request.data if isinstance(request.data, Mapping) else {}
+
+        def in_scope(path):
+            return self._target_path_matches_assigned_paths(path, assigned_paths)
+
+        _type = obj._meta.model.__name__
+        if _type == "Project" and "projectClass" in data:
+            return in_scope(class_path_by_id(data.get("projectClass")))
+        if _type == "Note" and "project" in data:
+            return in_scope(project_class_path_by_id(data.get("project")))
+        if _type == "ProjectGroup":
+            if "classRelation" in data and not in_scope(
+                class_path_by_id(data.get("classRelation"))
+            ):
+                return False
+            if "projects" in data:
+                project_ids = data.get("projects")
+                if not isinstance(project_ids, list):
+                    return False
+                return all(
+                    in_scope(project_class_path_by_id(project_id))
+                    for project_id in project_ids
+                )
+        return True
+    
+class IsConstructionManagementLead(permissions.BasePermission):
+    """Permission class for construction management leads (Rakennuttamisen esihenkilöt)."""
+
+    CONSTRUCTION_HANDOVER_BASENAME = "constructionHandovers"
+
+    def user_in_construction_management_lead_group(self, request):
+        if (
+            "sg_kymp_sso_io_rakennuttamisen_esihenkilot"
+            in request.user.ad_groups.all().values_list("name", flat=True)
+        ):
+            return True
+        else:
+            return False
+
+    def _is_construction_handover_view(self, view):
+        return getattr(view, "basename", None) == self.CONSTRUCTION_HANDOVER_BASENAME
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if not self.user_in_construction_management_lead_group(request=request):
+            return False
+
+        if request.method not in SAFE_METHODS:
+            return False
+
+        # Allow read rights for all resources this role can view.
+        if request.method == GET and view.action in [
+            *DJANGO_BASE_READ_ONLY_ACTIONS,
+            *PROJECT_CLASS_ALL_GET_ACTIONS,
+            *PROJECT_LOCATION_ALL_GET_ACTIONS,
+            *PROJECT_GROUP_ALL_GET_ACTIONS,
+            *PROJECT_FINANCES_ALL_GET_ACTIONS,
+            *PROJECT_ALL_GET_ACTIONS,
+            *SAP_COST_ALL_GET_ACTIONS,
+            *CONSTRUCTION_HANDOVER_GET_ACTIONS,
+            *PROJECT_PROGRAMME_GET_ACTIONS,
+        ]:
+            return True
+
+        # Strict write rights: only update/transition actions on construction handovers.
+        if self._is_construction_handover_view(view) and view.action in [
+            *DJANGO_BASE_UPDATE_ONLY_ACTIONS,
+            *CONSTRUCTION_HANDOVER_POST_ACTIONS,
+        ]:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.method == GET:
+            return True
+
+        if self._is_construction_handover_view(view):
+            return True
+
+        return False
