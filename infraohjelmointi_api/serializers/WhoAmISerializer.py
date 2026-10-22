@@ -1,4 +1,5 @@
-from infraohjelmointi_api.models import User
+from django.db.models import Q
+from infraohjelmointi_api.models import ProjectClass, User
 from infraohjelmointi_api.permissions import (
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
@@ -11,6 +12,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
     ad_groups = serializers.SerializerMethodField()
     is_restricted_programmer = serializers.SerializerMethodField()
     restricted_class_paths = serializers.SerializerMethodField()
+    restricted_class_ids = serializers.SerializerMethodField()
 
     group_to_uuid_mapping = {
         "sg_kymp_sso_io_koordinaattorit": "86b826df-589c-40f9-898f-1584e80b5482",
@@ -42,6 +44,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
             "ad_groups",
             "is_restricted_programmer",
             "restricted_class_paths",
+            "restricted_class_ids",
         )
 
     def get_ad_groups(self, current_user):
@@ -78,3 +81,17 @@ class WhoAmISerializer(serializers.ModelSerializer):
         if not is_restricted_programmer(current_user):
             return []
         return sorted(get_restricted_user_assigned_class_paths(current_user))
+
+    def get_restricted_class_ids(self, current_user):
+        """IDs of the classes a restricted programmer may edit, sub classes
+        included, so the UI can check a project without loading the classes."""
+        paths = self.get_restricted_class_paths(current_user)
+        if not paths:
+            return []
+        in_scope = Q()
+        for path in paths:
+            in_scope |= Q(path=path) | Q(path__startswith=f"{path}/")
+        return sorted(
+            str(class_id)
+            for class_id in ProjectClass.objects.filter(in_scope).values_list("id", flat=True)
+        )
