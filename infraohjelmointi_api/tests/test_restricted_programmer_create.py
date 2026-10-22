@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from helusers.models import ADGroup
 from rest_framework.test import APIClient
 
@@ -141,7 +141,30 @@ class RestrictedProgrammerCreateTestCase(TestCase):
             settings.RESTRICTED_PROGRAMMER_AD_GROUP,
             [group["name"] for group in body["ad_groups"]],
         )
+        self.assertTrue(body["is_restricted_programmer"])
         self.assertEqual(body["restricted_class_paths"], [self.own_class.path])
+
+    def test_who_am_i_flag_follows_configured_group_name(self, _pw):
+        """The UI relies on the flag, so a renamed group must still be detected."""
+        custom = User.objects.create_user(username="c@test.fi", email="c@test.fi")
+        custom.ad_groups.add(ADGroup.objects.create(name="custom_restricted_group"))
+        ClassProgrammerAssignment.objects.create(user=custom, project_class=self.own_class)
+        self.client.force_authenticate(user=custom)
+
+        with override_settings(RESTRICTED_PROGRAMMER_AD_GROUP="custom_restricted_group"):
+            body = self.client.get("/who-am-i/").json()
+
+        self.assertTrue(body["is_restricted_programmer"])
+        self.assertIn("custom_restricted_group", [group["name"] for group in body["ad_groups"]])
+        self.assertEqual(body["restricted_class_paths"], [self.own_class.path])
+
+    def test_who_am_i_coordinator_in_group_is_not_restricted(self, _pw):
+        self.user.ad_groups.add(ADGroup.objects.create(name="sg_kymp_sso_io_koordinaattorit"))
+
+        body = self.client.get("/who-am-i/").json()
+
+        self.assertFalse(body["is_restricted_programmer"])
+        self.assertEqual(body["restricted_class_paths"], [])
 
     def test_who_am_i_class_paths_empty_for_other_users(self, _pw):
         other = User.objects.create_user(username="p@test.fi", email="p@test.fi")
@@ -149,4 +172,6 @@ class RestrictedProgrammerCreateTestCase(TestCase):
         ClassProgrammerAssignment.objects.create(user=other, project_class=self.own_class)
         self.client.force_authenticate(user=other)
 
-        self.assertEqual(self.client.get("/who-am-i/").json()["restricted_class_paths"], [])
+        body = self.client.get("/who-am-i/").json()
+        self.assertFalse(body["is_restricted_programmer"])
+        self.assertEqual(body["restricted_class_paths"], [])

@@ -2,12 +2,14 @@ from infraohjelmointi_api.models import User
 from infraohjelmointi_api.permissions import (
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
+    is_restricted_programmer,
 )
 from rest_framework import serializers
 
 
 class WhoAmISerializer(serializers.ModelSerializer):
     ad_groups = serializers.SerializerMethodField()
+    is_restricted_programmer = serializers.SerializerMethodField()
     restricted_class_paths = serializers.SerializerMethodField()
 
     group_to_uuid_mapping = {
@@ -38,6 +40,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
             "department_name",
             "uuid",
             "ad_groups",
+            "is_restricted_programmer",
             "restricted_class_paths",
         )
 
@@ -65,10 +68,13 @@ class WhoAmISerializer(serializers.ModelSerializer):
 
         return groups
 
+    def get_is_restricted_programmer(self, current_user):
+        """IO-756: lets the UI apply the restriction without knowing the
+        configurable group name."""
+        return is_restricted_programmer(current_user)
+
     def get_restricted_class_paths(self, current_user):
         """Class paths a restricted programmer may edit (IO-756), else empty."""
-        if not current_user.ad_groups.filter(
-            name=get_restricted_programmer_group_name()
-        ).exists():
+        if not is_restricted_programmer(current_user):
             return []
         return sorted(get_restricted_user_assigned_class_paths(current_user))
