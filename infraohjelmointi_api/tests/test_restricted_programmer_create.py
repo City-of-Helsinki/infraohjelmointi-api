@@ -13,7 +13,7 @@ from django.test import TestCase, override_settings
 from helusers.models import ADGroup
 from rest_framework.test import APIClient
 
-from ..models import ClassProgrammerAssignment, Note, Project, ProjectClass
+from ..models import ClassProgrammerAssignment, Note, Project, ProjectClass, ProjectGroup
 
 User = get_user_model()
 
@@ -181,3 +181,61 @@ class RestrictedProgrammerCreateTestCase(TestCase):
         self.assertFalse(body["is_restricted_programmer"])
         self.assertEqual(body["restricted_class_paths"], [])
         self.assertEqual(body["restricted_class_ids"], [])
+
+    # ------------------------------------------------------------------
+    # Edits must not move anything out of the user's classes either
+    # ------------------------------------------------------------------
+
+    def _own_note(self):
+        return Note.objects.create(content="x", project=self.own_project, updatedBy=self.user)
+
+    def test_cannot_move_note_to_other_project(self, _pw):
+        note = self._own_note()
+        response = self.client.patch(
+            f"/notes/{note.id}/", {"project": str(self.other_project.id)}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+        note.refresh_from_db()
+        self.assertEqual(note.project, self.own_project)
+
+    def test_can_edit_own_note(self, _pw):
+        note = self._own_note()
+        response = self.client.patch(f"/notes/{note.id}/", {"content": "y"}, format="json")
+        self.assertEqual(response.status_code, 200, msg=response.content)
+
+    def test_bulk_update_cannot_move_project_to_other_class(self, _pw):
+        response = self.client.patch(
+            "/projects/bulk-update/",
+            [{"id": str(self.own_project.id), "data": {"projectClass": str(self.other_class.id)}}],
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.own_project.refresh_from_db()
+        self.assertEqual(self.own_project.projectClass, self.own_class)
+
+    def test_group_edit_cannot_move_group_or_pull_in_other_projects(self, _pw):
+        group = ProjectGroup.objects.create(name="Group", classRelation=self.own_class)
+        for data in [
+            {"classRelation": str(self.other_class.id)},
+            {"projects": [str(self.other_project.id)]},
+        ]:
+            with self.subTest(data=data):
+                response = self.client.patch(f"/project-groups/{group.id}/", data, format="json")
+                self.assertEqual(response.status_code, 403)
+        self.other_project.refresh_from_db()
+        self.assertIsNone(self.other_project.projectGroup)
+
+    def test_json_array_body_is_denied_not_a_server_error(self, _pw):
+        response = self.client.post("/projects/", [{"name": "x"}], format="json")
+        self.assertEqual(response.status_code, 403)
+
+    def test_can_read_history_of_other_project(self, _pw):
+        response = self.client.get(f"/projects/{self.other_project.id}/history/")
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_restricted_planner_cannot_create_project_programme(self, _pw):
+        self.user.ad_groups.add(ADGroup.objects.create(name="sg_kymp_sso_io_ohjelmoijat"))
+        response = self.client.post(
+            "/project-programmes/", {"project": str(self.other_project.id)}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)

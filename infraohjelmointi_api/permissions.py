@@ -4,6 +4,7 @@ from infraohjelmointi_api.models.ProjectGroup import ProjectGroup
 from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssignment
 from rest_framework import permissions
 from django.conf import settings
+from collections.abc import Mapping
 from django.core.exceptions import ValidationError
 
 
@@ -115,6 +116,30 @@ def target_path_matches_assigned_paths(target_class_path, assigned_paths):
         if target_class_path == path or target_class_path.startswith(path + "/"):
             return True
     return False
+
+
+def class_path_by_id(class_id):
+    """Path of the ProjectClass with this id, or None if missing or not a valid id."""
+    if not class_id or not isinstance(class_id, str):
+        return None
+    try:
+        project_class = ProjectClass.objects.filter(id=class_id).first()
+    except (ValidationError, ValueError):
+        return None
+    return project_class.path if project_class else None
+
+
+def project_class_path_by_id(project_id):
+    """Class path of the Project with this id, or None if missing or not a valid id."""
+    if not project_id or not isinstance(project_id, str):
+        return None
+    try:
+        project = Project.objects.filter(id=project_id).select_related("projectClass").first()
+    except (ValidationError, ValueError):
+        return None
+    if not project or not project.projectClass:
+        return None
+    return project.projectClass.path
 
 GET = "GET"
 POST = "POST"
@@ -788,32 +813,6 @@ class IsClassProgrammer(permissions.BasePermission):
             return obj.classRelation.path if obj.classRelation else None
         return None
 
-    @staticmethod
-    def _get_class_path_by_id(class_id):
-        if not class_id:
-            return None
-        try:
-            project_class = ProjectClass.objects.filter(id=class_id).first()
-        except (ValidationError, ValueError):
-            return None
-        return project_class.path if project_class else None
-
-    @staticmethod
-    def _get_project_class_path_by_id(project_id):
-        if not project_id:
-            return None
-        try:
-            project = (
-                Project.objects.filter(id=project_id)
-                .select_related("projectClass")
-                .first()
-            )
-        except (ValidationError, ValueError):
-            return None
-        if not project or not project.projectClass:
-            return None
-        return project.projectClass.path
-
     def _can_create(self, request, view):
         """Restricted programmers may only create projects and notes inside
         their assigned classes. Project programme creation is decided by
@@ -821,14 +820,12 @@ class IsClassProgrammer(permissions.BasePermission):
         basename = getattr(view, "basename", None)
         if basename == "projectProgrammes":
             return True
+        if not isinstance(request.data, Mapping):
+            return False
         if basename == "projects":
-            target_class_path = self._get_class_path_by_id(
-                request.data.get("projectClass")
-            )
+            target_class_path = class_path_by_id(request.data.get("projectClass"))
         elif basename == "notes":
-            target_class_path = self._get_project_class_path_by_id(
-                request.data.get("project")
-            )
+            target_class_path = project_class_path_by_id(request.data.get("project"))
         else:
             return False
 
@@ -846,7 +843,13 @@ class IsClassProgrammer(permissions.BasePermission):
         if self.user_is_coordinator_or_admin(request):
             return True
 
-        if view.action in DJANGO_BASE_READ_ONLY_ACTIONS:
+        # Restricted programmers may read everything, including custom read
+        # actions such as history and note images. (permissions.SAFE_METHODS is
+        # DRF's GET/HEAD/OPTIONS, not this module's SAFE_METHODS.)
+        if (
+            view.action in DJANGO_BASE_READ_ONLY_ACTIONS
+            or request.method in permissions.SAFE_METHODS
+        ):
             return True
 
         target_class_path = self._get_target_class_path_for_restricted_edit(obj)
@@ -862,13 +865,34 @@ class IsClassProgrammer(permissions.BasePermission):
         ):
             return False
 
-        # A project must not be moved out of the user's classes either.
-        if obj._meta.model.__name__ == "Project" and "projectClass" in request.data:
-            return self._target_path_matches_assigned_paths(
-                self._get_class_path_by_id(request.data.get("projectClass")),
-                assigned_paths,
-            )
+        return self._edit_stays_in_scope(request, obj, assigned_paths)
 
+    def _edit_stays_in_scope(self, request, obj, assigned_paths):
+        """An in-scope object must not be moved, or pull other projects, out
+        of the user's classes."""
+        data = request.data if isinstance(request.data, Mapping) else {}
+
+        def in_scope(path):
+            return self._target_path_matches_assigned_paths(path, assigned_paths)
+
+        _type = obj._meta.model.__name__
+        if _type == "Project" and "projectClass" in data:
+            return in_scope(class_path_by_id(data.get("projectClass")))
+        if _type == "Note" and "project" in data:
+            return in_scope(project_class_path_by_id(data.get("project")))
+        if _type == "ProjectGroup":
+            if "classRelation" in data and not in_scope(
+                class_path_by_id(data.get("classRelation"))
+            ):
+                return False
+            if "projects" in data:
+                project_ids = data.get("projects")
+                if not isinstance(project_ids, list):
+                    return False
+                return all(
+                    in_scope(project_class_path_by_id(project_id))
+                    for project_id in project_ids
+                )
         return True
     
 class IsConstructionManagementLead(permissions.BasePermission):
