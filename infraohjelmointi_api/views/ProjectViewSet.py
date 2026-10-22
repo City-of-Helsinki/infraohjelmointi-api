@@ -42,8 +42,9 @@ from infraohjelmointi_api.services.ProjectWiseService import (
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.permissions import (
-    user_in_restricted_programmer_group,
+    class_path_by_id,
     get_restricted_user_assigned_class_paths,
+    is_restricted_programmer,
     target_path_matches_assigned_paths,
 )
 import json
@@ -1507,7 +1508,14 @@ class ProjectViewSet(BaseViewSet):
                 # IO-756: enforce per-project class assignments here; DRF
                 # does not call check_object_permissions for bulk actions.
                 forbidden_response = self._enforce_restricted_bulk_update_access(
-                    request, projectIds
+                    request,
+                    projectIds,
+                    target_class_ids=[
+                        projectData["data"].get("projectClass")
+                        for projectData in data
+                        if isinstance(projectData.get("data"), dict)
+                        and "projectClass" in projectData["data"]
+                    ],
                 )
                 if forbidden_response is not None:
                     return forbidden_response
@@ -1653,10 +1661,11 @@ class ProjectViewSet(BaseViewSet):
         except ValueError:
             return False
 
-    def _enforce_restricted_bulk_update_access(self, request, project_ids):
+    def _enforce_restricted_bulk_update_access(self, request, project_ids, target_class_ids=()):
         """Return a 403 Response if a restricted programmer is bulk-updating
-        projects outside their assigned classes, otherwise None (IO-756)."""
-        if not user_in_restricted_programmer_group(request):
+        projects outside their assigned classes, or moving projects to a class
+        outside them, otherwise None (IO-756)."""
+        if not is_restricted_programmer(request.user):
             return None
 
         assigned_paths = get_restricted_user_assigned_class_paths(request.user)
@@ -1700,6 +1709,15 @@ class ProjectViewSet(BaseViewSet):
                     ),
                     "unauthorized_project_ids": unauthorized_ids,
                 },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if any(
+            not target_path_matches_assigned_paths(class_path_by_id(class_id), assigned_paths)
+            for class_id in target_class_ids
+        ):
+            return Response(
+                data={"message": "Not allowed to move projects outside your assigned classes."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 

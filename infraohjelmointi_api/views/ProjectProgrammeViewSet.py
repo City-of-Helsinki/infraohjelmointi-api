@@ -31,6 +31,7 @@ from infraohjelmointi_api.permissions import (
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
+    is_restricted_programmer,
     parse_name_from_email,
     target_path_matches_assigned_paths,
 )
@@ -279,6 +280,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
         group_names = self._get_user_group_names(user)
         if self.ADMIN_GROUP in group_names:
             return
+
+        # IO-756: restricted programmers can't create programmes, even if they
+        # are also in the planner or contributor group.
+        if is_restricted_programmer(user):
+            raise PermissionDenied("Restricted programmers can't create a project programme.")
 
         if get_planner_group_name() in group_names:
             return
