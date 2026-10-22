@@ -53,6 +53,22 @@ def user_in_restricted_programmer_group(request):
     )
 
 
+# Groups that bypass the restricted programmer rules (IO-756).
+RESTRICTION_BYPASS_GROUPS = ("sg_kymp_sso_io_koordinaattorit", "sg_kymp_sso_io_admin")
+
+
+def is_restricted_programmer(user):
+    """True if IsClassProgrammer restricts this user: in the restricted
+    programmer group and not a coordinator or admin (IO-756)."""
+    if not user or not user.is_authenticated:
+        return False
+    group_names = set(user.ad_groups.values_list("name", flat=True))
+    return (
+        get_restricted_programmer_group_name() in group_names
+        and not group_names.intersection(RESTRICTION_BYPASS_GROUPS)
+    )
+
+
 def user_in_project_programme_contributor_group(request):
     """True if the authenticated user is in the project programme contributor AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
@@ -701,11 +717,7 @@ class IsClassProgrammer(permissions.BasePermission):
 
     def user_is_coordinator_or_admin(self, request):
         """Check if user is coordinator or admin (bypass restrictions)"""
-        ad_groups = request.user.ad_groups.all().values_list("name", flat=True)
-        return (
-            "sg_kymp_sso_io_koordinaattorit" in ad_groups
-            or "sg_kymp_sso_io_admin" in ad_groups
-        )
+        return request.user.ad_groups.filter(name__in=RESTRICTION_BYPASS_GROUPS).exists()
 
     def get_user_assigned_classes_paths(self, request):
         """Get project class paths assigned to this user."""
