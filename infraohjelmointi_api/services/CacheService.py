@@ -3,11 +3,13 @@ CacheService for caching expensive calculations.
 Uses Django's cache framework with Redis in production.
 """
 
+import contextvars
 import hashlib
 import json
 import logging
 import sys
 import time
+from contextlib import contextmanager
 from datetime import date
 from typing import Optional, Any, List
 
@@ -17,6 +19,8 @@ from django.core.cache import cache
 from .RedisAvailabilityChecker import RedisAvailabilityChecker
 
 logger = logging.getLogger(__name__)
+
+_bypass_reads = contextvars.ContextVar('cache_bypass_reads', default=False)
 
 
 class CacheService:
@@ -36,6 +40,20 @@ class CacheService:
     _redis_check_interval = 60
     _last_redis_availability_check = 0
     _redis_availability_check_interval = 5
+
+    @staticmethod
+    @contextmanager
+    def bypass_reads():
+        """Make cache reads miss inside the block, so values are computed from the database.
+
+        Writes still happen. Used when a value must reflect the latest committed
+        data even though the invalidation for it has not run yet (e.g. SSE payloads).
+        """
+        token = _bypass_reads.set(True)
+        try:
+            yield
+        finally:
+            _bypass_reads.reset(token)
 
     @staticmethod
     def _generate_cache_key(prefix: str, *args, **kwargs) -> str:
@@ -115,7 +133,7 @@ class CacheService:
 
     @classmethod
     def _safe_cache_get(cls, cache_key: str) -> Optional[Any]:
-        if cls._is_cache_disabled():
+        if _bypass_reads.get() or cls._is_cache_disabled():
             return None
 
         cache_backend = settings.CACHES['default']['BACKEND']
