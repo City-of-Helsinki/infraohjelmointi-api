@@ -143,6 +143,10 @@ class RestrictedProgrammerCreateTestCase(TestCase):
         )
         self.assertTrue(body["is_restricted_programmer"])
         self.assertEqual(body["restricted_class_paths"], [self.own_class.path])
+        self.assertCountEqual(
+            body["restricted_class_ids"],
+            [str(self.own_class.id), str(self.own_sub_class.id)],
+        )
 
     def test_who_am_i_flag_follows_configured_group_name(self, _pw):
         """The UI relies on the flag, so a renamed group must still be detected."""
@@ -165,6 +169,7 @@ class RestrictedProgrammerCreateTestCase(TestCase):
 
         self.assertFalse(body["is_restricted_programmer"])
         self.assertEqual(body["restricted_class_paths"], [])
+        self.assertEqual(body["restricted_class_ids"], [])
 
     def test_who_am_i_class_paths_empty_for_other_users(self, _pw):
         other = User.objects.create_user(username="p@test.fi", email="p@test.fi")
@@ -175,3 +180,4 @@ class RestrictedProgrammerCreateTestCase(TestCase):
         body = self.client.get("/who-am-i/").json()
         self.assertFalse(body["is_restricted_programmer"])
         self.assertEqual(body["restricted_class_paths"], [])
+        self.assertEqual(body["restricted_class_ids"], [])
