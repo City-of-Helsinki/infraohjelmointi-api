@@ -35,9 +35,9 @@ class ConstructionHandover(HistoricalModel):
     personFinancing = models.ForeignKey(
         "ProjectProgrammer", related_name="handovers_financing", on_delete=models.DO_NOTHING, null=True, blank=True
     )
-    linkDesignDrawings = models.URLField(max_length=500, blank=True, null=True)
-    linkCostAllocation = models.URLField(max_length=500, blank=True, null=True)
-    linkContractBoundaries = models.URLField(max_length=500, blank=True, null=True)
+    linkDesignDrawings = models.CharField(max_length=500, blank=True, null=True)
+    linkCostAllocation = models.CharField(max_length=500, blank=True, null=True)
+    linkContractBoundaries = models.CharField(max_length=500, blank=True, null=True)
     constructionProjectManager = models.ForeignKey(
         "Person", related_name="handovers_pm", on_delete=models.DO_NOTHING, null=True, blank=True
     )
