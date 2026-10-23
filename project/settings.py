@@ -47,10 +47,9 @@ env = environ.Env(
     MEDIA_ROOT=(str, str(BASE_DIR / "media")),
     MEDIA_URL=(str, "/media/"),
     NOTE_IMAGE_MAX_BYTES=(int, 10 * 1024 * 1024),
-    HANDOVER_ATTACHMENT_MAX_BYTES=(int, 2 * 1000 * 1024), # 2MB
-    # IO-914 / IO-936: matches the Figma copy ("max 500 kb").
-    PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES=(int, 500 * 1024),
-    PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES=(int, 500 * 1024),
+    HANDOVER_ATTACHMENT_MAX_BYTES=(int, 2 * 1024 * 1024), # 2MB
+    PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES=(int, 2 * 1024 * 1024), # 2MB
+    PROJECT_PROGRAMME_LOCATION_MAP_MAX_BYTES=(int, 2 * 1024 * 1024), # 2MB
     # IO-812 phase 2: Azure Blob storage for uploaded files. Empty by default so
     # local/CI keep using FileSystemStorage; Platta sets these in the deploy env.
     #
