@@ -292,58 +292,57 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
             )
 
 
+def _invalidate_hierarchy_with_coordinators(node, model_class):
+    """Invalidate financial sums for node, its ancestors, and every coordinator
+    node (plus ancestors) linked to them via relatedTo."""
+    instance_type = model_class.__name__
+    planning_ids = []
+    while node:
+        planning_ids.append(node.id)
+        node = node.parent
+
+    ids = set(planning_ids)
+    for coordinator in model_class.objects.filter(relatedTo__in=planning_ids):
+        while coordinator:
+            ids.add(coordinator.id)
+            coordinator = coordinator.parent
+
+    for instance_id in ids:
+        CacheService.invalidate_financial_sum(
+            instance_id=instance_id,
+            instance_type=instance_type
+        )
+
+
 @receiver(post_save, sender=ProjectFinancial)
 @receiver(post_delete, sender=ProjectFinancial)
-@on_transaction_commit
 def invalidate_project_financial_cache(sender, instance, **kwargs):
     """
     Invalidate cache when ProjectFinancial is saved or deleted.
 
-    Deferred to ``transaction.on_commit`` to avoid the race where a concurrent
-    request reads (and re-populates) the cache between INVALIDATE and COMMIT,
-    repopulating it with the still-uncommitted, soon-to-be-stale value. This
-    matches the pattern used by ``_invalidate_cached_lookup`` below.
+    The affected IDs are captured now, while the project row still exists (a
+    cascading project delete removes it before commit), and the invalidation
+    itself is deferred to ``transaction.on_commit`` so a concurrent reader
+    cannot repopulate the cache with pre-commit data.
     """
-    try:
-        project = instance.project
+    relations = (
+        Project.objects.filter(pk=instance.project_id)
+        .values("projectClass_id", "projectLocation_id", "projectGroup_id")
+        .first()
+    )
+    if not relations:
+        logger.error(
+            f"Error invalidating cache for ProjectFinancial: project {instance.project_id} not found"
+        )
+        return
 
-        # Invalidate caches for all related entities
-        if project.projectClass:
-            CacheService.invalidate_financial_sum(
-                instance_id=project.projectClass.id,
-                instance_type='ProjectClass'
-            )
-            # Also invalidate parent classes
-            parent = project.projectClass.parent
-            while parent:
-                CacheService.invalidate_financial_sum(
-                    instance_id=parent.id,
-                    instance_type='ProjectClass'
-                )
-                parent = parent.parent
+    relation_ids = (
+        (ProjectClass, {relations["projectClass_id"]} - {None}),
+        (ProjectLocation, {relations["projectLocation_id"]} - {None}),
+    )
+    group_ids = {relations["projectGroup_id"]} - {None}
 
-        if project.projectLocation:
-            CacheService.invalidate_financial_sum(
-                instance_id=project.projectLocation.id,
-                instance_type='ProjectLocation'
-            )
-            # Also invalidate parent locations
-            parent = project.projectLocation.parent
-            while parent:
-                CacheService.invalidate_financial_sum(
-                    instance_id=parent.id,
-                    instance_type='ProjectLocation'
-                )
-                parent = parent.parent
-
-        if project.projectGroup:
-            CacheService.invalidate_financial_sum(
-                instance_id=project.projectGroup.id,
-                instance_type='ProjectGroup'
-            )
-
-    except Exception as e:
-        logger.error(f"Error invalidating cache for ProjectFinancial: {e}")
+    transaction.on_commit(lambda: _invalidate_project_relations(relation_ids, group_ids))
 
 
 @receiver(post_save, sender=ClassFinancial)
@@ -374,13 +373,11 @@ def invalidate_class_financial_cache(sender, instance, **kwargs):
             )
             parent = parent.parent
 
-        if class_relation.forCoordinatorOnly:
-            planning_classes = ProjectClass.objects.filter(relatedTo=class_relation)
-            for planning_class in planning_classes:
-                CacheService.invalidate_financial_sum(
-                    instance_id=planning_class.id,
-                    instance_type='ProjectClass'
-                )
+        if class_relation.forCoordinatorOnly and class_relation.relatedTo_id:
+            CacheService.invalidate_financial_sum(
+                instance_id=class_relation.relatedTo_id,
+                instance_type='ProjectClass'
+            )
 
         for year_offset in range(-10, 1):
             affected_year = instance.year + year_offset
@@ -418,13 +415,11 @@ def invalidate_location_financial_cache(sender, instance, **kwargs):
             )
             parent = parent.parent
 
-        if location_relation.forCoordinatorOnly:
-            planning_locations = ProjectLocation.objects.filter(relatedTo=location_relation)
-            for planning_location in planning_locations:
-                CacheService.invalidate_financial_sum(
-                    instance_id=planning_location.id,
-                    instance_type='ProjectLocation'
-                )
+        if location_relation.forCoordinatorOnly and location_relation.relatedTo_id:
+            CacheService.invalidate_financial_sum(
+                instance_id=location_relation.relatedTo_id,
+                instance_type='ProjectLocation'
+            )
 
         for year_offset in range(-10, 1):
             affected_year = instance.year + year_offset
@@ -434,8 +429,16 @@ def invalidate_location_financial_cache(sender, instance, **kwargs):
         logger.error(f"Error invalidating cache for LocationFinancial: {e}")
 
 
+@receiver(pre_save, sender=Project)
+def capture_old_cache_relations(sender, instance, **kwargs):
+    instance._old_cache_relations = (
+        Project.objects.filter(pk=instance.pk)
+        .values("programmed", "projectClass_id", "projectLocation_id", "projectGroup_id")
+        .first()
+    )
+
+
 @receiver(post_save, sender=Project)
-@on_transaction_commit
 def invalidate_project_cache(sender, instance, created, **kwargs):
     """
     Invalidate cache when Project is saved (programmed status or relationships change).
@@ -443,26 +446,32 @@ def invalidate_project_cache(sender, instance, created, **kwargs):
     Deferred to ``transaction.on_commit`` so a concurrent reader cannot
     repopulate the cache with pre-commit data.
     """
+    # Snapshot now: the instance may be saved again before commit, overwriting its state.
+    old = getattr(instance, "_old_cache_relations", None) or {}
+    # Sums only include programmed projects, so unprogramming must invalidate too
+    if not (created or instance.programmed or old.get("programmed")):
+        return
+
+    relation_ids = (
+        (ProjectClass, {instance.projectClass_id, old.get("projectClass_id")} - {None}),
+        (ProjectLocation, {instance.projectLocation_id, old.get("projectLocation_id")} - {None}),
+    )
+    group_ids = {instance.projectGroup_id, old.get("projectGroup_id")} - {None}
+
+    transaction.on_commit(lambda: _invalidate_project_relations(relation_ids, group_ids))
+
+
+def _invalidate_project_relations(relation_ids, group_ids):
     try:
-        # Only invalidate if relevant fields changed
-        if created or instance.programmed:
-            if instance.projectClass:
-                CacheService.invalidate_financial_sum(
-                    instance_id=instance.projectClass.id,
-                    instance_type='ProjectClass'
-                )
+        for model_class, ids in relation_ids:
+            for node in model_class.objects.filter(pk__in=ids):
+                _invalidate_hierarchy_with_coordinators(node, model_class)
 
-            if instance.projectLocation:
-                CacheService.invalidate_financial_sum(
-                    instance_id=instance.projectLocation.id,
-                    instance_type='ProjectLocation'
-                )
-
-            if instance.projectGroup:
-                CacheService.invalidate_financial_sum(
-                    instance_id=instance.projectGroup.id,
-                    instance_type='ProjectGroup'
-                )
+        for group_id in group_ids:
+            CacheService.invalidate_financial_sum(
+                instance_id=group_id,
+                instance_type='ProjectGroup'
+            )
 
     except Exception as e:
         logger.error(f"Error invalidating cache for Project: {e}")
