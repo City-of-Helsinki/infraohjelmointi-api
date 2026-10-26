@@ -157,8 +157,10 @@ class ProjectGetSerializer(DynamicFieldsModelSerializer, ProjectWithFinancesSeri
         if not isinstance(projects_to_sap_values, dict):
             projects_to_sap_values = {}
         sap_values = projects_to_sap_values.get(project.id)
-        
-        if not sap_values:
+        # projects_to_sap_values already holds every current year SAP row for the listed projects
+        has_bulk_sap_values = isinstance(self.context.get("projects_to_sap_values"), dict)
+
+        if not sap_values and not has_bulk_sap_values:
             current_year = datetime.datetime.now().year
             sap_values = SapCurrentYearService.get_by_project_id_year(project.id, int(current_year))
 
