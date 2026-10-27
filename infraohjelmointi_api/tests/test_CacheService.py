@@ -44,8 +44,20 @@ LOCMEM_CACHE = {
     }
 }
 
+# CacheService keeps its disabled state in class attributes. Without REDIS_URL
+# (as in CI) AppConfig.ready() disables the cache permanently, and the
+# circuit-breaker tests trip it, so reset that state for every LocMem test.
+reset_cache_service_state = patch.multiple(
+    CacheService,
+    _cache_failures=0,
+    _cache_disabled_until=0,
+    _cache_permanently_disabled=False,
+    _last_redis_check=0,
+)
+
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CacheServiceBasicTest(TestCase):
     """Basic unit tests for CacheService methods."""
 
@@ -238,6 +250,7 @@ class CacheServiceBasicTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CacheServiceIntegrationTest(TransactionTestCase):
     """Integration tests for CacheService with Django models"""
 
@@ -797,6 +810,7 @@ class CacheBackendTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class LookupCacheTest(TestCase):
     """Tests for lookup table caching."""
 
@@ -833,6 +847,7 @@ class LookupCacheTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CachedLookupViewSetTest(TestCase):
     """Tests for CachedLookupViewSet functionality."""
 
@@ -981,6 +996,7 @@ class CachedLookupViewSetTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class AllLookupViewSetsTest(TestCase):
     """Tests to cover all lookup ViewSets."""
 
@@ -1078,6 +1094,7 @@ class AllLookupViewSetsTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class RedisAvailabilityCheckerTest(TestCase):
     """Tests for RedisAvailabilityChecker."""
 
@@ -1122,6 +1139,7 @@ class RedisAvailabilityCheckerTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CacheServiceEdgeCasesTest(TestCase):
     """Tests for edge cases and error handling in CacheService."""
 
@@ -1191,6 +1209,7 @@ class CacheServiceEdgeCasesTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CachedLookupDeletionModificationTest(TestCase):
     """Tests for lookup item deletion and modification with project status logic."""
 
@@ -1610,6 +1629,7 @@ class CachedLookupDeletionModificationTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class PersonMultiFKDeletionTest(TestCase):
     """Tests that deleting/updating a Person referenced by Project via
     multiple FK fields (`personPlanning`, `personConstruction`) cleans up
@@ -1779,6 +1799,7 @@ class PersonMultiFKDeletionTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class PersonOtherReverseFKDeletionTest(TestCase):
     """Tests that deleting a Person cleans up references from tables other
     than Project's planning/construction FKs.
@@ -2022,6 +2043,7 @@ class PersonOtherReverseFKDeletionTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CachedLookupClearOtherReverseFKsBroaderImpactTest(TestCase):
     """Regression tests confirming ``_clear_other_reverse_fks`` runs for ALL
     CachedLookupViewSet subclasses (not just Person) and behaves sanely.
@@ -2093,6 +2115,7 @@ class CachedLookupClearOtherReverseFKsBroaderImpactTest(TestCase):
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
+@reset_cache_service_state
 class CachedLookupOrmInvalidationTest(TestCase):
     """Regression tests for cache invalidation on direct ORM mutations.
 
