@@ -36,11 +36,21 @@ def _values_of(node, key):
     return found
 
 
+def _force_cache_enabled(test_case):
+    """CacheService's circuit breaker is class-level state, so earlier tests can
+    leave it tripped when Redis is unavailable (as in CI). With the cache off,
+    these tests fail or pass without exercising anything."""
+    patcher = patch.object(CacheService, "_is_cache_disabled", return_value=False)
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 @override_settings(CACHES=LOCMEM_CACHE)
 class FinanceUpdateEventTest(TestCase):
     """IO-889: finance-update events must carry the values that were just saved."""
 
     def setUp(self):
+        _force_cache_enabled(self)
         cache.clear()
         self.year = date.today().year
 
@@ -116,6 +126,7 @@ class FinanceUpdateEventTest(TestCase):
 class CacheBypassReadsTest(TestCase):
     @override_settings(CACHES=LOCMEM_CACHE)
     def setUp(self):
+        _force_cache_enabled(self)
         cache.clear()
 
     @override_settings(CACHES=LOCMEM_CACHE)
