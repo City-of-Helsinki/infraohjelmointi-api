@@ -239,7 +239,12 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
     # Build the payload outside the try block so serialization bugs in
     # get_financial_sums raise loudly instead of being silently logged as
     # "send_event failed"
-    payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
+    #
+    # IO-889: the cache invalidation receivers for these models run after this
+    # one (same on_commit queue, registration order), so a cached read here
+    # would put the pre-update sums and frame budgets into the event.
+    with CacheService.bypass_reads():
+        payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
     try:
         send_event("finance", "finance-update", payload)
         logger.debug(
