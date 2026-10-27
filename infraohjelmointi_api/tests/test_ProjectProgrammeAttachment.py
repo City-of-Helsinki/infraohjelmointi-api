@@ -191,10 +191,10 @@ class ProjectProgrammeSectionAttachmentTestCase(_TempMediaMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
         self.assertFalse(ProjectProgrammeAttachment.objects.exists())
 
-    def test_default_size_limit_matches_figma(self):
+    def test_default_size_limit_is_2mb(self):
         from django.conf import settings
 
-        self.assertEqual(settings.PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES, 500 * 1024)
+        self.assertEqual(settings.PROJECT_PROGRAMME_ATTACHMENT_MAX_BYTES, 2 * 1024 * 1024)
 
     def test_POST_rejects_whole_batch_when_one_file_is_invalid(self):
         bad = SimpleUploadedFile("x.txt", b"nope", content_type="text/plain")
