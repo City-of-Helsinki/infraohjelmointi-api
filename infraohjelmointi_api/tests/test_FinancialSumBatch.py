@@ -1,7 +1,8 @@
 """
 The list serializers compute ``finances`` in one batch
-(``FinancialSumBatchService``); a single instance still goes through
-``FinancialSumSerializer.get_finance_sums``. Both must return the same payload.
+(``FinancialSumBatchService``) and resolve class hierarchy walks from an
+in-memory tree; a single instance still goes through the per-row code. Both
+must return the same payload.
 
 The fixture is a seeded random hierarchy with the awkward cases the relation
 filters care about: sibling paths sharing a prefix (IO-928), suurpiiri classes,
@@ -22,6 +23,7 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
     ProjectGroup,
     ProjectLocation,
+    ProjectProgrammer,
 )
 from infraohjelmointi_api.serializers.ProjectClassSerializer import ProjectClassSerializer
 from infraohjelmointi_api.serializers.ProjectGroupSerializer import ProjectGroupSerializer
@@ -36,11 +38,17 @@ class FinancialSumBatchEquivalenceTestCase(CacheClearingMixin, TestCase):
     def setUpTestData(cls):
         rng = random.Random(1234)
 
+        programmers = [
+            ProjectProgrammer.objects.create(firstName=f"First{i}", lastName=f"Last{i}")
+            for i in range(3)
+        ]
+
         def make_class(name, parent=None, coordinator=False, related_to=None):
             path = f"{parent.path}/{name}" if parent else name
             return ProjectClass.objects.create(
                 name=name, parent=parent, path=path,
                 forCoordinatorOnly=coordinator, relatedTo=related_to,
+                defaultProgrammer=rng.choice(programmers + [None, None]),
             )
 
         # Planning classes, including a sibling whose path extends "Malmi".
@@ -60,8 +68,9 @@ class FinancialSumBatchEquivalenceTestCase(CacheClearingMixin, TestCase):
             if planning is orphan or rng.random() < 0.2:
                 continue
             parent = coordinators.get(planning.parent_id)
+            numbering = f"8 0{rng.randint(1, 3)} {rng.randint(1, 9):02d}"
             coordinators[planning.id] = make_class(
-                f"K {planning.name}", parent, coordinator=True, related_to=planning
+                f"{numbering} K {planning.name}", parent, coordinator=True, related_to=planning
             )
 
         # Locations: district -> division -> subdivision, plus coordinator districts.
@@ -130,7 +139,7 @@ class FinancialSumBatchEquivalenceTestCase(CacheClearingMixin, TestCase):
             instance = queryset.model.objects.get(id=row["id"])
             single = serializer_class(instance, context=dict(context)).data
             self.assertEqual(
-                row["finances"], single["finances"],
+                row, single,
                 f"{queryset.model.__name__} {instance.name} with {context}",
             )
 
