@@ -6,6 +6,7 @@ from infraohjelmointi_api.models import ProjectLocation
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.FinancialSumSerializer import (
     FinancialSumSerializer,
+    FinancialSumListSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import (
     ProjectProgrammerSerializer,
@@ -27,6 +28,7 @@ class ProjectLocationSerializer(FinancialSumSerializer):
 
     class Meta(BaseMeta):
         model = ProjectLocation
+        list_serializer_class = FinancialSumListSerializer
 
     def _get_name_lookup(self):
         cached = self.context.get(_LOOKUP_CONTEXT_KEY)

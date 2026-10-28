@@ -2,6 +2,7 @@ from infraohjelmointi_api.models import ProjectClass
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.FinancialSumSerializer import (
     FinancialSumSerializer,
+    FinancialSumListSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import (
     ProjectProgrammerSerializer,
@@ -31,6 +32,7 @@ class ProjectClassSerializer(FinancialSumSerializer):
 
     class Meta(BaseMeta):
         model = ProjectClass
+        list_serializer_class = FinancialSumListSerializer
 
     # -------------------------------------------------------------------------
     # Name transformation helpers (IO-455, IO-758)

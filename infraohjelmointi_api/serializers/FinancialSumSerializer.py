@@ -20,6 +20,29 @@ from django.db.models import (
 )
 from django.db.models.manager import BaseManager
 
+PRECOMPUTED_SUMS_KEY = "_precomputed_finance_sums"
+
+
+class FinancialSumListSerializer(serializers.ListSerializer):
+    """Computes ``finances`` for the whole list up front instead of per row."""
+
+    def to_representation(self, data):
+        instances = list(data.all() if isinstance(data, BaseManager) else data)
+        if instances:
+            from infraohjelmointi_api.services.FinancialSumBatchService import (
+                FinancialSumBatchService,
+            )
+            batch = FinancialSumBatchService(
+                year=int(self.context.get("finance_year", date.today().year)),
+                forced_to_frame=self.context.get("forcedToFrame", False),
+                for_coordinator=self.context.get("for_coordinator", False),
+                frame_budgets=self.context.get("frame_budgets"),
+            )
+            self.context[PRECOMPUTED_SUMS_KEY] = batch.compute(
+                instances, instances[0]._meta.model.__name__
+            )
+        return [self.child.to_representation(item) for item in instances]
+
 
 class FinancialSumSerializer(serializers.ModelSerializer):
     finances = serializers.SerializerMethodField(method_name="get_finance_sums")
@@ -230,6 +253,10 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         year = int(self.context.get("finance_year", date.today().year))
         forced_to_frame = self.context.get("forcedToFrame", False)
         for_coordinator = self.context.get("for_coordinator", False)
+
+        precomputed = self.context.get(PRECOMPUTED_SUMS_KEY)
+        if precomputed is not None and instance.id in precomputed:
+            return precomputed[instance.id]
 
         frame_budgets = self.context.get("frame_budgets")
         if frame_budgets is None:
