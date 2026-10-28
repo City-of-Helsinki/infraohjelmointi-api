@@ -166,23 +166,27 @@ class FinancialSumBatchService:
 
     # --------------------------------------------------------------- classes
 
-    def _class_matcher(self, instance_path: str):
-        """Predicate for "this project class falls under the instance"."""
+    def _class_matcher(self, instance_path: str, coordinator_of: dict):
+        """Predicate for "this project class falls under the instance".
+
+        Unknown ids (a class created after the class table was read) never match.
+        """
         classes = self._all_classes()
         prefix = instance_path + "/"
 
         def under(class_id):
-            return class_id is not None and (classes[class_id]["path"] or "").startswith(prefix)
+            row = classes.get(class_id)
+            return row is not None and (row["path"] or "").startswith(prefix)
 
         if not self.for_coordinator:
             def matches(project_class_id, instance_id):
                 return project_class_id == instance_id or under(project_class_id)
             return matches
 
-        coordinator_of = self._coordinator_of(classes)
-
         def matches(project_class_id, instance_id):
-            project_class = classes[project_class_id]
+            project_class = classes.get(project_class_id)
+            if project_class is None:
+                return False
             coordinator = coordinator_of.get(project_class_id)
             if coordinator == instance_id or under(coordinator):
                 return True
@@ -226,7 +230,7 @@ class FinancialSumBatchService:
         for instance in instances:
             if instance.path is None:
                 continue  # per-instance path raises on this; leave it that behaviour
-            matches = self._class_matcher(instance.path)
+            matches = self._class_matcher(instance.path, coordinator_of)
             buckets = [
                 b
                 for class_id, class_buckets in buckets_by_class.items()
@@ -275,7 +279,8 @@ class FinancialSumBatchService:
                 if location_id is None:
                     break
                 ids.append(location_id)
-                location_id = locations[location_id]["parent_id"]
+                location = locations.get(location_id)
+                location_id = location["parent_id"] if location else None
             return ids
 
         if self.for_coordinator:
