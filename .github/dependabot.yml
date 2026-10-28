@@ -3,7 +3,25 @@ updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
       timezone: "Europe/Helsinki"
     target-branch: "develop"
     open-pull-requests-limit: 10
+    groups:
+      # One PR for all minor and patch bumps; majors still get their own PR
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+        # Django feature releases (5.1 -> 5.2) count as "minor" but can break
+        # things; channels is tied to Django. Review these as separate PRs.
+        exclude-patterns:
+          - "django"
+          - "channels"
+    ignore:
+      # Major upgrades of these are planned work, not drive-by bumps
+      - dependency-name: "django"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "channels"
+        update-types: ["version-update:semver-major"]
