@@ -589,7 +589,9 @@ else:
 # django_eventstream/storage.py: EVENT_TIMEOUT = 60 * 24). True real-time
 # cross-pod push would require either Pushpin/GRIP or upgrading to
 # django-eventstream >=5; defer that until traffic warrants it.
-EVENTSTREAM_STORAGE_CLASS = "django_eventstream.storage.DjangoModelStorage"
+#
+# The subclass only replaces the row-by-row expiry trim with one bulk DELETE.
+EVENTSTREAM_STORAGE_CLASS = "infraohjelmointi_api.utils.eventstream_storage.BulkTrimDjangoModelStorage"
 
 # GRIP proxy configuration (optional - not needed for your scale)
 GRIP_URL = env('GRIP_URL', default=None)
