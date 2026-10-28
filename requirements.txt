@@ -1,5 +1,5 @@
 django==4.2.30                                 # web framework itself
-djangorestframework==3.14.0                    # creating rest APIs
+djangorestframework==3.17.2                    # creating rest APIs
 psycopg2-binary==2.9.13                         # postgres database adapter
 requests>=2.32.4
 django-cors-headers==3.13.0
