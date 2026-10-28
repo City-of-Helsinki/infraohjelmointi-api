@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.1](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.12.0...infraohjelmointi-api-v1.12.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* Fixes to construction handover according to testing comments (IO-849) ([#504](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/504)) ([70cb738](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/70cb738d3c5842a55ecfe63102b72b2005c1994c))
+* Invalidate coordinator finance caches when planning finances change (IO-957) ([#501](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/501)) ([fcdd310](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/fcdd3103147e092a7b27d8ea19432046fb9ba683))
+* Use fresh values in finance update events (IO-889) ([476c030](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/476c030d350af9f77a3b9fa4b6e2edaae763d53b))
+
 ## [1.12.0](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.11.0...infraohjelmointi-api-v1.12.0) (2026-10-22)
 
 
