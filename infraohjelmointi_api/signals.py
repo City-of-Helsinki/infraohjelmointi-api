@@ -257,12 +257,7 @@ def get_notified_financial_sums(sender, instance, created, **kwargs):
     # Build the payload outside the try block so serialization bugs in
     # get_financial_sums raise loudly instead of being silently logged as
     # "send_event failed"
-    #
-    # IO-889: the cache invalidation receivers for these models run after this
-    # one (same on_commit queue, registration order), so a cached read here
-    # would put the pre-update sums and frame budgets into the event.
-    with CacheService.bypass_reads():
-        payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
+    payload = get_financial_sums(instance=instance, _type=_type, finance_year=year)
     try:
         send_event("finance", "finance-update", payload)
         logger.debug(
@@ -313,193 +308,6 @@ def get_notified_project(sender, instance, created, update_fields, **kwargs):
                 "send_event failed for project-update (id=%s, year=%s)",
                 instance.pk, year,
             )
-
-
-def _invalidate_hierarchy_with_coordinators(node, model_class):
-    """Invalidate financial sums for node, its ancestors, and every coordinator
-    node (plus ancestors) linked to them via relatedTo."""
-    instance_type = model_class.__name__
-    planning_ids = []
-    while node:
-        planning_ids.append(node.id)
-        node = node.parent
-
-    ids = set(planning_ids)
-    for coordinator in model_class.objects.filter(relatedTo__in=planning_ids):
-        while coordinator:
-            ids.add(coordinator.id)
-            coordinator = coordinator.parent
-
-    for instance_id in ids:
-        CacheService.invalidate_financial_sum(
-            instance_id=instance_id,
-            instance_type=instance_type
-        )
-
-
-@receiver(post_save, sender=ProjectFinancial)
-@receiver(post_delete, sender=ProjectFinancial)
-def invalidate_project_financial_cache(sender, instance, **kwargs):
-    """
-    Invalidate cache when ProjectFinancial is saved or deleted.
-
-    The affected IDs are captured now, while the project row still exists (a
-    cascading project delete removes it before commit), and the invalidation
-    itself is deferred to ``transaction.on_commit`` so a concurrent reader
-    cannot repopulate the cache with pre-commit data.
-    """
-    relations = (
-        Project.objects.filter(pk=instance.project_id)
-        .values("projectClass_id", "projectLocation_id", "projectGroup_id")
-        .first()
-    )
-    if not relations:
-        logger.error(
-            f"Error invalidating cache for ProjectFinancial: project {instance.project_id} not found"
-        )
-        return
-
-    relation_ids = (
-        (ProjectClass, {relations["projectClass_id"]} - {None}),
-        (ProjectLocation, {relations["projectLocation_id"]} - {None}),
-    )
-    group_ids = {relations["projectGroup_id"]} - {None}
-
-    transaction.on_commit(lambda: _invalidate_project_relations(relation_ids, group_ids))
-
-
-@receiver(post_save, sender=ClassFinancial)
-@receiver(post_delete, sender=ClassFinancial)
-@on_transaction_commit
-def invalidate_class_financial_cache(sender, instance, **kwargs):
-    """
-    Invalidate cache when ClassFinancial is saved or deleted.
-
-    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
-    between INVALIDATE and COMMIT.
-    """
-    try:
-        class_relation = instance.classRelation
-
-        # Invalidate cache for this class
-        CacheService.invalidate_financial_sum(
-            instance_id=class_relation.id,
-            instance_type='ProjectClass'
-        )
-
-        # Invalidate parent classes
-        parent = class_relation.parent
-        while parent:
-            CacheService.invalidate_financial_sum(
-                instance_id=parent.id,
-                instance_type='ProjectClass'
-            )
-            parent = parent.parent
-
-        if class_relation.forCoordinatorOnly and class_relation.relatedTo_id:
-            CacheService.invalidate_financial_sum(
-                instance_id=class_relation.relatedTo_id,
-                instance_type='ProjectClass'
-            )
-
-        for year_offset in range(-10, 1):
-            affected_year = instance.year + year_offset
-            if affected_year >= 2000:
-                CacheService.invalidate_frame_budgets(year=affected_year)
-    except Exception as e:
-        logger.error(f"Error invalidating cache for ClassFinancial: {e}")
-
-
-@receiver(post_save, sender=LocationFinancial)
-@receiver(post_delete, sender=LocationFinancial)
-@on_transaction_commit
-def invalidate_location_financial_cache(sender, instance, **kwargs):
-    """
-    Invalidate cache when LocationFinancial is saved or deleted.
-
-    Deferred to ``transaction.on_commit`` to avoid a read/repopulate race
-    between INVALIDATE and COMMIT.
-    """
-    try:
-        location_relation = instance.locationRelation
-
-        # Invalidate cache for this location
-        CacheService.invalidate_financial_sum(
-            instance_id=location_relation.id,
-            instance_type='ProjectLocation'
-        )
-
-        # Invalidate parent locations
-        parent = location_relation.parent
-        while parent:
-            CacheService.invalidate_financial_sum(
-                instance_id=parent.id,
-                instance_type='ProjectLocation'
-            )
-            parent = parent.parent
-
-        if location_relation.forCoordinatorOnly and location_relation.relatedTo_id:
-            CacheService.invalidate_financial_sum(
-                instance_id=location_relation.relatedTo_id,
-                instance_type='ProjectLocation'
-            )
-
-        for year_offset in range(-10, 1):
-            affected_year = instance.year + year_offset
-            if affected_year >= 2000:
-                CacheService.invalidate_frame_budgets(year=affected_year)
-    except Exception as e:
-        logger.error(f"Error invalidating cache for LocationFinancial: {e}")
-
-
-@receiver(pre_save, sender=Project)
-def capture_old_cache_relations(sender, instance, **kwargs):
-    instance._old_cache_relations = (
-        Project.objects.filter(pk=instance.pk)
-        .values("programmed", "projectClass_id", "projectLocation_id", "projectGroup_id")
-        .first()
-    )
-
-
-@receiver(post_save, sender=Project)
-def invalidate_project_cache(sender, instance, created, **kwargs):
-    """
-    Invalidate cache when Project is saved (programmed status or relationships change).
-
-    Deferred to ``transaction.on_commit`` so a concurrent reader cannot
-    repopulate the cache with pre-commit data.
-    """
-    # Snapshot now: the instance may be saved again before commit, overwriting its state.
-    old = getattr(instance, "_old_cache_relations", None) or {}
-    # Sums only include programmed projects, so unprogramming must invalidate too
-    if not (created or instance.programmed or old.get("programmed")):
-        return
-
-    relation_ids = (
-        (ProjectClass, {instance.projectClass_id, old.get("projectClass_id")} - {None}),
-        (ProjectLocation, {instance.projectLocation_id, old.get("projectLocation_id")} - {None}),
-    )
-    group_ids = {instance.projectGroup_id, old.get("projectGroup_id")} - {None}
-
-    transaction.on_commit(lambda: _invalidate_project_relations(relation_ids, group_ids))
-
-
-def _invalidate_project_relations(relation_ids, group_ids):
-    try:
-        for model_class, ids in relation_ids:
-            for node in model_class.objects.filter(pk__in=ids):
-                _invalidate_hierarchy_with_coordinators(node, model_class)
-
-        for group_id in group_ids:
-            CacheService.invalidate_financial_sum(
-                instance_id=group_id,
-                instance_type='ProjectGroup'
-            )
-
-    except Exception as e:
-        logger.error(f"Error invalidating cache for Project: {e}")
-
-
 
 
 @receiver(post_save, sender=Project)
@@ -609,19 +417,29 @@ def _all_subclasses(cls):
         yield from _all_subclasses(sub)
 
 
-def _invalidate_cached_lookup(sender, **kwargs):
-    """Drop the cached list response for ``sender`` after the surrounding
-    transaction commits. Deferring to ``on_commit`` avoids a race where a
-    concurrent request reads the cache between INVALIDATE and COMMIT and
-    re-populates it with the (still-uncommitted, soon-to-be-stale) value.
+def _lookup_invalidator(lookup_names):
+    """Receiver that drops the cached lists in ``lookup_names`` after the
+    surrounding transaction commits. Deferring to ``on_commit`` avoids a race
+    where a concurrent request reads the cache between INVALIDATE and COMMIT
+    and re-populates it with the (still-uncommitted, soon-to-be-stale) value.
     """
-    transaction.on_commit(lambda: CacheService.invalidate_lookup(sender.__name__))
+    names = tuple(sorted(lookup_names))
+
+    def invalidate(sender, **kwargs):
+        def run():
+            for name in names:
+                CacheService.invalidate_lookup(name)
+
+        transaction.on_commit(run)
+
+    return invalidate
 
 
 def _connect_cached_lookup_invalidation():
-    """Wire post_save/post_delete on every CachedLookupViewSet model so that
-    direct ORM mutations (Django shell, admin, management commands, bulk
-    imports) also invalidate the lookup cache.
+    """Wire post_save/post_delete on every CachedLookupViewSet model, and on
+    the models listed in its ``cache_depends_on``, so that direct ORM
+    mutations (Django shell, admin, management commands, bulk imports) also
+    invalidate the lookup cache.
 
     Without this, only ViewSet-driven mutations refresh the cache and
     out-of-band edits stay invisible until the 12 h TTL expires.
@@ -633,23 +451,25 @@ def _connect_cached_lookup_invalidation():
     from infraohjelmointi_api import views  # noqa: F401
     from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
 
-    seen_models = set()
+    lookups_by_model = {}
     for viewset_cls in _all_subclasses(CachedLookupViewSet):
         try:
             model = viewset_cls.serializer_class.Meta.model
         except AttributeError:
             continue
-        if model in seen_models:
-            continue
-        seen_models.add(model)
+        for source in (model, *viewset_cls.cache_depends_on):
+            lookups_by_model.setdefault(source, set()).add(model.__name__)
+
+    for model, lookup_names in lookups_by_model.items():
+        receiver_fn = _lookup_invalidator(lookup_names)
         post_save.connect(
-            _invalidate_cached_lookup,
+            receiver_fn,
             sender=model,
             dispatch_uid=f"cached_lookup_invalidate_save_{model.__name__}",
             weak=False,
         )
         post_delete.connect(
-            _invalidate_cached_lookup,
+            receiver_fn,
             sender=model,
             dispatch_uid=f"cached_lookup_invalidate_delete_{model.__name__}",
             weak=False,

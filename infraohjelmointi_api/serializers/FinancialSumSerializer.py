@@ -12,7 +12,6 @@ from infraohjelmointi_api.services import (
     ClassFinancialService,
     LocationFinancialService,
 )
-from infraohjelmointi_api.services.CacheService import CacheService
 from rest_framework import serializers
 from django.db.models import (
     Sum,
@@ -247,12 +246,11 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def get_finance_sums(self, instance):
         """
         Calculates financial sums for 10 years given a group | location | class instance.
-        Uses caching for performance optimization.
+        List serializers precompute these for every row (FinancialSumListSerializer).
         """
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         forced_to_frame = self.context.get("forcedToFrame", False)
-        for_coordinator = self.context.get("for_coordinator", False)
 
         precomputed = self.context.get(PRECOMPUTED_SUMS_KEY)
         if precomputed is not None and instance.id in precomputed:
@@ -266,39 +264,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(
                 year, for_frame_view=forced_to_frame
             )
-
-        # Coordinator classes/locations should always be cached (best performance benefit)
-        # Planning classes should not be cached (depend on coordinator finances for overlap)
-        use_cache = True
-        if _type == "ProjectClass":
-            # Coordinator classes: always cache
-            if getattr(instance, "forCoordinatorOnly", False):
-                use_cache = True
-            # Planning classes: don't cache (have coordinatorClass attribute)
-            elif getattr(instance, "coordinatorClass", None):
-                use_cache = False
-        elif _type == "ProjectLocation":
-            # Coordinator locations: always cache
-            if getattr(instance, "forCoordinatorOnly", False):
-                use_cache = True
-            # Planning locations: don't cache (have coordinatorLocation attribute)
-            elif getattr(instance, "coordinatorLocation", None):
-                use_cache = False
-        elif _type == "ProjectGroup":
-            use_cache = False
-
-        cached_result = None
-        if use_cache:
-            cached_result = CacheService.get_financial_sum(
-                instance_id=instance.id,
-                instance_type=_type,
-                year=year,
-                for_frame_view=forced_to_frame,
-                for_coordinator=for_coordinator
-            )
-
-        if cached_result is not None:
-            return cached_result
 
         related_projects = self.get_related_projects(instance=instance, _type=_type)
 
@@ -334,16 +299,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         }
         for i in range(11):
             summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
-
-        if use_cache:
-            CacheService.set_financial_sum(
-                instance_id=instance.id,
-                instance_type=_type,
-                year=year,
-                for_frame_view=forced_to_frame,
-                data=summed_finances,
-                for_coordinator=for_coordinator
-            )
 
         return summed_finances
 

@@ -5,8 +5,7 @@ artefacts known internally as "haamuluvut" (ghost numbers). See
 
 Default mode is dry-run: the command prints a CSV report and never writes.
 With ``--apply`` it zeroes the offending rows in place via ``save()`` so
-that the cache-invalidation and event-stream signals defined in
-``signals.py`` fire correctly.
+that the event-stream signals defined in ``signals.py`` fire correctly.
 """
 
 import argparse

@@ -24,11 +24,15 @@ class CachedLookupViewSet(BaseViewSet):
     project_field can be either a single string (one Project FK referencing
     this lookup) or an iterable of strings (multiple FKs, e.g. Person is
     referenced by both `personPlanning` and `personConstruction`).
+
+    cache_depends_on lists other models whose saves and deletes must also drop
+    this cached list, because the serialized rows embed data from them.
     """
 
     preserved_fields = ['value']
     PRESERVED_PHASES = ('completed', 'warrantyPeriod')
     project_field = None
+    cache_depends_on = ()
 
     def get_cache_key_name(self) -> str:
         return self.get_serializer_class().Meta.model.__name__

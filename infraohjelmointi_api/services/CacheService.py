@@ -1,310 +1,119 @@
 """
-CacheService for caching expensive calculations.
-Uses Django's cache framework with Redis in production.
+Caching for lookup lists (phases, categories, persons, programmers, ...).
+
+Lookup lists are read on every app load and change rarely, so their serialized
+``list()`` responses are cached. ``CachedLookupViewSet`` and the model signals
+in ``signals.py`` invalidate them on writes.
+
+Financial sums are not cached: list endpoints compute them in a few batched
+queries (``FinancialSumBatchService``), which is as fast as the old cache was
+and cannot go stale.
+
+A cache failure never fails a request. Errors are logged and read as misses,
+and after one the process leaves the cache alone for ``FAILURE_BACKOFF``
+seconds, so an unreachable Redis costs one socket timeout per process per
+backoff period instead of one per request. Without ``REDIS_URL`` the backend
+is DummyCache and every read misses.
 """
 
-import contextvars
+import functools
 import hashlib
-import json
 import logging
-import sys
 import time
-from contextlib import contextmanager
-from datetime import date
-from typing import Optional, Any, List
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.cache import cache
 
-from .RedisAvailabilityChecker import RedisAvailabilityChecker
-
 logger = logging.getLogger(__name__)
 
-_bypass_reads = contextvars.ContextVar('cache_bypass_reads', default=False)
+# Bump to drop every cached lookup on the next deploy, for a change in what a
+# lookup returns that keeps its field names (field changes are picked up by
+# the fingerprint below automatically).
+LOOKUP_CACHE_EPOCH = 1
+
+
+@functools.cache
+def _lookup_schema_fingerprint() -> str:
+    """Hash of every cached lookup's serializer fields.
+
+    Part of each key, so a deploy that changes a lookup's response shape reads
+    and writes new keys instead of serving the old shape until the TTL runs
+    out, and pods still on the old release during a rolling deploy cannot
+    overwrite the new shape.
+    """
+    # Lazy import: views import this module.
+    from infraohjelmointi_api import views  # noqa: F401
+    from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+
+    def fields(serializer) -> list:
+        nested = getattr(serializer, "child", serializer)
+        if not hasattr(nested, "fields"):
+            return []
+        return sorted(
+            (name, fields(field)) for name, field in nested.fields.items()
+        )
+
+    def subclasses(cls):
+        for sub in cls.__subclasses__():
+            yield sub
+            yield from subclasses(sub)
+
+    shapes = sorted(
+        (viewset.__name__, fields(viewset.serializer_class()))
+        for viewset in subclasses(CachedLookupViewSet)
+        if getattr(viewset, "serializer_class", None)
+    )
+    digest = hashlib.sha256(repr((LOOKUP_CACHE_EPOCH, shapes)).encode()).hexdigest()
+    return digest[:12]
 
 
 class CacheService:
-    """Service for caching expensive calculations with circuit breaker pattern."""
+    LOOKUP_PREFIX = "lookup"
+    CACHE_TIMEOUT = getattr(settings, "CACHE_TIMEOUT", 43200)
+    FAILURE_BACKOFF = 30
 
-    CACHE_TIMEOUT = getattr(settings, 'CACHE_TIMEOUT', 43200)
-    FINANCIAL_SUM_PREFIX = 'financial_sum'
-    FRAME_BUDGET_PREFIX = 'frame_budget'
-    LOOKUP_PREFIX = 'lookup'
+    _skip_until = 0.0
 
-    _cache_failures = 0
-    _cache_disabled_until = 0
-    _max_failures = 3
-    _disable_duration = 300
-    _cache_permanently_disabled = False
-    _last_redis_check = 0
-    _redis_check_interval = 60
-    _last_redis_availability_check = 0
-    _redis_availability_check_interval = 5
+    @classmethod
+    def _lookup_key(cls, table_name: str) -> str:
+        return f"{cls.LOOKUP_PREFIX}:{_lookup_schema_fingerprint()}:{table_name}"
 
-    @staticmethod
-    @contextmanager
-    def bypass_reads():
-        """Make cache reads miss inside the block, so values are computed from the database.
-
-        Writes still happen. Used when a value must reflect the latest committed
-        data even though the invalidation for it has not run yet (e.g. SSE payloads).
-        """
-        token = _bypass_reads.set(True)
+    @classmethod
+    def _run(cls, operation: str, table_name: str, call, default=None):
+        """Run one cache call; on any error log it, back off and return ``default``."""
+        if time.monotonic() < cls._skip_until:
+            return default
         try:
-            yield
-        finally:
-            _bypass_reads.reset(token)
-
-    @staticmethod
-    def _generate_cache_key(prefix: str, *args, **kwargs) -> str:
-        key_data = {'args': args, 'kwargs': sorted(kwargs.items())}
-        key_string = json.dumps(key_data, sort_keys=True, default=str)
-        key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:32]
-        return f"{prefix}:{key_hash}"
-
-    @staticmethod
-    def _is_test_environment() -> bool:
-        return 'test' in sys.argv or (sys.argv and 'pytest' in sys.argv[0])
-
-    @classmethod
-    def _is_cache_disabled(cls) -> bool:
-        cache_backend = settings.CACHES['default']['BACKEND']
-        if 'dummy' in cache_backend.lower():
-            return True
-
-        if cls._is_test_environment() and 'redis' in cache_backend.lower():
-            if not getattr(settings, 'REDIS_AVAILABLE', False):
-                return True
-
-        if cls._cache_permanently_disabled:
-            cls._try_re_enable_cache()
-            if cls._cache_permanently_disabled:
-                return True
-
-        if cls._cache_disabled_until > 0:
-            if time.time() < cls._cache_disabled_until:
-                cls._try_re_enable_cache()
-                return True
-            else:
-                cls._cache_failures = 0
-                cls._cache_disabled_until = 0
-        return False
-
-    @classmethod
-    def disable_cache_permanently(cls):
-        cls._cache_permanently_disabled = True
-        cls._last_redis_check = time.time()
-        logger.warning("Cache permanently disabled - Redis unavailable")
-
-    @classmethod
-    def _check_redis_availability(cls) -> bool:
-        return RedisAvailabilityChecker.is_available()
-
-    @classmethod
-    def _try_re_enable_cache(cls):
-        current_time = time.time()
-        if current_time - cls._last_redis_check < cls._redis_check_interval:
-            return
-
-        cls._last_redis_check = current_time
-
-        if cls._check_redis_availability():
-            cache_backend = settings.CACHES['default']['BACKEND']
-            if 'dummy' in cache_backend.lower():
-                return
-
-            if cls._cache_permanently_disabled or cls._cache_disabled_until > 0:
-                cls._cache_permanently_disabled = False
-                cls._cache_failures = 0
-                cls._cache_disabled_until = 0
-                logger.debug("Redis is back online - cache re-enabled")
-
-    @classmethod
-    def _record_cache_failure(cls):
-        cls._cache_failures += 1
-        if cls._cache_failures >= cls._max_failures:
-            cls._cache_disabled_until = time.time() + cls._disable_duration
-            logger.warning(f"Cache circuit breaker triggered after {cls._cache_failures} failures")
-
-    @classmethod
-    def _record_cache_success(cls):
-        if cls._cache_failures > 0:
-            cls._cache_failures = 0
-
-    @classmethod
-    def _safe_cache_get(cls, cache_key: str) -> Optional[Any]:
-        if _bypass_reads.get() or cls._is_cache_disabled():
-            return None
-
-        cache_backend = settings.CACHES['default']['BACKEND']
-        if 'dummy' in cache_backend.lower():
-            return None
-
-        try:
-            result = cache.get(cache_key)
-            if result is not None:
-                cls._record_cache_success()
-            return result
-        except Exception as e:
-            cls._record_cache_failure()
-            logger.warning(f"Cache get failed: {e}")
-            return None
-
-    @classmethod
-    def _safe_cache_set(cls, cache_key: str, data: Any, timeout: int):
-        if cls._is_cache_disabled():
-            return
-
-        cache_backend = settings.CACHES['default']['BACKEND']
-        if 'dummy' in cache_backend.lower():
-            return
-
-        try:
-            result = cache.set(cache_key, data, timeout)
-            if result:
-                cls._record_cache_success()
-            else:
-                ignore_exceptions = settings.CACHES['default'].get('OPTIONS', {}).get('IGNORE_EXCEPTIONS', False)
-                is_redis = 'redis' in cache_backend.lower()
-
-                if is_redis and ignore_exceptions:
-                    current_time = time.time()
-                    if (current_time - cls._last_redis_availability_check) >= cls._redis_availability_check_interval:
-                        cls._last_redis_availability_check = current_time
-                        if not cls._check_redis_availability():
-                            cls._record_cache_failure()
-                elif 'locmem' not in cache_backend.lower():
-                    cls._record_cache_failure()
-        except Exception as e:
-            cls._record_cache_failure()
-            logger.warning(f"Cache set failed: {e}")
-
-    @classmethod
-    def _safe_cache_delete(cls, cache_key: str) -> None:
-        if cls._is_cache_disabled():
-            return
-
-        cache_backend = settings.CACHES['default']['BACKEND']
-        if 'dummy' in cache_backend.lower():
-            return
-
-        try:
-            cache.delete(cache_key)
+            return call()
         except Exception:
-            pass
+            cls._skip_until = time.monotonic() + cls.FAILURE_BACKOFF
+            logger.warning(
+                "Lookup cache %s failed for %s; skipping the cache for %ss",
+                operation, table_name, cls.FAILURE_BACKOFF, exc_info=True,
+            )
+            return default
 
     @classmethod
-    def get_financial_sum(cls, instance_id: str, instance_type: str, year: int,
-                          for_frame_view: bool, for_coordinator: bool = False) -> Optional[dict]:
-        cache_key = cls._generate_cache_key(
-            cls.FINANCIAL_SUM_PREFIX,
-            instance_id=str(instance_id),
-            instance_type=instance_type,
-            year=year,
-            for_frame_view=for_frame_view,
-            for_coordinator=for_coordinator
+    def get_lookup(cls, table_name: str) -> Optional[Any]:
+        return cls._run("read", table_name, lambda: cache.get(cls._lookup_key(table_name)))
+
+    @classmethod
+    def set_lookup(cls, table_name: str, data: Any) -> None:
+        cls._run(
+            "write", table_name,
+            lambda: cache.set(cls._lookup_key(table_name), data, cls.CACHE_TIMEOUT),
         )
-        return cls._safe_cache_get(cache_key)
-
-    @classmethod
-    def set_financial_sum(cls, instance_id: str, instance_type: str, year: int,
-                          for_frame_view: bool, data: dict,
-                          for_coordinator: bool = False, timeout: Optional[int] = None) -> None:
-        cache_key = cls._generate_cache_key(
-            cls.FINANCIAL_SUM_PREFIX,
-            instance_id=str(instance_id),
-            instance_type=instance_type,
-            year=year,
-            for_frame_view=for_frame_view,
-            for_coordinator=for_coordinator
-        )
-        cls._safe_cache_set(cache_key, data, timeout or cls.CACHE_TIMEOUT)
-
-    @classmethod
-    def get_frame_budgets(cls, year: int, for_frame_view: bool) -> Optional[dict]:
-        cache_key = cls._generate_cache_key(
-            cls.FRAME_BUDGET_PREFIX,
-            year=year,
-            for_frame_view=for_frame_view
-        )
-        return cls._safe_cache_get(cache_key)
-
-    @classmethod
-    def set_frame_budgets(cls, year: int, for_frame_view: bool,
-                          data: dict, timeout: Optional[int] = None) -> None:
-        cache_key = cls._generate_cache_key(
-            cls.FRAME_BUDGET_PREFIX,
-            year=year,
-            for_frame_view=for_frame_view
-        )
-        cls._safe_cache_set(cache_key, data, timeout or cls.CACHE_TIMEOUT)
-
-    @classmethod
-    def invalidate_financial_sum(cls, instance_id: str, instance_type: str) -> None:
-        if cls._is_cache_disabled():
-            return
-
-        try:
-            current_year = date.today().year
-            for year_offset in range(-2, 13):
-                year = current_year + year_offset
-                for for_frame_view in [True, False]:
-                    for for_coordinator in [True, False]:
-                        cache_key = cls._generate_cache_key(
-                            cls.FINANCIAL_SUM_PREFIX,
-                            instance_id=str(instance_id),
-                            instance_type=instance_type,
-                            year=year,
-                            for_frame_view=for_frame_view,
-                            for_coordinator=for_coordinator
-                        )
-                        cls._safe_cache_delete(cache_key)
-        except Exception as e:
-            logger.warning(f"Cache invalidation failed: {e}")
-
-    @classmethod
-    def invalidate_frame_budgets(cls, year: Optional[int] = None) -> None:
-        if cls._is_cache_disabled():
-            return
-
-        try:
-            if year is not None:
-                for for_frame_view in [True, False]:
-                    cache_key = cls._generate_cache_key(
-                        cls.FRAME_BUDGET_PREFIX,
-                        year=year,
-                        for_frame_view=for_frame_view
-                    )
-                    cls._safe_cache_delete(cache_key)
-            else:
-                current_year = date.today().year
-                for year_offset in range(-2, 13):
-                    cls.invalidate_frame_budgets(current_year + year_offset)
-        except Exception as e:
-            logger.warning(f"Cache invalidation failed: {e}")
-
-    @classmethod
-    def clear_all(cls) -> None:
-        if cls._is_cache_disabled():
-            return
-
-        try:
-            cache.clear()
-        except Exception as e:
-            logger.warning(f"Cache clear failed: {e}")
-
-    # Lookup table caching
-    @classmethod
-    def get_lookup(cls, table_name: str) -> Optional[List[dict]]:
-        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
-        return cls._safe_cache_get(cache_key)
-
-    @classmethod
-    def set_lookup(cls, table_name: str, data: List[dict]) -> None:
-        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
-        cls._safe_cache_set(cache_key, data, cls.CACHE_TIMEOUT)
 
     @classmethod
     def invalidate_lookup(cls, table_name: str) -> None:
-        cache_key = f"{cls.LOOKUP_PREFIX}:{table_name}"
-        cls._safe_cache_delete(cache_key)
+        # Not skipped by the backoff: a missed delete can serve a stale list
+        # for up to CACHE_TIMEOUT, so it is always attempted.
+        try:
+            cache.delete(cls._lookup_key(table_name))
+        except Exception:
+            cls._skip_until = time.monotonic() + cls.FAILURE_BACKOFF
+            logger.error(
+                "Lookup cache invalidation failed for %s; the cached list may "
+                "be stale for up to %ss", table_name, cls.CACHE_TIMEOUT, exc_info=True,
+            )

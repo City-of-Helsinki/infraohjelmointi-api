@@ -9,15 +9,10 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
-import concurrent.futures
 import logging
 import os
-import socket
-import sys
-import time
 from os import path
 from pathlib import Path
-from urllib.parse import urlparse
 
 import dj_database_url
 import environ
@@ -432,117 +427,13 @@ LOGGING = {
 }
 
 
-# Caching framework - Redis for production, LocMemCache as fallback
-# Note: logger is already defined at the top of the file
-
-# Get REDIS_URL from environment (docker-compose or .env)
-# Also log what's actually in os.environ to debug docker-compose override
-redis_url_from_os = os.environ.get('REDIS_URL')
-if redis_url_from_os:
-    safe_os_url = redis_url_from_os.split('@')[-1] if '@' in redis_url_from_os else redis_url_from_os
-    logger.info(f"REDIS_URL from os.environ (before env() call): {safe_os_url}")
-else:
-    logger.info("REDIS_URL not in os.environ (before env() call)")
-
+# Caching: Redis when REDIS_URL is set, otherwise DummyCache (every read misses).
+# Only lookup lists are cached, and only through CacheService, which turns any
+# cache error into a logged miss and backs off. IGNORE_EXCEPTIONS stays off so
+# those errors reach it; the short socket timeouts bound what one costs.
 REDIS_URL = env('REDIS_URL', default=None)
-REDIS_AVAILABLE = False
-
 CACHE_TIMEOUT = env('CACHE_TIMEOUT')
 
-
-def _is_test_environment() -> bool:
-    return 'test' in sys.argv or (sys.argv and 'pytest' in sys.argv[0])
-
-
-def check_redis_availability(redis_url: str, max_retries: int = 5, initial_delay: float = 0.5) -> bool:
-    """Check if Redis is available. Uses thread-based timeout in test environments."""
-    parsed = urlparse(redis_url)
-    host = parsed.hostname or 'localhost'
-    port = parsed.port or 6379
-    
-    # In test environments, use single attempt with thread-based timeout
-    # to handle DNS hanging issues when Redis container is stopped
-    if _is_test_environment():
-        def try_connect():
-            try:
-                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                test_socket.settimeout(0.5)
-                result = test_socket.connect_ex((host, port))
-                test_socket.close()
-                return result == 0
-            except Exception:
-                return False
-        
-        # Use ThreadPoolExecutor with timeout to handle DNS hanging
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(try_connect)
-                return future.result(timeout=1.0)  # 1 second total timeout including DNS
-        except (concurrent.futures.TimeoutError, Exception):
-            logger.info("Test environment: Redis check timed out or failed")
-            return False
-    
-    # Production: use normal retry logic
-    retry_delay = initial_delay
-    
-    for attempt in range(max_retries):
-        try:
-            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            test_socket.settimeout(2.0)
-            result = test_socket.connect_ex((host, port))
-            test_socket.close()
-            
-            if result == 0:
-                return True
-        except Exception:
-            pass
-        
-        if attempt < max_retries - 1:
-            time.sleep(retry_delay)
-            retry_delay *= 1.5  # Exponential backoff
-    
-    return False
-
-
-# Configure Redis if URL is provided
-# Skip Redis check for management commands that don't need it (e.g., makemigrations, migrate)
-_skip_redis_check_commands = ['makemigrations', 'migrate', 'showmigrations', 'sqlmigrate', 'sqlflush', 'inspectdb', 'collectstatic', 'check']
-_skip_redis_check = len(sys.argv) > 1 and sys.argv[1] in _skip_redis_check_commands
-
-if REDIS_URL and not _skip_redis_check:
-    # Log the REDIS_URL being used (mask password if present)
-    if '@' in REDIS_URL:
-        safe_url = REDIS_URL.split('@')[-1]
-        logger.info(f"Using REDIS_URL: redis://***@{safe_url}")
-    else:
-        logger.info(f"Using REDIS_URL: {REDIS_URL}")
-    
-    # Test Redis connectivity with retries (for Docker Compose startup timing)
-    # django-redis will handle actual connection and errors gracefully
-    # Use a timeout wrapper to prevent hanging
-    try:
-        REDIS_AVAILABLE = check_redis_availability(REDIS_URL)
-    except Exception as e:
-        logger.warning(f"Redis availability check failed: {e}, assuming unavailable")
-        REDIS_AVAILABLE = False
-    
-    if not REDIS_AVAILABLE:
-        parsed = urlparse(REDIS_URL)
-        host = parsed.hostname or 'localhost'
-        port = parsed.port or 6379
-        logger.debug(f"Redis not immediately available at {host}:{port}, will attempt connection on first use")
-elif REDIS_URL:
-    # For management commands, assume Redis is available (will be checked when actually used)
-    REDIS_AVAILABLE = True
-else:
-    REDIS_AVAILABLE = False
-    if not _skip_redis_check:
-        logger.info("REDIS_URL not configured")
-
-# Configure Redis cache backend if REDIS_URL is provided
-# Always configure Redis backend if URL is set, even if not immediately available
-# django-redis with IGNORE_EXCEPTIONS will handle connection failures gracefully
-# This allows cache to work when Redis becomes available without restart
 if REDIS_URL:
     CACHES = {
         "default": {
@@ -550,32 +441,26 @@ if REDIS_URL:
             "LOCATION": REDIS_URL,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "IGNORE_EXCEPTIONS": True,
                 "SOCKET_CONNECT_TIMEOUT": 1,
                 "SOCKET_TIMEOUT": 1,
                 "CONNECTION_POOL_KWARGS": {
-                    "max_connections": 10,
+                    "max_connections": 50,
                     "retry_on_timeout": False,
-                    "socket_connect_timeout": 1,
-                    "socket_timeout": 1,
                 },
             },
             "KEY_PREFIX": "infraohjelmointi",
-            "TIMEOUT": 60 * 60 * 2,  # 2 hour timeout default
+            "TIMEOUT": CACHE_TIMEOUT,
         }
     }
-
     safe_url = REDIS_URL.split('@')[-1] if '@' in REDIS_URL else REDIS_URL
     logger.info("Redis cache configured: %s", safe_url)
-    if not REDIS_AVAILABLE:
-        logger.info("Redis URL configured but not available at startup - cache will attempt connection on first use")
 else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         }
     }
-    logger.info("Redis not configured - cache disabled (development/local)")
+    logger.info("Redis not configured - cache disabled")
 
 # IO-890: django-eventstream 4.5.x does NOT read EVENTSTREAM_REDIS (that
 # setting was introduced in 5.x). On this version the only cross-pod

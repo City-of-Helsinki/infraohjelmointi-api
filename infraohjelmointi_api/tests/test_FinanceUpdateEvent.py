@@ -12,7 +12,6 @@ from infraohjelmointi_api.models import (
     ProjectFinancial,
     ProjectLocation,
 )
-from infraohjelmointi_api.services.CacheService import CacheService
 from infraohjelmointi_api.signals import get_financial_sums
 
 LOCMEM_CACHE = {
@@ -36,21 +35,11 @@ def _values_of(node, key):
     return found
 
 
-def _force_cache_enabled(test_case):
-    """CacheService's circuit breaker is class-level state, so earlier tests can
-    leave it tripped when Redis is unavailable (as in CI). With the cache off,
-    these tests fail or pass without exercising anything."""
-    patcher = patch.object(CacheService, "_is_cache_disabled", return_value=False)
-    patcher.start()
-    test_case.addCleanup(patcher.stop)
-
-
 @override_settings(CACHES=LOCMEM_CACHE)
 class FinanceUpdateEventTest(TestCase):
     """IO-889: finance-update events must carry the values that were just saved."""
 
     def setUp(self):
-        _force_cache_enabled(self)
         cache.clear()
         self.year = date.today().year
 
@@ -58,8 +47,7 @@ class FinanceUpdateEventTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             financial.save()
 
-        # The invalidation after the save cleared the cache; a regular read
-        # warms it again, like the UI loading the view does.
+        # A regular read first, like the UI loading the view does.
         warm_payload = get_financial_sums(
             instance=financial, _type=model_name, finance_year=self.year
         )
@@ -122,28 +110,3 @@ class FinanceUpdateEventTest(TestCase):
             financial, "ProjectFinancial", "value", "plannedBudget", 1000, 1500
         )
 
-
-class CacheBypassReadsTest(TestCase):
-    @override_settings(CACHES=LOCMEM_CACHE)
-    def setUp(self):
-        _force_cache_enabled(self)
-        cache.clear()
-
-    @override_settings(CACHES=LOCMEM_CACHE)
-    def test_bypass_reads_ignores_cached_values_but_keeps_cache_usable_afterwards(self):
-        CacheService.set_lookup("bypass_test", [{"value": "cached"}])
-
-        with CacheService.bypass_reads():
-            self.assertIsNone(CacheService.get_lookup("bypass_test"))
-
-        self.assertEqual(CacheService.get_lookup("bypass_test"), [{"value": "cached"}])
-
-    @override_settings(CACHES=LOCMEM_CACHE)
-    def test_bypass_reads_is_reset_when_the_block_raises(self):
-        CacheService.set_lookup("bypass_test", [{"value": "cached"}])
-
-        with self.assertRaises(RuntimeError):
-            with CacheService.bypass_reads():
-                raise RuntimeError("boom")
-
-        self.assertEqual(CacheService.get_lookup("bypass_test"), [{"value": "cached"}])
