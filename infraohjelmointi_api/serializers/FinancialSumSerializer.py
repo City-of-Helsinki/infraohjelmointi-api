@@ -25,9 +25,13 @@ PRECOMPUTED_SUMS_KEY = "_precomputed_finance_sums"
 class FinancialSumListSerializer(serializers.ListSerializer):
     """Computes ``finances`` for the whole list up front instead of per row."""
 
+    # Rows of the whole ProjectClass table, if a subclass has already loaded them.
+    class_rows = None
+
     def to_representation(self, data):
         instances = list(data.all() if isinstance(data, BaseManager) else data)
-        if instances:
+        # e.g. the free search lists groups with fields=("id", "name").
+        if instances and "finances" in self.child.fields:
             from infraohjelmointi_api.services.FinancialSumBatchService import (
                 FinancialSumBatchService,
             )
@@ -36,6 +40,7 @@ class FinancialSumListSerializer(serializers.ListSerializer):
                 forced_to_frame=self.context.get("forcedToFrame", False),
                 for_coordinator=self.context.get("for_coordinator", False),
                 frame_budgets=self.context.get("frame_budgets"),
+                class_rows=self.class_rows,
             )
             self.context[PRECOMPUTED_SUMS_KEY] = batch.compute(
                 instances, instances[0]._meta.model.__name__

@@ -29,12 +29,13 @@ YEARS = range(11)
 
 
 class FinancialSumBatchService:
-    def __init__(self, year: int, forced_to_frame: bool, for_coordinator: bool, frame_budgets=None):
+    def __init__(self, year: int, forced_to_frame: bool, for_coordinator: bool,
+                 frame_budgets=None, class_rows=None):
         self.year = year
         self.forced_to_frame = forced_to_frame
         self.for_coordinator = for_coordinator
         self._frame_budgets = frame_budgets
-        self._classes = None
+        self._classes = class_rows
         self._locations = None
 
     def compute(self, instances: list, _type: str) -> dict:
@@ -166,35 +167,45 @@ class FinancialSumBatchService:
 
     # --------------------------------------------------------------- classes
 
-    def _class_matcher(self, instance_path: str, coordinator_of: dict):
-        """Predicate for "this project class falls under the instance".
+    def _class_targets(self, instances: list, coordinator_of: dict):
+        """Function mapping a project class id to the listed instances it falls under.
 
-        Unknown ids (a class created after the class table was read) never match.
+        An instance matches a class that is the instance itself or whose path
+        starts with ``instance.path + "/"`` (IO-928 boundary). Instead of testing
+        every instance, a class looks up the instances sitting at each "/"
+        boundary of its own path. Unknown ids (a class created after the class
+        table was read) never match.
         """
         classes = self._all_classes()
-        prefix = instance_path + "/"
+        listed_ids = {i.id for i in instances}
+        by_path = defaultdict(set)
+        for instance in instances:
+            by_path[instance.path].add(instance.id)
 
-        def under(class_id):
+        def self_or_ancestors(class_id):
+            targets = {class_id} & listed_ids
             row = classes.get(class_id)
-            return row is not None and (row["path"] or "").startswith(prefix)
+            path = (row["path"] or "") if row else ""
+            for i, char in enumerate(path):
+                if char == "/":
+                    targets |= by_path.get(path[:i], set())
+            return targets
 
         if not self.for_coordinator:
-            def matches(project_class_id, instance_id):
-                return project_class_id == instance_id or under(project_class_id)
-            return matches
+            return self_or_ancestors
 
-        def matches(project_class_id, instance_id):
+        def coordinator_targets(project_class_id):
             project_class = classes.get(project_class_id)
             if project_class is None:
-                return False
+                return set()
             coordinator = coordinator_of.get(project_class_id)
-            if coordinator == instance_id or under(coordinator):
-                return True
+            targets = self_or_ancestors(coordinator) if coordinator else set()
             if "suurpiiri" in project_class["name"].lower():
                 parent_coordinator = coordinator_of.get(project_class["parent_id"])
-                return parent_coordinator == instance_id or under(parent_coordinator)
-            return False
-        return matches
+                if parent_coordinator:
+                    targets |= self_or_ancestors(parent_coordinator)
+            return targets
+        return coordinator_targets
 
     def _compute_classes(self, instances: list) -> dict:
         classes = self._all_classes()
@@ -226,17 +237,17 @@ class FinancialSumBatchService:
             if loc["forCoordinatorOnly"] and loc["parentClass_id"]:
                 child_locations[loc["parentClass_id"]].append(loc["id"])
 
+        # The per-instance path raises on a missing path; leave those to it.
+        batchable = [i for i in instances if i.path is not None]
+        targets_of = self._class_targets(batchable, coordinator_of)
+        buckets_by_instance = defaultdict(list)
+        for class_id, class_buckets in buckets_by_class.items():
+            for instance_id in targets_of(class_id):
+                buckets_by_instance[instance_id].extend(class_buckets)
+
         result = {}
-        for instance in instances:
-            if instance.path is None:
-                continue  # per-instance path raises on this; leave it that behaviour
-            matches = self._class_matcher(instance.path, coordinator_of)
-            buckets = [
-                b
-                for class_id, class_buckets in buckets_by_class.items()
-                if matches(class_id, instance.id)
-                for b in class_buckets
-            ]
+        for instance in batchable:
+            buckets = buckets_by_instance[instance.id]
 
             frame_result = self._empty_frame_result()
             source = frame_source[instance.id]
@@ -292,17 +303,17 @@ class FinancialSumBatchService:
 
         group_location = dict(ProjectGroup.objects.values_list("id", "locationRelation_id"))
 
-        buckets = self._project_buckets()
-        bucket_targets = []
-        for bucket in buckets:
-            location_targets = related(bucket["projectLocation_id"]) if bucket["projectLocation_id"] else set()
+        # Only top-level locations carry project sums.
+        top_level_ids = {i.id for i in instances if i.parent_id is None}
+        buckets_by_instance = defaultdict(list)
+        for bucket in self._project_buckets(projectLocation__isnull=False):
+            targets = related(bucket["projectLocation_id"]) & top_level_ids
             group_id = bucket["projectGroup_id"]
-            if group_id is None:
-                group_targets = None  # no group: the group filter always passes
-            else:
+            if group_id is not None:  # no group: the group filter always passes
                 group_loc = group_location.get(group_id)
-                group_targets = related(group_loc) if group_loc else set()
-            bucket_targets.append((bucket, location_targets, group_targets))
+                targets &= related(group_loc) if group_loc else set()
+            for instance_id in targets:
+                buckets_by_instance[instance_id].append(bucket)
 
         frame_source = {}
         for instance in instances:
@@ -316,19 +327,13 @@ class FinancialSumBatchService:
 
         result = {}
         for instance in instances:
-            if instance.parent_id is None:
-                matched = [
-                    b for b, loc_targets, grp_targets in bucket_targets
-                    if instance.id in loc_targets and (grp_targets is None or instance.id in grp_targets)
-                ]
-            else:
-                matched = []  # only top-level locations carry project sums
-
             frame_result = self._empty_frame_result()
             source = frame_source[instance.id]
             if source is not None:
                 self._apply_financial_rows(frame_rows.get(source, {}), frame_result)
-            result[instance.id] = self._assemble(self._sum_buckets(matched), frame_result)
+            result[instance.id] = self._assemble(
+                self._sum_buckets(buckets_by_instance[instance.id]), frame_result
+            )
         return result
 
     # --------------------------------------------------------------- shared
