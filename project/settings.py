@@ -158,7 +158,13 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SOCIAL_AUTH_TUNNISTAMO_SCOPE = env("SOCIAL_AUTH_TUNNISTAMO_SCOPE")
-SESSION_SERIALIZER = "django.contrib.sessions.serializers.PickleSerializer"
+# social_django migration 0020 backfills UserSocialAuth.id_key only for the
+# providers it knows, and tunnistamo is not one of them. Unstamped rows can be
+# refused at login, so this must be in place before that migration runs.
+SOCIAL_AUTH_OLD_ID_KEYS = {"tunnistamo": "sub"}
+# Django 5 removed PickleSerializer. This JSON serializer still round-trips
+# the access-token expiry datetime stored by the helusers social-auth pipeline.
+SESSION_SERIALIZER = "helusers.sessions.TunnistamoOIDCSerializer"
 
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
@@ -264,6 +270,9 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Opt in to the Django 6.0 default for scheme-less URLs in forms.URLField.
+FORMS_URLFIELD_ASSUME_HTTPS = True
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
@@ -366,6 +375,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'project.extensions.CustomTokenAuth.CustomTokenAuth',
     ],
+    # DRF 3.18 defaults this to True, which turns bulk-update validation
+    # errors from a list into an index-keyed object. Kept False so the API
+    # response shape doesn't change with the upgrade. DRF 3.20 removes the
+    # list format, so dependabot holds DRF below 3.20 until that is handled.
+    "LIST_SERIALIZER_ERRORS_AS_DICT": False,
 }
 
 DRF_STANDARDIZED_ERRORS = {"ENABLE_IN_DEBUG_FOR_UNHANDLED_EXCEPTIONS": False}
