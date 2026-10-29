@@ -1,6 +1,6 @@
 import logging
 
-from django.db import migrations
+from django.db import migrations, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,12 @@ def fix_itakeskus_coordinator_paths(apps, schema_editor):
         name__in=COORDINATOR_NAMES, forCoordinatorOnly=True
     ).select_related("parent"):
         parent = project_class.parent
-        if parent is None or not parent.path:
+        if parent is None or not parent.forCoordinatorOnly or not parent.path:
+            print(f"\n  0126: skipped {project_class.name}: no coordinator parent with a path")
             continue
         expected = f"{parent.path}/{project_class.name}"
         if project_class.path == expected:
+            print(f"\n  0126: {project_class.name} already correct")
             continue
 
         # Keep any subtree consistent too (none exists today).
@@ -39,12 +41,15 @@ def fix_itakeskus_coordinator_paths(apps, schema_editor):
                 child.path = f"{expected}/{child.path[len(old_prefix):]}"
                 child.save(update_fields=["path"])
 
+        print(f"\n  0126: {project_class.path} -> {expected}")
         project_class.path = expected
         project_class.save(update_fields=["path"])
         changed = True
 
     if changed:
-        _clear_cached_sums()
+        # After commit, so no pod can re-cache a sum from the old paths
+        # between the clear and the commit.
+        transaction.on_commit(_clear_cached_sums)
 
 
 def _clear_cached_sums():

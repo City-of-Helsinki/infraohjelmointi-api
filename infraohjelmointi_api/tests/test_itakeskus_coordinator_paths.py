@@ -68,9 +68,12 @@ class ItakeskusCoordinatorPathTests(CacheClearingMixin, TestCase):
         fix_migration.fix_itakeskus_coordinator_paths(django_apps, schema_editor=None)
 
     def test_parent_totals_include_itakeskus_after_the_fix(self):
+        # With Redis this also caches the wrong total, as in prod; the cache
+        # clear the migration schedules for commit has to remove it.
         self.assertEqual(self.coordinator_total(self.coordinator_parks), 0)
 
-        self.run_migration()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.run_migration()
 
         self.coordinator_itakeskus.refresh_from_db()
         self.assertEqual(
@@ -107,9 +110,32 @@ class ItakeskusCoordinatorPathTests(CacheClearingMixin, TestCase):
             f"{COORDINATOR_ROOT}/8 08 03 Puistot ja liikunta-alueet",
         )
 
+    def test_cache_is_cleared_only_after_commit(self):
+        with patch("django.core.cache.cache.clear") as clear:
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                self.run_migration()
+            clear.assert_not_called()
+
+            for callback in callbacks:
+                callback()
+        clear.assert_called_once()
+
     def test_cache_failure_does_not_fail_the_migration(self):
         with patch("django.core.cache.cache.clear", side_effect=Exception("Redis down")):
-            self.run_migration()
+            with self.captureOnCommitCallbacks(execute=True):
+                self.run_migration()
 
         self.coordinator_itakeskus.refresh_from_db()
         self.assertTrue(self.coordinator_itakeskus.path.startswith(COORDINATOR_ROOT + "/"))
+
+    def test_skips_a_parent_that_is_not_a_coordinator_class(self):
+        """0092 picked parents by name only; never derive a path from a planning row."""
+        planning_parent = ProjectClass.objects.create(
+            name="Wrong parent", path=f"{PLANNING_ROOT}/Wrong parent"
+        )
+        old_path = self.coordinator_itakeskus.path
+        ProjectClass.objects.filter(id=self.coordinator_itakeskus.id).update(parent=planning_parent)
+
+        self.run_migration()
+
+        self.assertEqual(ProjectClass.objects.get(id=self.coordinator_itakeskus.id).path, old_path)
