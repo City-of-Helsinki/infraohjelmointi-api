@@ -1,3 +1,5 @@
+import functools
+
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework import status
@@ -8,6 +10,37 @@ from infraohjelmointi_api.services.CacheService import CacheService
 from infraohjelmointi_api.models.Project import Project
 from infraohjelmointi_api.models.ProjectPhase import ProjectPhase
 from .BaseViewSet import BaseViewSet
+
+
+def cached_lookup_viewsets():
+    """Every CachedLookupViewSet subclass, at any inheritance depth."""
+    from infraohjelmointi_api import views  # noqa: F401  (registers them all)
+
+    def walk(cls):
+        for sub in cls.__subclasses__():
+            yield sub
+            yield from walk(sub)
+
+    return list(walk(CachedLookupViewSet))
+
+
+@functools.cache
+def lookups_affected_by() -> dict:
+    """{model: names of the cached lookup lists its rows appear in}.
+
+    A lookup model affects its own list and every list whose viewset names it
+    in ``cache_depends_on``.
+    """
+    affected = {}
+    for viewset_cls in cached_lookup_viewsets():
+        model = getattr(getattr(viewset_cls, "serializer_class", None), "Meta", None)
+        model = getattr(model, "model", None)
+        if model is None:
+            continue
+        for source in (model, *viewset_cls.cache_depends_on):
+            affected.setdefault(source, set()).add(model.__name__)
+    return affected
+
 
 class CachedLookupViewSet(BaseViewSet):
     """ViewSet that caches list() responses for lookup tables.
@@ -36,6 +69,12 @@ class CachedLookupViewSet(BaseViewSet):
 
     def get_cache_key_name(self) -> str:
         return self.get_serializer_class().Meta.model.__name__
+
+    def invalidate_cached_lists(self):
+        """Drop this list and every cached list that embeds its rows."""
+        model = self.get_serializer_class().Meta.model
+        for name in lookups_affected_by().get(model, {model.__name__}):
+            CacheService.invalidate_lookup(name)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -75,7 +114,7 @@ class CachedLookupViewSet(BaseViewSet):
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
         if response.status_code == 201:
-            CacheService.invalidate_lookup(self.get_cache_key_name())
+            self.invalidate_cached_lists()
         return response
 
     def _preserve_for_completed_projects(self, instance):
@@ -125,7 +164,7 @@ class CachedLookupViewSet(BaseViewSet):
         response = super().update(request, *args, **kwargs)
         if response.status_code == 200:
             self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
-            CacheService.invalidate_lookup(self.get_cache_key_name())
+            self.invalidate_cached_lists()
         return response
 
     def partial_update(self, request, *args, **kwargs):
@@ -135,7 +174,7 @@ class CachedLookupViewSet(BaseViewSet):
         response = super().partial_update(request, *args, **kwargs)
         if response.status_code == 200:
             self._apply_preservation(self.get_object(), old_snapshot, ids_by_field)
-            CacheService.invalidate_lookup(self.get_cache_key_name())
+            self.invalidate_cached_lists()
         return response
 
     def destroy(self, request, *args, **kwargs):
@@ -176,7 +215,7 @@ class CachedLookupViewSet(BaseViewSet):
             response = super().destroy(request, *args, **kwargs)
 
         if response.status_code == 204:
-            CacheService.invalidate_lookup(self.get_cache_key_name())
+            self.invalidate_cached_lists()
         return response
 
     def _clear_other_reverse_fks(self, instance, skip_fields):
@@ -246,5 +285,5 @@ class CachedLookupViewSet(BaseViewSet):
                     )
                 self.get_queryset().filter(id=item["id"]).update(order=item["order"])
 
-        CacheService.invalidate_lookup(self.get_cache_key_name())
+        self.invalidate_cached_lists()
         return Response({"status": "order updated"}, status=status.HTTP_200_OK)

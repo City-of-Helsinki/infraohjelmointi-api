@@ -6,10 +6,14 @@ copy-paste accident doesn't silently regress us back to in-memory storage
 (which would resurrect the IO-725 / IO-890 cross-pod event-loss bug).
 """
 
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from django_eventstream.storage import DjangoModelStorage
 from django_eventstream.utils import get_storage
+
+from infraohjelmointi_api.utils.eventstream_storage import BulkTrimDjangoModelStorage
 
 
 class EventStreamStorageConfigTest(TestCase):
@@ -56,3 +60,22 @@ class EventStreamTrimTest(TestCase):
             get_storage().trim_event_log()
 
         self.assertEqual(Event.objects.count(), 20)
+
+    def test_sending_an_event_runs_the_bulk_trim(self):
+        """Guards the override against the library renaming or dropping its trim hook."""
+        import datetime
+
+        from django.utils import timezone
+        from django_eventstream.models import Event
+
+        old = Event.objects.create(channel="expired", type="t", data="{}", eid=1)
+        Event.objects.filter(id=old.id).update(created=timezone.now() - datetime.timedelta(days=2))
+
+        with patch.object(
+            BulkTrimDjangoModelStorage, "trim_event_log", autospec=True,
+            side_effect=BulkTrimDjangoModelStorage.trim_event_log,
+        ) as trim:
+            get_storage().append_event("finance", "t", {})
+
+        trim.assert_called_once()
+        self.assertFalse(Event.objects.filter(id=old.id).exists())

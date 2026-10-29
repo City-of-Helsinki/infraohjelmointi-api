@@ -40,11 +40,12 @@ def _lookup_schema_fingerprint() -> str:
     Part of each key, so a deploy that changes a lookup's response shape reads
     and writes new keys instead of serving the old shape until the TTL runs
     out, and pods still on the old release during a rolling deploy cannot
-    overwrite the new shape.
+    overwrite the new shape. The flip side: an edit that lands on an old pod
+    mid-rollout only clears the old key, so the new key can hold the pre-edit
+    list until the edit is repeated or CACHE_TIMEOUT runs out.
     """
     # Lazy import: views import this module.
-    from infraohjelmointi_api import views  # noqa: F401
-    from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+    from infraohjelmointi_api.views.CachedLookupViewSet import cached_lookup_viewsets
 
     def fields(serializer) -> list:
         nested = getattr(serializer, "child", serializer)
@@ -54,14 +55,9 @@ def _lookup_schema_fingerprint() -> str:
             (name, fields(field)) for name, field in nested.fields.items()
         )
 
-    def subclasses(cls):
-        for sub in cls.__subclasses__():
-            yield sub
-            yield from subclasses(sub)
-
     shapes = sorted(
         (viewset.__name__, fields(viewset.serializer_class()))
-        for viewset in subclasses(CachedLookupViewSet)
+        for viewset in cached_lookup_viewsets()
         if getattr(viewset, "serializer_class", None)
     )
     digest = hashlib.sha256(repr((LOOKUP_CACHE_EPOCH, shapes)).encode()).hexdigest()
@@ -107,8 +103,15 @@ class CacheService:
 
     @classmethod
     def invalidate_lookup(cls, table_name: str) -> None:
-        # Not skipped by the backoff: a missed delete can serve a stale list
-        # for up to CACHE_TIMEOUT, so it is always attempted.
+        # Also backed off: a bulk import saving hundreds of rows would otherwise
+        # wait one socket timeout per row while Redis is unreachable. A skipped
+        # or failed delete can leave the list stale for up to CACHE_TIMEOUT.
+        if time.monotonic() < cls._skip_until:
+            logger.error(
+                "Lookup cache invalidation skipped for %s (cache backing off); "
+                "the cached list may be stale for up to %ss", table_name, cls.CACHE_TIMEOUT,
+            )
+            return
         try:
             cache.delete(cls._lookup_key(table_name))
         except Exception:

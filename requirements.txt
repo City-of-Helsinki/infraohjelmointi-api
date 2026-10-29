@@ -18,7 +18,7 @@ Twisted>=26.4.0                                  # daphne dependency package wit
 django-filter                                  # DRF package to add filtering on viewsets
 drf-standardized-errors                        # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
-django-eventstream                             # For server sent events
+django-eventstream==4.5.1                      # For server sent events; utils/eventstream_storage.py overrides its trim
 django-helusers                                # Tunnistamo user inegration
 social-auth-app-django
 drf-yasg                                       # API Swagger documentation

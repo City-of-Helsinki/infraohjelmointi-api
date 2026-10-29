@@ -409,14 +409,6 @@ def _is_valid_sap_project(value: str | None) -> bool:
     return True
 
 
-def _all_subclasses(cls):
-    """Yield every (transitive) subclass of ``cls``. Used to discover all
-    CachedLookupViewSet subclasses regardless of inheritance depth."""
-    for sub in cls.__subclasses__():
-        yield sub
-        yield from _all_subclasses(sub)
-
-
 def _lookup_invalidator(lookup_names):
     """Receiver that drops the cached lists in ``lookup_names`` after the
     surrounding transaction commits. Deferring to ``on_commit`` avoids a race
@@ -446,21 +438,9 @@ def _connect_cached_lookup_invalidation():
     Caveat: queryset-level ``.update()`` / ``.delete()`` bypass these signals
     by design — those callsites must invalidate explicitly.
     """
-    # Force-import the views package so every CachedLookupViewSet subclass is
-    # registered before we walk subclasses.
-    from infraohjelmointi_api import views  # noqa: F401
-    from infraohjelmointi_api.views.CachedLookupViewSet import CachedLookupViewSet
+    from infraohjelmointi_api.views.CachedLookupViewSet import lookups_affected_by
 
-    lookups_by_model = {}
-    for viewset_cls in _all_subclasses(CachedLookupViewSet):
-        try:
-            model = viewset_cls.serializer_class.Meta.model
-        except AttributeError:
-            continue
-        for source in (model, *viewset_cls.cache_depends_on):
-            lookups_by_model.setdefault(source, set()).add(model.__name__)
-
-    for model, lookup_names in lookups_by_model.items():
+    for model, lookup_names in lookups_affected_by().items():
         receiver_fn = _lookup_invalidator(lookup_names)
         post_save.connect(
             receiver_fn,

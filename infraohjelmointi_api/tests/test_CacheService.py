@@ -228,6 +228,23 @@ class CachedLookupViewSetTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_reorder_invalidates_lists_that_embed_the_model(self):
+        """reorder() uses queryset .update(), which fires no signals."""
+        admin_group = ADGroup.objects.create(name='sg_kymp_sso_io_admin', display_name='Admins')
+        self.user.ad_groups.add(admin_group)
+        phase = ProjectPhase.objects.create(value='reorder_dependency_test')
+        CacheService.set_lookup('ProjectPhase', [{'stale': True}])
+        CacheService.set_lookup('ProjectPhaseDetail', [{'stale': True}])
+
+        response = self.client.put(
+            '/project-phases/reorder/', [{"id": phase.id, "order": 5}],
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(CacheService.get_lookup('ProjectPhase'))
+        self.assertIsNone(CacheService.get_lookup('ProjectPhaseDetail'))
+
     def test_reorder_without_permission_returns_403(self):
         """User without correct permissions cannot reorder."""
         # Remove permission group
@@ -330,21 +347,14 @@ class AllLookupViewSetsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(CacheService.get_lookup('TaskStatus'))
 
-    def test_financing_parties_viewset_is_cached_and_has_expected_shape(self):
-        """Test FinancingPartyViewSet response and cache behavior."""
+    def test_financing_parties_viewset_has_expected_shape(self):
+        """FinancingParty is a code enum, served without the cache."""
         response = self.client.get('/financing-parties/')
         self.assertEqual(response.status_code, 200)
 
         expected = [{"id": party.value, "value": party.label} for party in FinancingParty]
         self.assertEqual(response.json(), expected)
 
-        cached = CacheService.get_lookup('FinancingParty')
-        self.assertIsNotNone(cached)
-        self.assertEqual(cached, expected)
-
-        second_response = self.client.get('/financing-parties/')
-        self.assertEqual(second_response.status_code, 200)
-        self.assertEqual(second_response.json(), expected)
 
 
 @override_settings(CACHES=LOCMEM_CACHE)
@@ -395,7 +405,7 @@ class CacheServiceEdgeCasesTest(TestCase):
             with patch.object(cache, operation, side_effect=Exception("Redis error")):
                 call()
 
-    def test_failure_backs_off_reads_and_writes_but_not_invalidation(self):
+    def test_failure_backs_off_reads_writes_and_invalidation(self):
         """An unreachable Redis costs one timeout per backoff, not one per request."""
         self._reset_backoff()
         with patch.object(cache, "get", side_effect=Exception("Redis error")) as failing_get:
@@ -407,7 +417,7 @@ class CacheServiceEdgeCasesTest(TestCase):
             CacheService.set_lookup("ProjectType", [])
             CacheService.invalidate_lookup("ProjectType")
         cache_set.assert_not_called()
-        cache_delete.assert_called_once()
+        cache_delete.assert_not_called()
 
         CacheService._skip_until = 0.0
         with patch.object(cache, "get", return_value=[{"value": "back"}]):
