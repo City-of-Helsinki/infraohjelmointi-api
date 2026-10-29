@@ -14,7 +14,7 @@ coverage==7.17.0                                # for test coverage
 django-simple-history                          # To maintain history of table data
 overrides                                      # Decorators to assert function overrides
 openpyxl                                       # dependency for reading excel files through pandas
-Twisted>=22.4                                  # daphne dependency package with specific version to fix CVE vulnerability
+Twisted>=26.4.0                                  # daphne dependency package with specific version to fix CVE vulnerability
 django-filter                                  # DRF package to add filtering on viewsets
 drf-standardized-errors                        # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
