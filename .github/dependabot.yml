@@ -25,9 +25,16 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "channels"
         update-types: ["version-update:semver-major"]
-      # DRF 3.18+ requires Django 5.2; stay on 3.17.x while we're on Django 4.2
+      # Auth stack majors can change login behaviour (e.g. social-auth-core 6
+      # changed how stored identities are matched).
+      - dependency-name: "social-auth-app-django"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "django-helusers"
+        update-types: ["version-update:semver-major"]
+      # 3.20 removes the list error format kept by
+      # LIST_SERIALIZER_ERRORS_AS_DICT in project/settings.py.
       - dependency-name: "djangorestframework"
-        versions: [">=3.18"]
-      # django-redis 7 requires Django 5.2
-      - dependency-name: "django-redis"
-        versions: [">=7"]
+        versions: [">=3.20"]
+      # 5.x removes EventsConsumer, which project/consumers.py subclasses.
+      - dependency-name: "django-eventstream"
+        versions: [">=5"]

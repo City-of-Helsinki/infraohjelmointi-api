@@ -178,8 +178,11 @@ class ViewEndpointConsistencyTestCase(CacheClearingMixin, TestCase):
             name="Test Planning Class",
             path="001.001",
             forCoordinatorOnly=False,
-            coordinatorClass=self.coordinator_class
         )
+        # coordinatorClass is the reverse side of relatedTo. Django 5 rejects
+        # passing that reverse name to QuerySet.create().
+        self.coordinator_class.relatedTo = self.planning_class
+        self.coordinator_class.save(update_fields=["relatedTo"])
 
         # Create budget scenario that should trigger overlap
         # Only create for coordinator class (model validation requires this)

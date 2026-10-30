@@ -1,5 +1,5 @@
-django==4.2.30                                 # web framework itself
-djangorestframework==3.17.2                    # creating rest APIs
+django==5.2.18                                 # web framework itself
+djangorestframework==3.18.3                    # creating rest APIs
 psycopg2-binary==2.9.13                         # postgres database adapter
 requests>=2.34.2
 django-cors-headers==4.9.0
@@ -11,16 +11,16 @@ pyyaml==6.0.1                                  # yml parser
 whitenoise==6.12.0                              # enabling Django to serve its own static files
 django-storages[azure]==1.14.6                 # IO-812: Azure Blob backend for uploaded files (active only when AZURE_BLOB_STORAGE_* env vars are set)
 coverage==7.17.0                                # for test coverage
-django-simple-history                          # To maintain history of table data
+django-simple-history==3.13.0                  # To maintain history of table data
 overrides                                      # Decorators to assert function overrides
 openpyxl                                       # dependency for reading excel files through pandas
 Twisted>=26.4.0                                  # daphne dependency package with specific version to fix CVE vulnerability
-django-filter                                  # DRF package to add filtering on viewsets
+django-filter==26.2                            # DRF package to add filtering on viewsets
 drf-standardized-errors                        # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
-django-eventstream                             # For server sent events
-django-helusers                                # Tunnistamo user inegration
-social-auth-app-django
+django-eventstream>=4.5.1,<5                   # 5.x removes EventsConsumer; stay on 4.5 until Channels is upgraded
+django-helusers==1.3.0                         # Tunnistamo user inegration
+social-auth-app-django==7.2.0
 drf-yasg                                       # API Swagger documentation
 numpy
 setuptools>=84.2.1                             # not directly required, pinned by Snyk to avoid a vulnerability
@@ -29,6 +29,6 @@ zipp>=3.19.1                                   # not directly required, pinned b
 python-dateutil
 urllib3>=2.8.0                                 # not directly required, pinned by Snyk to avoid a vulnerability
 h11>=0.16.0                                    # not directly required, pinned by Snyk to avoid a vulnerability
-django-redis==6.0.0                            # Redis cache backend for Django
+django-redis==7.0.0                            # Redis cache backend for Django
 redis>=5.0.0                                   # Redis client (for django-eventstream)
-django-resilient-logger>=2.1.0                 # Ship audit logs to Platta's Elastic Cloud (IO-845)
+django-resilient-logger==3.1.0                 # Ship audit logs to Platta's Elastic Cloud (IO-845)
