@@ -35,6 +35,15 @@ def on_transaction_commit(func):
     return inner
 
 
+def _frame_budgets(finance_year, for_frame_view):
+    """One frame-budget map for the whole payload instead of one per serializer."""
+    from infraohjelmointi_api.views.BaseClassLocationViewSet import BaseClassLocationViewSet
+
+    return BaseClassLocationViewSet.build_frame_budgets_context(
+        int(finance_year), for_frame_view=for_frame_view
+    )
+
+
 def get_financial_sums(
     _type: str,
     instance: ClassFinancial | ProjectFinancial | LocationFinancial,
@@ -113,6 +122,7 @@ def get_financial_sums(
     if _type == "ProjectFinancial":
         project = instance.project
         forFrameView = instance.forFrameView
+        frame_budgets = _frame_budgets(finance_year, forFrameView)
         projectRelations = ProjectService.get_project_class_location_group_relations(
             project=project
         )
@@ -133,6 +143,7 @@ def get_financial_sums(
                             or forFrameView,
                             "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
+                            "frame_budgets": frame_budgets,
                         },
                     ).data
 
@@ -146,6 +157,7 @@ def get_financial_sums(
                             or forFrameView,
                             "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
+                            "frame_budgets": frame_budgets,
                         },
                     ).data
                 else:
@@ -158,6 +170,7 @@ def get_financial_sums(
                             or forFrameView,
                             "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
+                            "frame_budgets": frame_budgets,
                         },
                     ).data
 
@@ -166,6 +179,7 @@ def get_financial_sums(
             instance=instance
         )
         forFrameView = instance.forFrameView
+        frame_budgets = _frame_budgets(finance_year, forFrameView)
 
         for viewType, classValues in classRelations.items():
             for classType, classInstance in classValues.items():
@@ -176,6 +190,7 @@ def get_financial_sums(
                             "for_coordinator": viewType == "coordination" or forFrameView,
                             "forcedToFrame": forFrameView,
                             "finance_year": finance_year,
+                            "frame_budgets": frame_budgets,
                         },
                     ).data
 
@@ -186,6 +201,7 @@ def get_financial_sums(
             )
         )
         forFrameView = instance.forFrameView
+        frame_budgets = _frame_budgets(finance_year, forFrameView)
 
         for viewType, instances in locationFinancialRelations.items():
             for instanceType, instance in instances.items():
@@ -197,6 +213,7 @@ def get_financial_sums(
                                 "for_coordinator": viewType == "coordination" or forFrameView,
                                 "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
+                                "frame_budgets": frame_budgets,
                             },
                         ).data
                     else:
@@ -206,6 +223,7 @@ def get_financial_sums(
                                 "for_coordinator": viewType == "coordination" or forFrameView,
                                 "forcedToFrame": forFrameView,
                                 "finance_year": finance_year,
+                                "frame_budgets": frame_budgets,
                             },
                         ).data
 
