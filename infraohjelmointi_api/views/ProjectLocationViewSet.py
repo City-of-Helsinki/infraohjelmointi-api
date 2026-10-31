@@ -1,5 +1,4 @@
 from datetime import date
-from django.db.models import Prefetch
 from infraohjelmointi_api.serializers.ProjectLocationSerializer import (
     ProjectLocationSerializer,
 )
@@ -8,7 +7,6 @@ from infraohjelmointi_api.services import (
     LocationFinancialService,
 )
 from infraohjelmointi_api.models.LocationFinancial import LocationFinancial
-from infraohjelmointi_api.models import Project
 from overrides import override
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -35,19 +33,6 @@ class ProjectLocationViewSet(BaseClassLocationViewSet):
                 'parent__parent',
                 'parent__parent__parent',
                 'parentClass',
-            )
-            .prefetch_related(
-                'coordinatorLocation__finances',
-                Prefetch(
-                    'finances',
-                    queryset=LocationFinancial.objects.filter(forFrameView=False).order_by('year'),
-                ),
-                Prefetch(
-                    'project_set',
-                    queryset=Project.objects.filter(programmed=True)
-                    .select_related('projectLocation')
-                    .prefetch_related('finances'),
-                ),
             )
         )
 

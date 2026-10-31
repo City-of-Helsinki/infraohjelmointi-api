@@ -2,11 +2,13 @@ from infraohjelmointi_api.models import ProjectClass
 from infraohjelmointi_api.serializers import BaseMeta
 from infraohjelmointi_api.serializers.FinancialSumSerializer import (
     FinancialSumSerializer,
+    FinancialSumListSerializer,
 )
 from infraohjelmointi_api.serializers.ProjectProgrammerSerializer import (
     ProjectProgrammerSerializer,
 )
 from infraohjelmointi_api.utils.project_class_utils import get_programmer_from_hierarchy
+from django.db.models.manager import BaseManager
 from rest_framework import serializers
 import re
 import logging
@@ -23,6 +25,43 @@ SUFFIX_PATTERN = re.compile(
 NUMBERING_PATTERN = re.compile(r'^(\d+\s+\d+(?:\s+\d+){0,2})')
 
 
+class ProjectClassListSerializer(FinancialSumListSerializer):
+    """Links every listed class into one in-memory class tree before serializing.
+
+    ``name`` and ``computedDefaultProgrammer`` walk ``parent`` and
+    ``coordinatorClass`` chains, which otherwise costs a query per hop per row.
+    The whole table is small, so it is loaded once and the relation caches are
+    filled the same way ``prefetch_related`` fills them.
+    """
+
+    def to_representation(self, data):
+        instances = list(data.all() if isinstance(data, BaseManager) else data)
+        if instances:
+            tree = link_class_tree(instances)
+            # The finance batch needs the same table; hand it over instead of re-reading it.
+            self.class_rows = {
+                c.id: {
+                    "id": c.id, "name": c.name, "path": c.path, "parent_id": c.parent_id,
+                    "relatedTo_id": c.relatedTo_id, "forCoordinatorOnly": c.forCoordinatorOnly,
+                }
+                for c in tree.values()
+            }
+        return super().to_representation(instances)
+
+
+def link_class_tree(instances):
+    by_id = {c.id: c for c in ProjectClass.objects.select_related("defaultProgrammer")}
+    coordinator_of = {c.relatedTo_id: c for c in by_id.values() if c.relatedTo_id}
+    parent_field = ProjectClass._meta.get_field("parent")
+    coordinator_rel = ProjectClass._meta.get_field("coordinatorClass")
+    for project_class in [*by_id.values(), *instances]:
+        # A parent missing from the table would only happen mid-write; leave it lazy.
+        if project_class.parent_id is None or project_class.parent_id in by_id:
+            parent_field.set_cached_value(project_class, by_id.get(project_class.parent_id))
+        coordinator_rel.set_cached_value(project_class, coordinator_of.get(project_class.id))
+    return by_id
+
+
 class ProjectClassSerializer(FinancialSumSerializer):
     defaultProgrammer = ProjectProgrammerSerializer(read_only=True)
     computedDefaultProgrammer = serializers.SerializerMethodField()
@@ -31,6 +70,7 @@ class ProjectClassSerializer(FinancialSumSerializer):
 
     class Meta(BaseMeta):
         model = ProjectClass
+        list_serializer_class = ProjectClassListSerializer
 
     # -------------------------------------------------------------------------
     # Name transformation helpers (IO-455, IO-758)
