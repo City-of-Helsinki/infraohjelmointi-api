@@ -19,11 +19,11 @@ from infraohjelmointi_api.utils.eventstream_storage import BulkTrimDjangoModelSt
 class EventStreamStorageConfigTest(TestCase):
     """django-eventstream must use a persisted storage backend.
 
-    IO-890: ``django-eventstream==4.5.x`` has no Redis backend; persisted
-    storage is the only mechanism by which an SSE client reconnecting to a
-    different pod can replay events fired on another pod (via the standard
-    ``Last-Event-ID`` header). Without storage every event lives only in the
-    in-process listener queue of the pod that handled the write.
+    IO-890: Redis pub/sub carries events live between processes, but the
+    stored events are what a reconnecting client replays (via the standard
+    ``Last-Event-ID`` header) and what open streams re-read after a Redis
+    reconnect (utils/eventstream_setup.py). Without storage, anything sent
+    while a browser or a subscriber was disconnected would be lost.
     """
 
     def test_storage_is_django_model_storage(self):
@@ -37,8 +37,8 @@ class EventStreamStorageConfigTest(TestCase):
         self.assertIsInstance(
             storage,
             DjangoModelStorage,
-            "Storage backend must be DjangoModelStorage. EVENTSTREAM_REDIS is "
-            "silently ignored by django-eventstream 4.5.x.",
+            "Storage backend must be DjangoModelStorage: the Redis channel only "
+            "carries live events, it keeps nothing for replay.",
         )
 
 

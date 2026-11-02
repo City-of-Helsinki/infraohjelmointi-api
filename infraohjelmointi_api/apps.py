@@ -10,3 +10,7 @@ class InfraohjelmointiApiConfig(AppConfig):
         import infraohjelmointi_api.signals
 
         register_serializer("yml", "django.core.serializers.pyyaml")
+
+        from infraohjelmointi_api.utils import eventstream_setup
+
+        eventstream_setup.install()

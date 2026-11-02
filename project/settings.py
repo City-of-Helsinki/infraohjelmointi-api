@@ -24,9 +24,6 @@ logger = logging.getLogger(__name__)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# asyncronous application for django event stream
-ASGI_APPLICATION = "project.asgi.application"
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
@@ -136,7 +133,6 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "drf_standardized_errors",
-    "channels",
     "django_eventstream",
     "social_django",
     "infraohjelmointi_api",
@@ -472,21 +468,55 @@ else:
     }
     logger.info("Redis not configured - cache disabled")
 
-# IO-890: django-eventstream 4.5.x does NOT read EVENTSTREAM_REDIS (that
-# setting was introduced in 5.x). On this version the only cross-pod
-# mechanism is persisted storage: ``send_event`` writes a DB row and
-# ``get_events`` lets a reconnecting SSE client replay missed events via the
-# standard ``Last-Event-ID`` header. Without storage, every event the signals
-# fired existed only in the in-process listener queue of the pod that handled
-# the write — which is exactly what IO-725 / IO-890 describe.
+# Server-sent events (IO-890). send_event stores every event in the database
+# (DjangoModelStorage), so a reconnecting browser replays what it missed via the
+# Last-Event-ID header. Live delivery to browsers connected to *other* worker
+# processes (two uvicorn workers per pod, several pods) goes through Redis
+# pub/sub when REDIS_URL is set; without it, events only reach browsers
+# connected to the sending process until they reconnect.
 #
 # DjangoModelStorage auto-trims rows older than 24h on every insert (see
-# django_eventstream/storage.py: EVENT_TIMEOUT = 60 * 24). True real-time
-# cross-pod push would require either Pushpin/GRIP or upgrading to
-# django-eventstream >=5; defer that until traffic warrants it.
-#
-# The subclass only replaces the row-by-row expiry trim with one bulk DELETE.
+# django_eventstream/storage.py: EVENT_TIMEOUT = 60 * 24). The subclass only
+# replaces the row-by-row expiry trim with one bulk DELETE.
 EVENTSTREAM_STORAGE_CLASS = "infraohjelmointi_api.utils.eventstream_storage.BulkTrimDjangoModelStorage"
+
+
+def _eventstream_redis_kwargs(redis_url: str) -> dict:
+    """redis.Redis(**kwargs) for django-eventstream, which takes no URL.
+
+    The timeouts and the disabled retries bound send_event, which runs in
+    request threads: an unreachable Redis costs about a second once per
+    backoff period instead of a stalled request (redis-py's default retries
+    took 15 s), and the event is then delivered to this process's streams
+    only. The subscriber replaces both settings; see
+    infraohjelmointi_api/utils/eventstream_setup.py.
+    """
+    from urllib.parse import unquote, urlparse
+
+    from redis.backoff import NoBackoff
+    from redis.retry import Retry
+
+    parsed = urlparse(redis_url)
+    kwargs = {
+        "host": parsed.hostname or "localhost",
+        "port": parsed.port or 6379,
+        "db": int(parsed.path.lstrip("/") or 0),
+        "socket_connect_timeout": 1,
+        "socket_timeout": 2,
+        "socket_keepalive": True,
+        "retry": Retry(NoBackoff(), 0),
+    }
+    if parsed.username:
+        kwargs["username"] = unquote(parsed.username)
+    if parsed.password:
+        kwargs["password"] = unquote(parsed.password)
+    if parsed.scheme == "rediss":
+        kwargs["ssl"] = True
+    return kwargs
+
+
+if REDIS_URL:
+    EVENTSTREAM_REDIS = _eventstream_redis_kwargs(REDIS_URL)
 
 # GRIP proxy configuration (optional - not needed for your scale)
 GRIP_URL = env('GRIP_URL', default=None)
