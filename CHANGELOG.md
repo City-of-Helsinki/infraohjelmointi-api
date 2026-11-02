@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.2](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.12.1...infraohjelmointi-api-v1.12.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* Clear the cache after commit and only trust coordinator parents (IO-822) ([79eb17b](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/79eb17bd83c673cd519ff291f4225cbd118b7441))
+* **deps:** Bump djangorestframework to 3.17.2 for security fixes ([78d94b9](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/78d94b9ab7369b44d6c60ad427e545763567190c))
+* **deps:** Bump djangorestframework to 3.17.2 for security fixes ([2d8553b](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/2d8553b046b79954314957094d17f1256ab13422))
+* Repair the coordinator Itäkeskus class paths (IO-822) ([138b41a](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/138b41a96fd8928c967ed953d3391a450af9fba1))
+
 ## [1.12.1](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.12.0...infraohjelmointi-api-v1.12.1) (2026-10-28)
 
 
