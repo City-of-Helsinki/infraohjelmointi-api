@@ -1,11 +1,11 @@
-django==4.2.26                                 # web framework itself
-djangorestframework==3.14.0                    # creating rest APIs
+django==4.2.30                                 # web framework itself
+djangorestframework==3.17.2                    # creating rest APIs
 psycopg2-binary==2.9.13                         # postgres database adapter
-requests>=2.32.4
-django-cors-headers==3.13.0
+requests>=2.34.2
+django-cors-headers==4.9.0
 django_db_logger==0.1.12
-tzdata==2022.6
-dj_database_url==1.0.0
+tzdata==2026.5
+dj_database_url==3.1.2
 django-environ==0.9.0                          # environment variables utility
 pyyaml==6.0.1                                  # yml parser
 whitenoise==6.12.0                              # enabling Django to serve its own static files
@@ -14,7 +14,7 @@ coverage==7.17.0                                # for test coverage
 django-simple-history                          # To maintain history of table data
 overrides                                      # Decorators to assert function overrides
 openpyxl                                       # dependency for reading excel files through pandas
-Twisted>=22.4                                  # daphne dependency package with specific version to fix CVE vulnerability
+Twisted>=26.4.0                                  # daphne dependency package with specific version to fix CVE vulnerability
 django-filter                                  # DRF package to add filtering on viewsets
 drf-standardized-errors                        # DRF package to standerdize all 5xx and 4xx errors
 channels==3.0.5                                # Prerequisite for django-eventstream
@@ -23,11 +23,11 @@ django-helusers                                # Tunnistamo user inegration
 social-auth-app-django
 drf-yasg                                       # API Swagger documentation
 numpy
-setuptools>=78.1.1                             # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=84.2.1                             # not directly required, pinned by Snyk to avoid a vulnerability
 uvicorn
 zipp>=3.19.1                                   # not directly required, pinned by Snyk to avoid a vulnerability
 python-dateutil
-urllib3>=2.5.0                                 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=2.8.0                                 # not directly required, pinned by Snyk to avoid a vulnerability
 h11>=0.16.0                                    # not directly required, pinned by Snyk to avoid a vulnerability
 django-redis==6.0.0                            # Redis cache backend for Django
 redis>=5.0.0                                   # Redis client (for django-eventstream)

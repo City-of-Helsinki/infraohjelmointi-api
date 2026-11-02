@@ -25,3 +25,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "channels"
         update-types: ["version-update:semver-major"]
+      # DRF 3.18+ requires Django 5.2; stay on 3.17.x while we're on Django 4.2
+      - dependency-name: "djangorestframework"
+        versions: [">=3.18"]
+      # django-redis 7 requires Django 5.2
+      - dependency-name: "django-redis"
+        versions: [">=7"]

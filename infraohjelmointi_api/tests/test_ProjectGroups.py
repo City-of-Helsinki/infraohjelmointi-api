@@ -188,10 +188,11 @@ class ProjectGroupTestCase(TestCase):
         )
 
         errorMessage = response.json()["detail"]
-        # Handle both English and Finnish error messages
+        # Handle both English and Finnish error messages. DRF >= 3.15 passes
+        # Django's get_object_or_404 message through instead of "Not found."
         self.assertIn(
             errorMessage,
-            ["Not found.", "Ei löydy."],
+            ["Not found.", "Ei löydy.", "No Project matches the given query."],
             msg="Should throw error if project is not found in DB",
         )
 
