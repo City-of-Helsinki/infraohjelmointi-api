@@ -25,7 +25,7 @@ drf-yasg                                       # API Swagger documentation
 numpy
 setuptools>=84.2.1                             # not directly required, pinned by Snyk to avoid a vulnerability
 uvicorn
-zipp>=3.19.1                                   # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=4.1.2                                   # not directly required, pinned by Snyk to avoid a vulnerability
 python-dateutil
 urllib3>=2.8.0                                 # not directly required, pinned by Snyk to avoid a vulnerability
 h11>=0.16.0                                    # not directly required, pinned by Snyk to avoid a vulnerability
