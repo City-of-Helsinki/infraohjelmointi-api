@@ -158,10 +158,6 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SOCIAL_AUTH_TUNNISTAMO_SCOPE = env("SOCIAL_AUTH_TUNNISTAMO_SCOPE")
-# social_django migration 0020 backfills UserSocialAuth.id_key only for the
-# providers it knows, and tunnistamo is not one of them. Unstamped rows can be
-# refused at login, so this must be in place before that migration runs.
-SOCIAL_AUTH_OLD_ID_KEYS = {"tunnistamo": "sub"}
 # Django 5 removed PickleSerializer. This JSON serializer still round-trips
 # the access-token expiry datetime stored by the helusers social-auth pipeline.
 SESSION_SERIALIZER = "helusers.sessions.TunnistamoOIDCSerializer"
