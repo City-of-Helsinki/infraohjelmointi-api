@@ -170,25 +170,29 @@ class FinancialSumBatchService:
     def _class_targets(self, instances: list, coordinator_of: dict):
         """Function mapping a project class id to the listed instances it falls under.
 
-        An instance matches a class that is the instance itself or whose path
-        starts with ``instance.path + "/"`` (IO-928 boundary). Instead of testing
-        every instance, a class looks up the instances sitting at each "/"
-        boundary of its own path. Unknown ids (a class created after the class
-        table was read) never match.
+        An instance matches a class that is the instance itself or one of its
+        descendants through ``parent`` links, every class below the instance
+        being of the view's kind (coordinator or planning). Same rule as the
+        per-instance sums; ``path`` is not used, as it can drift from the
+        parent links (IO-960). A class walks up its own parent chain instead of
+        every instance walking down. Unknown ids (a class created after the
+        class table was read) never match.
         """
         classes = self._all_classes()
         listed_ids = {i.id for i in instances}
-        by_path = defaultdict(set)
-        for instance in instances:
-            by_path[instance.path].add(instance.id)
+        kind = bool(self.for_coordinator)
 
         def self_or_ancestors(class_id):
-            targets = {class_id} & listed_ids
-            row = classes.get(class_id)
-            path = (row["path"] or "") if row else ""
-            for i, char in enumerate(path):
-                if char == "/":
-                    targets |= by_path.get(path[:i], set())
+            targets = set()
+            seen = set()
+            while class_id is not None and class_id not in seen:
+                seen.add(class_id)
+                if class_id in listed_ids:
+                    targets.add(class_id)
+                row = classes.get(class_id)
+                if row is None or row["forCoordinatorOnly"] != kind:
+                    break
+                class_id = row["parent_id"]
             return targets
 
         if not self.for_coordinator:

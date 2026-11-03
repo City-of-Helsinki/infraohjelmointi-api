@@ -207,3 +207,61 @@ class FinancialSumBatchEquivalenceTestCase(CacheClearingMixin, TestCase):
                         response = self.client.get(url)
                     self.assertEqual(response.status_code, 200)
                     self.assertLessEqual(len(queries.captured_queries), 10)
+
+
+class FinancialSumBatchHierarchyTestCase(CacheClearingMixin, TestCase):
+    """The batch finds a class's descendants by parent id, not by ``path``,
+    which can drift from the parent links (IO-960: migration 0092 gave the
+    Itäkeskus coordinator classes a path outside their parent's)."""
+
+    year = date.today().year
+
+    def list_totals(self, queryset, for_coordinator):
+        context = {"finance_year": self.year, "for_coordinator": for_coordinator, "forcedToFrame": False}
+        serializer = ProjectClassSerializer(queryset, many=True, context=context)
+        rows = serializer.data
+        self.assertEqual(set(serializer.context[PRECOMPUTED_SUMS_KEY]), {c.id for c in queryset})
+        return {row["name"]: row["finances"]["year0"]["plannedBudget"] for row in rows}
+
+    def add_project(self, project_class):
+        project = Project.objects.create(
+            name=f"Project in {project_class.name}", description="hierarchy",
+            programmed=True, projectClass=project_class,
+        )
+        ProjectFinancial.objects.create(project=project, year=self.year, value=300)
+
+    def test_planning_rows_include_a_child_with_a_drifted_path(self):
+        master = ProjectClass.objects.create(name="8 08 Planning", path="8 08 Planning")
+        parks = ProjectClass.objects.create(
+            name="8 08 03 Parks", parent=master, path="8 08 Planning/8 08 03 Parks"
+        )
+        drifted = ProjectClass.objects.create(
+            name="Itäkeskus", parent=parks, path="Somewhere else/Itäkeskus"
+        )
+        self.add_project(drifted)
+
+        totals = self.list_totals(ProjectClass.objects.filter(forCoordinatorOnly=False), False)
+
+        self.assertEqual(totals, {"8 08 Planning": 300, "8 08 03 Parks": 300, "Itäkeskus": 300})
+
+    def test_coordinator_rows_include_a_child_with_a_drifted_path(self):
+        root = ProjectClass.objects.create(
+            name="8 08 K", path="8 08 K, Khn käytettäväksi", forCoordinatorOnly=True
+        )
+        parks = ProjectClass.objects.create(
+            name="8 08 03 K Parks", parent=root, forCoordinatorOnly=True,
+            path="8 08 K, Khn käytettäväksi/8 08 03 K Parks",
+        )
+        planning = ProjectClass.objects.create(name="Itäkeskus planning", path="Itäkeskus planning")
+        ProjectClass.objects.create(
+            name="8 08 03 12 K Itäkeskus", parent=parks, forCoordinatorOnly=True, relatedTo=planning,
+            # The prefix 0092 wrote, without ", Khn käytettäväksi".
+            path="8 08 K/8 08 03 K Parks/8 08 03 12 K Itäkeskus",
+        )
+        self.add_project(planning)
+
+        totals = self.list_totals(ProjectClass.objects.filter(forCoordinatorOnly=True), True)
+
+        self.assertEqual(
+            totals, {"8 08 K": 300, "8 08 03 K Parks": 300, "8 08 03 12 K Itäkeskus": 300}
+        )
