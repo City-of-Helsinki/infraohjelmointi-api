@@ -4250,6 +4250,49 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             [str(project.id)],
         )
 
+    def test_location_descendants_are_found_by_parent_fk(self):
+        """
+        Regression for IO-961: ProjectLocation descendants must be found by
+        walking `parent` ids, same as ProjectClass (IO-952), so a stray
+        `path` never hides a district's divisions/subDivisions from a
+        hierarchy filter.
+        """
+        district = ProjectLocation.objects.create(
+            name="District for path mismatch",
+            path="District for path mismatch",
+            forCoordinatorOnly=False,
+        )
+        division = district.childLocation.create(
+            name="Division for path mismatch",
+            path="District for path mismatch/Division for path mismatch",
+            forCoordinatorOnly=False,
+        )
+        sub_division = division.childLocation.create(
+            name="SubDivision for path mismatch",
+            # Correct parent FK, but a path that does not start with the
+            # division's path at all.
+            path="Legacy path/with a different prefix",
+            forCoordinatorOnly=False,
+        )
+
+        project = Project.objects.create(
+            name="Project under mismatched location path",
+            description="Regression test project",
+            programmed=True,
+            projectLocation=sub_division,
+        )
+
+        response = self.client.get(
+            "/projects/?district={}&programmed=true".format(district.id),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [result["id"] for result in response.json()["results"]],
+            [str(project.id)],
+        )
+
     def _create_listed_project(self, name, year):
         project = Project.objects.create(
             name=name,

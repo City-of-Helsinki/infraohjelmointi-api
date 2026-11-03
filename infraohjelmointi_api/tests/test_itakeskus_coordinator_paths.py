@@ -1,4 +1,10 @@
-"""Migration 0126 repairs the coordinator Itäkeskus paths written by 0092 (IO-822)."""
+"""Migration 0126 repairs the coordinator Itäkeskus paths written by 0092 (IO-822).
+
+IO-961 made the coordinator/planning sums in FinancialSumSerializer walk
+coordinatorClass/parent ids instead of `path`, so the sums no longer depend on
+this migration having run; it still matters for everything else that reads
+`path` (display, PW export, permission checks).
+"""
 
 import importlib
 from datetime import date
@@ -68,9 +74,10 @@ class ItakeskusCoordinatorPathTests(CacheClearingMixin, TestCase):
         fix_migration.fix_itakeskus_coordinator_paths(django_apps, schema_editor=None)
 
     def test_parent_totals_include_itakeskus_after_the_fix(self):
-        # With Redis this also caches the wrong total, as in prod; the cache
-        # clear the migration schedules for commit has to remove it.
-        self.assertEqual(self.coordinator_total(self.coordinator_parks), 0)
+        # IO-961: sums now walk coordinatorClass/parent ids instead of matching
+        # on `path`, so the mismatched path 0092 wrote no longer hides
+        # Itaekeskus from its parents' totals, even before this migration runs.
+        self.assertEqual(self.coordinator_total(self.coordinator_parks), 300)
 
         with self.captureOnCommitCallbacks(execute=True):
             self.run_migration()
@@ -80,6 +87,9 @@ class ItakeskusCoordinatorPathTests(CacheClearingMixin, TestCase):
             self.coordinator_itakeskus.path,
             f"{COORDINATOR_ROOT}/8 08 03 Puistot ja liikunta-alueet/8 08 03 12 Itäkeskus",
         )
+        # The migration still repairs the stored path for everything else
+        # that reads it (display, PW export, permission checks), and the
+        # totals stay correct afterwards.
         self.assertEqual(self.coordinator_total(self.coordinator_itakeskus), 300)
         self.assertEqual(self.coordinator_total(self.coordinator_parks), 300)
         self.assertEqual(self.coordinator_total(self.coordinator_root), 300)
