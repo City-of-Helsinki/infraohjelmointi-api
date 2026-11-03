@@ -13,6 +13,7 @@ from infraohjelmointi_api.services import (
     LocationFinancialService,
 )
 from infraohjelmointi_api.services.CacheService import CacheService
+from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 from rest_framework import serializers
 from django.db.models import (
     Sum,
@@ -393,7 +394,15 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
             return Project.objects.none()
         if _type == "ProjectClass":
+            # Walk the real parent id chain instead of matching on `path` (IO-961):
+            # `path` is a denormalized string that can drift from the parent
+            # links (see IO-822/IO-960) and silently drop descendants from a
+            # prefix match. `get_self_and_descendant_ids` always reflects the
+            # actual hierarchy.
             if for_coordinator == True:
+                descendant_coordinator_ids = get_self_and_descendant_ids(
+                    ProjectClass, [instance.id], forCoordinatorOnly=True
+                )
                 return (
                     Project.objects.select_related(
                         "projectClass",
@@ -403,36 +412,27 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
                     .prefetch_related("finances")  # CRITICAL: Prevents N+1 queries when aggregating ProjectFinancial
                     .filter(
-                        # IO-928: same trailing-slash boundary as the planning branch.
                         (
                             Q(projectClass__name__icontains="suurpiiri")
-                            & (
-                                Q(projectClass__parent__coordinatorClass=instance)
-                                | Q(
-                                    projectClass__parent__coordinatorClass__path__startswith=instance.path
-                                    + "/"
-                                )
+                            & Q(
+                                projectClass__parent__coordinatorClass__in=descendant_coordinator_ids
                             )
                         )
-                        | Q(projectClass__coordinatorClass=instance)
                         | Q(
-                            projectClass__coordinatorClass__path__startswith=instance.path
-                            + "/"
+                            projectClass__coordinatorClass__in=descendant_coordinator_ids
                         ),
                         programmed=True,
                     )
                 )
             else:
+                descendant_class_ids = get_self_and_descendant_ids(
+                    ProjectClass, [instance.id], forCoordinatorOnly=False
+                )
                 return (
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
                     .filter(
-                        # IO-928: `path` is name-based, so the descendant prefix match
-                        # needs a trailing-slash boundary — without it ".../Malmi" also
-                        # matches the sibling ".../Malminkartano-Kannelmäki" and absorbs
-                        # its projects. Q(projectClass=instance) keeps this class's own.
-                        Q(projectClass__path__startswith=instance.path + "/")
-                        | Q(projectClass=instance),
+                        projectClass_id__in=descendant_class_ids,
                         programmed=True,
                     )
                 )
