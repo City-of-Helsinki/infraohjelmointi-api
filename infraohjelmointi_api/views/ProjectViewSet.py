@@ -895,8 +895,7 @@ class ProjectViewSet(BaseViewSet):
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
         if limit is None:
-            querySetCount = id_queryset.count()
-            limit = querySetCount if querySetCount > 0 else 1
+            limit = id_queryset.count() or 1
 
         if financeYear is not None and not financeYear.isnumeric():
             logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")

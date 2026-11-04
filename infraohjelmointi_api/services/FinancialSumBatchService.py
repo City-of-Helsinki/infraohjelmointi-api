@@ -178,68 +178,53 @@ class FinancialSumBatchService:
         every instance walking down. Unknown ids (a class created after the
         class table was read) never match.
         """
-        classes = self._all_classes()
         listed_ids = {i.id for i in instances}
-        kind = bool(self.for_coordinator)
 
         def self_or_ancestors(class_id):
-            targets = set()
-            seen = set()
-            while class_id is not None and class_id not in seen:
-                seen.add(class_id)
-                if class_id in listed_ids:
-                    targets.add(class_id)
-                row = classes.get(class_id)
-                if row is None or row["forCoordinatorOnly"] != kind:
-                    break
-                class_id = row["parent_id"]
-            return targets
+            return self._listed_self_or_ancestors(class_id, listed_ids)
 
         if not self.for_coordinator:
             return self_or_ancestors
 
         def coordinator_targets(project_class_id):
-            project_class = classes.get(project_class_id)
-            if project_class is None:
-                return set()
-            coordinator = coordinator_of.get(project_class_id)
-            targets = self_or_ancestors(coordinator) if coordinator else set()
-            if "suurpiiri" in project_class["name"].lower():
-                parent_coordinator = coordinator_of.get(project_class["parent_id"])
-                if parent_coordinator:
-                    targets |= self_or_ancestors(parent_coordinator)
-            return targets
+            return self._coordinator_targets(project_class_id, coordinator_of, self_or_ancestors)
         return coordinator_targets
 
-    def _compute_classes(self, instances: list) -> dict:
+    def _listed_self_or_ancestors(self, class_id, listed_ids: set) -> set:
         classes = self._all_classes()
-        locations = self._all_locations()
-        coordinator_of = self._coordinator_of(classes)
+        kind = bool(self.for_coordinator)
+        targets = set()
+        seen = set()
+        while class_id is not None and class_id not in seen:
+            seen.add(class_id)
+            if class_id in listed_ids:
+                targets.add(class_id)
+            row = classes.get(class_id)
+            if row is None or row["forCoordinatorOnly"] != kind:
+                break
+            class_id = row["parent_id"]
+        return targets
+
+    def _coordinator_targets(self, project_class_id, coordinator_of: dict, self_or_ancestors) -> set:
+        """Coordinator rows a planning class's projects count towards: its
+        coordinator twin's, plus its parent's twin's for a suurpiiri class."""
+        project_class = self._all_classes().get(project_class_id)
+        if project_class is None:
+            return set()
+        coordinator = coordinator_of.get(project_class_id)
+        targets = self_or_ancestors(coordinator) if coordinator else set()
+        if "suurpiiri" in project_class["name"].lower():
+            parent_coordinator = coordinator_of.get(project_class["parent_id"])
+            if parent_coordinator:
+                targets |= self_or_ancestors(parent_coordinator)
+        return targets
+
+    def _compute_classes(self, instances: list) -> dict:
+        coordinator_of = self._coordinator_of(self._all_classes())
 
         buckets_by_class = defaultdict(list)
         for bucket in self._project_buckets(projectClass__isnull=False):
             buckets_by_class[bucket["projectClass_id"]].append(bucket)
-
-        # Whose frame data is shown: the coordinator twin in the planning view,
-        # the class itself in the coordinator view.
-        frame_source = {}
-        for instance in instances:
-            if self.for_coordinator and instance.forCoordinatorOnly:
-                frame_source[instance.id] = instance.id
-            else:
-                frame_source[instance.id] = coordinator_of.get(instance.id)
-        frame_rows = self._financial_rows(
-            ClassFinancial, "classRelation_id", {s for s in frame_source.values() if s}
-        )
-
-        child_classes = defaultdict(list)
-        for c in classes.values():
-            if c["forCoordinatorOnly"] and c["parent_id"]:
-                child_classes[c["parent_id"]].append(c["id"])
-        child_locations = defaultdict(list)
-        for loc in locations.values():
-            if loc["forCoordinatorOnly"] and loc["parentClass_id"]:
-                child_locations[loc["parentClass_id"]].append(loc["id"])
 
         # The per-instance path raises on a missing path; leave those to it.
         batchable = [i for i in instances if i.path is not None]
@@ -249,17 +234,27 @@ class FinancialSumBatchService:
             for instance_id in targets_of(class_id):
                 buckets_by_instance[instance_id].extend(class_buckets)
 
-        result = {}
-        for instance in batchable:
-            buckets = buckets_by_instance[instance.id]
+        child_classes, child_locations = self._coordinator_children()
 
-            frame_result = self._empty_frame_result()
-            source = frame_source[instance.id]
-            if source is not None:
-                self._apply_financial_rows(frame_rows.get(source, {}), frame_result)
-                self._apply_overlaps(source, child_classes, child_locations, frame_result)
-            result[instance.id] = self._assemble(self._sum_buckets(buckets), frame_result)
-        return result
+        def apply_overlaps(source, frame_result):
+            self._apply_overlaps(source, child_classes, child_locations, frame_result)
+
+        return self._assemble_all(
+            batchable, buckets_by_instance, ClassFinancial, "classRelation_id",
+            coordinator_of, apply_overlaps,
+        )
+
+    def _coordinator_children(self):
+        """Coordinator classes and locations under each class id."""
+        child_classes = defaultdict(list)
+        for c in self._all_classes().values():
+            if c["forCoordinatorOnly"] and c["parent_id"]:
+                child_classes[c["parent_id"]].append(c["id"])
+        child_locations = defaultdict(list)
+        for loc in self._all_locations().values():
+            if loc["forCoordinatorOnly"] and loc["parentClass_id"]:
+                child_locations[loc["parentClass_id"]].append(loc["id"])
+        return child_classes, child_locations
 
     def _apply_overlaps(self, class_id, child_classes, child_locations, frame_result):
         """Mirror of ``_get_child_relations`` + ``_calculate_budget_overlaps``."""
@@ -283,50 +278,63 @@ class FinancialSumBatchService:
 
     # ------------------------------------------------------------- locations
 
-    def _compute_locations(self, instances: list) -> dict:
+    def _location_chain(self, location_id) -> list:
+        """The location and its two ancestors, as the ORM filter walks them."""
         locations = self._all_locations()
-        coordinator_of = self._coordinator_of(locations)
+        ids = []
+        for _ in range(3):
+            if location_id is None:
+                break
+            ids.append(location_id)
+            location = locations.get(location_id)
+            location_id = location["parent_id"] if location else None
+        return ids
 
-        def chain(location_id):
-            """The location and its two ancestors, as the ORM filter walks them."""
-            ids = []
-            for _ in range(3):
-                if location_id is None:
-                    break
-                ids.append(location_id)
-                location = locations.get(location_id)
-                location_id = location["parent_id"] if location else None
-            return ids
-
+    def _related_locations(self, location_id, coordinator_of: dict) -> set:
+        """Ids a location matches in the per-instance filter: its chain in the
+        planning view, the chain's coordinator twins in the coordinator view."""
+        chain = self._location_chain(location_id)
         if self.for_coordinator:
-            def related(location_id):
-                return {coordinator_of.get(i) for i in chain(location_id)} - {None}
-        else:
-            def related(location_id):
-                return set(chain(location_id))
+            return {coordinator_of.get(i) for i in chain} - {None}
+        return set(chain)
 
+    def _compute_locations(self, instances: list) -> dict:
+        coordinator_of = self._coordinator_of(self._all_locations())
         group_location = dict(ProjectGroup.objects.values_list("id", "locationRelation_id"))
 
         # Only top-level locations carry project sums.
         top_level_ids = {i.id for i in instances if i.parent_id is None}
         buckets_by_instance = defaultdict(list)
         for bucket in self._project_buckets(projectLocation__isnull=False):
-            targets = related(bucket["projectLocation_id"]) & top_level_ids
+            targets = self._related_locations(bucket["projectLocation_id"], coordinator_of)
+            targets &= top_level_ids
             group_id = bucket["projectGroup_id"]
             if group_id is not None:  # no group: the group filter always passes
                 group_loc = group_location.get(group_id)
-                targets &= related(group_loc) if group_loc else set()
+                targets &= self._related_locations(group_loc, coordinator_of) if group_loc else set()
             for instance_id in targets:
                 buckets_by_instance[instance_id].append(bucket)
 
-        frame_source = {}
-        for instance in instances:
-            if self.for_coordinator and instance.forCoordinatorOnly:
-                frame_source[instance.id] = instance.id
-            else:
-                frame_source[instance.id] = coordinator_of.get(instance.id)
+        return self._assemble_all(
+            instances, buckets_by_instance, LocationFinancial, "locationRelation_id",
+            coordinator_of,
+        )
+
+    # --------------------------------------------------------------- shared
+
+    def _assemble_all(self, instances, buckets_by_instance, financial_model, relation_field,
+                      coordinator_of, apply_overlaps=None) -> dict:
+        """Add each instance's frame data to its project sums.
+
+        The frame data comes from the coordinator twin in the planning view and
+        from the instance itself in the coordinator view.
+        """
+        frame_source = {
+            i.id: i.id if self.for_coordinator and i.forCoordinatorOnly else coordinator_of.get(i.id)
+            for i in instances
+        }
         frame_rows = self._financial_rows(
-            LocationFinancial, "locationRelation_id", {s for s in frame_source.values() if s}
+            financial_model, relation_field, {s for s in frame_source.values() if s}
         )
 
         result = {}
@@ -335,12 +343,12 @@ class FinancialSumBatchService:
             source = frame_source[instance.id]
             if source is not None:
                 self._apply_financial_rows(frame_rows.get(source, {}), frame_result)
+                if apply_overlaps:
+                    apply_overlaps(source, frame_result)
             result[instance.id] = self._assemble(
                 self._sum_buckets(buckets_by_instance[instance.id]), frame_result
             )
         return result
-
-    # --------------------------------------------------------------- shared
 
     def _financial_rows(self, model, relation_field: str, relation_ids: set) -> dict:
         """{relation id: {year: (frameBudget, budgetChange)}} for the 11-year window."""
