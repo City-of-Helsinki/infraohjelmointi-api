@@ -222,6 +222,8 @@ OIDC_API_TOKEN_AUTH = {
     # it. Multiple acceptable audiences are supported, so this
     # setting can also be a list of strings. This setting is required.
     "AUDIENCE": env("HELSINKI_TUNNISTUS_AUDIENCE"),
+    # Syncs the user from a token once instead of on every request.
+    "USER_RESOLVER": "infraohjelmointi_api.utils.user_resolver.resolve_user",
 }
 
 from helusers.defaults import SOCIAL_AUTH_PIPELINE
