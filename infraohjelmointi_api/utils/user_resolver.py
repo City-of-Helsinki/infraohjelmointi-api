@@ -50,7 +50,9 @@ def resolve_user(request, payload):
             return user
     finally:
         with _lock:
-            _key_locks.pop(key, None)
+            # A waiter must not drop a lock a later request already replaced it with.
+            if _key_locks.get(key) is key_lock:
+                del _key_locks[key]
 
 
 def clear():
