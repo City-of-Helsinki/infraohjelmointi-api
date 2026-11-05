@@ -6,9 +6,14 @@ import asyncio
 import json
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, override_settings
+from asgiref.sync import sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from django.db import connections
+from django.test import RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
 from django.urls import resolve
 from django_eventstream.event import Event
+from django_eventstream.utils import get_storage
+from django_eventstream import views
 from django_eventstream.views import Listener, events, get_listener_manager
 
 from infraohjelmointi_api.utils import eventstream_setup
@@ -176,6 +181,115 @@ class ResyncingListenerManagerTests(SimpleTestCase):
         self.assertEqual(rereading.channel_items, {})
         rereading.wake_threadsafe.assert_not_called()
 
+    def stream_at(self, manager, position):
+        listener = Listener()
+        listener.channels = {"finance"}
+        listener.wake_threadsafe = Mock()
+        listener.positions = {"finance": position}
+        manager.listeners_by_channel.setdefault("finance", set()).add(listener)
+        return listener
+
+    def test_queues_the_next_event_and_advances_the_position(self):
+        manager = ResyncingListenerManager()
+        stream = self.stream_at(manager, 4)
+
+        manager.add_to_queues("finance", Event("finance", "finance-update", "{}", id="5"))
+
+        self.assertEqual([e.id for e in stream.channel_items["finance"]], ["5"])
+        self.assertEqual(stream.positions["finance"], 5)
+
+    def test_drops_an_event_the_stream_already_has(self):
+        # e.g. a publish that timed out after reaching Redis: the sending
+        # process delivered it locally and then got it from Redis too.
+        manager = ResyncingListenerManager()
+        stream = self.stream_at(manager, 5)
+
+        manager.add_to_queues("finance", Event("finance", "finance-update", "{}", id="5"))
+
+        self.assertEqual(stream.channel_items, {})
+        stream.wake_threadsafe.assert_not_called()
+
+    def test_sends_the_stream_back_to_the_table_on_a_gap(self):
+        manager = ResyncingListenerManager()
+        stream = self.stream_at(manager, 4)
+
+        manager.add_to_queues("finance", Event("finance", "finance-update", "{}", id="6"))
+
+        self.assertTrue(stream.overflow)
+        self.assertEqual(stream.channel_items, {})
+        stream.wake_threadsafe.assert_called_once()
+        self.assertEqual(stream.positions["finance"], 4)
+
+
+class StreamGapTests(TransactionTestCase):
+    """The real stream loop and event table (TransactionTestCase: the loop
+    reads the table on another thread)."""
+
+    def deliveries(self, publish_events, wait_first):
+        """Open a stream, run ``publish_events`` (returns the event to hand to
+        this process's subscriber) and return the event types the stream sent.
+
+        With ``wait_first`` the stream is idle in its wait loop first;
+        otherwise it is still right after its first read.
+        """
+        request = RequestFactory().get("/events/")
+        request.user = AnonymousUser()
+
+        async def scenario():
+            content = events(request, channels=["finance"]).streaming_content
+            try:
+                body = (await anext(content)).decode()  # stream-open
+                if wait_first:
+                    pending = asyncio.ensure_future(anext(content))
+                    await asyncio.sleep(0.3)
+                event = await sync_to_async(publish_events)()
+                # What this process's subscriber does with a published event.
+                get_listener_manager().add_to_queues(
+                    "finance", Event("finance", event.type, event.data, id=str(event.id))
+                )
+                if not wait_first:
+                    # The stream resumes only now and finds the event queued.
+                    pending = asyncio.ensure_future(anext(content))
+                while event.type not in body:
+                    body += (await asyncio.wait_for(pending, 5)).decode()
+                    pending = asyncio.ensure_future(anext(content))
+                pending.cancel()
+            finally:
+                await content.aclose()
+                await sync_to_async(connections.close_all)()
+            return body
+
+        with patch.object(get_listener_manager(), "redis_listener", None):
+            body = asyncio.run(scenario())
+        return [
+            line.removeprefix("event: ") for line in body.splitlines()
+            if line.startswith("event: ") and line not in ("event: stream-open", "event: keep-alive")
+        ]
+
+    @staticmethod
+    def store(event_type):
+        return get_storage().append_event("finance", event_type, json.dumps({}))
+
+    def test_an_event_whose_publish_was_lost_still_reaches_the_stream(self):
+        """One worker's publish fails while Redis stays up for the others: the
+        open stream gets the lost event from the table, before the next one."""
+        def lost_then_healthy():
+            self.store("lost-publish")
+            return self.store("healthy-publish")
+
+        self.assertEqual(
+            self.deliveries(lost_then_healthy, wait_first=True),
+            ["lost-publish", "healthy-publish"],
+        )
+
+    def test_an_event_right_after_the_stream_opens_is_not_lost(self):
+        """The library re-reads when events were queued during a read; without
+        a Last-Event-ID that re-read used to start from "now"."""
+        self.assertEqual(
+            self.deliveries(lambda: self.store("first-event"), wait_first=False),
+            ["first-event"],
+        )
+
 
 class FallbackPublisherTests(SimpleTestCase):
     message = json.dumps({"channel": "finance", "event_type": "finance-update", "data": "{}", "pub_id": "9"})
@@ -214,6 +328,8 @@ class ConnectionReleaseTests(SimpleTestCase):
         from django_eventstream import eventstream
 
         self.assertTrue(getattr(eventstream.get_events, "releases_connections", False))
+        self.assertTrue(getattr(eventstream.get_events, "records_positions", False))
+        self.assertTrue(getattr(views.stream, "links_listener", False))
 
     def test_releases_the_connection_even_when_the_read_fails(self):
         def failing_read(*args, **kwargs):

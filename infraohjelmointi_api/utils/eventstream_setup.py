@@ -14,15 +14,21 @@ Runtime fixes for django-eventstream 5.3 (installed from AppConfig.ready).
    retries so every drop reaches its own loop, resubscribes after a pause, and
    then makes the open streams re-read the event table (the library's
    overflow path: the stream loop re-reads from its last id), so the missed
-   events still arrive. ``ResyncingListenerManager`` keeps live events away
-   from a stream that is about to re-read, so it can't jump past the gap.
+   events still arrive.
 
-3. Publishing. With Redis configured, ``send_event`` only publishes; a failed
+3. Order and gaps. Event ids are consecutive per channel, so
+   ``ResyncingListenerManager`` knows each stream's position: an event that
+   skips ids sends the stream back to the table for the missing ones, and one
+   it already has is dropped. Nothing is lost when a single publish fails while
+   Redis stays up for the other processes (their next event shows the gap),
+   and live events can't jump a stream past events it is about to re-read.
+
+4. Publishing. With Redis configured, ``send_event`` only publishes; a failed
    publish meant even the sending process's own tabs got nothing. Now the
    event is then delivered to this process's streams directly, and publishing
    is skipped for a while so a dead Redis costs one timeout per process per
-   backoff period, not one per event. Other processes get the events from the
-   table when their subscribers reconnect.
+   backoff period, not one per event. Other processes read the skipped events
+   from the table once a later event or their resubscribe reaches them.
 """
 
 import asyncio
@@ -106,12 +112,20 @@ class ReconnectingRedisListener(RedisListener):
 
 
 class ResyncingListenerManager(ListenerManager):
-    """ListenerManager that doesn't queue live events for a re-reading stream.
+    """ListenerManager that delivers every stored event once and in order.
 
-    Same as the library's ``add_to_queues`` (5.3.4) except that listeners with
-    ``overflow`` set are skipped: they are about to re-read the event table,
-    which has the event, and a queued newer event would move their position
-    past events they haven't read yet.
+    Same as the library's ``add_to_queues`` (5.3.4), plus:
+
+    - Listeners with ``overflow`` set are skipped: they are about to re-read
+      the event table, which has the event, and a queued newer event would
+      move their position past events they haven't read yet.
+    - A stream's position (``listener.positions``, recorded by
+      ``recording_positions``) is compared with the event id. Ids are
+      consecutive per channel, so a jump means an event never arrived here,
+      e.g. its publish failed in another process while Redis stayed up for
+      this one; the stream then re-reads the table from its position instead
+      of skipping it. An id at or below the position was delivered already
+      (by a re-read, or both locally and through Redis) and is dropped.
     """
 
     def add_to_queues(self, channel, event):
@@ -119,6 +133,13 @@ class ResyncingListenerManager(ListenerManager):
             wake = []
             for listener in self.listeners_by_channel.get(channel, set()):
                 if listener.overflow:
+                    continue
+                verdict = _check_position(listener, channel, event)
+                if verdict == "delivered":
+                    continue
+                if verdict == "gap":
+                    listener.overflow = True
+                    wake.append(listener)
                     continue
                 items = listener.channel_items.setdefault(channel, [])
                 if len(items) < MAX_PENDING:
@@ -128,6 +149,22 @@ class ResyncingListenerManager(ListenerManager):
                     listener.overflow = True
             for listener in wake:
                 listener.wake_threadsafe()
+
+
+def _check_position(listener, channel, event):
+    """'next', 'gap' or 'delivered' for ``event`` on this stream; 'next' also
+    advances the position. Unknown positions or ids always count as 'next'."""
+    positions = getattr(listener, "positions", None)
+    if not positions or positions.get(channel) is None or event.id is None:
+        return "next"
+    event_id = int(event.id)
+    position = positions[channel]
+    if event_id <= position:
+        return "delivered"
+    if event_id > position + 1:
+        return "gap"
+    positions[channel] = event_id
+    return "next"
 
 
 def resync_open_streams():
@@ -165,7 +202,8 @@ class FallbackPublisher:
                     "SSE publish to Redis failed; delivering to this process only for %ss",
                     PUBLISH_BACKOFF_SECONDS, exc_info=True,
                 )
-        # The event is already stored; other processes re-read it on reconnect.
+        # The event is already stored; other processes read it from the table
+        # when their next event shows the gap (ResyncingListenerManager).
         payload = json.loads(message)
         views.get_listener_manager().add_to_queues(
             payload["channel"],
@@ -191,10 +229,64 @@ def releasing_connections(get_events):
     return wrapper
 
 
+def recording_positions(get_events):
+    """Wrap get_events so a stream's listener knows how far each read got.
+
+    ``linking_listener`` puts the listener on the request. The position is the
+    last event id the read returned, or the channel's current id when it
+    returned none: where the stream loop continues from.
+
+    The position also goes on the request right away. The library only stores
+    it there when the stream starts waiting, so the re-read it does when events
+    were queued during a read started from the request's original ids; for a
+    browser that connected without Last-Event-ID that meant "from now", and
+    those queued events were lost.
+    """
+    if getattr(get_events, "records_positions", False):
+        return get_events
+
+    @functools.wraps(get_events)
+    def wrapper(request, *args, **kwargs):
+        response = get_events(request, *args, **kwargs)
+        listener = getattr(request, "listener", None)
+        if listener is not None:
+            positions = {}
+            for channel in request.channels:
+                items = response.channel_items.get(channel) or []
+                last_id = items[-1].id if items else response.channel_last_ids.get(channel)
+                positions[channel] = int(last_id) if last_id is not None else None
+            with views.get_listener_manager().lock:
+                listener.positions = positions
+            request.channel_last_ids = {
+                channel: str(position) for channel, position in positions.items()
+                if position is not None
+            }
+        return response
+
+    wrapper.records_positions = True
+    return wrapper
+
+
+def linking_listener(stream):
+    """Wrap the view's stream() so get_events can find the request's listener."""
+    if getattr(stream, "links_listener", False):
+        return stream
+
+    @functools.wraps(stream)
+    def wrapper(event_request, listener):
+        event_request.listener = listener
+        return stream(event_request, listener)
+
+    wrapper.links_listener = True
+    return wrapper
+
+
 def install():
     """Called from AppConfig.ready, before any stream starts."""
-    # The stream loop imports get_events from this module on every call.
-    eventstream.get_events = releasing_connections(eventstream.get_events)
+    # The stream loop imports get_events from this module on every call, and
+    # the events view looks stream up in its module on every request.
+    eventstream.get_events = releasing_connections(recording_positions(eventstream.get_events))
+    views.stream = linking_listener(views.stream)
 
     if not isinstance(views.listener_manager, ResyncingListenerManager):
         manager = ResyncingListenerManager()
