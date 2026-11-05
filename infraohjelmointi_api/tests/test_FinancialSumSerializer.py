@@ -2,7 +2,6 @@ from django.test import TestCase
 from datetime import date
 from collections import defaultdict
 import uuid
-from unittest.mock import patch
 
 from infraohjelmointi_api.models import (
     ProjectClass,
@@ -110,10 +109,8 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
             "Should not show budget overlap when children sum equals parent budget (TSE-2028 scenario)"
         )
 
-    @patch("infraohjelmointi_api.serializers.FinancialSumSerializer.CacheService.set_financial_sum")
-    @patch("infraohjelmointi_api.serializers.FinancialSumSerializer.CacheService.get_financial_sum")
-    def test_project_group_finance_sums_bypass_cache(self, mock_get_financial_sum, mock_set_financial_sum):
-        """Regression test: ProjectGroup sums must be calculated fresh and bypass cache."""
+    def test_project_group_finance_sums(self):
+        """ProjectGroup sums include the group's programmed projects."""
         year = date.today().year
 
         project_group = ProjectGroup.objects.create(name="Group A")
@@ -130,11 +127,6 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
             forFrameView=False,
         )
 
-        mock_get_financial_sum.return_value = {
-            "year0": {"plannedBudget": 999999},
-            "year": year,
-        }
-
         serializer = FinancialSumSerializer(
             context={
                 "finance_year": year,
@@ -147,8 +139,6 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
         result = serializer.get_finance_sums(project_group)
 
         self.assertEqual(result["year0"]["plannedBudget"], 1234)
-        mock_get_financial_sum.assert_not_called()
-        mock_set_financial_sum.assert_not_called()
 
     def test_planning_masterclass_sums_descendant_projects_across_deep_levels(self):
         """Regression: masterclass planning sums must include projects deeper than 2 levels."""

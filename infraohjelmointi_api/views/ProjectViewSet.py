@@ -30,7 +30,6 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
-    CacheService,
     ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
@@ -98,6 +97,43 @@ class ProjectFilter(django_filters.FilterSet):
             "personConstruction": ["exact"],
         }
         model = Project
+
+
+# Relations ProjectGetSerializer renders, loaded with the project rows.
+PROJECT_LIST_RELATIONS = (
+    "projectClass",
+    "projectLocation",
+    "lock",
+    "phase",
+    "category",
+    "personPlanning",
+    "personConstruction",
+    "personProgramming",
+    "budgetOverrunReason",
+    "siteId",
+    "projectSet",
+    "area",
+    "type",
+    "typeQualifier",
+    "priority",
+    "phaseDetail__projectPhase",
+    "suspendedFromPhase",
+    "constructionProcurementMethod",
+    "staraProcurementReason",
+    "riskAssessment",
+    "constructionPhase",
+    "planningPhase",
+    "projectQualityLevel",
+    "responsibleZone",
+)
+COORDINATOR_LIST_RELATIONS = (
+    "projectClass__coordinatorClass",
+    "projectLocation__coordinatorLocation",
+    "projectClass__parent__coordinatorClass",
+    "projectLocation__parent__coordinatorLocation",
+    "projectLocation__parent__parent__coordinatorLocation",
+)
+PROJECT_LIST_PREFETCHES = ("favPersons", "hashTags", "otherPersons")
 
 
 class ProjectViewSet(BaseViewSet):
@@ -273,26 +309,6 @@ class ProjectViewSet(BaseViewSet):
 
                     if update_finances:
                         ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
-
-                # Invalidate cache for all affected projects (bulk operations bypass signals)
-                affected_project_ids = {f.project_id for f in finance_instances}
-                for project_id in affected_project_ids:
-                    affected_project = Project.objects.get(id=project_id)
-                    if affected_project.projectClass:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectClass.id,
-                            instance_type='ProjectClass'
-                        )
-                    if affected_project.projectLocation:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectLocation.id,
-                            instance_type='ProjectLocation'
-                        )
-                    if affected_project.projectGroup:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectGroup.id,
-                            instance_type='ProjectGroup'
-                        )
 
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
@@ -868,34 +884,18 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
-        # Preload the relations ProjectGetSerializer renders as nested objects to avoid per-project queries
-        queryset = (
-            self.filter_queryset(self.get_queryset(for_coordinator=for_coordinator))
-            .select_related(
-                "siteId",
-                "projectSet",
-                "area",
-                "type",
-                "typeQualifier",
-                "priority",
-                "phaseDetail__projectPhase",
-                "suspendedFromPhase",
-                "constructionProcurementMethod",
-                "staraProcurementReason",
-                "riskAssessment",
-                "constructionPhase",
-                "planningPhase",
-                "projectQualityLevel",
-                "responsibleZone",
-            )
-            .prefetch_related("otherPersons")
-        )
+        # Two steps: the filter picks the page's project ids, then only those rows
+        # are loaded with the relations ProjectGetSerializer renders. As one
+        # query, Postgres spent 1.5-3 s *planning* the ~30 relation joins on top
+        # of the filter's joins (executing it took ~15 ms); by id it plans in ms.
+        id_queryset = self.filter_queryset(
+            self.get_queryset(for_coordinator=for_coordinator)
+        ).values_list("id", flat=True)
 
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
         if limit is None:
-            querySetCount = queryset.count()
-            limit = querySetCount if querySetCount > 0 else 1
+            limit = id_queryset.count() or 1
 
         if financeYear is not None and not financeYear.isnumeric():
             logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")
@@ -904,10 +904,15 @@ class ProjectViewSet(BaseViewSet):
         # pagination
         paginator = PageNumberPagination()
         paginator.page_size = limit
-        page = paginator.paginate_queryset(queryset, request)
-        project_ids = (
-            [project.id for project in page] if page is not None else queryset.values("id")
-        )
+        id_page = paginator.paginate_queryset(id_queryset, request)
+        project_ids = list(id_page) if id_page is not None else list(id_queryset)
+
+        relations = PROJECT_LIST_RELATIONS + (COORDINATOR_LIST_RELATIONS if for_coordinator else ())
+        rows = Project.objects.select_related(*relations).prefetch_related(
+            *PROJECT_LIST_PREFETCHES
+        ).in_bulk(project_ids)
+        queryset = [rows[project_id] for project_id in project_ids if project_id in rows]
+        page = queryset if id_page is not None else None
 
         year = date.today().year if financeYear == None else int(financeYear)
         finances = ProjectFinancialSerializer(
@@ -1379,11 +1384,6 @@ class ProjectViewSet(BaseViewSet):
         if update_location_finances:
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
-
-        for year_offset in range(-2, 13):
-            year = current_year + year_offset
-            CacheService.invalidate_frame_budgets(year=year)
-        CacheService.clear_all()
 
         forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
 

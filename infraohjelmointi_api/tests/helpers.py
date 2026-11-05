@@ -7,18 +7,11 @@ class CacheClearingMixin:
     """
     Clear the process-global Django cache before each test.
 
-    IO-890: cache invalidation signals (see ``signals.invalidate_*_cache``)
-    are deferred to ``transaction.on_commit``. Inside Django's ``TestCase``
-    the surrounding transaction is rolled back rather than committed, so
-    those callbacks never fire. Without an explicit clear, financial-sum
-    and frame-budget cache entries written by one test persist into the
-    next test's process and appear as stale data keyed by the previous
-    test's instance IDs.
-
-    Mix this in for any test class that exercises a code path through
-    ``CacheService`` (directly or via signals firing on
-    ``ClassFinancial`` / ``LocationFinancial`` / ``ProjectFinancial`` /
-    ``Project`` saves).
+    Lookup-cache invalidation (see ``signals._lookup_invalidator``) is
+    deferred to ``transaction.on_commit``. Inside Django's ``TestCase`` the
+    surrounding transaction is rolled back rather than committed, so those
+    callbacks never fire. Without an explicit clear, lookup lists cached by
+    one test persist into the next.
 
     Usage::
 
@@ -39,4 +32,9 @@ class CacheClearingMixin:
 
     def setUp(self):
         cache.clear()
+        # A backoff tripped by an earlier test would make this one read misses.
+        from infraohjelmointi_api.services.CacheService import CacheService
+
+        CacheService._skip_until = 0.0
+        CacheService._pending_invalidations.clear()
         super().setUp()

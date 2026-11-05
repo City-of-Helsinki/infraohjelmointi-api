@@ -1,4 +1,4 @@
-from infraohjelmointi_api.models import ProjectDistrict
+from infraohjelmointi_api.models import ProjectClass, ProjectDistrict, ProjectProgrammer
 from infraohjelmointi_api.serializers.ProjectDistrictSerializer import (
     ProjectDistrictSerializer,
 )
@@ -10,13 +10,9 @@ class ProjectDistrictViewSet(CachedLookupViewSet):
     """API endpoint for project districts (cached)."""
 
     serializer_class = ProjectDistrictSerializer
-
-    # Bump on response-shape changes so post-deploy clients hit a cold cache
-    # instead of stale Redis entries missing computedDefaultProgrammer (IO-411).
-    _CACHE_KEY_VERSION = "v2-io411"
-
-    def get_cache_key_name(self) -> str:
-        return f"{super().get_cache_key_name()}:{self._CACHE_KEY_VERSION}"
+    # computedDefaultProgrammer (IO-411) comes from the programmer-view classes'
+    # defaultProgrammer.
+    cache_depends_on = (ProjectClass, ProjectProgrammer)
 
     def get_queryset(self):
         # Pre-load the parent chain (district → division → subDivision) so
