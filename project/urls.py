@@ -15,6 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+import django_eventstream
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import routers
@@ -242,6 +243,8 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    # Server-sent events for live finance and project updates (IO-890).
+    path("events/", include(django_eventstream.urls), {"channels": ["finance", "project"]}),
     path("", include(router.urls)),
     path("", include(apirouter.urls)),
     path("admin/planning-excel-uploader", admin_views.ExcelFormView.as_view()),

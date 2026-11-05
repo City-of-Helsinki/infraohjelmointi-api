@@ -15,15 +15,14 @@ updates:
           - "minor"
           - "patch"
         # Django feature releases (5.1 -> 5.2) count as "minor" but can break
-        # things; channels is tied to Django. Review these as separate PRs.
+        # things, and utils/eventstream_setup.py relies on django-eventstream
+        # internals. Review these as separate PRs.
         exclude-patterns:
           - "django"
-          - "channels"
+          - "django-eventstream"
     ignore:
       # Major upgrades of these are planned work, not drive-by bumps
       - dependency-name: "django"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "channels"
         update-types: ["version-update:semver-major"]
       # Auth stack majors can change login behaviour. social-auth-app-django 7
       # needs social-auth-core 6.2, which calls get_remote_jwks_keys(uri) while
@@ -39,6 +38,6 @@ updates:
       # LIST_SERIALIZER_ERRORS_AS_DICT in project/settings.py.
       - dependency-name: "djangorestframework"
         versions: [">=3.20"]
-      # 5.x removes EventsConsumer, which project/consumers.py subclasses.
+      # utils/eventstream_setup.py subclasses its RedisListener; review majors.
       - dependency-name: "django-eventstream"
-        versions: [">=5"]
+        update-types: ["version-update:semver-major"]
