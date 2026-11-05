@@ -160,6 +160,22 @@ class ReconnectingRedisListenerTests(SimpleTestCase):
         # ...and the reconnected subscription delivers live events again.
         self.assertEqual([e.type for e in stream.channel_items["finance"]], ["finance-update"])
 
+    def test_a_resync_message_makes_open_streams_reread(self):
+        subscriber = ReconnectingRedisListener()
+        subscriber.pubsub = FakePubSub([
+            {"type": "message", "data": eventstream_setup.RESYNC_MESSAGE},
+            ConnectionError("stop the loop"),
+        ])
+
+        with patch.object(eventstream_setup, "resync_open_streams") as resync, \
+                patch.object(get_listener_manager(), "add_to_queues") as queue, \
+                self.assertRaises(ConnectionError):
+            asyncio.run(subscriber.listen())
+
+        # Once after subscribing, once for the message, which is not an event.
+        self.assertEqual(resync.call_count, 2)
+        queue.assert_not_called()
+
 
 class ResyncingListenerManagerTests(SimpleTestCase):
     def test_is_installed(self):
@@ -310,6 +326,7 @@ class FallbackPublisherTests(SimpleTestCase):
         publisher = FallbackPublisher(client)
 
         with patch.object(get_listener_manager(), "add_to_queues") as local, \
+                patch.object(eventstream_setup.threading, "Timer") as timer, \
                 self.assertLogs(eventstream_setup.logger, "WARNING"):
             publisher.publish("events_channel", self.message)
             publisher.publish("events_channel", self.message)
@@ -319,6 +336,45 @@ class FallbackPublisherTests(SimpleTestCase):
         self.assertEqual(local.call_count, 2)
         channel, event = local.call_args.args
         self.assertEqual((channel, event.type, event.id), ("finance", "finance-update", "9"))
+        # The resync that ends the backoff is scheduled once.
+        timer.assert_called_once_with(eventstream_setup.PUBLISH_BACKOFF_SECONDS, publisher.announce_resync)
+        timer.return_value.start.assert_called_once()
+
+    def test_tells_every_process_to_reread_when_the_backoff_ends(self):
+        """Without it, a lost last event would only reach other processes'
+        tabs with the next event on its channel, maybe hours later."""
+        client = Mock()
+        client.publish.side_effect = [ConnectionError("Redis down"), 1, 1]
+        publisher = FallbackPublisher(client)
+
+        with patch.object(get_listener_manager(), "add_to_queues"), \
+                patch.object(eventstream_setup.threading, "Timer"), \
+                self.assertLogs(eventstream_setup.logger, "WARNING"):
+            publisher.publish("events_channel", self.message)
+        publisher.announce_resync()
+        publisher.publish("events_channel", self.message)
+
+        self.assertEqual(
+            [c.args for c in client.publish.call_args_list],
+            [
+                ("events_channel", self.message),
+                ("events_channel", eventstream_setup.RESYNC_MESSAGE),
+                # The backoff is over, so events are published again.
+                ("events_channel", self.message),
+            ],
+        )
+
+    def test_retries_the_resync_while_redis_is_down(self):
+        client = Mock()
+        client.publish.side_effect = ConnectionError("Redis down")
+        publisher = FallbackPublisher(client)
+
+        with patch.object(eventstream_setup.threading, "Timer") as timer, \
+                self.assertLogs(eventstream_setup.logger, "WARNING"):
+            publisher.announce_resync()
+
+        timer.assert_called_once_with(eventstream_setup.PUBLISH_BACKOFF_SECONDS, publisher.announce_resync)
+        self.assertGreater(publisher.skip_until, 0)
 
 
 class ConnectionReleaseTests(SimpleTestCase):

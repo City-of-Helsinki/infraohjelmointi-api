@@ -19,16 +19,18 @@ Runtime fixes for django-eventstream 5.3 (installed from AppConfig.ready).
 3. Order and gaps. Event ids are consecutive per channel, so
    ``ResyncingListenerManager`` knows each stream's position: an event that
    skips ids sends the stream back to the table for the missing ones, and one
-   it already has is dropped. Nothing is lost when a single publish fails while
-   Redis stays up for the other processes (their next event shows the gap),
-   and live events can't jump a stream past events it is about to re-read.
+   it already has is dropped, and live events can't jump a stream past events
+   it is about to re-read.
 
 4. Publishing. With Redis configured, ``send_event`` only publishes; a failed
    publish meant even the sending process's own tabs got nothing. Now the
    event is then delivered to this process's streams directly, and publishing
    is skipped for a while so a dead Redis costs one timeout per process per
-   backoff period, not one per event. Other processes read the skipped events
-   from the table once a later event or their resubscribe reaches them.
+   backoff period, not one per event. When the backoff ends the process
+   publishes a resync message, and every process's open streams re-read the
+   table for the events it couldn't publish. Without it they would only notice
+   when a later event on the same channel showed the gap, which for the last
+   edit of a session can be hours.
 """
 
 import asyncio
@@ -37,6 +39,7 @@ import json
 import logging
 import random
 import socket
+import threading
 import time
 
 from django.conf import settings
@@ -47,6 +50,8 @@ from django_eventstream.views import MAX_PENDING, ListenerManager, RedisListener
 
 logger = logging.getLogger(__name__)
 
+EVENTS_CHANNEL = "events_channel"  # the library's pub/sub channel
+RESYNC_MESSAGE = json.dumps({"resync": True})
 RETRY_SECONDS = 5
 PUBLISH_BACKOFF_SECONDS = 30
 # Re-reads after a reconnect are spread out so every open tab doesn't open a
@@ -105,10 +110,20 @@ class ReconnectingRedisListener(RedisListener):
 
     async def listen(self):
         # Subscribe before resyncing, so nothing published from here on is missed.
-        # The base class subscribes again, which costs one harmless round trip.
-        await self.pubsub.subscribe("events_channel")
+        await self.pubsub.subscribe(EVENTS_CHANNEL)
         resync_open_streams()
-        await super().listen()
+        # The library's loop (5.3.4), plus the resync message (FallbackPublisher).
+        async for message in self.pubsub.listen():
+            if message["type"] != "message":
+                continue
+            payload = json.loads(message["data"])
+            if payload.get("resync"):
+                resync_open_streams()
+                continue
+            views.get_listener_manager().add_to_queues(
+                payload["channel"],
+                Event(payload["channel"], payload["event_type"], payload["data"], id=payload["pub_id"]),
+            )
 
 
 class ResyncingListenerManager(ListenerManager):
@@ -191,25 +206,51 @@ class FallbackPublisher:
     def __init__(self, client):
         self.client = client
         self.skip_until = 0.0
+        self.lock = threading.Lock()
+        self.resync_timer = None
 
     def publish(self, channel_name, message):
         if time.monotonic() >= self.skip_until:
             try:
                 return self.client.publish(channel_name, message)
             except Exception:
-                self.skip_until = time.monotonic() + PUBLISH_BACKOFF_SECONDS
+                self.back_off()
                 logger.warning(
                     "SSE publish to Redis failed; delivering to this process only for %ss",
                     PUBLISH_BACKOFF_SECONDS, exc_info=True,
                 )
         # The event is already stored; other processes read it from the table
-        # when their next event shows the gap (ResyncingListenerManager).
+        # on the resync message that ends the backoff.
         payload = json.loads(message)
         views.get_listener_manager().add_to_queues(
             payload["channel"],
             Event(payload["channel"], payload["event_type"], payload["data"], id=payload["pub_id"]),
         )
         return 0
+
+    def back_off(self):
+        with self.lock:
+            self.skip_until = time.monotonic() + PUBLISH_BACKOFF_SECONDS
+            if self.resync_timer is None:
+                self.resync_timer = threading.Timer(PUBLISH_BACKOFF_SECONDS, self.announce_resync)
+                self.resync_timer.daemon = True
+                self.resync_timer.start()
+
+    def announce_resync(self):
+        """End the backoff and make every process re-read what it missed."""
+        with self.lock:
+            self.resync_timer = None
+            # Events sent from here on are published again; the ones skipped
+            # before are in the table the resync reads.
+            self.skip_until = 0.0
+        try:
+            self.client.publish(EVENTS_CHANNEL, RESYNC_MESSAGE)
+        except Exception:
+            self.back_off()
+            logger.warning(
+                "SSE resync publish to Redis failed; retrying in %ss",
+                PUBLISH_BACKOFF_SECONDS, exc_info=True,
+            )
 
 
 def releasing_connections(get_events):
