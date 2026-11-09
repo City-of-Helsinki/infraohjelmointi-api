@@ -131,13 +131,16 @@ def get_restricted_user_class_scope_ids(user):
 
     Sub classes are found through the `parent` links, not by `path` prefix
     (IO-961): `path` is a denormalized string that can drift from the real
-    hierarchy (IO-822/IO-960), which would wrongly grant or deny access."""
+    hierarchy (IO-822/IO-960), which would wrongly grant or deny access.
+    Coordinator-only classes hold no projects, so the walk skips them."""
     assigned_ids = get_restricted_user_assigned_class_ids(user)
     if not assigned_ids:
         return set()
     return {
         str(class_id)
-        for class_id in get_self_and_descendant_ids(ProjectClass, assigned_ids)
+        for class_id in get_self_and_descendant_ids(
+            ProjectClass, assigned_ids, forCoordinatorOnly=False
+        )
     }
 
 

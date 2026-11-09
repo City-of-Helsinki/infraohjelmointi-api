@@ -2,8 +2,8 @@
 
 IO-961 made the coordinator/planning sums in FinancialSumSerializer walk
 coordinatorClass/parent ids instead of `path`, so the sums no longer depend on
-this migration having run; it still matters for everything else that reads
-`path` (display, PW export, permission checks).
+this migration having run, and restricted programmer scope no longer reads
+`path` either; it still matters for display and the PW export.
 """
 
 import importlib
@@ -88,7 +88,7 @@ class ItakeskusCoordinatorPathTests(CacheClearingMixin, TestCase):
             f"{COORDINATOR_ROOT}/8 08 03 Puistot ja liikunta-alueet/8 08 03 12 Itäkeskus",
         )
         # The migration still repairs the stored path for everything else
-        # that reads it (display, PW export, permission checks), and the
+        # that reads it (display, PW export), and the
         # totals stay correct afterwards.
         self.assertEqual(self.coordinator_total(self.coordinator_itakeskus), 300)
         self.assertEqual(self.coordinator_total(self.coordinator_parks), 300)

@@ -226,9 +226,7 @@ class FinancialSumBatchService:
         for bucket in self._project_buckets(projectClass__isnull=False):
             buckets_by_class[bucket["projectClass_id"]].append(bucket)
 
-        # The per-instance path raises on a missing path; leave those to it.
-        batchable = [i for i in instances if i.path is not None]
-        targets_of = self._class_targets(batchable, coordinator_of)
+        targets_of = self._class_targets(instances, coordinator_of)
         buckets_by_instance = defaultdict(list)
         for class_id, class_buckets in buckets_by_class.items():
             for instance_id in targets_of(class_id):
@@ -240,7 +238,7 @@ class FinancialSumBatchService:
             self._apply_overlaps(source, child_classes, child_locations, frame_result)
 
         return self._assemble_all(
-            batchable, buckets_by_instance, ClassFinancial, "classRelation_id",
+            instances, buckets_by_instance, ClassFinancial, "classRelation_id",
             coordinator_of, apply_overlaps,
         )
 
