@@ -1,8 +1,8 @@
-from django.db.models import Q
-from infraohjelmointi_api.models import ProjectClass, User
+from infraohjelmointi_api.models import User
 from infraohjelmointi_api.permissions import (
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
+    get_restricted_user_class_scope_ids,
     is_restricted_programmer,
 )
 from rest_framework import serializers
@@ -85,13 +85,6 @@ class WhoAmISerializer(serializers.ModelSerializer):
     def get_restricted_class_ids(self, current_user):
         """IDs of the classes a restricted programmer may edit, sub classes
         included, so the UI can check a project without loading the classes."""
-        paths = self.get_restricted_class_paths(current_user)
-        if not paths:
+        if not is_restricted_programmer(current_user):
             return []
-        in_scope = Q()
-        for path in paths:
-            in_scope |= Q(path=path) | Q(path__startswith=f"{path}/")
-        return sorted(
-            str(class_id)
-            for class_id in ProjectClass.objects.filter(in_scope).values_list("id", flat=True)
-        )
+        return sorted(get_restricted_user_class_scope_ids(current_user))

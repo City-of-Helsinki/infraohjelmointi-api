@@ -239,3 +239,76 @@ class RestrictedProgrammerCreateTestCase(TestCase):
             "/project-programmes/", {"project": str(self.other_project.id)}, format="json"
         )
         self.assertEqual(response.status_code, 403)
+
+    # ------------------------------------------------------------------
+    # IO-961: scope follows the parent links, not the `path` string, which
+    # can drift from the real hierarchy (IO-822/IO-960).
+    # ------------------------------------------------------------------
+
+    def _make_drifted_classes(self):
+        """A real sub class whose path no longer starts with its parent's,
+        and a class elsewhere whose path wrongly does."""
+        drifted_sub_class = ProjectClass.objects.create(
+            name="Sillat alue 2",
+            parent=self.own_class,
+            path="8 03 Kadut/8 03 02 Muut/Sillat alue 2",
+        )
+        lookalike_class = ProjectClass.objects.create(
+            name="Lumet alue 1",
+            parent=self.other_class,
+            path=f"{self.own_class.path}/Lumet alue 1",
+        )
+        return drifted_sub_class, lookalike_class
+
+    def test_sub_class_with_drifted_path_is_in_scope(self, _pw):
+        drifted_sub_class, _ = self._make_drifted_classes()
+
+        response = self._post_project(drifted_sub_class)
+        self.assertEqual(response.status_code, 201, msg=response.content)
+
+        response = self.client.patch(
+            f"/projects/{self.own_project.id}/",
+            {"projectClass": str(drifted_sub_class.id)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.content)
+
+        body = self.client.get("/who-am-i/").json()
+        self.assertIn(str(drifted_sub_class.id), body["restricted_class_ids"])
+
+    def test_class_with_lookalike_path_is_out_of_scope(self, _pw):
+        _, lookalike_class = self._make_drifted_classes()
+        lookalike_project = Project.objects.create(
+            name="Lookalike project", description="d", projectClass=lookalike_class
+        )
+
+        self.assertEqual(self._post_project(lookalike_class).status_code, 403)
+
+        response = self.client.patch(
+            f"/projects/{lookalike_project.id}/", {"name": "Renamed"}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.patch(
+            "/projects/bulk-update/",
+            [{"id": str(self.own_project.id), "data": {"projectClass": str(lookalike_class.id)}}],
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.own_project.refresh_from_db()
+        self.assertEqual(self.own_project.projectClass, self.own_class)
+
+        body = self.client.get("/who-am-i/").json()
+        self.assertNotIn(str(lookalike_class.id), body["restricted_class_ids"])
+
+    def test_upper_case_class_id_is_matched(self, _pw):
+        response = self.client.post(
+            "/projects/",
+            {
+                "name": "New project",
+                "description": "d",
+                "projectClass": str(self.own_sub_class.id).upper(),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, msg=response.content)
