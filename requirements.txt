@@ -1,4 +1,4 @@
-django==5.2.18                                 # web framework itself
+django==5.2.19                                 # web framework itself
 djangorestframework==3.18.3                    # creating rest APIs
 psycopg2-binary==2.9.13                         # postgres database adapter
 requests>=2.34.2
