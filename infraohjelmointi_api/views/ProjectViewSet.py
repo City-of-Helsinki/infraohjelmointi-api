@@ -40,6 +40,7 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectResponseError,
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
+from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 from infraohjelmointi_api.permissions import (
     class_path_by_id,
     get_restricted_user_assigned_class_paths,
@@ -1805,31 +1806,13 @@ class ProjectViewSet(BaseViewSet):
             forCoordinatorOnly=for_coordinator,
         ).distinct()
 
-        if model_class.__name__ == "ProjectClass":
-            ids = list(matching_nodes.values_list("id", flat=True))
-            frontier_ids = ids
-
-            while frontier_ids:
-                child_ids = list(
-                    model_class.objects.filter(
-                        parent__in=frontier_ids,
-                        forCoordinatorOnly=for_coordinator,
-                    )
-                    .exclude(id__in=ids)
-                    .values_list("id", flat=True)
-                )
-                ids.extend(child_ids)
-                frontier_ids = child_ids
-            return ids
-
-        paths = list(matching_nodes.values_list("path", flat=True))
-        if not paths:
+        root_ids = list(matching_nodes.values_list("id", flat=True))
+        if not root_ids:
             return []
 
-        return model_class.objects.filter(
-            Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
-            forCoordinatorOnly=for_coordinator,
-        ).distinct().values_list("id", flat=True)
+        return get_self_and_descendant_ids(
+            model_class, root_ids, forCoordinatorOnly=for_coordinator
+        )
 
     def _filter_projects_by_hierarchy(
         self,
