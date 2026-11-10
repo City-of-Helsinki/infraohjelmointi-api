@@ -172,6 +172,12 @@ router.register(
 )
 
 router.register(
+    r"personal-data-retention",
+    views.PersonalDataRetentionViewSet,
+    basename="personalDataRetention"
+)
+
+router.register(
     r"talpa-project-opening",
     views.TalpaProjectOpeningViewSet,
     basename="talpaProjectOpening"

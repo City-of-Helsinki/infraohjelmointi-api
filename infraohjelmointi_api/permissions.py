@@ -754,6 +754,21 @@ class IsAdmin(permissions.BasePermission):
         return True
 
 
+class IsPersonalDataRetentionAdmin(permissions.BasePermission):
+    """
+    Admins only, for every HTTP method. IsAdmin is read-only, but confirming
+    a personal data removal is a write.
+    """
+
+    ADMIN_AD_GROUP = "sg_kymp_sso_io_admin"
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user.is_authenticated
+            and request.user.ad_groups.filter(name=self.ADMIN_AD_GROUP).exists()
+        )
+
+
 class IsClassProgrammer(permissions.BasePermission):
     """
     Permission class for restricted class programmers (IO-756).

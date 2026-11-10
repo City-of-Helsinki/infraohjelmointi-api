@@ -46,6 +46,7 @@ from .SapCurrentYearViewSet import *
 from .BudgetOverrunReasonViewSet import *
 from .ProjectProgrammerViewSet import *
 from .AuditLogViewSet import *
+from .PersonalDataRetentionViewSet import PersonalDataRetentionViewSet
 from .TalpaProjectOpeningViewSet import *
 from .TalpaProjectTypeViewSet import *
 from .TalpaServiceClassViewSet import *
