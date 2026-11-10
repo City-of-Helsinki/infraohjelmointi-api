@@ -1,0 +1,30 @@
+from django.db import migrations
+
+
+def add_pikku_huopalahti_subdivisions(apps, schema_editor):
+    project_district = apps.get_model("infraohjelmointi_api", "ProjectDistrict")
+    districts = project_district.objects.using(schema_editor.connection.alias)
+
+    for parent in districts.filter(
+        name__in=["29. Haaga", "16. Ruskeasuo", "15. Meilahti"],
+        level="division",
+    ):
+        districts.get_or_create(
+            name="Pikku Huopalahti",
+            level="subDivision",
+            parent=parent,
+            path=f"{parent.path}/Pikku Huopalahti",
+        )
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("infraohjelmointi_api", "0126_fix_itakeskus_coordinator_paths"),
+    ]
+
+    operations = [
+        migrations.RunPython(
+            add_pikku_huopalahti_subdivisions,
+            migrations.RunPython.noop,
+        ),
+    ]
