@@ -19,7 +19,7 @@ def add_pikku_huopalahti_subdivisions(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("infraohjelmointi_api", "0126_fix_itakeskus_coordinator_paths"),
+        ("infraohjelmointi_api", "0127_add_unallocated_major_transport_class"),
     ]
 
     operations = [
