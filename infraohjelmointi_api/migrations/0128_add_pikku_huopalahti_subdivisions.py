@@ -6,7 +6,7 @@ def add_pikku_huopalahti_subdivisions(apps, schema_editor):
     districts = project_district.objects.using(schema_editor.connection.alias)
 
     for parent in districts.filter(
-        name__in=["29. Haaga", "16. Ruskeasuo", "15. Meilahti"],
+        name__in=["Haaga", "Ruskeasuo", "Meilahti"],
         level="division",
     ):
         districts.get_or_create(
