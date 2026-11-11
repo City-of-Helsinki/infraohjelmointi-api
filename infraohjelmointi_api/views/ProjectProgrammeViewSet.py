@@ -30,10 +30,10 @@ from infraohjelmointi_api.permissions import (
     get_planner_group_name,
     get_project_programme_contributor_group_name,
     get_restricted_programmer_group_name,
-    get_restricted_user_assigned_class_paths,
+    class_id_in_scope,
+    get_restricted_user_class_scope_ids,
     is_restricted_programmer,
     parse_name_from_email,
-    target_path_matches_assigned_paths,
 )
 from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
     ProjectPersonAuthorizationService,
@@ -298,15 +298,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     def _restricted_programmer_matches_project(self, user, project):
         """IO-756: restricted programmers are limited to their assigned project classes."""
-        project_class = getattr(project, "projectClass", None)
-        if not project_class:
+        class_id = getattr(project, "projectClass_id", None)
+        if not class_id:
             return False
 
-        assigned_paths = get_restricted_user_assigned_class_paths(user)
-        if not assigned_paths:
-            return False
-
-        return target_path_matches_assigned_paths(project_class.path, assigned_paths)
+        return class_id_in_scope(class_id, get_restricted_user_class_scope_ids(user))
 
     def _assert_can_edit_or_complete(self, request, project):
         user = self._get_authenticated_user(request)

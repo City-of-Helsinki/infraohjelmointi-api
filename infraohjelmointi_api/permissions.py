@@ -5,7 +5,8 @@ from infraohjelmointi_api.models import ProjectProgrammer, ClassProgrammerAssign
 from rest_framework import permissions
 from django.conf import settings
 from collections.abc import Mapping
-from django.core.exceptions import ValidationError
+from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
+import uuid
 
 
 def parse_name_from_email(email):
@@ -79,8 +80,8 @@ def user_in_project_programme_contributor_group(request):
     ).exists()
 
 
-def _get_legacy_class_paths_from_email(user_email):
-    """Resolve class paths via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
+def _get_legacy_class_ids_from_email(user_email):
+    """Resolve class ids via email → name → ProjectClass.defaultProgrammer (IO-756 fallback)."""
     first_name, last_name = parse_name_from_email(user_email)
     if not first_name or not last_name:
         return set()
@@ -92,54 +93,85 @@ def _get_legacy_class_paths_from_email(user_email):
         return set()
     return set(
         ProjectClass.objects.filter(defaultProgrammer=programmer)
-        .values_list("path", flat=True)
+        .values_list("id", flat=True)
     )
+
+
+def get_restricted_user_assigned_class_ids(user):
+    """Ids of the project classes the restricted programmer is assigned to,
+    without their sub classes."""
+    # 1. Primary: direct ClassProgrammerAssignment rows
+    assigned_ids = set(
+        ClassProgrammerAssignment.objects.filter(user=user)
+        .values_list("project_class_id", flat=True)
+    )
+    # 2. Fallback: legacy email -> name matching onto ProjectClass.defaultProgrammer
+    assigned_ids.update(_get_legacy_class_ids_from_email(getattr(user, "email", None)))
+    return assigned_ids
 
 
 def get_restricted_user_assigned_class_paths(user):
-    """Project-class paths the restricted programmer is allowed to edit."""
-    # 1. Primary: direct ClassProgrammerAssignment rows
-    assigned_paths = set(
-        ClassProgrammerAssignment.objects.filter(user=user)
-        .values_list("project_class__path", flat=True)
+    """Paths of the restricted programmer's assigned classes. Only for display:
+    access is decided by get_restricted_user_class_scope_ids."""
+    assigned_ids = get_restricted_user_assigned_class_ids(user)
+    if not assigned_ids:
+        return []
+    return [
+        path
+        for path in ProjectClass.objects.filter(id__in=assigned_ids).values_list(
+            "path", flat=True
+        )
+        if path
+    ]
+
+
+def get_restricted_user_class_scope_ids(user):
+    """Ids, as strings, of the classes the restricted programmer may edit: their
+    assigned classes and every sub class below them.
+
+    Sub classes are found through the `parent` links, not by `path` prefix
+    (IO-961): `path` is a denormalized string that can drift from the real
+    hierarchy (IO-822/IO-960), which would wrongly grant or deny access.
+    Coordinator-only classes hold no projects, so the walk skips them."""
+    assigned_ids = get_restricted_user_assigned_class_ids(user)
+    if not assigned_ids:
+        return set()
+    return {
+        str(class_id)
+        for class_id in get_self_and_descendant_ids(
+            ProjectClass, assigned_ids, forCoordinatorOnly=False
+        )
+    }
+
+
+def _normalize_id(value):
+    """The id as a canonical UUID string, or None if it is not a valid id."""
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if not isinstance(value, str):
+        return None
+    try:
+        return str(uuid.UUID(value))
+    except ValueError:
+        return None
+
+
+def class_id_in_scope(class_id, scope_ids):
+    """True if class_id (a UUID or an id string) is in scope_ids."""
+    normalized = _normalize_id(class_id)
+    return normalized is not None and normalized in scope_ids
+
+
+def project_class_id_by_project_id(project_id):
+    """Class id of the Project with this id, or None if missing or not a valid id."""
+    normalized = _normalize_id(project_id)
+    if normalized is None:
+        return None
+    return (
+        Project.objects.filter(id=normalized)
+        .values_list("projectClass_id", flat=True)
+        .first()
     )
-    # 2. Fallback: legacy email -> name matching onto ProjectClass.defaultProgrammer
-    assigned_paths.update(_get_legacy_class_paths_from_email(getattr(user, "email", None)))
-    return [p for p in assigned_paths if p]
-
-
-def target_path_matches_assigned_paths(target_class_path, assigned_paths):
-    """True if target equals or is a descendant of an assigned path (paths use '/')."""
-    if not target_class_path:
-        return False
-    for path in assigned_paths:
-        if target_class_path == path or target_class_path.startswith(path + "/"):
-            return True
-    return False
-
-
-def class_path_by_id(class_id):
-    """Path of the ProjectClass with this id, or None if missing or not a valid id."""
-    if not class_id or not isinstance(class_id, str):
-        return None
-    try:
-        project_class = ProjectClass.objects.filter(id=class_id).first()
-    except (ValidationError, ValueError):
-        return None
-    return project_class.path if project_class else None
-
-
-def project_class_path_by_id(project_id):
-    """Class path of the Project with this id, or None if missing or not a valid id."""
-    if not project_id or not isinstance(project_id, str):
-        return None
-    try:
-        project = Project.objects.filter(id=project_id).select_related("projectClass").first()
-    except (ValidationError, ValueError):
-        return None
-    if not project or not project.projectClass:
-        return None
-    return project.projectClass.path
 
 GET = "GET"
 POST = "POST"
@@ -744,9 +776,9 @@ class IsClassProgrammer(permissions.BasePermission):
         """Check if user is coordinator or admin (bypass restrictions)"""
         return request.user.ad_groups.filter(name__in=RESTRICTION_BYPASS_GROUPS).exists()
 
-    def get_user_assigned_classes_paths(self, request):
-        """Get project class paths assigned to this user."""
-        return get_restricted_user_assigned_class_paths(request.user)
+    def get_user_class_scope_ids(self, request):
+        """Ids of the classes this user may edit, sub classes included."""
+        return get_restricted_user_class_scope_ids(request.user)
 
     def has_permission(self, request, view):
         """Check if user has permission for the action"""
@@ -794,23 +826,16 @@ class IsClassProgrammer(permissions.BasePermission):
 
         return False
 
-    def _get_target_class_path_for_restricted_edit(self, obj):
-        """Resolve project class path for restricted programmer object checks."""
+    def _get_target_class_id_for_restricted_edit(self, obj):
+        """Resolve the project class id for restricted programmer object checks."""
         _type = obj._meta.model.__name__
         if _type == "Project":
-            return obj.projectClass.path if obj.projectClass else None
-        if _type == "ProjectProgramme":
+            return obj.projectClass_id
+        if _type in ("ProjectProgramme", "Note"):
             target_project = getattr(obj, "project", None)
-            if target_project and target_project.projectClass:
-                return target_project.projectClass.path
-            return None
-        if _type == "Note":
-            target_project = obj.project
-            if target_project and target_project.projectClass:
-                return target_project.projectClass.path
-            return None
+            return target_project.projectClass_id if target_project else None
         if _type == "ProjectGroup":
-            return obj.classRelation.path if obj.classRelation else None
+            return obj.classRelation_id
         return None
 
     def _can_create(self, request, view):
@@ -823,20 +848,13 @@ class IsClassProgrammer(permissions.BasePermission):
         if not isinstance(request.data, Mapping):
             return False
         if basename == "projects":
-            target_class_path = class_path_by_id(request.data.get("projectClass"))
+            target_class_id = request.data.get("projectClass")
         elif basename == "notes":
-            target_class_path = project_class_path_by_id(request.data.get("project"))
+            target_class_id = project_class_id_by_project_id(request.data.get("project"))
         else:
             return False
 
-        return self._target_path_matches_assigned_paths(
-            target_class_path, self.get_user_assigned_classes_paths(request)
-        )
-
-    @staticmethod
-    def _target_path_matches_assigned_paths(target_class_path, assigned_paths):
-        """True if target equals or is a child of an assigned path (paths use '/')."""
-        return target_path_matches_assigned_paths(target_class_path, assigned_paths)
+        return class_id_in_scope(target_class_id, self.get_user_class_scope_ids(request))
 
     def has_object_permission(self, request, view, obj):
         """Check if user has permission for this specific object"""
@@ -852,49 +870,43 @@ class IsClassProgrammer(permissions.BasePermission):
         ):
             return True
 
-        target_class_path = self._get_target_class_path_for_restricted_edit(obj)
-        if not target_class_path:
+        target_class_id = self._get_target_class_id_for_restricted_edit(obj)
+        if not target_class_id:
             return False
 
-        assigned_paths = self.get_user_assigned_classes_paths(request)
-        if not assigned_paths:
+        scope_ids = self.get_user_class_scope_ids(request)
+        if not class_id_in_scope(target_class_id, scope_ids):
             return False
 
-        if not self._target_path_matches_assigned_paths(
-            target_class_path, assigned_paths
-        ):
-            return False
+        return self._edit_stays_in_scope(request, obj, scope_ids)
 
-        return self._edit_stays_in_scope(request, obj, assigned_paths)
-
-    def _edit_stays_in_scope(self, request, obj, assigned_paths):
+    def _edit_stays_in_scope(self, request, obj, scope_ids):
         """An in-scope object must not be moved, or pull other projects, out
         of the user's classes."""
         data = request.data if isinstance(request.data, Mapping) else {}
 
-        def in_scope(path):
-            return self._target_path_matches_assigned_paths(path, assigned_paths)
+        def in_scope(class_id):
+            return class_id_in_scope(class_id, scope_ids)
 
         _type = obj._meta.model.__name__
         if _type == "Project" and "projectClass" in data:
-            return in_scope(class_path_by_id(data.get("projectClass")))
+            return in_scope(data.get("projectClass"))
         if _type == "Note" and "project" in data:
-            return in_scope(project_class_path_by_id(data.get("project")))
+            return in_scope(project_class_id_by_project_id(data.get("project")))
         if _type == "ProjectGroup":
-            if "classRelation" in data and not in_scope(
-                class_path_by_id(data.get("classRelation"))
-            ):
+            if "classRelation" in data and not in_scope(data.get("classRelation")):
                 return False
             if "projects" in data:
                 project_ids = data.get("projects")
                 if not isinstance(project_ids, list):
                     return False
                 return all(
-                    in_scope(project_class_path_by_id(project_id))
+                    in_scope(project_class_id_by_project_id(project_id))
                     for project_id in project_ids
                 )
         return True
-    
+
+
 class IsConstructionManagementLead(permissions.BasePermission):
     """Permission class for construction management leads (Rakennuttamisen esihenkilöt)."""
 

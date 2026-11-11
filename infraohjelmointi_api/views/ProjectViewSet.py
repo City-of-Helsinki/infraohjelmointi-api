@@ -42,10 +42,9 @@ from infraohjelmointi_api.services.ProjectWiseService import (
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
 from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 from infraohjelmointi_api.permissions import (
-    class_path_by_id,
-    get_restricted_user_assigned_class_paths,
+    class_id_in_scope,
+    get_restricted_user_class_scope_ids,
     is_restricted_programmer,
-    target_path_matches_assigned_paths,
 )
 import json
 
@@ -1692,8 +1691,8 @@ class ProjectViewSet(BaseViewSet):
         if not is_restricted_programmer(request.user):
             return None
 
-        assigned_paths = get_restricted_user_assigned_class_paths(request.user)
-        if not assigned_paths:
+        scope_ids = get_restricted_user_class_scope_ids(request.user)
+        if not scope_ids:
             return Response(
                 data={
                     "message": (
@@ -1705,19 +1704,14 @@ class ProjectViewSet(BaseViewSet):
             )
 
         unauthorized_ids = []
-        projects = (
-            Project.objects.filter(id__in=project_ids)
-            .select_related("projectClass")
-            .only("id", "projectClass__path")
+        projects = Project.objects.filter(id__in=project_ids).values_list(
+            "id", "projectClass_id"
         )
         found_ids = set()
-        for project in projects:
-            found_ids.add(str(project.id))
-            class_path = (
-                project.projectClass.path if project.projectClass else None
-            )
-            if not target_path_matches_assigned_paths(class_path, assigned_paths):
-                unauthorized_ids.append(str(project.id))
+        for project_id, class_id in projects:
+            found_ids.add(str(project_id))
+            if not class_id_in_scope(class_id, scope_ids):
+                unauthorized_ids.append(str(project_id))
 
         # Treat unknown ids the same as out-of-class — deny by default.
         missing_ids = [pid for pid in project_ids if pid not in found_ids]
@@ -1737,7 +1731,7 @@ class ProjectViewSet(BaseViewSet):
             )
 
         if any(
-            not target_path_matches_assigned_paths(class_path_by_id(class_id), assigned_paths)
+            not class_id_in_scope(class_id, scope_ids)
             for class_id in target_class_ids
         ):
             return Response(
