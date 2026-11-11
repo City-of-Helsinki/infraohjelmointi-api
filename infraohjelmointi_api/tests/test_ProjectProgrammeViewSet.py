@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from helusers.models import ADGroup
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -1946,6 +1946,143 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_who_am_i_includes_contributor_and_other_memberships(self):
+        for extra_group in (
+            None,
+            self.viewer_group,
+            self.project_manager_group,
+            self.restricted_programmer_group,
+        ):
+            with self.subTest(extra_group=extra_group):
+                groups = [self.project_programme_contributor_group]
+                if extra_group:
+                    groups.append(extra_group)
+                self.contributor_user.ad_groups.set(groups)
+                self.client.force_authenticate(user=self.contributor_user)
+
+                response = self.client.get("/who-am-i/")
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertCountEqual(
+                    [group["name"] for group in response.json()["ad_groups"]],
+                    [group.name for group in groups],
+                )
+
+    @override_settings(PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP="custom_contributors")
+    def test_who_am_i_includes_configured_contributor_group(self):
+        group = ADGroup.objects.create(name="custom_contributors", display_name="Contributors")
+        self.contributor_user.ad_groups.set([group])
+        self.client.force_authenticate(user=self.contributor_user)
+
+        response = self.client.get("/who-am-i/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json()["ad_groups"],
+            [{"id": group.name, "name": group.name, "display_name": group.display_name}],
+        )
+
+    def test_contributor_mixed_memberships_can_create_except_restricted(self):
+        for extra_group, expected_status in (
+            (self.viewer_group, status.HTTP_201_CREATED),
+            (self.project_manager_group, status.HTTP_201_CREATED),
+            (self.restricted_programmer_group, status.HTTP_403_FORBIDDEN),
+        ):
+            with self.subTest(extra_group=extra_group.name):
+                self.contributor_user.ad_groups.set(
+                    [self.project_programme_contributor_group, extra_group]
+                )
+                self.client.force_authenticate(user=self.contributor_user)
+
+                response = self.client.post(
+                    "/project-programmes/",
+                    {"project": str(self.responsible_project.id)},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, expected_status)
+                ProjectProgramme.objects.filter(project=self.responsible_project).delete()
+
+    def test_contributor_can_edit_switch_and_complete_with_other_memberships(self):
+        programme = self.unassigned_programme
+        programme.briefProjectProgramme = False
+        programme.save()
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, programme)
+        for extra_group in (
+            None,
+            self.viewer_group,
+            self.project_manager_group,
+            self.restricted_programmer_group,
+        ):
+            with self.subTest(extra_group=extra_group):
+                groups = [self.project_programme_contributor_group]
+                if extra_group:
+                    groups.append(extra_group)
+                self.contributor_user.ad_groups.set(groups)
+                self.client.force_authenticate(user=self.contributor_user)
+                programme.status = "DRAFT"
+                programme.briefProjectProgramme = True
+                programme.save()
+
+                response = self.client.patch(
+                    f"/project-programmes/{programme.id}/",
+                    {"briefProjectProgramme": True},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+                response = self.client.post(f"/project-programmes/{programme.id}/switch-type/")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                programme.refresh_from_db()
+                self.assertFalse(programme.briefProjectProgramme)
+
+                response = self.client.post(
+                    f"/project-programmes/{programme.id}/transitions/",
+                    {"to": "COMPLETE"},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                programme.refresh_from_db()
+                self.assertEqual(programme.status, "COMPLETE")
+
+    def test_project_manager_without_contributor_cannot_switch_type(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/switch-type/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.allowed_programme.refresh_from_db()
+        self.assertTrue(self.allowed_programme.briefProjectProgramme)
+
+    def test_contributor_membership_overrides_commissioning_manager_completion_restriction(self):
+        programme = self.allowed_programme
+        programme.briefProjectProgramme = False
+        programme.save()
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, programme)
+        self.client.force_authenticate(user=self.project_manager_user)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.project_manager_user.ad_groups.add(self.project_programme_contributor_group)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "COMPLETE")
 
     def test_responsible_viewer_cannot_create_project_programme(self):
         self.client.force_authenticate(user=self.responsible_viewer_user)

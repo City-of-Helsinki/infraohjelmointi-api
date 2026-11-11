@@ -411,6 +411,15 @@ class IsViewer(permissions.BasePermission):
 
 class IsProjectProgrammeContributor(permissions.BasePermission):
     def has_permission(self, request, view):
+        if (
+            request.user.is_authenticated
+            and user_in_project_programme_contributor_group(request=request)
+            and getattr(view, "basename", None) == "whoAmI"
+            and request.method == GET
+            and view.action in DJANGO_BASE_READ_ONLY_ACTIONS
+        ):
+            return True
+
         return (
             request.user.is_authenticated
             and user_in_project_programme_contributor_group(request=request)
