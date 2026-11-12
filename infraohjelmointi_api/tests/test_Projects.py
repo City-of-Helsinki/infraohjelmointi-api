@@ -1441,6 +1441,42 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             msg="visibilityEnd format in POST request != format in response",
         )
 
+    def test_search_results_without_hkr_id(self):
+        missing_project = Project.objects.create(
+            name="Project without PW identifier",
+            description="Project with no linked PW identifier",
+            projectClass=self.projectClass,
+            phase=self.projectPhase,
+            programmed=False,
+        )
+        endpoint = "/projects/search-results/"
+
+        response = self.client.get(endpoint, {"withoutHkrId": "true"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(str(missing_project.id), result_ids)
+        self.assertNotIn(str(self.project.id), result_ids)
+
+        for params in ({}, {"withoutHkrId": "false"}):
+            with self.subTest(params=params):
+                response = self.client.get(endpoint, params)
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                result_ids = {item["id"] for item in response.json()["results"]}
+                self.assertIn(str(missing_project.id), result_ids)
+                self.assertIn(str(self.project.id), result_ids)
+
+        response = self.client.get(
+            endpoint, {"withoutHkrId": "true", "programmed": "true"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 0)
+
+        response = self.client.get(
+            endpoint, {"withoutHkrId": "true", "hkrId": self.project.hkrId}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("withoutHkrId", response.json())
+
     def test_search_results_endpoint_project(self):
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_2_Id,

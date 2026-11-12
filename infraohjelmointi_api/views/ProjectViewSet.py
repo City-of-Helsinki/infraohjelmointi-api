@@ -71,6 +71,17 @@ audit_logger = logging.getLogger("audit")
 
 
 class ProjectFilter(django_filters.FilterSet):
+    withoutHkrId = django_filters.BooleanFilter(method="filter_without_hkr_id")
+
+    def filter_without_hkr_id(self, queryset, name, value):
+        if not value:
+            return queryset
+        if self.data.getlist("hkrId"):
+            raise ValidationError(
+                {"withoutHkrId": "Cannot be combined with hkrId."}
+            )
+        return queryset.filter(hkrId__isnull=True)
+
     hashtag = django_filters.ModelMultipleChoiceFilter(
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
@@ -676,6 +687,12 @@ class ProjectViewSet(BaseViewSet):
 
             Filters project name by string provided.\n
             Usage: projects/search-results/?projectName=<string>
+
+            withoutHkrId : bool
+
+            When true, returns only projects with no PW identifier (hkrId is NULL).
+            False or omitted leaves PW identifiers unrestricted. Cannot be combined with hkrId.
+            Usage: projects/search-results/?withoutHkrId=true
 
             limit : int [10 | 20 | 30]
 
