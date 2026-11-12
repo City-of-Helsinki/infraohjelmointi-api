@@ -859,34 +859,45 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         handover.refresh_from_db()
         self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
 
-    def test_transitions_step_back_requires_forward_rule_of_current_status(self):
+    def test_transitions_step_back_allowed_for_forward_roles_into_and_out_of_current_status(self):
+        # user_2: PM + planning person, user_3: PM + construction person,
+        # user_4: programmer, user_5: construction management lead.
         cases = [
-            ("SUBMITTED_TO_CONSTRUCTION", "SUBMITTED_TO_PROGRAMMER", self.user_4, self.user_2),
-            ("PROJECT_MANAGER_NAMED", "SUBMITTED_TO_CONSTRUCTION", self.user_5, self.user_4),
-            ("MOVED_TO_CONSTRUCTION_PREPARATION", "PROJECT_MANAGER_NAMED", self.user_3, self.user_5),
+            ("SUBMITTED_TO_CONSTRUCTION", "SUBMITTED_TO_PROGRAMMER", [self.user_4, self.user_5], [self.user_2, self.user_3]),
+            ("PROJECT_MANAGER_NAMED", "SUBMITTED_TO_CONSTRUCTION", [self.user_5, self.user_3], [self.user_4, self.user_2]),
+            ("MOVED_TO_CONSTRUCTION_PREPARATION", "PROJECT_MANAGER_NAMED", [self.user_3], [self.user_5, self.user_2]),
         ]
 
-        for from_status, to_status, allowed_user, denied_user in cases:
-            with self.subTest(from_status=from_status, to_status=to_status):
-                handover = ConstructionHandover.objects.create(
-                    project=self.project,
-                    status=from_status,
-                    constructionProjectManager=self.person_construction,
-                )
-                url = f"/construction-handovers/{handover.id}/transitions/"
+        def post_step_back(user, from_status, to_status):
+            handover = ConstructionHandover.objects.create(
+                project=self.project,
+                status=from_status,
+                constructionProjectManager=self.person_construction,
+            )
+            self.client.force_authenticate(user=user)
+            response = self.client.post(
+                f"/construction-handovers/{handover.id}/transitions/",
+                {"to": to_status},
+                format="json",
+            )
+            handover.refresh_from_db()
+            new_status = handover.status
+            # Deleted before asserting so a failure can't leave an active handover behind.
+            handover.delete()
+            return response.status_code, new_status
 
-                self.client.force_authenticate(user=denied_user)
-                response = self.client.post(url, {"to": to_status}, format="json")
-                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-                handover.refresh_from_db()
-                self.assertEqual(handover.status, from_status)
+        for from_status, to_status, allowed_users, denied_users in cases:
+            for user in denied_users:
+                with self.subTest(from_status=from_status, user=user.username, expected="denied"):
+                    status_code, new_status = post_step_back(user, from_status, to_status)
+                    self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
+                    self.assertEqual(new_status, from_status)
 
-                self.client.force_authenticate(user=allowed_user)
-                response = self.client.post(url, {"to": to_status}, format="json")
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                handover.refresh_from_db()
-                self.assertEqual(handover.status, to_status)
-                handover.delete()
+            for user in allowed_users:
+                with self.subTest(from_status=from_status, user=user.username, expected="allowed"):
+                    status_code, new_status = post_step_back(user, from_status, to_status)
+                    self.assertEqual(status_code, status.HTTP_200_OK)
+                    self.assertEqual(new_status, to_status)
 
     def test_transitions_return_to_draft_denied_for_user_without_allowed_role(self):
         self.client.force_authenticate(user=self.user_1)
