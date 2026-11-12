@@ -123,14 +123,14 @@ def clear_personal_data(project: Project) -> dict:
         project.otherPersons.clear()
         project.favPersons.clear()
 
-        handover_clear = {field: None for field in HANDOVER_PERSON_FIELDS}
+        handover_clear = dict.fromkeys(HANDOVER_PERSON_FIELDS, None)
         handovers = ConstructionHandover.objects.filter(project=project)
         handovers.update(**handover_clear)
         ConstructionHandover.history.model.objects.filter(id__in=handovers.values("id")).update(**handover_clear)
 
         Task.objects.filter(projectId=project).update(person=None)
 
-        programme_clear = {field: "" for field in PROGRAMME_NAME_FIELDS}
+        programme_clear = dict.fromkeys(PROGRAMME_NAME_FIELDS, "")
         ProjectProgrammeBasicInfo.objects.filter(project_programme__project=project).update(**programme_clear)
         ProjectProgrammeBasicInfo.history.model.objects.filter(
             project_programme__project=project
