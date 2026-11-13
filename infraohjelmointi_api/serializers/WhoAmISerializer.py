@@ -1,7 +1,7 @@
 from django.db.models import Q
 from infraohjelmointi_api.models import ProjectClass, User
 from infraohjelmointi_api.permissions import (
-    get_project_programme_contributor_group_name,
+    get_transport_landscape_planning_group_name,
     get_restricted_programmer_group_name,
     get_restricted_user_assigned_class_paths,
     is_restricted_programmer,
@@ -51,7 +51,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
     def get_ad_groups(self, current_user):
         groups = []
         restricted_group_name = get_restricted_programmer_group_name()
-        contributor_group_name = get_project_programme_contributor_group_name()
+        transport_landscape_planning_group_name = get_transport_landscape_planning_group_name()
         for group in current_user.ad_groups.all():
             if group.name in self.group_to_uuid_mapping:
                 groups.append(
@@ -61,7 +61,7 @@ class WhoAmISerializer(serializers.ModelSerializer):
                         "display_name": group.display_name,
                     }
                 )
-            elif group.name in (restricted_group_name, contributor_group_name):
+            elif group.name in (restricted_group_name, transport_landscape_planning_group_name):
                 # IO-756: the group name is configurable, so it is not in the map
                 groups.append(
                     {

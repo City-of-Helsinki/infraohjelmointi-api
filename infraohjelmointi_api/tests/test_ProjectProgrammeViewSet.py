@@ -29,7 +29,7 @@ from infraohjelmointi_api.serializers import (
     ProjectProgrammeLinkUpdateSerializer,
     ProjectProgrammeUpdateSerializer,
 )
-from infraohjelmointi_api.permissions import get_project_programme_contributor_group_name
+from infraohjelmointi_api.permissions import get_transport_landscape_planning_group_name
 from infraohjelmointi_api.views.BaseViewSet import BaseViewSet
 from infraohjelmointi_api.validators.ProjectProgrammeValidator import get_required_section_fields
 
@@ -1696,9 +1696,9 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name="sg_kymp_sso_io_projektipaallikot",
             display_name="Project managers",
         )
-        self.project_programme_contributor_group = ADGroup.objects.create(
-            name=get_project_programme_contributor_group_name(),
-            display_name="Project programme contributors",
+        self.transport_landscape_planning_group = ADGroup.objects.create(
+            name=get_transport_landscape_planning_group_name(),
+            display_name="Transport and landscape planning",
         )
         self.planner_group = ADGroup.objects.create(
             name="sg_kymp_sso_io_ohjelmoijat",
@@ -1729,11 +1729,11 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
         self.responsible_viewer_user.ad_groups.add(self.viewer_group)
 
-        self.contributor_user = User.objects.create_user(
-            username="contributor.user@test.fi",
-            email="contributor.user@test.fi",
+        self.transport_landscape_planning_user = User.objects.create_user(
+            username="transport.landscape.planning.user@test.fi",
+            email="transport.landscape.planning.user@test.fi",
         )
-        self.contributor_user.ad_groups.add(self.project_programme_contributor_group)
+        self.transport_landscape_planning_user.ad_groups.add(self.transport_landscape_planning_group)
 
         self.planner_user = User.objects.create_user(
             username="planner.user@test.fi",
@@ -1936,8 +1936,8 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_contributor_group_user_can_create_project_programme(self):
-        self.client.force_authenticate(user=self.contributor_user)
+    def test_transport_landscape_planning_user_can_create_project_programme(self):
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
 
         response = self.client.post(
             "/project-programmes/",
@@ -1947,7 +1947,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_who_am_i_includes_contributor_and_other_memberships(self):
+    def test_who_am_i_includes_transport_landscape_planning_and_other_memberships(self):
         for extra_group in (
             None,
             self.viewer_group,
@@ -1955,11 +1955,11 @@ class ProjectProgrammePermissionTestCase(TestCase):
             self.restricted_programmer_group,
         ):
             with self.subTest(extra_group=extra_group):
-                groups = [self.project_programme_contributor_group]
+                groups = [self.transport_landscape_planning_group]
                 if extra_group:
                     groups.append(extra_group)
-                self.contributor_user.ad_groups.set(groups)
-                self.client.force_authenticate(user=self.contributor_user)
+                self.transport_landscape_planning_user.ad_groups.set(groups)
+                self.client.force_authenticate(user=self.transport_landscape_planning_user)
 
                 response = self.client.get("/who-am-i/")
 
@@ -1969,11 +1969,11 @@ class ProjectProgrammePermissionTestCase(TestCase):
                     [group.name for group in groups],
                 )
 
-    @override_settings(PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP="custom_contributors")
-    def test_who_am_i_includes_configured_contributor_group(self):
-        group = ADGroup.objects.create(name="custom_contributors", display_name="Contributors")
-        self.contributor_user.ad_groups.set([group])
-        self.client.force_authenticate(user=self.contributor_user)
+    @override_settings(TRANSPORT_LANDSCAPE_PLANNING_AD_GROUP="transport_landscape_planning") 
+    def test_who_am_i_includes_configured_transport_landscape_planning_group(self):
+        group = ADGroup.objects.create(name="transport_landscape_planning", display_name="Transport and Landscape Planning")
+        self.transport_landscape_planning_user.ad_groups.set([group])
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
 
         response = self.client.get("/who-am-i/")
 
@@ -1983,17 +1983,18 @@ class ProjectProgrammePermissionTestCase(TestCase):
             [{"id": group.name, "name": group.name, "display_name": group.display_name}],
         )
 
-    def test_contributor_mixed_memberships_can_create_except_restricted(self):
+
+    def test_transport_landscape_planning_mixed_memberships_can_create_except_restricted(self):
         for extra_group, expected_status in (
             (self.viewer_group, status.HTTP_201_CREATED),
             (self.project_manager_group, status.HTTP_201_CREATED),
             (self.restricted_programmer_group, status.HTTP_403_FORBIDDEN),
         ):
             with self.subTest(extra_group=extra_group.name):
-                self.contributor_user.ad_groups.set(
-                    [self.project_programme_contributor_group, extra_group]
+                self.transport_landscape_planning_user.ad_groups.set(
+                    [self.transport_landscape_planning_group, extra_group]
                 )
-                self.client.force_authenticate(user=self.contributor_user)
+                self.client.force_authenticate(user=self.transport_landscape_planning_user)
 
                 response = self.client.post(
                     "/project-programmes/",
@@ -2004,7 +2005,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
                 self.assertEqual(response.status_code, expected_status)
                 ProjectProgramme.objects.filter(project=self.responsible_project).delete()
 
-    def test_contributor_can_edit_switch_and_complete_with_other_memberships(self):
+    def test_transport_landscape_planning_user_can_edit_switch_and_complete_with_other_memberships(self):
         programme = self.unassigned_programme
         programme.briefProjectProgramme = False
         programme.save()
@@ -2016,11 +2017,11 @@ class ProjectProgrammePermissionTestCase(TestCase):
             self.restricted_programmer_group,
         ):
             with self.subTest(extra_group=extra_group):
-                groups = [self.project_programme_contributor_group]
+                groups = [self.transport_landscape_planning_group]
                 if extra_group:
                     groups.append(extra_group)
-                self.contributor_user.ad_groups.set(groups)
-                self.client.force_authenticate(user=self.contributor_user)
+                self.transport_landscape_planning_user.ad_groups.set(groups)
+                self.client.force_authenticate(user=self.transport_landscape_planning_user)
                 programme.status = "DRAFT"
                 programme.briefProjectProgramme = True
                 programme.save()
@@ -2046,7 +2047,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
                 programme.refresh_from_db()
                 self.assertEqual(programme.status, "COMPLETE")
 
-    def test_project_manager_without_contributor_cannot_switch_type(self):
+    def test_project_manager_without_transport_landscape_planning_cannot_switch_type(self):
         self.client.force_authenticate(user=self.project_manager_user)
 
         response = self.client.post(
@@ -2057,7 +2058,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.allowed_programme.refresh_from_db()
         self.assertTrue(self.allowed_programme.briefProjectProgramme)
 
-    def test_contributor_membership_overrides_commissioning_manager_completion_restriction(self):
+    def test_transport_landscape_planning_membership_overrides_commissioning_manager_completion_restriction(self):
         programme = self.allowed_programme
         programme.briefProjectProgramme = False
         programme.save()
@@ -2072,7 +2073,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        self.project_manager_user.ad_groups.add(self.project_programme_contributor_group)
+        self.project_manager_user.ad_groups.add(self.transport_landscape_planning_group)
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/transitions/",
@@ -2185,8 +2186,8 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_contributor_group_user_can_update_project_programme_without_membership(self):
-        self.client.force_authenticate(user=self.contributor_user)
+    def test_transport_landscape_planning_user_can_update_project_programme_without_membership(self):
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
 
         response = self.client.patch(
             f"/project-programmes/{self.unassigned_programme.id}/",
@@ -2196,8 +2197,8 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_contributor_group_user_can_mark_project_programme_complete_without_membership(self):
-        self.client.force_authenticate(user=self.contributor_user)
+    def test_transport_landscape_planning_user_can_mark_project_programme_complete_without_membership(self):
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
         ProjectProgrammeViewSetTestCase._fill_required_sections(self, self.unassigned_programme)
 
         response = self.client.post(
@@ -2208,8 +2209,8 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_contributor_group_user_can_mark_section_complete_without_membership(self):
-        self.client.force_authenticate(user=self.contributor_user)
+    def test_transport_landscape_planning_user_can_mark_section_complete_without_membership(self):
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
         basic_info = ProjectProgrammeBasicInfo.objects.create(
             project_programme=self.unassigned_programme,
             status="DRAFT",
