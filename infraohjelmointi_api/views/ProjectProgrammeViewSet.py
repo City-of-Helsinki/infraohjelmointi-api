@@ -28,7 +28,7 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.permissions import (
     get_planner_group_name,
-    get_project_programme_contributor_group_name,
+    get_transport_landscape_planning_group_name,
     get_restricted_programmer_group_name,
     class_id_in_scope,
     get_restricted_user_class_scope_ids,
@@ -282,18 +282,18 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return
 
         # IO-756: restricted programmers can't create programmes, even if they
-        # are also in the planner or contributor group.
+        # are also in the planner or transport and landscape planning group.
         if is_restricted_programmer(user):
             raise PermissionDenied("Restricted programmers can't create a project programme.")
 
         if get_planner_group_name() in group_names:
             return
 
-        if get_project_programme_contributor_group_name() in group_names:
+        if get_transport_landscape_planning_group_name() in group_names:
             return
 
         raise PermissionDenied(
-            "Only planners or project programme contributors can create a project programme."
+            "Only planners or transport and landscape planning users can create a project programme."
         )
 
     def _restricted_programmer_matches_project(self, user, project):
@@ -310,15 +310,15 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if self.ADMIN_GROUP in group_names:
             return
 
+        if get_transport_landscape_planning_group_name() in group_names:
+            return
+
         if self.COMMISSIONING_MANAGER_GROUP in group_names:
             raise PermissionDenied(
                 "Commissioning managers can only return a project programme to DRAFT."
             )
 
         if group_names.intersection(self.REVIEWER_GROUPS):
-            return
-
-        if get_project_programme_contributor_group_name() in group_names:
             return
 
         if (

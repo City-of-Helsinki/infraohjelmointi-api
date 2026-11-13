@@ -19,7 +19,7 @@ class BaseViewSet(viewsets.ModelViewSet):
             | IsClassProgrammer
             | IsProjectManager
             | IsViewer
-            | IsProjectProgrammeContributor
+            | IsTransportLandscapePlanning
             | IsAdmin
             | IsConstructionManagementLead
         )
