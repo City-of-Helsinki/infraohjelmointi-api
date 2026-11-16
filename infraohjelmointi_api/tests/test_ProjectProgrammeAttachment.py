@@ -669,7 +669,7 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
 
     def test_every_editing_role_can_upload_and_delete(self):
         from infraohjelmointi_api.permissions import (
-            get_project_programme_contributor_group_name,
+            get_transport_landscape_planning_group_name,
         )
 
         for group_name in (
@@ -677,7 +677,7 @@ class ProjectProgrammeAttachmentPermissionTestCase(_TempMediaMixin, APITestCase)
             "sg_kymp_sso_io_ohjelmoijat",  # IsPlanner
             "sg_kymp_sso_io_projektipaallikot",  # IsProjectManager
             "sg_kymp_sso_io_admin",  # IsAdmin
-            get_project_programme_contributor_group_name(),  # IsProjectProgrammeContributor
+            get_transport_landscape_planning_group_name(),  # IsTransportLandscapePlanning
         ):
             with self.subTest(group=group_name):
                 self.client.force_login(self._user_in_group(group_name))

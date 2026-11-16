@@ -28,11 +28,11 @@ def get_restricted_programmer_group_name():
     )
 
 
-def get_project_programme_contributor_group_name():
-    """AD group for users allowed to edit any existing project programme."""
+def get_transport_landscape_planning_group_name():
+    """AD group for transport and landscape planning users."""
     return getattr(
         settings,
-        "PROJECT_PROGRAMME_CONTRIBUTOR_AD_GROUP",
+        "TRANSPORT_LANDSCAPE_PLANNING_AD_GROUP",
         "sl_dyn_kymp_sso_io_liikenne-maisemasuunnittelijat",
     )
 
@@ -71,12 +71,12 @@ def is_restricted_programmer(user):
     )
 
 
-def user_in_project_programme_contributor_group(request):
-    """True if the authenticated user is in the project programme contributor AD group."""
+def user_in_transport_landscape_planning_group(request):
+    """True if the authenticated user belongs to the transport and landscape planning AD group."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return False
     return request.user.ad_groups.filter(
-        name=get_project_programme_contributor_group_name()
+        name=get_transport_landscape_planning_group_name()
     ).exists()
 
 
@@ -441,11 +441,20 @@ class IsViewer(permissions.BasePermission):
         return False
 
 
-class IsProjectProgrammeContributor(permissions.BasePermission):
+class IsTransportLandscapePlanning(permissions.BasePermission):
     def has_permission(self, request, view):
+        if (
+            request.user.is_authenticated
+            and user_in_transport_landscape_planning_group(request=request)
+            and getattr(view, "basename", None) == "whoAmI"
+            and request.method == GET
+            and view.action in DJANGO_BASE_READ_ONLY_ACTIONS
+        ):
+            return True
+
         return (
             request.user.is_authenticated
-            and user_in_project_programme_contributor_group(request=request)
+            and user_in_transport_landscape_planning_group(request=request)
             and getattr(view, "basename", None) == "projectProgrammes"
             and view.action
             in [
