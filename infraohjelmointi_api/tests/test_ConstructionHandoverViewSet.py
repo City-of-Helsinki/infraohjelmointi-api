@@ -456,7 +456,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["currentStatus"], "SUBMITTED_TO_PROGRAMMER")
-        self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_CONSTRUCTION"])
+        self.assertEqual(response.data["possibleTransitions"], ["SUBMITTED_TO_CONSTRUCTION", "DRAFT"])
 
         handover.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
@@ -707,6 +707,72 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         )
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
 
+    def test_transitions_step_back_to_draft_restores_project_phase_and_unlocks_handover(self):
+        self.client.force_authenticate(user=self.user_4)
+
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        construction_wait_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        self.project.phase = construction_wait_phase
+        self.project.phaseDetail = construction_wait_phase_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_CONSTRUCTION",
+            previousProjectPhase=proposal_phase,
+            previousProjectPhaseDetail=None,
+            updatedBy=self.user_1,
+        )
+
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "SUBMITTED_TO_PROGRAMMER"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+        self.assertIsNone(self.project.phaseDetail_id)
+
+        self.client.force_authenticate(user=self.user_2)
+        response = self.client.post(
+            f"/construction-handovers/{handover.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            {
+                "currentStatus": "DRAFT",
+                "possibleTransitions": ["SUBMITTED_TO_PROGRAMMER"],
+            },
+        )
+
+        handover.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertEqual(handover.status, "DRAFT")
+        self.assertEqual(handover.updatedBy_id, self.user_2.uuid)
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+
+        patch_response = self.client.patch(
+            f"/construction-handovers/{handover.id}/",
+            {"name": "Edited after return to draft"},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+
         get_response = self.client.get(f"/construction-handovers/{handover.id}/")
         self.assertEqual(get_response.status_code, status.HTTP_200_OK)
         self.assertEqual(get_response.data["status"], "DRAFT")
@@ -715,6 +781,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
     def test_transitions_return_to_draft_allowed_for_handover_roles(self):
         cases = [
+            ("project manager", self.user_2, "SUBMITTED_TO_PROGRAMMER"),
             ("project manager", self.user_2, "SUBMITTED_TO_CONSTRUCTION"),
             ("programmer", self.user_4, "SUBMITTED_TO_CONSTRUCTION"),
             ("construction management lead", self.user_5, "PROJECT_MANAGER_NAMED"),
@@ -744,37 +811,96 @@ class ConstructionHandoverViewSetTestCase(TestCase):
                 self.assertEqual(handover.status, "DRAFT")
                 handover.delete()
 
-    def test_transitions_return_to_draft_denied_for_user_without_allowed_role(self):
-        self.client.force_authenticate(user=self.user_1)
-
-        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
-        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
-            value="constructionWait"
-        )
-        self.project.phase = construction_wait_phase
-        self.project.save(update_fields=["phase"])
+    def test_transitions_leaving_moved_to_construction_preparation_rejected_when_other_active_handover_exists(self):
+        self.client.force_authenticate(user=self.user_3)
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="SUBMITTED_TO_CONSTRUCTION",
-            previousProjectPhase=proposal_phase,
+            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            constructionProjectManager=self.person_construction,
+        )
+        ConstructionHandover.objects.create(project=self.project, status="DRAFT")
+
+        for to_status in ["PROJECT_MANAGER_NAMED", "DRAFT"]:
+            with self.subTest(to_status=to_status):
+                response = self.client.post(
+                    f"/construction-handovers/{handover.id}/transitions/",
+                    {"to": to_status},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+                self.assertEqual(
+                    response.data["detail"],
+                    "An active construction handover already exists for this project.",
+                )
+                handover.refresh_from_db()
+                self.assertEqual(handover.status, "MOVED_TO_CONSTRUCTION_PREPARATION")
+
+    def test_transitions_leaving_moved_to_construction_preparation_allowed_when_other_handovers_finished(self):
+        self.client.force_authenticate(user=self.user_3)
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            constructionProjectManager=self.person_construction,
+        )
+        ConstructionHandover.objects.create(
+            project=self.project, status="MOVED_TO_CONSTRUCTION_PREPARATION"
         )
 
         response = self.client.post(
             f"/construction-handovers/{handover.id}/transitions/",
-            {"to": "DRAFT"},
+            {"to": "PROJECT_MANAGER_NAMED"},
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         handover.refresh_from_db()
-        self.project.refresh_from_db()
-        self.assertEqual(handover.status, "SUBMITTED_TO_CONSTRUCTION")
-        self.assertEqual(handover.previousProjectPhase_id, proposal_phase.id)
-        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+        self.assertEqual(handover.status, "PROJECT_MANAGER_NAMED")
 
-    def test_transitions_return_to_draft_rejected_from_submitted_to_programmer(self):
-        self.client.force_authenticate(user=self.user_4)
+    def test_transitions_step_back_allowed_for_forward_roles_into_and_out_of_current_status(self):
+        # user_2: PM + planning person, user_3: PM + construction person,
+        # user_4: programmer, user_5: construction management lead.
+        cases = [
+            ("SUBMITTED_TO_CONSTRUCTION", "SUBMITTED_TO_PROGRAMMER", [self.user_4, self.user_5], [self.user_2, self.user_3]),
+            ("PROJECT_MANAGER_NAMED", "SUBMITTED_TO_CONSTRUCTION", [self.user_5, self.user_3], [self.user_4, self.user_2]),
+            ("MOVED_TO_CONSTRUCTION_PREPARATION", "PROJECT_MANAGER_NAMED", [self.user_3], [self.user_5, self.user_2]),
+        ]
+
+        def post_step_back(user, from_status, to_status):
+            handover = ConstructionHandover.objects.create(
+                project=self.project,
+                status=from_status,
+                constructionProjectManager=self.person_construction,
+            )
+            self.client.force_authenticate(user=user)
+            response = self.client.post(
+                f"/construction-handovers/{handover.id}/transitions/",
+                {"to": to_status},
+                format="json",
+            )
+            handover.refresh_from_db()
+            new_status = handover.status
+            # Deleted before asserting so a failure can't leave an active handover behind.
+            handover.delete()
+            return response.status_code, new_status
+
+        for from_status, to_status, allowed_users, denied_users in cases:
+            for user in denied_users:
+                with self.subTest(from_status=from_status, user=user.username, expected="denied"):
+                    status_code, new_status = post_step_back(user, from_status, to_status)
+                    self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
+                    self.assertEqual(new_status, from_status)
+
+            for user in allowed_users:
+                with self.subTest(from_status=from_status, user=user.username, expected="allowed"):
+                    status_code, new_status = post_step_back(user, from_status, to_status)
+                    self.assertEqual(status_code, status.HTTP_200_OK)
+                    self.assertEqual(new_status, to_status)
+
+    def test_transitions_return_to_draft_denied_for_user_without_allowed_role(self):
+        self.client.force_authenticate(user=self.user_1)
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
@@ -787,11 +913,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
-        self.assertEqual(response.data["detail"], "Invalid status transition.")
-        self.assertEqual(
-            response.data["possibleTransitions"], ["SUBMITTED_TO_CONSTRUCTION"]
-        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         handover.refresh_from_db()
         self.assertEqual(handover.status, "SUBMITTED_TO_PROGRAMMER")
 
@@ -1184,7 +1306,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             stara_procurement_reason.id,
         )
 
-    def test_sync_project_fields_for_transition_draft_restores_previous_phase_values_and_clears_handover_previous_fields(self):
+    def test_sync_project_fields_for_transition_back_to_programmer_restores_previous_phase_values_and_clears_handover_previous_fields(self):
         proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
         construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
             value="constructionWait"
@@ -1207,7 +1329,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         viewset = ConstructionHandoverViewSet()
         viewset._sync_project_fields_for_transition(
             instance=handover,
-            requested_status="DRAFT",
+            requested_status="SUBMITTED_TO_PROGRAMMER",
             previous_status="SUBMITTED_TO_CONSTRUCTION",
         )
 
@@ -1218,8 +1340,73 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         self.assertIsNone(handover.previousProjectPhase_id)
         self.assertIsNone(handover.previousProjectPhaseDetail_id)
 
-    def test_sync_project_fields_for_transition_draft_keeps_manually_changed_phase(self):
+    def test_sync_project_fields_for_transition_stepping_back_restores_previous_phase(self):
         proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        ProjectPhase.objects.get_or_create(value="constructionWait")
+        ProjectPhase.objects.get_or_create(value="constructionPreparation")
+        self.project.phase = proposal_phase
+        self.project.phaseDetail = None
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project, status="SUBMITTED_TO_PROGRAMMER"
+        )
+        viewset = ConstructionHandoverViewSet()
+        steps = [
+            ("SUBMITTED_TO_PROGRAMMER", "SUBMITTED_TO_CONSTRUCTION"),
+            ("SUBMITTED_TO_CONSTRUCTION", "PROJECT_MANAGER_NAMED"),
+            ("PROJECT_MANAGER_NAMED", "MOVED_TO_CONSTRUCTION_PREPARATION"),
+            ("MOVED_TO_CONSTRUCTION_PREPARATION", "PROJECT_MANAGER_NAMED"),
+            ("PROJECT_MANAGER_NAMED", "SUBMITTED_TO_CONSTRUCTION"),
+            ("SUBMITTED_TO_CONSTRUCTION", "SUBMITTED_TO_PROGRAMMER"),
+            ("SUBMITTED_TO_PROGRAMMER", "DRAFT"),
+        ]
+        for previous_status, requested_status in steps:
+            handover.status = requested_status
+            handover.save()
+            viewset._sync_project_fields_for_transition(
+                instance=handover,
+                requested_status=requested_status,
+                previous_status=previous_status,
+            )
+            self.project.refresh_from_db()
+            handover.refresh_from_db()
+            if requested_status == "PROJECT_MANAGER_NAMED":
+                self.assertEqual(self.project.phase.value, "constructionWait")
+
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+        self.assertIsNone(self.project.phaseDetail_id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+
+    def test_sync_project_fields_for_transition_back_to_programmer_keeps_manually_changed_phase(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
+        self.project.phase = construction_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="SUBMITTED_TO_PROGRAMMER",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="SUBMITTED_TO_PROGRAMMER",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_phase.id)
+        self.assertIsNone(handover.previousProjectPhase_id)
+        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+
+    def test_sync_project_fields_for_transition_back_to_submitted_to_construction_keeps_saved_and_manual_phase(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        ProjectPhase.objects.get_or_create(value="constructionWait")
         construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
         self.project.phase = construction_phase
         self.project.save(update_fields=["phase"])
@@ -1233,15 +1420,79 @@ class ConstructionHandoverViewSetTestCase(TestCase):
         viewset = ConstructionHandoverViewSet()
         viewset._sync_project_fields_for_transition(
             instance=handover,
-            requested_status="DRAFT",
-            previous_status="SUBMITTED_TO_CONSTRUCTION",
+            requested_status="SUBMITTED_TO_CONSTRUCTION",
+            previous_status="PROJECT_MANAGER_NAMED",
         )
 
         self.project.refresh_from_db()
         handover.refresh_from_db()
         self.assertEqual(self.project.phase_id, construction_phase.id)
-        self.assertIsNone(handover.previousProjectPhase_id)
-        self.assertIsNone(handover.previousProjectPhaseDetail_id)
+        self.assertEqual(handover.previousProjectPhase_id, proposal_phase.id)
+
+    def test_sync_project_fields_for_transition_restores_empty_phase(self):
+        ProjectPhase.objects.get_or_create(value="constructionWait")
+        self.project.phase = None
+        self.project.phaseDetail = None
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project, status="SUBMITTED_TO_CONSTRUCTION"
+        )
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="SUBMITTED_TO_CONSTRUCTION",
+            previous_status="SUBMITTED_TO_PROGRAMMER",
+        )
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase.value, "constructionWait")
+
+        handover.status = "SUBMITTED_TO_PROGRAMMER"
+        handover.save()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="SUBMITTED_TO_PROGRAMMER",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertIsNone(self.project.phase_id)
+        self.assertIsNone(self.project.phaseDetail_id)
+
+    def test_sync_project_fields_for_transition_restores_detail_when_already_in_construction_wait(self):
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        original_detail = ProjectPhaseDetail.objects.create(
+            value="waitingForSomething", projectPhase=construction_wait_phase
+        )
+        self.project.phase = construction_wait_phase
+        self.project.phaseDetail = original_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project, status="SUBMITTED_TO_CONSTRUCTION"
+        )
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="SUBMITTED_TO_CONSTRUCTION",
+            previous_status="SUBMITTED_TO_PROGRAMMER",
+        )
+        handover.status = "DRAFT"
+        handover.save()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="SUBMITTED_TO_CONSTRUCTION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+        self.assertEqual(self.project.phaseDetail_id, original_detail.id)
 
     def test_sync_project_fields_for_transition_draft_keeps_manual_change_from_wait_to_preparation(self):
         proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
@@ -1253,7 +1504,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="PROJECT_MANAGER_NAMED",
+            status="DRAFT",
             previousProjectPhase=proposal_phase,
         )
 
@@ -1279,7 +1530,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            status="DRAFT",
             previousProjectPhase=proposal_phase,
         )
 
@@ -1305,7 +1556,7 @@ class ConstructionHandoverViewSetTestCase(TestCase):
 
         handover = ConstructionHandover.objects.create(
             project=self.project,
-            status="MOVED_TO_CONSTRUCTION_PREPARATION",
+            status="DRAFT",
             previousProjectPhase=proposal_phase,
         )
 
@@ -1314,6 +1565,107 @@ class ConstructionHandoverViewSetTestCase(TestCase):
             instance=handover,
             requested_status="DRAFT",
             previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase_id, proposal_phase.id)
+
+    def test_sync_project_fields_for_transition_back_from_preparation_keeps_detail_when_other_reason_missing(self):
+        ProjectPhase.objects.get_or_create(value="constructionWait")
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        contract_preparation_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="contractPreparation"
+        )
+        ProjectPhaseDetail.objects.filter(value="otherReason").delete()
+        self.project.phase = construction_preparation_phase
+        self.project.phaseDetail = contract_preparation_detail
+        self.project.save(update_fields=["phase", "phaseDetail"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project, status="PROJECT_MANAGER_NAMED"
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="PROJECT_MANAGER_NAMED",
+            previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase.value, "constructionWait")
+        self.assertEqual(self.project.phaseDetail_id, contract_preparation_detail.id)
+
+    def test_sync_project_fields_for_transition_back_from_preparation_reverts_to_construction_wait(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        construction_wait_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionWait"
+        )
+        construction_wait_phase_detail, _ = ProjectPhaseDetail.objects.get_or_create(
+            value="otherReason", projectPhase=construction_wait_phase
+        )
+        construction_preparation_phase, _ = ProjectPhase.objects.get_or_create(
+            value="constructionPreparation"
+        )
+        self.project.phase = construction_preparation_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+            previousProjectPhase=proposal_phase,
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="PROJECT_MANAGER_NAMED",
+            previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        handover.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_wait_phase.id)
+        self.assertEqual(self.project.phaseDetail_id, construction_wait_phase_detail.id)
+        self.assertEqual(handover.previousProjectPhase_id, proposal_phase.id)
+
+    def test_sync_project_fields_for_transition_back_from_preparation_keeps_manually_changed_phase(self):
+        construction_phase, _ = ProjectPhase.objects.get_or_create(value="construction")
+        self.project.phase = construction_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="PROJECT_MANAGER_NAMED",
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="PROJECT_MANAGER_NAMED",
+            previous_status="MOVED_TO_CONSTRUCTION_PREPARATION",
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.phase_id, construction_phase.id)
+
+    def test_sync_project_fields_for_transition_draft_from_programmer_without_saved_phase_is_noop(self):
+        proposal_phase, _ = ProjectPhase.objects.get_or_create(value="proposal")
+        self.project.phase = proposal_phase
+        self.project.save(update_fields=["phase"])
+
+        handover = ConstructionHandover.objects.create(
+            project=self.project,
+            status="DRAFT",
+        )
+
+        viewset = ConstructionHandoverViewSet()
+        viewset._sync_project_fields_for_transition(
+            instance=handover,
+            requested_status="DRAFT",
+            previous_status="SUBMITTED_TO_PROGRAMMER",
         )
 
         self.project.refresh_from_db()

@@ -2,7 +2,6 @@ from django.test import TestCase
 from datetime import date
 from collections import defaultdict
 import uuid
-from unittest.mock import patch
 
 from infraohjelmointi_api.models import (
     ProjectClass,
@@ -110,10 +109,8 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
             "Should not show budget overlap when children sum equals parent budget (TSE-2028 scenario)"
         )
 
-    @patch("infraohjelmointi_api.serializers.FinancialSumSerializer.CacheService.set_financial_sum")
-    @patch("infraohjelmointi_api.serializers.FinancialSumSerializer.CacheService.get_financial_sum")
-    def test_project_group_finance_sums_bypass_cache(self, mock_get_financial_sum, mock_set_financial_sum):
-        """Regression test: ProjectGroup sums must be calculated fresh and bypass cache."""
+    def test_project_group_finance_sums(self):
+        """ProjectGroup sums include the group's programmed projects."""
         year = date.today().year
 
         project_group = ProjectGroup.objects.create(name="Group A")
@@ -130,11 +127,6 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
             forFrameView=False,
         )
 
-        mock_get_financial_sum.return_value = {
-            "year0": {"plannedBudget": 999999},
-            "year": year,
-        }
-
         serializer = FinancialSumSerializer(
             context={
                 "finance_year": year,
@@ -147,8 +139,6 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
         result = serializer.get_finance_sums(project_group)
 
         self.assertEqual(result["year0"]["plannedBudget"], 1234)
-        mock_get_financial_sum.assert_not_called()
-        mock_set_financial_sum.assert_not_called()
 
     def test_planning_masterclass_sums_descendant_projects_across_deep_levels(self):
         """Regression: masterclass planning sums must include projects deeper than 2 levels."""
@@ -205,4 +195,125 @@ class FinancialSumSerializerTestCase(CacheClearingMixin, TestCase):
 
         self.assertEqual(class_total, 100)
         self.assertEqual(master_total, class_total)
+
+    def test_planning_sums_find_descendants_by_parent_id_despite_path_mismatch(self):
+        """
+        Regression for IO-822/IO-960/IO-961: a descendant whose `path` was
+        built with the wrong prefix (like the Itaekeskus migration bug) must
+        still be found and summed, because lookups now walk `parent` ids
+        instead of matching on `path`.
+        """
+        year = date.today().year
+
+        root_master = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 Projektialueet",
+            path="8 08 Projektialueet",
+        )
+        child_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 03 Puistot ja liikunta-alueet",
+            parent=root_master,
+            path="8 08 Projektialueet/8 08 03 Puistot ja liikunta-alueet",
+        )
+        # Correct parent FK, but a path that does not start with the parent's
+        # path at all - exactly the kind of drift IO-822 introduced.
+        mismatched_path_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="Itakeskus",
+            parent=child_class,
+            path="Unrelated legacy path/Itakeskus",
+        )
+
+        project = Project.objects.create(
+            name="Itakeskus project",
+            description="Path mismatch regression project",
+            projectClass=mismatched_path_class,
+            programmed=True,
+        )
+        ProjectFinancial.objects.create(
+            project=project,
+            year=year,
+            value=300,
+            forFrameView=False,
+        )
+
+        serializer = FinancialSumSerializer(
+            context={
+                "finance_year": year,
+                "forcedToFrame": False,
+                "for_coordinator": False,
+                "frame_budgets": defaultdict(lambda: 0),
+            }
+        )
+
+        child_total = serializer.get_finance_sums(child_class)["year0"]["plannedBudget"]
+        master_total = serializer.get_finance_sums(root_master)["year0"]["plannedBudget"]
+
+        self.assertEqual(child_total, 300)
+        self.assertEqual(master_total, 300)
+
+    def test_coordinator_sums_find_descendants_by_parent_id_despite_path_mismatch(self):
+        """
+        Regression for IO-822/IO-960/IO-961, coordinator-view variant: the
+        Itaekeskus coordinator classes had paths under the wrong prefix, so
+        `8 08 03`'s coordinator sum silently dropped their budgets. Summing
+        must rely on `coordinatorClass`/`parent` ids, not `path`.
+        """
+        year = date.today().year
+
+        coordinator_root = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 Projektialueiden infrarakentaminen",
+            path="8 08 Projektialueiden infrarakentaminen, Khn käytettäväksi",
+            forCoordinatorOnly=True,
+        )
+        coordinator_child = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 03 Puistot ja liikunta-alueet",
+            parent=coordinator_root,
+            path="8 08 Projektialueiden infrarakentaminen, Khn käytettäväksi/8 08 03 Puistot ja liikunta-alueet",
+            forCoordinatorOnly=True,
+        )
+        planning_class = ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="Itakeskus",
+            path="Planning/Itakeskus",
+            forCoordinatorOnly=False,
+        )
+        ProjectClass.objects.create(
+            id=uuid.uuid4(),
+            name="8 08 03 12 Itakeskus",
+            parent=coordinator_child,
+            # Wrong prefix, same bug as migration 0092 before PR #531.
+            path="8 08 Projektialueiden infrarakentaminen/8 08 03 Puistot ja liikunta-alueet/8 08 03 12 Itakeskus",
+            forCoordinatorOnly=True,
+            relatedTo=planning_class,
+        )
+
+        project = Project.objects.create(
+            name="Itakeskus coordinator project",
+            description="Coordinator path mismatch regression project",
+            programmed=True,
+            projectClass=planning_class,
+        )
+        ProjectFinancial.objects.create(
+            project=project,
+            year=year,
+            value=300,
+            forFrameView=False,
+        )
+
+        serializer = FinancialSumSerializer(
+            context={
+                "finance_year": year,
+                "forcedToFrame": False,
+                "for_coordinator": True,
+                "frame_budgets": defaultdict(lambda: 0),
+            }
+        )
+
+        child_total = serializer.get_finance_sums(coordinator_child)["year0"]["plannedBudget"]
+
+        self.assertEqual(child_total, 300)
 

@@ -10,6 +10,8 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.utils import timezone
 
+from infraohjelmointi_api.services.CacheService import CacheService
+
 try:
     import openpyxl
 except ImportError:
@@ -376,6 +378,9 @@ class Command(BaseCommand):
     def process_assignments(self, specific_assignments, fallback_assignments, clear_existing, apply_to_projects):
         """Process programmer assignments and assign them to project classes"""
         self.stdout.write(self.style.SUCCESS("\n=== IMPORTING PROGRAMMERS ==="))
+        # The queryset .update() calls below skip the save signals that keep the
+        # district list (computedDefaultProgrammer) in sync.
+        transaction.on_commit(lambda: CacheService.invalidate_lookup("ProjectDistrict"))
 
         if clear_existing:
             cleared_count = ProjectClass.objects.exclude(defaultProgrammer=None).count()

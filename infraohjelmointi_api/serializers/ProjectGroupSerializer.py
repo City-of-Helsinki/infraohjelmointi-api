@@ -5,6 +5,7 @@ from infraohjelmointi_api.serializers.DynamicFieldsModelSerializer import (
 )
 from infraohjelmointi_api.serializers.FinancialSumSerializer import (
     FinancialSumSerializer,
+    FinancialSumListSerializer,
 )
 from infraohjelmointi_api.validators.ProjectGroupValidators.ProjectsFieldValidator import (
     ProjectsFieldValidator,
@@ -27,6 +28,7 @@ class ProjectGroupSerializer(DynamicFieldsModelSerializer, FinancialSumSerialize
 
     class Meta(BaseMeta):
         model = ProjectGroup
+        list_serializer_class = FinancialSumListSerializer
         validators = [
             UniqueTogetherValidator(
                 queryset=ProjectGroup.objects.all(),

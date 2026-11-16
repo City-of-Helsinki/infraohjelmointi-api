@@ -30,7 +30,6 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.services import (
     AppStateValueService,
-    CacheService,
     ProjectPhaseService,
     ProjectWiseService,
     ProjectFinancialService,
@@ -41,11 +40,11 @@ from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectResponseError,
 )
 from infraohjelmointi_api.services.utils import create_comprehensive_project_data
+from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 from infraohjelmointi_api.permissions import (
-    class_path_by_id,
-    get_restricted_user_assigned_class_paths,
+    class_id_in_scope,
+    get_restricted_user_class_scope_ids,
     is_restricted_programmer,
-    target_path_matches_assigned_paths,
 )
 import json
 
@@ -72,6 +71,17 @@ audit_logger = logging.getLogger("audit")
 
 
 class ProjectFilter(django_filters.FilterSet):
+    withoutHkrId = django_filters.BooleanFilter(method="filter_without_hkr_id")
+
+    def filter_without_hkr_id(self, queryset, name, value):
+        if not value:
+            return queryset
+        if self.data.getlist("hkrId"):
+            raise ValidationError(
+                {"withoutHkrId": "Cannot be combined with hkrId."}
+            )
+        return queryset.filter(hkrId__isnull=True)
+
     hashtag = django_filters.ModelMultipleChoiceFilter(
         field_name="hashTags",
         queryset=ProjectHashtagSerializer.Meta.model.objects.all(),
@@ -98,6 +108,43 @@ class ProjectFilter(django_filters.FilterSet):
             "personConstruction": ["exact"],
         }
         model = Project
+
+
+# Relations ProjectGetSerializer renders, loaded with the project rows.
+PROJECT_LIST_RELATIONS = (
+    "projectClass",
+    "projectLocation",
+    "lock",
+    "phase",
+    "category",
+    "personPlanning",
+    "personConstruction",
+    "personProgramming",
+    "budgetOverrunReason",
+    "siteId",
+    "projectSet",
+    "area",
+    "type",
+    "typeQualifier",
+    "priority",
+    "phaseDetail__projectPhase",
+    "suspendedFromPhase",
+    "constructionProcurementMethod",
+    "staraProcurementReason",
+    "riskAssessment",
+    "constructionPhase",
+    "planningPhase",
+    "projectQualityLevel",
+    "responsibleZone",
+)
+COORDINATOR_LIST_RELATIONS = (
+    "projectClass__coordinatorClass",
+    "projectLocation__coordinatorLocation",
+    "projectClass__parent__coordinatorClass",
+    "projectLocation__parent__coordinatorLocation",
+    "projectLocation__parent__parent__coordinatorLocation",
+)
+PROJECT_LIST_PREFETCHES = ("favPersons", "hashTags", "otherPersons")
 
 
 class ProjectViewSet(BaseViewSet):
@@ -273,26 +320,6 @@ class ProjectViewSet(BaseViewSet):
 
                     if update_finances:
                         ProjectFinancialService.update_or_create_bulk(project_financials=update_finances)
-
-                # Invalidate cache for all affected projects (bulk operations bypass signals)
-                affected_project_ids = {f.project_id for f in finance_instances}
-                for project_id in affected_project_ids:
-                    affected_project = Project.objects.get(id=project_id)
-                    if affected_project.projectClass:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectClass.id,
-                            instance_type='ProjectClass'
-                        )
-                    if affected_project.projectLocation:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectLocation.id,
-                            instance_type='ProjectLocation'
-                        )
-                    if affected_project.projectGroup:
-                        CacheService.invalidate_financial_sum(
-                            instance_id=affected_project.projectGroup.id,
-                            instance_type='ProjectGroup'
-                        )
 
                 # adding finance_year here so that on save the instance that gets to the post_save signal has this value on finance_update
                 updated_finance_instance.finance_year = year
@@ -661,6 +688,12 @@ class ProjectViewSet(BaseViewSet):
             Filters project name by string provided.\n
             Usage: projects/search-results/?projectName=<string>
 
+            withoutHkrId : bool
+
+            When true, returns only projects with no PW identifier (hkrId is NULL).
+            False or omitted leaves PW identifiers unrestricted. Cannot be combined with hkrId.
+            Usage: projects/search-results/?withoutHkrId=true
+
             limit : int [10 | 20 | 30]
 
             Limits the number of results in response and enables paginates the rest.\n
@@ -868,34 +901,18 @@ class ProjectViewSet(BaseViewSet):
 
             Project Queryset
         """
-        # Preload the relations ProjectGetSerializer renders as nested objects to avoid per-project queries
-        queryset = (
-            self.filter_queryset(self.get_queryset(for_coordinator=for_coordinator))
-            .select_related(
-                "siteId",
-                "projectSet",
-                "area",
-                "type",
-                "typeQualifier",
-                "priority",
-                "phaseDetail__projectPhase",
-                "suspendedFromPhase",
-                "constructionProcurementMethod",
-                "staraProcurementReason",
-                "riskAssessment",
-                "constructionPhase",
-                "planningPhase",
-                "projectQualityLevel",
-                "responsibleZone",
-            )
-            .prefetch_related("otherPersons")
-        )
+        # Two steps: the filter picks the page's project ids, then only those rows
+        # are loaded with the relations ProjectGetSerializer renders. As one
+        # query, Postgres spent 1.5-3 s *planning* the ~30 relation joins on top
+        # of the filter's joins (executing it took ~15 ms); by id it plans in ms.
+        id_queryset = self.filter_queryset(
+            self.get_queryset(for_coordinator=for_coordinator)
+        ).values_list("id", flat=True)
 
         financeYear = request.query_params.get("year", None)
         limit = request.query_params.get("limit", None)
         if limit is None:
-            querySetCount = queryset.count()
-            limit = querySetCount if querySetCount > 0 else 1
+            limit = id_queryset.count() or 1
 
         if financeYear is not None and not financeYear.isnumeric():
             logger.error(f"{request.user.id}: Invalid financeYear provided: {financeYear}")
@@ -904,10 +921,15 @@ class ProjectViewSet(BaseViewSet):
         # pagination
         paginator = PageNumberPagination()
         paginator.page_size = limit
-        page = paginator.paginate_queryset(queryset, request)
-        project_ids = (
-            [project.id for project in page] if page is not None else queryset.values("id")
-        )
+        id_page = paginator.paginate_queryset(id_queryset, request)
+        project_ids = list(id_page) if id_page is not None else list(id_queryset)
+
+        relations = PROJECT_LIST_RELATIONS + (COORDINATOR_LIST_RELATIONS if for_coordinator else ())
+        rows = Project.objects.select_related(*relations).prefetch_related(
+            *PROJECT_LIST_PREFETCHES
+        ).in_bulk(project_ids)
+        queryset = [rows[project_id] for project_id in project_ids if project_id in rows]
+        page = queryset if id_page is not None else None
 
         year = date.today().year if financeYear == None else int(financeYear)
         finances = ProjectFinancialSerializer(
@@ -1380,11 +1402,6 @@ class ProjectViewSet(BaseViewSet):
             for batch in batch_process(update_location_finances, bulk_size):
                 LocationFinancial.objects.bulk_update(batch, ['frameBudget', 'budgetChange'])
 
-        for year_offset in range(-2, 13):
-            year = current_year + year_offset
-            CacheService.invalidate_frame_budgets(year=year)
-        CacheService.clear_all()
-
         forced_to_frame_data_updated, _ = AppStateValueService.update_or_create(name="forcedToFrameDataUpdated", value=True)
 
         forced_to_frame_data_updated_serializer = AppStateValueSerializer(forced_to_frame_data_updated)
@@ -1691,8 +1708,8 @@ class ProjectViewSet(BaseViewSet):
         if not is_restricted_programmer(request.user):
             return None
 
-        assigned_paths = get_restricted_user_assigned_class_paths(request.user)
-        if not assigned_paths:
+        scope_ids = get_restricted_user_class_scope_ids(request.user)
+        if not scope_ids:
             return Response(
                 data={
                     "message": (
@@ -1704,19 +1721,14 @@ class ProjectViewSet(BaseViewSet):
             )
 
         unauthorized_ids = []
-        projects = (
-            Project.objects.filter(id__in=project_ids)
-            .select_related("projectClass")
-            .only("id", "projectClass__path")
+        projects = Project.objects.filter(id__in=project_ids).values_list(
+            "id", "projectClass_id"
         )
         found_ids = set()
-        for project in projects:
-            found_ids.add(str(project.id))
-            class_path = (
-                project.projectClass.path if project.projectClass else None
-            )
-            if not target_path_matches_assigned_paths(class_path, assigned_paths):
-                unauthorized_ids.append(str(project.id))
+        for project_id, class_id in projects:
+            found_ids.add(str(project_id))
+            if not class_id_in_scope(class_id, scope_ids):
+                unauthorized_ids.append(str(project_id))
 
         # Treat unknown ids the same as out-of-class — deny by default.
         missing_ids = [pid for pid in project_ids if pid not in found_ids]
@@ -1736,7 +1748,7 @@ class ProjectViewSet(BaseViewSet):
             )
 
         if any(
-            not target_path_matches_assigned_paths(class_path_by_id(class_id), assigned_paths)
+            not class_id_in_scope(class_id, scope_ids)
             for class_id in target_class_ids
         ):
             return Response(
@@ -1805,31 +1817,13 @@ class ProjectViewSet(BaseViewSet):
             forCoordinatorOnly=for_coordinator,
         ).distinct()
 
-        if model_class.__name__ == "ProjectClass":
-            ids = list(matching_nodes.values_list("id", flat=True))
-            frontier_ids = ids
-
-            while frontier_ids:
-                child_ids = list(
-                    model_class.objects.filter(
-                        parent__in=frontier_ids,
-                        forCoordinatorOnly=for_coordinator,
-                    )
-                    .exclude(id__in=ids)
-                    .values_list("id", flat=True)
-                )
-                ids.extend(child_ids)
-                frontier_ids = child_ids
-            return ids
-
-        paths = list(matching_nodes.values_list("path", flat=True))
-        if not paths:
+        root_ids = list(matching_nodes.values_list("id", flat=True))
+        if not root_ids:
             return []
 
-        return model_class.objects.filter(
-            Q(*[("path__startswith", path) for path in paths], _connector=Q.OR),
-            forCoordinatorOnly=for_coordinator,
-        ).distinct().values_list("id", flat=True)
+        return get_self_and_descendant_ids(
+            model_class, root_ids, forCoordinatorOnly=for_coordinator
+        )
 
     def _filter_projects_by_hierarchy(
         self,

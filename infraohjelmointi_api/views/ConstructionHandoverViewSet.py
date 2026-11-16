@@ -55,12 +55,22 @@ LOCKED_HANDOVER_ATTACHMENT_ERROR = (
 
 
 class ConstructionHandoverViewSet(BaseViewSet):
+    # Flow: DRAFT -> SUBMITTED_TO_PROGRAMMER -> SUBMITTED_TO_CONSTRUCTION -> PROJECT_MANAGER_NAMED
+    # -> MOVED_TO_CONSTRUCTION_PREPARATION. Each status can step back one, or return to DRAFT.
+    # Project sync on entry:
+    #   SUBMITTED_TO_CONSTRUCTION (from SUBMITTED_TO_PROGRAMMER): saves phase/phaseDetail on the
+    #     handover, sets constructionWait/otherReason.
+    #   PROJECT_MANAGER_NAMED: personConstruction, constructionProcurementMethod, staraProcurementReason;
+    #     from MOVED_TO_CONSTRUCTION_PREPARATION also reverts the phase to constructionWait/otherReason.
+    #   MOVED_TO_CONSTRUCTION_PREPARATION: constructionPreparation/contractPreparation + procurement fields.
+    #   SUBMITTED_TO_PROGRAMMER / DRAFT: restore the saved phase/phaseDetail.
+    # Phase changes are skipped if the project phase was changed manually; person and procurement are never reverted.
     ALLOWED_STATUS_TRANSITIONS = {
         "DRAFT": ["SUBMITTED_TO_PROGRAMMER"],
-        "SUBMITTED_TO_PROGRAMMER": ["SUBMITTED_TO_CONSTRUCTION"],
-        "SUBMITTED_TO_CONSTRUCTION": ["PROJECT_MANAGER_NAMED", "DRAFT"],
-        "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION", "DRAFT"],
-        "MOVED_TO_CONSTRUCTION_PREPARATION": ["DRAFT"],
+        "SUBMITTED_TO_PROGRAMMER": ["SUBMITTED_TO_CONSTRUCTION", "DRAFT"],
+        "SUBMITTED_TO_CONSTRUCTION": ["PROJECT_MANAGER_NAMED", "SUBMITTED_TO_PROGRAMMER", "DRAFT"],
+        "PROJECT_MANAGER_NAMED": ["MOVED_TO_CONSTRUCTION_PREPARATION", "SUBMITTED_TO_CONSTRUCTION", "DRAFT"],
+        "MOVED_TO_CONSTRUCTION_PREPARATION": ["PROJECT_MANAGER_NAMED", "DRAFT"],
     }
 
     # Project phase the handover sets when it enters each status.
@@ -376,258 +386,146 @@ class ConstructionHandoverViewSet(BaseViewSet):
     def _get_project_phase_detail_or_none(self, phase_detail_value):
         return ProjectPhaseDetailService.find_by_value(value=phase_detail_value)
 
-    def _sync_procurement_method(self, project, instance, project_update_fields):
-        # Keep project's procurement method aligned with the handover value.
-        if (
-            project.constructionProcurementMethod_id
-            != instance.constructionProcurementMethod_id
-        ):
-            project.constructionProcurementMethod = instance.constructionProcurementMethod
-            project_update_fields.append("constructionProcurementMethod")
+    @staticmethod
+    def _set_if_changed(obj, field, value, update_fields):
+        if getattr(obj, f"{field}_id") != getattr(value, "pk", None):
+            setattr(obj, field, value)
+            update_fields.append(field)
 
-        # Keep project's staraProcurementReason aligned with the handover value.
-        if (
-            project.staraProcurementReason_id
-            != instance.staraProcurementReason_id
-        ):
-            project.staraProcurementReason = instance.staraProcurementReason
-            project_update_fields.append("staraProcurementReason")
+    @staticmethod
+    def _project_in_phase(project, phase_value):
+        return project.phase is not None and project.phase.value == phase_value
 
-    def _sync_submitted_to_construction(
-        self,
-        project,
-        instance,
-        project_update_fields,
-        handover_update_fields,
-    ):
-        # Move project to construction-wait state and store previous values for rollback to DRAFT.
-        construction_wait_phase = self._get_project_phase_or_none("constructionWait")
-        construction_wait_phase_detail = self._get_project_phase_detail_or_none("otherReason")
+    def _set_project_phase(self, project, phase_value, phase_detail_value, project_update_fields):
+        # Missing lookup rows are skipped rather than clearing the project's values.
+        phase = self._get_project_phase_or_none(phase_value)
+        if phase is None:
+            return
+        self._set_if_changed(project, "phase", phase, project_update_fields)
+        phase_detail = self._get_project_phase_detail_or_none(phase_detail_value)
+        if phase_detail is not None:
+            self._set_if_changed(project, "phaseDetail", phase_detail, project_update_fields)
 
-        if construction_wait_phase and project.phase_id != construction_wait_phase.id:
-            instance.previousProjectPhase = project.phase
-            handover_update_fields.append("previousProjectPhase")
-            project.phase = construction_wait_phase
-            project_update_fields.append("phase")
-
-        if (
-            construction_wait_phase_detail
-            and project.phaseDetail_id != construction_wait_phase_detail.id
-        ):
-            instance.previousProjectPhaseDetail = project.phaseDetail
-            handover_update_fields.append("previousProjectPhaseDetail")
-            project.phaseDetail = construction_wait_phase_detail
-            project_update_fields.append("phaseDetail")
-
-    def _sync_project_manager_named(
-        self,
-        project,
-        instance,
-        project_update_fields,
-    ):
-        # Mirror selected construction project manager to the project.
-        if project.personConstruction_id != instance.constructionProjectManager_id:
-            project.personConstruction = instance.constructionProjectManager
-            project_update_fields.append("personConstruction")
-
-        self._sync_procurement_method(
-            project=project,
-            instance=instance,
-            project_update_fields=project_update_fields,
+    def _sync_procurement(self, project, instance, project_update_fields):
+        self._set_if_changed(
+            project, "constructionProcurementMethod", instance.constructionProcurementMethod, project_update_fields
+        )
+        self._set_if_changed(
+            project, "staraProcurementReason", instance.staraProcurementReason, project_update_fields
         )
 
-    def _sync_moved_to_construction_preparation(
-        self,
-        project,
-        instance,
-        project_update_fields,
+    def _restore_previous_project_phase(
+        self, project, instance, previous_status, project_update_fields, handover_update_fields
     ):
-        # Advance project to construction-preparation phase and contract-preparation detail.
-        construction_preparation_phase = self._get_project_phase_or_none(
-            "constructionPreparation"
-        )
-        construction_preparation_phase_detail = self._get_project_phase_detail_or_none(
-            "contractPreparation"
-        )
-
-        if (
-            construction_preparation_phase
-            and project.phase_id != construction_preparation_phase.id
-        ):
-            project.phase = construction_preparation_phase
-            project_update_fields.append("phase")
-
-        if (
-            construction_preparation_phase_detail
-            and project.phaseDetail_id != construction_preparation_phase_detail.id
-        ):
-            project.phaseDetail = construction_preparation_phase_detail
-            project_update_fields.append("phaseDetail")
-
-        self._sync_procurement_method(
-            project=project,
-            instance=instance,
-            project_update_fields=project_update_fields,
-        )
-
-    def _sync_draft(
-        self,
-        project,
-        instance,
-        previous_status,
-        project_update_fields,
-        handover_update_fields,
-    ):
-        # Restore previously saved phase values when transition returns to DRAFT.
-        # PersonConstruction and constructionProcurementMethod are not reverted to previous values.
-        
-        if not instance.previousProjectPhase_id:
+        handover_set_phase_value = self.HANDOVER_SET_PROJECT_PHASES.get(previous_status)
+        if handover_set_phase_value is None:
             return
 
-        # Don't overwrite a phase that was changed manually after the handover set it.
-        handover_set_phase_value = self.HANDOVER_SET_PROJECT_PHASES.get(previous_status)
-        project_still_in_handover_phase = (
-            handover_set_phase_value is not None
-            and project.phase is not None
-            and project.phase.value == handover_set_phase_value
-        )
-
-        if project_still_in_handover_phase:
-            project.phase = instance.previousProjectPhase
-            project_update_fields.append("phase")
-
-            # previousProjectPhaseDetail may intentionally be None.
-            if project.phaseDetail_id != instance.previousProjectPhaseDetail_id:
-                project.phaseDetail = instance.previousProjectPhaseDetail
-                project_update_fields.append("phaseDetail")
+        # A manually changed phase is kept; saved values may intentionally be None.
+        if self._project_in_phase(project, handover_set_phase_value):
+            self._set_if_changed(project, "phase", instance.previousProjectPhase, project_update_fields)
+            self._set_if_changed(
+                project, "phaseDetail", instance.previousProjectPhaseDetail, project_update_fields
+            )
 
         instance.previousProjectPhase = None
-        handover_update_fields.append("previousProjectPhase")
         instance.previousProjectPhaseDetail = None
-        handover_update_fields.append("previousProjectPhaseDetail")
-
-    def _persist_synced_transition_fields(
-        self,
-        project,
-        instance,
-        project_update_fields,
-        handover_update_fields,
-    ):
-        # Persist only changed fields to avoid unnecessary writes.
-        if project_update_fields:
-            project.save(update_fields=project_update_fields)
-
-        if handover_update_fields:
-            instance.save(update_fields=handover_update_fields)
+        handover_update_fields.extend(["previousProjectPhase", "previousProjectPhaseDetail"])
 
     def _sync_project_fields_for_transition(self, instance, requested_status, previous_status):
         project = instance.project
         project_update_fields = []
         handover_update_fields = []
 
-        transition_sync_handlers = {
-            "SUBMITTED_TO_CONSTRUCTION": lambda: self._sync_submitted_to_construction(
-                project=project,
-                instance=instance,
-                project_update_fields=project_update_fields,
-                handover_update_fields=handover_update_fields,
-            ),
-            "PROJECT_MANAGER_NAMED": lambda: self._sync_project_manager_named(
-                project=project,
-                instance=instance,
-                project_update_fields=project_update_fields,
-            ),
-            "MOVED_TO_CONSTRUCTION_PREPARATION": lambda: self._sync_moved_to_construction_preparation(
-                project=project,
-                instance=instance,
-                project_update_fields=project_update_fields,
-            ),
-            "DRAFT": lambda: self._sync_draft(
-                project=project,
-                instance=instance,
-                previous_status=previous_status,
-                project_update_fields=project_update_fields,
-                handover_update_fields=handover_update_fields,
-            ),
-        }
+        if requested_status in ("DRAFT", "SUBMITTED_TO_PROGRAMMER"):
+            self._restore_previous_project_phase(
+                project, instance, previous_status, project_update_fields, handover_update_fields
+            )
 
-        sync_handler = transition_sync_handlers.get(requested_status)
-        if sync_handler:
-            sync_handler()
+        elif requested_status == "SUBMITTED_TO_CONSTRUCTION":
+            # Stepping back from PROJECT_MANAGER_NAMED keeps the values saved on first entry.
+            if previous_status == "SUBMITTED_TO_PROGRAMMER":
+                instance.previousProjectPhase = project.phase
+                instance.previousProjectPhaseDetail = project.phaseDetail
+                handover_update_fields.extend(["previousProjectPhase", "previousProjectPhaseDetail"])
+                self._set_project_phase(project, "constructionWait", "otherReason", project_update_fields)
 
-        self._persist_synced_transition_fields(
-            project=project,
-            instance=instance,
-            project_update_fields=project_update_fields,
-            handover_update_fields=handover_update_fields,
+        elif requested_status == "PROJECT_MANAGER_NAMED":
+            if (
+                previous_status == "MOVED_TO_CONSTRUCTION_PREPARATION"
+                and self._project_in_phase(project, "constructionPreparation")
+            ):
+                self._set_project_phase(project, "constructionWait", "otherReason", project_update_fields)
+            self._set_if_changed(
+                project, "personConstruction", instance.constructionProjectManager, project_update_fields
+            )
+            self._sync_procurement(project, instance, project_update_fields)
+
+        elif requested_status == "MOVED_TO_CONSTRUCTION_PREPARATION":
+            self._set_project_phase(
+                project, "constructionPreparation", "contractPreparation", project_update_fields
+            )
+            self._sync_procurement(project, instance, project_update_fields)
+
+        if project_update_fields:
+            project.save(update_fields=project_update_fields)
+        if handover_update_fields:
+            instance.save(update_fields=handover_update_fields)
+
+    def _transition_error_response(self, instance, detail, http_status):
+        return Response(
+            {
+                "detail": detail,
+                "currentStatus": instance.status,
+                "possibleTransitions": self._get_possible_status_transitions(instance.status),
+            },
+            status=http_status,
         )
 
-    def _transition_to_status(self, request, instance, requested_status):
-        possible_statuses = self._get_possible_status_transitions(instance.status)
+    def _get_transition_error(self, request, instance, requested_status):
+        """Return (detail, http_status) if the transition is not allowed, else None."""
+        if requested_status not in {choice[0] for choice in instance.STATUS_CHOICES}:
+            return f"Invalid status '{requested_status}'.", status.HTTP_400_BAD_REQUEST
 
-        valid_statuses = {choice[0] for choice in instance.STATUS_CHOICES}
-        if requested_status not in valid_statuses:
-            return Response(
-                {
-                    "detail": f"Invalid status '{requested_status}'.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if requested_status not in self._get_possible_status_transitions(instance.status):
+            return "Invalid status transition.", status.HTTP_409_CONFLICT
 
-        if requested_status not in possible_statuses:
-            return Response(
-                {
-                    "detail": "Invalid status transition.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        if (
-            requested_status == "PROJECT_MANAGER_NAMED"
-            and instance.constructionProjectManager_id in (None, "")
-        ):
-            return Response(
-                {
-                    "detail": "constructionProjectManager is required for this transition.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
+        if requested_status == "PROJECT_MANAGER_NAMED" and not instance.constructionProjectManager_id:
+            return "constructionProjectManager is required for this transition.", status.HTTP_409_CONFLICT
 
         if (
             requested_status == "MOVED_TO_CONSTRUCTION_PREPARATION"
-            and instance.constructionProcurementMethod_id in (None, "")
+            and not instance.constructionProcurementMethod_id
         ):
-            return Response(
-                {
-                    "detail": "constructionProcurementMethod is required for this transition.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-        
+            return "constructionProcurementMethod is required for this transition.", status.HTTP_409_CONFLICT
+
+        # Once moved to preparation a new handover may exist; don't reopen this one next to it.
+        if (
+            instance.status == "MOVED_TO_CONSTRUCTION_PREPARATION"
+            and ConstructionHandover.objects.filter(project_id=instance.project_id)
+            .exclude(pk=instance.pk)
+            .exclude(status="MOVED_TO_CONSTRUCTION_PREPARATION")
+            .exists()
+        ):
+            return "An active construction handover already exists for this project.", status.HTTP_409_CONFLICT
+
         if not ConstructionHandoverTransitionPermissionService.is_transition_allowed(
             requested_status=requested_status,
+            current_status=instance.status,
             user=self._get_authenticated_user(request),
             project=instance.project,
             is_project_manager=self._is_project_manager(request),
             is_programmer=self._is_programmer(request),
             is_construction_management_lead=self._is_construction_management_lead(request),
         ):
-            return Response(
-                {
-                    "detail": "You do not have permission to perform this transition.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return "You do not have permission to perform this transition.", status.HTTP_403_FORBIDDEN
+
+        return None
+
+    def _transition_to_status(self, request, instance, requested_status):
+        error = self._get_transition_error(request, instance, requested_status)
+        if error:
+            return self._transition_error_response(instance, *error)
 
         user = self._get_authenticated_user(request)
         previous_status = instance.status
@@ -658,17 +556,11 @@ class ConstructionHandoverViewSet(BaseViewSet):
     )
     def transitions(self, request, pk=None):
         instance = self.get_object()
-        possible_statuses = self._get_possible_status_transitions(instance.status)
         requested_status = request.data.get("to")
 
         if requested_status is None:
-            return Response(
-                {
-                    "detail": "Field 'to' is required.",
-                    "currentStatus": instance.status,
-                    "possibleTransitions": possible_statuses,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return self._transition_error_response(
+                instance, "Field 'to' is required.", status.HTTP_400_BAD_REQUEST
             )
 
         transition_error_response = self._transition_to_status(

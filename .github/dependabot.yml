@@ -15,19 +15,29 @@ updates:
           - "minor"
           - "patch"
         # Django feature releases (5.1 -> 5.2) count as "minor" but can break
-        # things; channels is tied to Django. Review these as separate PRs.
+        # things, and utils/eventstream_setup.py relies on django-eventstream
+        # internals. Review these as separate PRs.
         exclude-patterns:
           - "django"
-          - "channels"
+          - "django-eventstream"
     ignore:
       # Major upgrades of these are planned work, not drive-by bumps
       - dependency-name: "django"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "channels"
+      # Auth stack majors can change login behaviour. social-auth-app-django 7
+      # needs social-auth-core 6.2, which calls get_remote_jwks_keys(uri) while
+      # helusers 1.3 still overrides get_remote_jwks_keys(self): Helsinki Login
+      # to the admin fails until helusers catches up.
+      - dependency-name: "social-auth-app-django"
         update-types: ["version-update:semver-major"]
-      # DRF 3.18+ requires Django 5.2; stay on 3.17.x while we're on Django 4.2
+      - dependency-name: "social-auth-core"
+        versions: [">=6.1"]
+      - dependency-name: "django-helusers"
+        update-types: ["version-update:semver-major"]
+      # 3.20 removes the list error format kept by
+      # LIST_SERIALIZER_ERRORS_AS_DICT in project/settings.py.
       - dependency-name: "djangorestframework"
-        versions: [">=3.18"]
-      # django-redis 7 requires Django 5.2
-      - dependency-name: "django-redis"
-        versions: [">=7"]
+        versions: [">=3.20"]
+      # utils/eventstream_setup.py subclasses its RedisListener; review majors.
+      - dependency-name: "django-eventstream"
+        update-types: ["version-update:semver-major"]

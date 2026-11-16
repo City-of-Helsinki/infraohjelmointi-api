@@ -1,8 +1,6 @@
 from datetime import date
-from django.db.models import Prefetch
 from .BaseClassLocationViewSet import BaseClassLocationViewSet
 from infraohjelmointi_api.serializers import ProjectClassSerializer
-from infraohjelmointi_api.models import Project
 from infraohjelmointi_api.models.ClassFinancial import ClassFinancial
 from infraohjelmointi_api.services import ProjectClassService, ClassFinancialService
 from overrides import override
@@ -23,19 +21,6 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
         queryset = (
             ProjectClassService.list_all()
             .select_related('coordinatorClass', 'coordinatorClass__parent', 'coordinatorClass__parent__parent', 'parent', 'defaultProgrammer')
-            .prefetch_related(
-                'coordinatorClass__finances',
-                Prefetch(
-                    'finances',
-                    queryset=ClassFinancial.objects.filter(forFrameView=False).order_by('year'),
-                ),
-                Prefetch(
-                    'project_set',
-                    queryset=Project.objects.filter(programmed=True)
-                    .select_related('projectClass')
-                    .prefetch_related('finances'),
-                ),
-            )
         )
 
         user = self.request.user

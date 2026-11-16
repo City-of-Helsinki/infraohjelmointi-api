@@ -12,13 +12,41 @@ from infraohjelmointi_api.services import (
     ClassFinancialService,
     LocationFinancialService,
 )
-from infraohjelmointi_api.services.CacheService import CacheService
+from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 from rest_framework import serializers
 from django.db.models import (
     Sum,
     Q,
 )
 from django.db.models.manager import BaseManager
+
+PRECOMPUTED_SUMS_KEY = "_precomputed_finance_sums"
+
+
+class FinancialSumListSerializer(serializers.ListSerializer):
+    """Computes ``finances`` for the whole list up front instead of per row."""
+
+    # Rows of the whole ProjectClass table, if a subclass has already loaded them.
+    class_rows = None
+
+    def to_representation(self, data):
+        instances = list(data.all() if isinstance(data, BaseManager) else data)
+        # e.g. the free search lists groups with fields=("id", "name").
+        if instances and "finances" in self.child.fields:
+            from infraohjelmointi_api.services.FinancialSumBatchService import (
+                FinancialSumBatchService,
+            )
+            batch = FinancialSumBatchService(
+                year=int(self.context.get("finance_year", date.today().year)),
+                forced_to_frame=self.context.get("forcedToFrame", False),
+                for_coordinator=self.context.get("for_coordinator", False),
+                frame_budgets=self.context.get("frame_budgets"),
+                class_rows=self.class_rows,
+            )
+            self.context[PRECOMPUTED_SUMS_KEY] = batch.compute(
+                instances, instances[0]._meta.model.__name__
+            )
+        return [self.child.to_representation(item) for item in instances]
 
 
 class FinancialSumSerializer(serializers.ModelSerializer):
@@ -224,12 +252,15 @@ class FinancialSumSerializer(serializers.ModelSerializer):
     def get_finance_sums(self, instance):
         """
         Calculates financial sums for 10 years given a group | location | class instance.
-        Uses caching for performance optimization.
+        List serializers precompute these for every row (FinancialSumListSerializer).
         """
         _type = instance._meta.model.__name__
         year = int(self.context.get("finance_year", date.today().year))
         forced_to_frame = self.context.get("forcedToFrame", False)
-        for_coordinator = self.context.get("for_coordinator", False)
+
+        precomputed = self.context.get(PRECOMPUTED_SUMS_KEY)
+        if precomputed is not None and instance.id in precomputed:
+            return precomputed[instance.id]
 
         frame_budgets = self.context.get("frame_budgets")
         if frame_budgets is None:
@@ -239,39 +270,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
             frame_budgets = BaseClassLocationViewSet.build_frame_budgets_context(
                 year, for_frame_view=forced_to_frame
             )
-
-        # Coordinator classes/locations should always be cached (best performance benefit)
-        # Planning classes should not be cached (depend on coordinator finances for overlap)
-        use_cache = True
-        if _type == "ProjectClass":
-            # Coordinator classes: always cache
-            if getattr(instance, "forCoordinatorOnly", False):
-                use_cache = True
-            # Planning classes: don't cache (have coordinatorClass attribute)
-            elif getattr(instance, "coordinatorClass", None):
-                use_cache = False
-        elif _type == "ProjectLocation":
-            # Coordinator locations: always cache
-            if getattr(instance, "forCoordinatorOnly", False):
-                use_cache = True
-            # Planning locations: don't cache (have coordinatorLocation attribute)
-            elif getattr(instance, "coordinatorLocation", None):
-                use_cache = False
-        elif _type == "ProjectGroup":
-            use_cache = False
-
-        cached_result = None
-        if use_cache:
-            cached_result = CacheService.get_financial_sum(
-                instance_id=instance.id,
-                instance_type=_type,
-                year=year,
-                for_frame_view=forced_to_frame,
-                for_coordinator=for_coordinator
-            )
-
-        if cached_result is not None:
-            return cached_result
 
         related_projects = self.get_related_projects(instance=instance, _type=_type)
 
@@ -307,16 +305,6 @@ class FinancialSumSerializer(serializers.ModelSerializer):
         }
         for i in range(11):
             summed_finances[f"year{i}"]["plannedBudget"] = int(summed_finances.pop(f"year{i}_plannedBudget"))
-
-        if use_cache:
-            CacheService.set_financial_sum(
-                instance_id=instance.id,
-                instance_type=_type,
-                year=year,
-                for_frame_view=forced_to_frame,
-                data=summed_finances,
-                for_coordinator=for_coordinator
-            )
 
         return summed_finances
 
@@ -393,7 +381,15 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
             return Project.objects.none()
         if _type == "ProjectClass":
+            # Walk the real parent id chain instead of matching on `path` (IO-961):
+            # `path` is a denormalized string that can drift from the parent
+            # links (see IO-822/IO-960) and silently drop descendants from a
+            # prefix match. `get_self_and_descendant_ids` always reflects the
+            # actual hierarchy.
             if for_coordinator == True:
+                descendant_coordinator_ids = get_self_and_descendant_ids(
+                    ProjectClass, [instance.id], forCoordinatorOnly=True
+                )
                 return (
                     Project.objects.select_related(
                         "projectClass",
@@ -403,36 +399,27 @@ class FinancialSumSerializer(serializers.ModelSerializer):
                     )
                     .prefetch_related("finances")  # CRITICAL: Prevents N+1 queries when aggregating ProjectFinancial
                     .filter(
-                        # IO-928: same trailing-slash boundary as the planning branch.
                         (
                             Q(projectClass__name__icontains="suurpiiri")
-                            & (
-                                Q(projectClass__parent__coordinatorClass=instance)
-                                | Q(
-                                    projectClass__parent__coordinatorClass__path__startswith=instance.path
-                                    + "/"
-                                )
+                            & Q(
+                                projectClass__parent__coordinatorClass__in=descendant_coordinator_ids
                             )
                         )
-                        | Q(projectClass__coordinatorClass=instance)
                         | Q(
-                            projectClass__coordinatorClass__path__startswith=instance.path
-                            + "/"
+                            projectClass__coordinatorClass__in=descendant_coordinator_ids
                         ),
                         programmed=True,
                     )
                 )
             else:
+                descendant_class_ids = get_self_and_descendant_ids(
+                    ProjectClass, [instance.id], forCoordinatorOnly=False
+                )
                 return (
                     Project.objects.select_related("projectClass")
                     .prefetch_related("finances")
                     .filter(
-                        # IO-928: `path` is name-based, so the descendant prefix match
-                        # needs a trailing-slash boundary — without it ".../Malmi" also
-                        # matches the sibling ".../Malminkartano-Kannelmäki" and absorbs
-                        # its projects. Q(projectClass=instance) keeps this class's own.
-                        Q(projectClass__path__startswith=instance.path + "/")
-                        | Q(projectClass=instance),
+                        projectClass_id__in=descendant_class_ids,
                         programmed=True,
                     )
                 )

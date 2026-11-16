@@ -7,7 +7,6 @@ from rest_framework import status
 
 from .BaseViewSet import BaseViewSet
 from infraohjelmointi_api.models import ClassFinancial, LocationFinancial
-from infraohjelmointi_api.services.CacheService import CacheService
 
 
 class BaseClassLocationViewSet(BaseViewSet):
@@ -19,7 +18,6 @@ class BaseClassLocationViewSet(BaseViewSet):
     def build_frame_budgets_context(year: int, for_frame_view: bool = False) -> defaultdict:
         """
         Build frame_budgets context for consistent budget overlap logic.
-        Uses caching for performance optimization.
         
         Args:
             year: Starting year for frame budget collection
@@ -28,12 +26,6 @@ class BaseClassLocationViewSet(BaseViewSet):
         Returns:
             defaultdict: Dictionary with keys "{year}-{relation_id}" and frameBudget values
         """
-        cached_frame_budgets = CacheService.get_frame_budgets(year=year, for_frame_view=for_frame_view)
-        if cached_frame_budgets is not None:
-            frame_budgets = defaultdict(lambda: 0)
-            frame_budgets.update(cached_frame_budgets)
-            return frame_budgets
-        
         class_financials = ClassFinancial.objects.filter(
             year__in=range(year, year+11),
             forFrameView=for_frame_view
@@ -50,12 +42,6 @@ class BaseClassLocationViewSet(BaseViewSet):
             relation_id = str(f['relation']) if f['relation'] else None
             if relation_id:
                 frame_budgets[f"{f['year']}-{relation_id}"] = f["frameBudget"]
-        
-        CacheService.set_frame_budgets(
-            year=year,
-            for_frame_view=for_frame_view,
-            data=dict(frame_budgets)
-        )
         
         return frame_budgets
 
@@ -331,15 +317,6 @@ class BaseClassLocationViewSet(BaseViewSet):
                             )
                         setattr(obj, key, value)
                     obj.save()
-                    
-                    CacheService.invalidate_financial_sum(
-                        instance_id=entity_id,
-                        instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
-                    )
-                    for year_offset in range(-10, 1):
-                        affected_year = year + year_offset
-                        if affected_year >= 2000:
-                            CacheService.invalidate_frame_budgets(year=affected_year)
                     self._update_frame_view_if_needed(
                         forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
                     )
@@ -363,15 +340,6 @@ class BaseClassLocationViewSet(BaseViewSet):
                             data={"message": "Failed to save financial data: " + str(save_error)},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
-                    
-                    CacheService.invalidate_financial_sum(
-                        instance_id=entity_id,
-                        instance_type='ProjectClass' if relation_field == 'classRelation' else 'ProjectLocation'
-                    )
-                    for year_offset in range(-10, 1):
-                        affected_year = year + year_offset
-                        if affected_year >= 2000:
-                            CacheService.invalidate_frame_budgets(year=affected_year)
                     self._update_frame_view_if_needed(
                         forced_to_frame_status, forced_to_frame, obj, entity_id, relation_field, financial_service
                     )

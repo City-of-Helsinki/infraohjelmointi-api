@@ -1441,6 +1441,42 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             msg="visibilityEnd format in POST request != format in response",
         )
 
+    def test_search_results_without_hkr_id(self):
+        missing_project = Project.objects.create(
+            name="Project without PW identifier",
+            description="Project with no linked PW identifier",
+            projectClass=self.projectClass,
+            phase=self.projectPhase,
+            programmed=False,
+        )
+        endpoint = "/projects/search-results/"
+
+        response = self.client.get(endpoint, {"withoutHkrId": "true"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(str(missing_project.id), result_ids)
+        self.assertNotIn(str(self.project.id), result_ids)
+
+        for params in ({}, {"withoutHkrId": "false"}):
+            with self.subTest(params=params):
+                response = self.client.get(endpoint, params)
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                result_ids = {item["id"] for item in response.json()["results"]}
+                self.assertIn(str(missing_project.id), result_ids)
+                self.assertIn(str(self.project.id), result_ids)
+
+        response = self.client.get(
+            endpoint, {"withoutHkrId": "true", "programmed": "true"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 0)
+
+        response = self.client.get(
+            endpoint, {"withoutHkrId": "true", "hkrId": self.project.hkrId}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("withoutHkrId", response.json())
+
     def test_search_results_endpoint_project(self):
         district_1 = ProjectLocation.objects.create(
             id=self.projectDistrict_2_Id,
@@ -4241,6 +4277,49 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             "/projects/coordinator/?class={}&programmed=true".format(
                 coordinator_class.id
             ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [result["id"] for result in response.json()["results"]],
+            [str(project.id)],
+        )
+
+    def test_location_descendants_are_found_by_parent_fk(self):
+        """
+        Regression for IO-961: ProjectLocation descendants must be found by
+        walking `parent` ids, same as ProjectClass (IO-952), so a stray
+        `path` never hides a district's divisions/subDivisions from a
+        hierarchy filter.
+        """
+        district = ProjectLocation.objects.create(
+            name="District for path mismatch",
+            path="District for path mismatch",
+            forCoordinatorOnly=False,
+        )
+        division = district.childLocation.create(
+            name="Division for path mismatch",
+            path="District for path mismatch/Division for path mismatch",
+            forCoordinatorOnly=False,
+        )
+        sub_division = division.childLocation.create(
+            name="SubDivision for path mismatch",
+            # Correct parent FK, but a path that does not start with the
+            # division's path at all.
+            path="Legacy path/with a different prefix",
+            forCoordinatorOnly=False,
+        )
+
+        project = Project.objects.create(
+            name="Project under mismatched location path",
+            description="Regression test project",
+            programmed=True,
+            projectLocation=sub_division,
+        )
+
+        response = self.client.get(
+            "/projects/?district={}&programmed=true".format(district.id),
             content_type="application/json",
         )
 

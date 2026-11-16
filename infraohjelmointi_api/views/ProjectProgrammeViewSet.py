@@ -28,12 +28,12 @@ from infraohjelmointi_api.models import (
 )
 from infraohjelmointi_api.permissions import (
     get_planner_group_name,
-    get_project_programme_contributor_group_name,
+    get_transport_landscape_planning_group_name,
     get_restricted_programmer_group_name,
-    get_restricted_user_assigned_class_paths,
+    class_id_in_scope,
+    get_restricted_user_class_scope_ids,
     is_restricted_programmer,
     parse_name_from_email,
-    target_path_matches_assigned_paths,
 )
 from infraohjelmointi_api.services.ProjectPersonAuthorizationService import (
     ProjectPersonAuthorizationService,
@@ -282,36 +282,35 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return
 
         # IO-756: restricted programmers can't create programmes, even if they
-        # are also in the planner or contributor group.
+        # are also in the planner or transport and landscape planning group.
         if is_restricted_programmer(user):
             raise PermissionDenied("Restricted programmers can't create a project programme.")
 
         if get_planner_group_name() in group_names:
             return
 
-        if get_project_programme_contributor_group_name() in group_names:
+        if get_transport_landscape_planning_group_name() in group_names:
             return
 
         raise PermissionDenied(
-            "Only planners or project programme contributors can create a project programme."
+            "Only planners or transport and landscape planning users can create a project programme."
         )
 
     def _restricted_programmer_matches_project(self, user, project):
         """IO-756: restricted programmers are limited to their assigned project classes."""
-        project_class = getattr(project, "projectClass", None)
-        if not project_class:
+        class_id = getattr(project, "projectClass_id", None)
+        if not class_id:
             return False
 
-        assigned_paths = get_restricted_user_assigned_class_paths(user)
-        if not assigned_paths:
-            return False
-
-        return target_path_matches_assigned_paths(project_class.path, assigned_paths)
+        return class_id_in_scope(class_id, get_restricted_user_class_scope_ids(user))
 
     def _assert_can_edit_or_complete(self, request, project):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
         if self.ADMIN_GROUP in group_names:
+            return
+
+        if get_transport_landscape_planning_group_name() in group_names:
             return
 
         if self.COMMISSIONING_MANAGER_GROUP in group_names:
@@ -320,9 +319,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
             )
 
         if group_names.intersection(self.REVIEWER_GROUPS):
-            return
-
-        if get_project_programme_contributor_group_name() in group_names:
             return
 
         if (
