@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.13.0](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.12.2...infraohjelmointi-api-v1.13.0) (2026-11-16)
+
+
+### Features
+
+* Add new class for major unallocated traffic projects ([#546](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/546)) ([4f6f1a1](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/4f6f1a1f80076eab5400b70b4cce5eb68b9a2d6c))
+* Add pikku huopalahti ([#551](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/551)) ([f0da28a](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/f0da28a730a5fa51f1432cb76115b4d463bfcaed))
+* Added possibility to search projects without hkr id ([#552](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/552)) ([d0d7612](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/d0d76120b6643066ef990564bcc0fbe80e4fba25))
+* Allow construction handover to step back to previous status (IO-968) ([#550](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/550)) ([dc37356](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/dc37356232bca94145756a9c3bc58f33aac9895c))
+* Deliver SSE events to every worker process via Redis (IO-725) ([24b029f](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/24b029f5a9cc09a188da26cf7640481bc54f2d11))
+* **project-programme:** Support contributor access across mixed roles ([#553](https://github.com/City-of-Helsinki/infraohjelmointi-api/issues/553)) ([f67e186](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/f67e1866464f5965c6b048375726c83c816f7a2f))
+
+
+### Bug Fixes
+
+* Don't lose SSE events when one process fails to publish (IO-725) ([acf9d32](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/acf9d327b8e4d62aa0998257951be26f0a1f1a0d))
+* Find class descendants by parent id in batched list sums (IO-961) ([36e82c5](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/36e82c518cf586133af45ada47570d03da7b47c3))
+* Keep each channel's newest expired SSE event when trimming (IO-725) ([b1f71ae](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/b1f71ae0768dbc253369e1acef55344f547def1a))
+* Keep social-auth on 6.1 so Helsinki Login keeps working (IO-962) ([bbc3d26](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/bbc3d2679a4a960e62408846c8d18d879d842beb))
+* Look up class and location descendants by parent id (IO-961) ([f6a0fb7](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/f6a0fb753754b5009e09c7b8f90a1ba5459bd137))
+* Resync all processes when SSE publishing to Redis resumes (IO-725) ([a51d205](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/a51d2058facb703c4fb69fc34fcaeed50a120259))
+* Scope restricted programmers by parent id instead of path (IO-961) ([ac52ac7](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/ac52ac79cbe6243c2ea9fcafda50157d08a0cf5b))
+
+
+### Performance Improvements
+
+* Compute class, location and group list sums in batched queries ([e0b2326](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/e0b2326b0d825494c00b87bd511808860c41423e))
+* Load project list pages by id ([818940c](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/818940c866c90231909f8fb561907e8aca7107cb))
+* Make finance-update events cheaper to send ([a5ed49c](https://github.com/City-of-Helsinki/infraohjelmointi-api/commit/a5ed49cae1030dcc3a75daf7e4db79f78edac92f))
+
 ## [1.12.2](https://github.com/City-of-Helsinki/infraohjelmointi-api/compare/infraohjelmointi-api-v1.12.1...infraohjelmointi-api-v1.12.2) (2026-11-02)
 
 
