@@ -216,15 +216,12 @@ python manage.py locationimporter --eri-kaupunginosia
 
 ## Personal data retention
 
-Personal data linked to a project (persons, programmers, handover contacts, task contacts and the names in project programme basic info) is due for removal five years after the project's warranty phase end (`estWarrantyPhaseEnd`). Nothing is removed automatically.
+Personal data linked to a project (persons, the programmer link, handover contacts, task contacts, the names in project programme basic info and the Talpa project opening's responsible person) is due for removal five years after the project's warranty phase end (`estWarrantyPhaseEnd`), once the project is in the warranty (`warrantyPeriod`) or completed phase. Nothing is removed automatically.
 
-- Admins see the due projects at `GET /personal-data-retention/` and confirm each removal with `POST /personal-data-retention/<project id>/confirm/`. Confirmation writes an audit entry with counts only.
+- Admins see the due projects in the admin view (`GET /personal-data-retention/`) and confirm each removal (`POST /personal-data-retention/<project id>/confirm/`). The removal and its audit entry, which holds counts only, are committed together.
 - Persons who are no longer referenced by any record are anonymized, not deleted. Persons still used by another project are kept as they are.
-- A monthly report lists the projects still waiting for confirmation:
-
-```bash
-python manage.py report_personal_data_retention
-```
+- Programmer list entries (`ProjectProgrammer`) and their linked persons are kept: the list is the shared directory of programmers, so only the project's link to it is removed.
+- Free-text fields (notes, programme texts and so on) are not scanned for names.
 
 ## Add or delete API token
 

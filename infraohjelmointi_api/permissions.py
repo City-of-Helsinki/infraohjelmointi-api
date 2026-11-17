@@ -719,9 +719,12 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                     return True
         return False
 
+ADMIN_AD_GROUP = "sg_kymp_sso_io_admin"
+
+
 class IsAdmin(permissions.BasePermission):
     def user_in_test_group(self, request):
-        if "sg_kymp_sso_io_admin" in request.user.ad_groups.all().values_list(
+        if ADMIN_AD_GROUP in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
@@ -769,12 +772,10 @@ class IsPersonalDataRetentionAdmin(permissions.BasePermission):
     a personal data removal is a write.
     """
 
-    ADMIN_AD_GROUP = "sg_kymp_sso_io_admin"
-
     def has_permission(self, request, view):
         return bool(
             request.user.is_authenticated
-            and request.user.ad_groups.filter(name=self.ADMIN_AD_GROUP).exists()
+            and request.user.ad_groups.filter(name=ADMIN_AD_GROUP).exists()
         )
 
 

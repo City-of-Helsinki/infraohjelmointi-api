@@ -1,9 +1,9 @@
 import json
 from datetime import date, timedelta
-from io import StringIO
+from unittest.mock import patch
 
 from dateutil.relativedelta import relativedelta
-from django.core.management import call_command
+from django.db import DatabaseError
 from django.test import TestCase
 from helusers.models import ADGroup
 from rest_framework.test import APIClient
@@ -13,9 +13,11 @@ from infraohjelmointi_api.models import (
     ConstructionHandover,
     Person,
     Project,
+    ProjectPhase,
     ProjectProgramme,
     ProjectProgrammeBasicInfo,
     ProjectProgrammer,
+    TalpaProjectOpening,
     Task,
     User,
 )
@@ -40,20 +42,26 @@ class PersonalDataRetentionFixtureMixin:
             title="Title", phone="0401234567",
         )
 
-    def _make_project(self, name, warranty_end, **links):
+    def _phase(self, value):
+        phase, _ = ProjectPhase.objects.get_or_create(value=value)
+        return phase
+
+    def _make_project(self, name, warranty_end, phase="warrantyPeriod", **links):
         return Project.objects.create(
-            name=name, description="Test", estWarrantyPhaseEnd=warranty_end, **links
+            name=name, description="Test", estWarrantyPhaseEnd=warranty_end,
+            phase=self._phase(phase), **links
         )
 
-    def _make_full_project(self, name, warranty_end):
+    def _make_full_project(self, name, warranty_end, phase="warrantyPeriod"):
         """Project with personal data in every category the retention job clears."""
         planner = self._make_person("Pekka", f"Planner{name}")
         construction = self._make_person("Kalle", f"Builder{name}")
         other = self._make_person("Olli", f"Other{name}")
         favourite = self._make_person("Fanny", f"Fav{name}")
+        talpa_author = self._make_person("Tiina", f"Talpa{name}")
         programmer = ProjectProgrammer.objects.create(firstName="Ada", lastName=f"Coder{name}")
         project = self._make_project(
-            name, warranty_end,
+            name, warranty_end, phase=phase,
             personPlanning=planner,
             personConstruction=construction,
             personProgramming=programmer,
@@ -82,7 +90,18 @@ class PersonalDataRetentionFixtureMixin:
         )
         basic_info.summary = "Edited summary"
         basic_info.save()
+        talpa = TalpaProjectOpening.objects.create(
+            project=project,
+            subject="Uusi",
+            responsiblePerson="Tiina Talpa",
+            responsiblePersonEmail="tiina.talpa@example.com",
+            responsiblePersonPhone="0407654321",
+            createdBy=talpa_author,
+            updatedBy=talpa_author,
+        )
         return project, {
+            "talpa": talpa,
+            "talpaAuthor": talpa_author,
             "planner": planner,
             "construction": construction,
             "other": other,
@@ -98,6 +117,7 @@ class PersonalDataRetentionServiceTests(PersonalDataRetentionFixtureMixin, TestC
         self._make_project("Not yet due", _years_ago(4))
         self._make_project("Due but empty", _years_ago(6))
         self._make_project("No warranty end", None)
+        self._make_full_project("Stale estimate", _years_ago(6), phase="construction")
 
         overdue_ids = [project.id for project, _ in overdue_projects()]
 
@@ -108,6 +128,17 @@ class PersonalDataRetentionServiceTests(PersonalDataRetentionFixtureMixin, TestC
 
         self.assertTrue(is_past_retention(project))
         self.assertIn(project.id, [p.id for p, _ in overdue_projects()])
+
+    def test_completed_project_is_due(self):
+        project, _ = self._make_full_project("Completed", _years_ago(6), phase="completed")
+
+        self.assertTrue(is_past_retention(project))
+        self.assertIn(project.id, [p.id for p, _ in overdue_projects()])
+
+    def test_project_before_warranty_phase_is_not_due(self):
+        project, _ = self._make_full_project("Construction", _years_ago(6), phase="construction")
+
+        self.assertFalse(is_past_retention(project))
 
     def test_one_day_before_five_years_is_not_due(self):
         project, _ = self._make_full_project("Almost", _years_ago(5, extra_days=1))
@@ -143,13 +174,31 @@ class PersonalDataRetentionServiceTests(PersonalDataRetentionFixtureMixin, TestC
         self.assertEqual(result["removed"]["handovers"], 1)
         self.assertEqual(result["removed"]["taskPersons"], 1)
         self.assertEqual(result["removed"]["programmeNames"], 1)
+        self.assertEqual(result["removed"]["talpaContacts"], 1)
         self.assertEqual(personal_data_summary(project), {
             "projectPersons": 0,
             "programmers": 0,
             "handovers": 0,
             "taskPersons": 0,
             "programmeNames": 0,
+            "talpaContacts": 0,
         })
+
+    def test_clear_removes_talpa_contact_and_anonymizes_its_author(self):
+        project, links = self._make_full_project("Talpa", _years_ago(6))
+
+        clear_personal_data(project)
+
+        talpa = TalpaProjectOpening.objects.get(id=links["talpa"].id)
+        self.assertIsNone(talpa.responsiblePerson)
+        self.assertIsNone(talpa.responsiblePersonEmail)
+        self.assertIsNone(talpa.responsiblePersonPhone)
+        self.assertIsNone(talpa.createdBy_id)
+        self.assertIsNone(talpa.updatedBy_id)
+        self.assertFalse(talpa.excelFile)
+        author = Person.objects.get(id=links["talpaAuthor"].id)
+        self.assertEqual(author.lastName, "")
+        self.assertTrue(author.deleted)
 
     def test_clear_scrubs_handover_and_programme_history(self):
         project, links = self._make_full_project("History", _years_ago(6))
@@ -193,11 +242,13 @@ class PersonalDataRetentionServiceTests(PersonalDataRetentionFixtureMixin, TestC
         self.assertFalse(planner.deleted)
 
     def test_clear_keeps_shared_programmer_lookup_row(self):
+        """The programmer list is a shared directory: only the project's link is removed."""
         project, links = self._make_full_project("Programmer", _years_ago(6))
 
         clear_personal_data(project)
 
-        self.assertTrue(ProjectProgrammer.objects.filter(id=links["programmer"].id).exists())
+        programmer = ProjectProgrammer.objects.get(id=links["programmer"].id)
+        self.assertEqual(programmer.lastName, "CoderProgrammer")
 
     def test_clear_keeps_project_and_warranty_dates(self):
         warranty_end = _years_ago(6)
@@ -287,8 +338,33 @@ class PersonalDataRetentionApiTests(PersonalDataRetentionFixtureMixin, TestCase)
         self.assertEqual(audit.actor, self.admin)
         self.assertEqual(audit.origin, "infrahankkeiden_ohjelmointi")
         audit_text = json.dumps({"old": audit.old_values, "new": audit.new_values})
-        for name in ("Planner", "Builder", "Other", "Fav", "Coder", "Pekka", "Kalle", "Olli"):
+        for name in ("Planner", "Builder", "Other", "Fav", "Coder", "Pekka", "Kalle", "Olli", "Tiina"):
             self.assertNotIn(name, audit_text)
+
+    def test_confirm_rejects_project_before_warranty_phase(self):
+        project, links = self._make_full_project("Building", _years_ago(6), phase="construction")
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(self._confirm_url(project))
+
+        self.assertEqual(response.status_code, 400)
+        project.refresh_from_db()
+        self.assertEqual(project.personPlanning_id, links["planner"].id)
+
+    def test_confirm_rolls_back_removal_when_audit_fails(self):
+        project, links = self._make_full_project("NoAudit", _years_ago(6))
+        self.client.force_authenticate(user=self.admin)
+
+        with patch.object(AuditLog.objects, "create", side_effect=DatabaseError("audit down")):
+            with self.assertRaises(DatabaseError):
+                self.client.post(self._confirm_url(project))
+
+        project.refresh_from_db()
+        self.assertEqual(project.personPlanning_id, links["planner"].id)
+        self.assertEqual(Person.objects.get(id=links["other"].id).firstName, "Olli")
+        self.assertEqual(
+            TalpaProjectOpening.objects.get(id=links["talpa"].id).responsiblePerson, "Tiina Talpa"
+        )
 
     def test_second_confirm_is_a_no_op_for_cleared_project(self):
         project, _ = self._make_full_project("Twice", _years_ago(6))
@@ -300,23 +376,3 @@ class PersonalDataRetentionApiTests(PersonalDataRetentionFixtureMixin, TestCase)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(AuditLog.objects.filter(project=project).count(), 1)
 
-
-class ReportPersonalDataRetentionCommandTests(PersonalDataRetentionFixtureMixin, TestCase):
-    def test_reports_overdue_projects_and_deletes_nothing(self):
-        project, links = self._make_full_project("Reported", _years_ago(6))
-        out = StringIO()
-
-        call_command("report_personal_data_retention", stdout=out)
-
-        self.assertIn(str(project.id), out.getvalue())
-        self.assertEqual(Person.objects.get(id=links["planner"].id).firstName, "Pekka")
-        project.refresh_from_db()
-        self.assertEqual(project.personPlanning_id, links["planner"].id)
-
-    def test_reports_nothing_when_no_project_is_overdue(self):
-        self._make_project("Fresh", _years_ago(1))
-        out = StringIO()
-
-        call_command("report_personal_data_retention", stdout=out)
-
-        self.assertIn("No projects past personal data retention.", out.getvalue())

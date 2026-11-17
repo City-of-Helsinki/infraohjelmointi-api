@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import date
 
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -55,13 +56,18 @@ class PersonalDataRetentionViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         if not is_past_retention(project):
             return Response(
-                data={"message": "Project is not past its personal data retention period"},
+                data={
+                    "message": "Project is not in warranty or completed phase, "
+                    "or not past its personal data retention period"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = clear_personal_data(project)
-        if any(result["removed"].values()) or result["anonymizedPersons"]:
-            self._audit(request, project, result)
+        # One transaction: if the audit entry cannot be written, nothing is removed
+        with transaction.atomic():
+            result = clear_personal_data(project)
+            if any(result["removed"].values()) or result["anonymizedPersons"]:
+                self._audit(request, project, result)
         return Response(
             {"projectId": str(project.id), **result},
             status=status.HTTP_200_OK,
@@ -90,15 +96,15 @@ class PersonalDataRetentionViewSet(viewsets.ViewSet):
                 "name": f"{user.first_name} {user.last_name}".strip() or user.username,
                 "email": user.email,
             }
-        audit_logger.info(
-            f"PERSONAL_DATA_RETENTION on {project.name}",
-            extra={
-                "actor": actor_data,
-                "operation": "UPDATE",
-                "target": {"type": "project", "id": str(project.id), "name": project.name},
-                "status": "SUCCESS",
-                "old_values": None,
-                "new_values": new_values,
-                "endpoint": endpoint,
-            },
-        )
+        log_message = f"PERSONAL_DATA_RETENTION on {project.name}"
+        log_extra = {
+            "actor": actor_data,
+            "operation": "UPDATE",
+            "target": {"type": "project", "id": str(project.id), "name": project.name},
+            "status": "SUCCESS",
+            "old_values": None,
+            "new_values": new_values,
+            "endpoint": endpoint,
+        }
+        # The log line is only true once the removal has committed
+        transaction.on_commit(lambda: audit_logger.info(log_message, extra=log_extra))
