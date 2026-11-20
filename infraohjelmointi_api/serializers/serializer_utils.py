@@ -55,10 +55,7 @@ def _planning_location_param(location_instance):
     return None
 
 
-def get_planning_path(obj):
-    instance_type = obj._meta.model.__name__
-    class_instance = None
-    location_instance = None
+def _planning_instances(obj, instance_type):
     if instance_type == "Project":
         group = getattr(obj, "projectGroup", None)
         class_instance = getattr(group, "classRelation", None) if group is not None else None
@@ -67,46 +64,52 @@ def get_planning_path(obj):
             class_instance = getattr(obj, "projectClass", None)
         if location_instance is None:
             location_instance = getattr(obj, "projectLocation", None)
-    elif instance_type == "ProjectClass":
-        class_instance = obj
-    elif instance_type == "ProjectLocation":
-        class_instance = obj.parentClass
-        location_instance = obj
-    elif instance_type == "ProjectGroup":
-        class_instance = getattr(obj, "classRelation", None)
-        location_instance = getattr(obj, "locationRelation", None)
+        return class_instance, location_instance
+    if instance_type == "ProjectClass":
+        return obj, None
+    if instance_type == "ProjectLocation":
+        return obj.parentClass, obj
+    if instance_type == "ProjectGroup":
+        return getattr(obj, "classRelation", None), getattr(obj, "locationRelation", None)
+    return None, None
 
-    path_params = {}
-    current_class = class_instance
-    visited_classes = set()
-    while current_class is not None:
-        class_id = str(current_class.id)
-        if class_id in visited_classes:
+
+def _add_planning_hierarchy_path(path_params, instance, get_param, included_params, stop_param=None):
+    visited = set()
+    while instance is not None:
+        instance_id = str(instance.id)
+        if instance_id in visited:
             break
-        visited_classes.add(class_id)
-        param = _planning_class_param(current_class)
+        visited.add(instance_id)
+        param = get_param(instance)
         if param is None:
             break
-        path_params[param] = class_id
-        current_class = current_class.parent
+        if param in included_params:
+            path_params[param] = instance_id
+        if param == stop_param:
+            break
+        instance = instance.parent
 
+
+def get_planning_path(obj):
+    instance_type = obj._meta.model.__name__
+    class_instance, location_instance = _planning_instances(obj, instance_type)
     if instance_type != "Project" and class_instance is None:
         return ""
-
-    current_location = location_instance
-    visited_locations = set()
-    while current_location is not None:
-        location_id = str(current_location.id)
-        if location_id in visited_locations:
-            break
-        visited_locations.add(location_id)
-        param = _planning_location_param(current_location)
-        if param is None:
-            break
-        if param == "district":
-            path_params[param] = location_id
-            break
-        current_location = current_location.parent
+    path_params = {}
+    _add_planning_hierarchy_path(
+        path_params,
+        class_instance,
+        _planning_class_param,
+        {"masterClass", "class", "subClass"},
+    )
+    _add_planning_hierarchy_path(
+        path_params,
+        location_instance,
+        _planning_location_param,
+        {"district"},
+        stop_param="district",
+    )
 
     return "&".join(
         "{}={}".format(key, path_params[key])
