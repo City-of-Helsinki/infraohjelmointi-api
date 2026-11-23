@@ -513,7 +513,12 @@ class ProjectViewSet(BaseViewSet):
                 detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
             )
         serializer = self.get_serializer(
-            instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
+            instance,
+            context={
+                **self.get_serializer_context(),
+                "get_pw_link": True,
+                "forcedToFrame": forcedToFrame,
+            },
         )
         return Response(serializer.data)
 
@@ -1813,27 +1818,13 @@ class ProjectViewSet(BaseViewSet):
                         projectLocation__parent__parent__coordinatorLocation__in=search_ids
                     )
                 )
-            return qs.filter(
-                Q(projectGroup__locationRelation__in=search_ids)
-                | (
-                    Q(projectGroup__locationRelation__isnull=True)
-                    & Q(projectLocation__in=search_ids)
-                )
-            )
+            return qs.filter(projectLocation__in=search_ids)
 
         if model_class.__name__ == "ProjectClass":
             if for_coordinator:
                 return qs.filter(projectClass__coordinatorClass__in=search_ids)
             return qs.filter(
-                (
-                    Q(projectGroup__classRelation__in=search_ids)
-                    | (
-                        Q(projectGroup__classRelation__isnull=True)
-                        & Q(projectClass__in=search_ids)
-                    )
-                )
-                & Q(projectGroup__locationRelation__isnull=True)
-                & Q(projectLocation__isnull=True)
+                projectClass__in=search_ids, projectLocation__isnull=True
             )
 
         return None
@@ -1935,25 +1926,11 @@ class ProjectViewSet(BaseViewSet):
             for_coordinator,
         )
         if model_class.__name__ == "ProjectLocation":
-            if for_coordinator:
-                return qs.filter(projectLocation__in=ids)
-            return qs.filter(
-                Q(projectGroup__locationRelation__in=ids)
-                | (
-                    Q(projectGroup__locationRelation__isnull=True)
-                    & Q(projectLocation__in=ids)
-                )
-            )
+            return qs.filter(projectLocation__in=ids)
         if model_class.__name__ == "ProjectClass":
             if for_coordinator:
                 return qs.filter(projectClass__coordinatorClass__in=ids)
-            return qs.filter(
-                Q(projectGroup__classRelation__in=ids)
-                | (
-                    Q(projectGroup__classRelation__isnull=True)
-                    & Q(projectClass__in=ids)
-                )
-            )
+            return qs.filter(projectClass__in=ids)
 
     def _filter_projects_by_programming_year(self, qs, prYearMin, prYearMax):
         """

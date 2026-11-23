@@ -4,7 +4,6 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .ProjectHashtagSerializer import ProjectHashtagSerializer
 from .ProjectPhaseSerializer import ProjectPhaseSerializer
-from .serializer_utils import get_planning_path
 
 class SearchResultSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
@@ -16,7 +15,69 @@ class SearchResultSerializer(serializers.Serializer):
     programmed = serializers.SerializerMethodField()
 
     def get_path(self, obj):
-        return get_planning_path(obj)
+        instanceType = obj._meta.model.__name__
+        classInstance = None
+        locationInstance = None
+        path = ""
+        group = None
+        group_has_location = False
+        if instanceType == "Project":
+            classInstance = getattr(obj, "projectClass", None)
+            locationInstance = getattr(obj, "projectLocation", None)
+            group = getattr(obj, "projectGroup", None)
+
+            if group:
+                group_location = getattr(group, "locationRelation", None)
+                group_has_location = group_location is not None
+
+        elif instanceType == "ProjectClass":
+            classInstance = obj
+        elif instanceType == "ProjectLocation":
+            classInstance = obj.parentClass
+            locationInstance = obj
+        elif instanceType == "ProjectGroup":
+            classInstance = getattr(obj, "classRelation", None)
+            locationInstance = getattr(obj, "locationRelation", None)
+
+        if classInstance is None:
+            return path
+
+        if classInstance.parent is not None and classInstance.parent.parent is not None:
+            path = "masterClass={}&class={}&subClass={}".format(
+                str(classInstance.parent.parent.id),
+                str(classInstance.parent.id),
+                str(classInstance.id),
+            )
+        elif classInstance.parent is not None:
+            path = "masterClass={}&class={}".format(
+                str(classInstance.parent.id),
+                str(classInstance.id),
+            )
+        else:
+            path = "masterClass={}".format(str(classInstance.id))
+
+        if "suurpiiri" in classInstance.name.lower():
+            return path
+
+        if locationInstance is None:
+            return path
+
+        if locationInstance.parent is None and (group is None or group_has_location):
+            path = path + "&district={}".format(str(locationInstance.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is not None
+            and (group is None or group_has_location)
+        ):
+            path = path + "&district={}".format(str(locationInstance.parent.parent.id))
+        if (
+            locationInstance.parent is not None
+            and locationInstance.parent.parent is None
+            and (group is None or group_has_location)
+        ):
+            path = path + "&district={}".format(str(locationInstance.parent.id))
+
+        return path
 
     def get_phase(self, obj):
         if not hasattr(obj, "phase") or obj.phase is None:

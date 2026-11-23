@@ -59,7 +59,7 @@ from infraohjelmointi_api.services.ProjectWiseService import ProjectWiseService
 from infraohjelmointi_api.services.SapCurrentYearService import SapCurrentYearService
 from infraohjelmointi_api.serializers.BudgetOverrunReasonSerializer import BudgetOverrunReasonSerializer
 from infraohjelmointi_api.serializers.serializer_utils import (
-    get_planning_path,
+    get_project_detail_planning_path,
     get_pw_folder_link_for_project,
 )
 from rest_framework import serializers
@@ -271,4 +271,5 @@ class ProjectDetailSerializer(ProjectGetSerializer):
     planningPath = serializers.SerializerMethodField(method_name="get_planning_path")
 
     def get_planning_path(self, project: Project):
-        return get_planning_path(project)
+        request = self.context.get("request")
+        return get_project_detail_planning_path(project, request.user if request else None)

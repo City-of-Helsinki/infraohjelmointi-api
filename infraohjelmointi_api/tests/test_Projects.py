@@ -1,7 +1,9 @@
 from django.test import TestCase
+from django.contrib.auth.models import Group
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from datetime import (date, datetime)
+from urllib.parse import parse_qs
 import json
 from infraohjelmointi_api.services import AppStateValueService
 from overrides import override
@@ -9,6 +11,7 @@ from rest_framework.renderers import JSONRenderer
 from unittest.mock import patch
 import uuid
 from functools import wraps
+from types import SimpleNamespace
 from django.urls import reverse
 from rest_framework import status
 
@@ -43,10 +46,11 @@ from ..serializers import (
     ProjectCreateSerializer,
 )
 from ..serializers.ProjectGetSerializer import ProjectDetailSerializer
-from ..serializers.serializer_utils import get_planning_path
+from ..serializers.serializer_utils import get_project_detail_planning_path
 
 from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
+from infraohjelmointi_api.views.ProjectClassViewSet import ProjectClassViewSet
 
 
 def mock_projectwise_get_service(func):
@@ -1938,16 +1942,16 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            0,
-            msg="Filtered result should contain no projects assigned to subClass Id: {} by their group. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 project belonging to subClass Id: {}. Found: {}".format(
                 self.projectSubClass_1_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            0,
-            msg="Filtered result should contain no classes without matching projects for id {}. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
                 self.projectSubClass_1_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
@@ -1964,8 +1968,8 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            4,
-            msg="Filtered result should contain the four projects assigned to subClass Id: {} by their groups. Found: {}".format(
+            2,
+            msg="Filtered result should contain a project belonging to subClass Id: {} and another belonging to subClass Id: {}. Found: {}".format(
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
@@ -1973,8 +1977,8 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            3,
-            msg="Filtered result should contain the three project classes for groups assigned to ids {} and {}. Found: {}".format(
+            2,
+            msg="Filtered result should contain 2 classes with id {} and {}. Found: {}".format(
                 self.projectSubClass_1_Id,
                 self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
@@ -1993,8 +1997,8 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            3,
-            msg="Filtered result should contain the projects assigned to subClass Id: {} by their groups and category Id: {}. Found: {}".format(
+            1,
+            msg="Filtered result should contain a project belonging to subClass Id: {} and category Id: {}. Found: {}".format(
                 self.projectSubClass_2_Id,
                 self.projectCategory_3_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
@@ -2002,8 +2006,8 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            2,
-            msg="Filtered result should contain 2 project classes for id {}. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
                 self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
@@ -2036,16 +2040,16 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            0,
-            msg="Filtered result should contain no projects assigned to a child class by their group. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 project belonging to class Id: {}, directly. Found: {}".format(
                 self.projectClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            0,
-            msg="Filtered result should contain no classes without matching projects for id {}. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
                 self.projectClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
@@ -2210,15 +2214,17 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            4,
-            msg="Filtered result should contain the four projects assigned to the selected master and subclass by their groups. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 project belonging to masterClass Id: {}, directly or indirectly, and field programmed = false. Found: {}".format(
+                self.projectMasterClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            3,
-            msg="Filtered result should contain the three project classes. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
@@ -2255,15 +2261,20 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            4,
-            msg="Filtered result should contain the four projects assigned to the selected master and subclasses by their groups. Found: {}".format(
+            2,
+            msg="Filtered result should contain 2 projects belonging to masterClass Id: {}, directly or indirectly, and subClass Id: {} or {} each. Found: {}".format(
+                self.projectMasterClass_2_Id,
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            3,
-            msg="Filtered result should contain the three project classes. Found: {}".format(
+            2,
+            msg="Filtered result should contain 2 classes with id {} and {}. Found: {}".format(
+                self.projectSubClass_1_Id,
+                self.projectSubClass_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
@@ -2390,26 +2401,46 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
 
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "projects"]),
-            0,
-            msg="Filtered result should contain no projects because the selected groups assign projects to a different subclass. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 project with group {} or {}, subClass {} and district {}. Found: {}".format(
+                self.projectGroup_1_Id,
+                self.projectGroup_2_Id,
+                self.projectSubClass_1_Id,
+                self.projectDistrict_2_Id,
                 len([x for x in response.json()["results"] if x["type"] == "projects"]),
             ),
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "classes"]),
-            0,
-            msg="Filtered result should contain no project classes without matching projects. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 class with id {}. Found: {}".format(
+                self.projectSubClass_1_Id,
                 len([x for x in response.json()["results"] if x["type"] == "classes"]),
             ),
         )
         self.assertEqual(
+            [x for x in response.json()["results"] if x["type"] == "classes"][0][
+                "programmed"
+            ],
+            None,
+            msg="Classes in search result should have programmed field set to None",
+        )
+        self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "locations"]),
-            0,
-            msg="Filtered result should contain no locations without matching projects. Found: {}".format(
+            1,
+            msg="Filtered result should contain 1 location with id {}. Found: {}".format(
+                self.projectDistrict_2_Id,
                 len(
                     [x for x in response.json()["results"] if x["type"] == "locations"]
                 ),
             ),
+        )
+        self.assertEqual(
+            [x for x in response.json()["results"] if x["type"] == "locations"][0][
+                "programmed"
+            ],
+            None,
+            msg="Locations in search result should have programmed field set to None",
         )
         self.assertEqual(
             len([x for x in response.json()["results"] if x["type"] == "groups"]),
@@ -2484,15 +2515,14 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             200,
             msg="Status code != 200, Error: {}".format(response.json()),
         )
-        # The group supplies the class; the project supplies the location because
-        # the group has no location relation.
+        # A group without a location is displayed under its class.
         self.assertEqual(
             response.json()["results"][0]["path"],
             "masterClass={}&class={}&subClass={}".format(
                 self.projectMasterClass_2_Id,
                 self.projectClass_2_Id,
                 self.projectSubClass_2_Id,
-            ) + "&district={}".format(self.projectDistrict_3_Id),
+            ),
             msg="Path does not follow the format masterClass=&class=&subClass",
         )
 
@@ -2519,20 +2549,39 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         )
 
     @mock_projectwise_get_service
-    def test_project_planning_path_matches_search_path(self):
+    def test_project_detail_planning_path_matches_frontend_fallbacks(self):
+        special_class = self.projectClass.childClass.create(name="Test Suurpiiri")
+        group = ProjectGroup.objects.create(name="Class group", classRelation=special_class)
+        project = Project.objects.create(
+            name="Planning path project", description="Frontend path fallback",
+            projectClass=special_class, projectLocation=self.projectLocation,
+            projectGroup=group, phase=self.projectPhase, programmed=True,
+        )
+        response = self.client.get(f"/projects/{project.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["planningPath"],
+            f"subClass={special_class.id}&class={self.projectClass.id}"
+            f"&masterClass={self.projectMasterClass.id}&district={self.district.id}",
+        )
+        self.assertEqual(parse_qs(response.json()["planningPath"]), {
+            "masterClass": [str(self.projectMasterClass.id)],
+            "class": [str(self.projectClass.id)],
+            "subClass": [str(special_class.id)],
+            "district": [str(self.district.id)],
+        })
+
+    @mock_projectwise_get_service
+    def test_project_planning_path_matches_frontend_hierarchy(self):
         sub_class = self.projectClass.childClass.create(name="Sub class")
         special_class = self.projectClass.childClass.create(name="Suurpiiri")
         other_classification = sub_class.childClass.create(name="Other classification")
         sub_division = self.projectLocation.childLocation.create(name="Sub division")
-        deep_location = sub_division.childLocation.create(name="Deep location")
         other_district = ProjectLocation.objects.create(
             name="Other district", parent=None
         )
         coordinator_class = ProjectClass.objects.create(
             name="Coordinator class", parent=None, forCoordinatorOnly=True
-        )
-        coordinator_location = ProjectLocation.objects.create(
-            name="Coordinator location", parent=None, forCoordinatorOnly=True
         )
         class_group = ProjectGroup.objects.create(
             name="Class group", classRelation=self.projectClass
@@ -2542,36 +2591,31 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             classRelation=self.projectClass,
             locationRelation=other_district,
         )
-        fallback_group = ProjectGroup.objects.create(name="Fallback group")
-        master_path = f"masterClass={self.projectMasterClass.id}"
-        class_path = f"{master_path}&class={self.projectClass.id}"
-        sub_class_path = f"{class_path}&subClass={sub_class.id}"
-        district_param = f"&district={self.district.id}"
-        group_location_path = f"{class_path}&district={other_district.id}"
+        location_only_group = ProjectGroup.objects.create(
+            name="Location only group", locationRelation=other_district,
+        )
+        master_path = {"masterClass": [str(self.projectMasterClass.id)]}
+        class_path = {**master_path, "class": [str(self.projectClass.id)]}
+        sub_class_path = {**class_path, "subClass": [str(sub_class.id)]}
+        district_param = {"district": [str(self.district.id)]}
         scenarios = (
-            (self.projectMasterClass, None, None, master_path),
             (self.projectClass, None, None, class_path),
             (sub_class, None, None, sub_class_path),
-            (sub_class, self.district, None, sub_class_path + district_param),
-            (sub_class, self.projectLocation, None, sub_class_path + district_param),
-            (sub_class, sub_division, None, sub_class_path + district_param),
-            (sub_class, self.projectLocation, class_group, class_path + district_param),
-            (sub_class, self.projectLocation, location_group, group_location_path),
-            (other_classification, self.district, None, f"district={self.district.id}"),
-            (sub_class, deep_location, None, sub_class_path),
-            (coordinator_class, self.district, None, f"district={self.district.id}"),
-            (sub_class, coordinator_location, None, sub_class_path),
-            (
-                sub_class,
-                self.projectLocation,
-                fallback_group,
-                sub_class_path + district_param,
-            ),
+            (sub_class, self.district, None, {**sub_class_path, **district_param}),
+            (sub_class, self.projectLocation, None, {**sub_class_path, **district_param}),
+            (sub_class, sub_division, None, {**sub_class_path, **district_param}),
+            (sub_class, self.projectLocation, class_group, {**class_path, **district_param}),
+            (sub_class, self.projectLocation, location_group,
+             {**class_path, "district": [str(other_district.id)]}),
+            (sub_class, self.projectLocation, location_only_group,
+             {**sub_class_path, "district": [str(other_district.id)]}),
+            (other_classification, self.district, None, district_param),
+            (coordinator_class, self.district, None, district_param),
             (
                 special_class,
                 self.district,
                 None,
-                f"{class_path}&subClass={special_class.id}{district_param}",
+                {**class_path, "subClass": [str(special_class.id)], **district_param},
             ),
         )
         for project_class, location, group, expected_path in scenarios:
@@ -2583,23 +2627,8 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
                     phase=self.projectPhase, programmed=True,
                 )
                 detail = self.client.get(f"/projects/{project.id}/")
-                search = self.client.get(f"/projects/search-results/?project={project.id}")
                 self.assertEqual(detail.status_code, 200)
-                self.assertEqual(search.status_code, 200)
-                planning = self.client.get(
-                    f"/projects/?{expected_path}&project={project.id}"
-                )
-                self.assertEqual(planning.status_code, 200)
-                result = next(
-                    result for result in search.json()["results"]
-                    if result["type"] == "projects" and result["id"] == str(project.id)
-                )
-                self.assertEqual(detail.json()["planningPath"], expected_path)
-                self.assertEqual(detail.json()["planningPath"], result["path"])
-                self.assertIn(
-                    str(project.id),
-                    [result["id"] for result in planning.json()["results"]],
-                )
+                self.assertEqual(parse_qs(detail.json()["planningPath"]), expected_path)
                 loaded_project = Project.objects.select_related(
                     "projectClass__parent__parent",
                     "projectLocation__parent__parent",
@@ -2607,8 +2636,127 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
                     "projectGroup__locationRelation__parent__parent",
                 ).get(id=project.id)
                 with CaptureQueriesContext(connection) as path_queries:
-                    self.assertEqual(get_planning_path(loaded_project), expected_path)
+                    self.assertEqual(
+                        parse_qs(get_project_detail_planning_path(loaded_project)), expected_path
+                    )
                 self.assertEqual(len(path_queries), 0)
+
+    @mock_projectwise_get_service
+    def test_suurpiiri_workload_and_search_paths_keep_their_original_rules(self):
+        special_class = self.projectClass.childClass.create(name="Test Suurpiiri")
+        district = ProjectLocation.objects.create(
+            name="Test district", parentClass=special_class
+        )
+        group = ProjectGroup.objects.create(
+            name="Class level group", classRelation=special_class
+        )
+        group_project = Project.objects.create(
+            name="Group project", description="Class level group project",
+            projectClass=special_class, projectGroup=group,
+            phase=self.projectPhase, programmed=True,
+        )
+        target_project = Project.objects.create(
+            name="District project", description="District project",
+            projectClass=special_class, projectLocation=district,
+            phase=self.projectPhase, programmed=True,
+        )
+        expected_path = (
+            f"masterClass={self.projectMasterClass.id}"
+            f"&class={self.projectClass.id}&subClass={special_class.id}"
+        )
+
+        detail = self.client.get(f"/projects/{target_project.id}/")
+        search = self.client.get(f"/projects/search-results/?project={target_project.id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(search.status_code, 200)
+        self.assertEqual(
+            parse_qs(detail.json()["planningPath"]),
+            {**parse_qs(expected_path), "district": [str(district.id)]},
+        )
+        search_project = next(
+            result for result in search.json()["results"]
+            if result["type"] == "projects" and result["id"] == str(target_project.id)
+        )
+        self.assertEqual(search_project["path"], expected_path)
+
+        projects = self.client.get(f"/projects/?class={self.projectClass.id}&programmed=true")
+        self.assertEqual(projects.status_code, 200)
+        project_ids = {project["id"] for project in projects.json()["results"]}
+        self.assertIn(str(target_project.id), project_ids)
+        self.assertIn(str(group_project.id), project_ids)
+
+        located_group = ProjectGroup.objects.create(
+            name="District level group", classRelation=special_class,
+            locationRelation=district,
+        )
+        group_search = self.client.get(f"/projects/search-results/?group={located_group.name}")
+        self.assertEqual(group_search.status_code, 200)
+        search_group = next(
+            result for result in group_search.json()["results"]
+            if result["type"] == "groups" and result["id"] == str(located_group.id)
+        )
+        self.assertEqual(search_group["path"], expected_path)
+
+    @mock_projectwise_get_service
+    def test_search_and_planning_filters_use_project_relations(self):
+        project_class = self.projectClass.childClass.create(name="Project subclass")
+        group_class = self.projectClass.childClass.create(name="Group subclass")
+        group_district = ProjectLocation.objects.create(name="Group district")
+        group = ProjectGroup.objects.create(
+            name="Different planning group", classRelation=group_class,
+            locationRelation=group_district,
+        )
+        project = Project.objects.create(
+            name="Grouped project", description="Different project and group relations",
+            projectClass=project_class, projectLocation=self.district,
+            projectGroup=group, phase=self.projectPhase, programmed=True,
+        )
+        for relation, project_id, group_id in (
+            ("subClass", project_class.id, group_class.id),
+            ("district", self.district.id, group_district.id),
+        ):
+            with self.subTest(relation=relation):
+                project_search = self.client.get(
+                    f"/projects/search-results/?{relation}={project_id}&project={project.id}"
+                )
+                group_search = self.client.get(
+                    f"/projects/search-results/?{relation}={group_id}&project={project.id}"
+                )
+                planning = self.client.get(
+                    f"/projects/?{relation}={group_id}&project={project.id}"
+                )
+                project_planning = self.client.get(
+                    f"/projects/?{relation}={project_id}&project={project.id}"
+                )
+                self.assertEqual(project_search.status_code, 200)
+                self.assertEqual(group_search.status_code, 200)
+                self.assertEqual(planning.status_code, 200)
+                self.assertEqual(project_planning.status_code, 200)
+                search_ids = {item["id"] for item in project_search.json()["results"]}
+                group_search_ids = {item["id"] for item in group_search.json()["results"]}
+                planning_ids = {item["id"] for item in planning.json()["results"]}
+                self.assertIn(str(project.id), search_ids)
+                self.assertIn(str(project_id), search_ids)
+                self.assertNotIn(str(group_id), search_ids)
+                self.assertNotIn(str(project.id), group_search_ids)
+                self.assertNotIn(str(project.id), planning_ids)
+                self.assertIn(
+                    str(project.id), [item["id"] for item in project_planning.json()["results"]]
+                )
+
+        class_group = ProjectGroup.objects.create(name="Class group", classRelation=group_class)
+        project.projectGroup = class_group
+        project.save()
+        direct_planning = self.client.get(
+            f"/projects/?subClass={group_class.id}&direct=true&project={project.id}"
+        )
+        direct_search = self.client.get(
+            f"/projects/search-results/?subClass={project_class.id}&direct=true&project={project.id}"
+        )
+        self.assertEqual(direct_planning.status_code, 200)
+        self.assertEqual(direct_search.status_code, 200)
+        self.assertNotIn(str(project.id), [item["id"] for item in direct_planning.json()["results"]])
+        self.assertNotIn(str(project.id), [item["id"] for item in direct_search.json()["results"]])
 
     @mock_projectwise_get_service
     def test_group_planning_filters_do_not_add_per_project_queries(self):
@@ -2635,7 +2783,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
         ]
         planning_path = (
             f"masterClass={self.projectMasterClass.id}"
-            f"&class={self.projectClass.id}&district={other_district.id}"
+            f"&class={self.projectClass.id}&district={self.district.id}"
         )
 
         def get_query_count(project_ids):
@@ -2703,11 +2851,133 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             "instanceId": "mock-instance-id"
         }
         Project.objects.filter(id=self.project_1_Id).update(
-            projectClass=None, projectLocation=None
+            projectClass=None, projectLocation=None, projectGroup=None
         )
         response = self.client.get(f"/projects/{self.project_1_Id}/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["planningPath"], "")
+
+    @patch("infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService")
+    def test_project_planning_path_contains_master_class_only(self, mock_pw_service):
+        mock_pw_service.return_value.get_project_from_pw.return_value = {
+            "instanceId": "mock-instance-id"
+        }
+        Project.objects.filter(id=self.project_1_Id).update(
+            projectClass=self.projectMasterClass, projectLocation=None, projectGroup=None
+        )
+        response = self.client.get(f"/projects/{self.project_1_Id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["planningPath"], f"masterClass={self.projectMasterClass.id}")
+
+    @patch("infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService")
+    def test_project_planning_path_falls_back_for_group_without_hierarchy(self, mock_pw_service):
+        mock_pw_service.return_value.get_project_from_pw.return_value = {
+            "instanceId": "mock-instance-id"
+        }
+        group = ProjectGroup.objects.create(name="Group without hierarchy")
+        Project.objects.filter(id=self.project_1_Id).update(
+            projectClass=self.projectClass, projectGroup=group
+        )
+        response = self.client.get(f"/projects/{self.project_1_Id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(parse_qs(response.json()["planningPath"]), {
+            "masterClass": [str(self.projectMasterClass.id)],
+            "class": [str(self.projectClass.id)],
+            "district": [str(self.district.id)],
+        })
+
+    @patch("infraohjelmointi_api.serializers.serializer_utils.ProjectWiseService")
+    def test_project_planning_path_handles_unsupported_locations(self, mock_pw_service):
+        mock_pw_service.return_value.get_project_from_pw.return_value = {
+            "instanceId": "mock-instance-id"
+        }
+        sub_division = self.projectLocation.childLocation.create(name="Sub division")
+        deep_location = sub_division.childLocation.create(name="Deep location")
+        coordinator_location = ProjectLocation.objects.create(
+            name="Coordinator location", forCoordinatorOnly=True
+        )
+        group = ProjectGroup.objects.create(
+            name="Group in sub division", classRelation=self.projectClass,
+            locationRelation=sub_division,
+        )
+        class_path = {
+            "masterClass": [str(self.projectMasterClass.id)],
+            "class": [str(self.projectClass.id)],
+        }
+        scenarios = (
+            (deep_location, None, class_path),
+            (coordinator_location, None, class_path),
+            (self.district, group, {**class_path, "district": [str(self.district.id)]}),
+        )
+        for location, project_group, expected_path in scenarios:
+            with self.subTest(location=location, group=project_group):
+                Project.objects.filter(id=self.project_1_Id).update(
+                    projectClass=self.projectClass, projectLocation=location,
+                    projectGroup=project_group,
+                )
+                response = self.client.get(f"/projects/{self.project_1_Id}/")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(parse_qs(response.json()["planningPath"]), expected_path)
+
+    @mock_projectwise_get_service
+    def test_project_planning_path_uses_area_planner_class_visibility(self):
+        planner_patch = patch(
+            "infraohjelmointi_api.services.ProjectClassService.ProjectClassService.is_project_area_planner"
+        )
+        is_area_planner = planner_patch.start()
+        self.addCleanup(planner_patch.stop)
+        master = ProjectClass.objects.create(name="808 Master")
+        project_class = master.childClass.create(name="8 08 Class")
+        sub_class = project_class.childClass.create(name="808 Subclass")
+        project = Project.objects.create(
+            name="Area planner project", description="Class visibility",
+            projectClass=sub_class, projectLocation=self.district,
+            phase=self.projectPhase, programmed=True,
+        )
+        expected = {
+            "masterClass": [str(master.id)],
+            "class": [str(project_class.id)],
+            "subClass": [str(sub_class.id)],
+            "district": [str(self.district.id)],
+        }
+        is_area_planner.return_value = True
+        response = self.client.get(f"/projects/{project.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(parse_qs(response.json()["planningPath"]), expected)
+
+        project_class.name = "Other class"
+        project_class.save()
+        response = self.client.get(f"/projects/{project.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(parse_qs(response.json()["planningPath"]), {
+            "district": [str(self.district.id)],
+        })
+
+        is_area_planner.return_value = False
+        response = self.client.get(f"/projects/{project.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(parse_qs(response.json()["planningPath"]), expected)
+
+    def test_project_planning_path_uses_same_class_filter_as_planning_list(self):
+        master = ProjectClass.objects.create(name="808 Master")
+        project_class = master.childClass.create(name="Other class")
+        sub_class = project_class.childClass.create(name="808 Subclass")
+        project = Project.objects.create(
+            name="Filtered class project", description="Planning class visibility",
+            projectClass=sub_class, projectLocation=self.district,
+            phase=self.projectPhase, programmed=True,
+        )
+        user = User.objects.create_user(username="planning-path-area-planner")
+        user.groups.add(Group.objects.create(name="project_area_planners"))
+        class_view = ProjectClassViewSet()
+        class_view.request = SimpleNamespace(user=user)
+        visible_ids = set(class_view.get_queryset().values_list("id", flat=True))
+        self.assertIn(master.id, visible_ids)
+        self.assertNotIn(project_class.id, visible_ids)
+        self.assertIn(sub_class.id, visible_ids)
+        self.assertEqual(parse_qs(get_project_detail_planning_path(project, user)), {
+            "district": [str(self.district.id)],
+        })
 
     # Commented out test to check if a project gets locked automatically on phase change
     # def test_project_gets_locked_on_phase_change(self):

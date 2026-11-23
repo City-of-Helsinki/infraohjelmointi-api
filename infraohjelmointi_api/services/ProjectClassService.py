@@ -3,6 +3,21 @@ from ..models import ProjectClass, ProjectLocation
 
 class ProjectClassService:
     @staticmethod
+    def is_project_area_planner(user) -> bool:
+        planner_flag = getattr(user, "is_project_area_planner", None)
+        if planner_flag is True or planner_flag is False:
+            return planner_flag
+
+        group_names = getattr(user, "_cached_group_names", None)
+        if group_names is None and hasattr(user, "groups"):
+            group_names = set(user.groups.values_list("name", flat=True))
+            setattr(user, "_cached_group_names", group_names)
+
+        is_planner = bool(group_names and "project_area_planners" in group_names)
+        setattr(user, "is_project_area_planner", is_planner)
+        return is_planner
+
+    @staticmethod
     def get_or_create(
         name: str,
         parent: ProjectClass | None,

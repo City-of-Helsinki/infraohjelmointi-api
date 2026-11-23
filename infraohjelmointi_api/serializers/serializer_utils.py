@@ -1,6 +1,8 @@
 """Shared utilities for serializers."""
+from urllib.parse import urlencode
 import environ
 from infraohjelmointi_api.models import Project
+from infraohjelmointi_api.services.ProjectClassService import ProjectClassService
 from infraohjelmointi_api.services.ProjectWiseService import (
     PWProjectNotFoundError,
     PWProjectResponseError,
@@ -11,22 +13,28 @@ env = environ.Env()
 env.escape_proxy = True
 
 
-def _planning_class_param(class_instance):
-    if class_instance is None or class_instance.forCoordinatorOnly:
+def _planning_class_param(class_instance, area_planner=False):
+    def is_visible(instance):
+        return (
+            instance is not None
+            and not instance.forCoordinatorOnly
+            and (not area_planner or instance.name.startswith(("808", "8 08")))
+        )
+
+    if not is_visible(class_instance):
         return None
     if class_instance.parent_id is None:
         return "masterClass"
 
     parent = class_instance.parent
-    if parent is None or parent.forCoordinatorOnly:
+    if not is_visible(parent):
         return None
     if parent.parent_id is None:
         return "class"
 
     grandparent = parent.parent
     if (
-        grandparent is not None
-        and not grandparent.forCoordinatorOnly
+        is_visible(grandparent)
         and grandparent.parent_id is None
     ):
         return "subClass"
@@ -55,25 +63,6 @@ def _planning_location_param(location_instance):
     return None
 
 
-def _planning_instances(obj, instance_type):
-    if instance_type == "Project":
-        group = getattr(obj, "projectGroup", None)
-        class_instance = getattr(group, "classRelation", None) if group is not None else None
-        location_instance = getattr(group, "locationRelation", None) if group is not None else None
-        if class_instance is None:
-            class_instance = getattr(obj, "projectClass", None)
-        if location_instance is None:
-            location_instance = getattr(obj, "projectLocation", None)
-        return class_instance, location_instance
-    if instance_type == "ProjectClass":
-        return obj, None
-    if instance_type == "ProjectLocation":
-        return obj.parentClass, obj
-    if instance_type == "ProjectGroup":
-        return getattr(obj, "classRelation", None), getattr(obj, "locationRelation", None)
-    return None, None
-
-
 def _add_planning_hierarchy_path(path_params, instance, get_param, included_params, stop_param=None):
     visited = set()
     while instance is not None:
@@ -91,31 +80,22 @@ def _add_planning_hierarchy_path(path_params, instance, get_param, included_para
         instance = instance.parent
 
 
-def get_planning_path(obj):
-    instance_type = obj._meta.model.__name__
-    class_instance, location_instance = _planning_instances(obj, instance_type)
-    if instance_type != "Project" and class_instance is None:
-        return ""
+def get_project_detail_planning_path(project, user=None):
+    group = project.projectGroup
+    class_instance = group.classRelation if group and group.classRelation_id else project.projectClass
+    location_instance = (
+        group.locationRelation if group and group.locationRelation_id else project.projectLocation
+    )
+    area_planner = user is not None and ProjectClassService.is_project_area_planner(user)
     path_params = {}
     _add_planning_hierarchy_path(
-        path_params,
-        class_instance,
-        _planning_class_param,
+        path_params, class_instance, lambda instance: _planning_class_param(instance, area_planner),
         {"masterClass", "class", "subClass"},
     )
     _add_planning_hierarchy_path(
-        path_params,
-        location_instance,
-        _planning_location_param,
-        {"district"},
-        stop_param="district",
+        path_params, location_instance, _planning_location_param, {"district"}, stop_param="district"
     )
-
-    return "&".join(
-        "{}={}".format(key, path_params[key])
-        for key in ("masterClass", "class", "subClass", "district")
-        if key in path_params
-    )
+    return urlencode(path_params)
 
 
 def get_pw_folder_link_for_project(project: Project, pw_service=None):
