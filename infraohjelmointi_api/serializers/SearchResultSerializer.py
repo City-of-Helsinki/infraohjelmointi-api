@@ -65,7 +65,7 @@ class SearchResultSerializer(serializers.Serializer):
         if locationInstance.parent is None and (group is None or group_has_location):
             path = path + "&district={}".format(str(locationInstance.id))
         if (
-            locationInstance.parent is not None 
+            locationInstance.parent is not None
             and locationInstance.parent.parent is not None
             and (group is None or group_has_location)
         ):

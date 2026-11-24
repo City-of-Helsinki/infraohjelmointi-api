@@ -23,24 +23,8 @@ class ProjectClassViewSet(BaseClassLocationViewSet):
             .select_related('coordinatorClass', 'coordinatorClass__parent', 'coordinatorClass__parent__parent', 'parent', 'defaultProgrammer')
         )
 
-        user = self.request.user
-        planner_flag = getattr(user, 'is_project_area_planner', None)
-        if planner_flag is True:
+        if ProjectClassService.is_project_area_planner(self.request.user):
             return queryset.filter(name__startswith='808') | queryset.filter(name__startswith='8 08')
-        if planner_flag is False:
-            return queryset
-
-        group_names = getattr(user, '_cached_group_names', None)
-        if group_names is None and hasattr(user, 'groups'):
-            group_names = set(user.groups.values_list('name', flat=True))
-            setattr(user, '_cached_group_names', group_names)
-
-        if group_names and 'project_area_planners' in group_names:
-            queryset = queryset.filter(name__startswith='808') | queryset.filter(name__startswith='8 08')
-            setattr(user, 'is_project_area_planner', True)
-        else:
-            setattr(user, 'is_project_area_planner', False)
-
         return queryset
 
     @action(

@@ -17,6 +17,7 @@ from infraohjelmointi_api.serializers import (
     ConstructionHandoverGetSerializer,
     AuditLogSerializer,
 )
+from infraohjelmointi_api.serializers.ProjectGetSerializer import ProjectDetailSerializer
 from infraohjelmointi_api.models import (
     AuditLog,
     ClassFinancial,
@@ -61,7 +62,7 @@ from rest_framework.pagination import PageNumberPagination
 import uuid
 from rest_framework import serializers, status
 from itertools import chain
-from django.db.models import Count, Case, When, Q, F
+from django.db.models import Count, Case, When, Q, F, Prefetch
 from django.db.models.signals import post_save
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
@@ -512,7 +513,12 @@ class ProjectViewSet(BaseViewSet):
                 detail={"forcedToFrame": "Value must be a boolean"}, code="invalid"
             )
         serializer = self.get_serializer(
-            instance, context={"get_pw_link": True, "forcedToFrame": forcedToFrame}
+            instance,
+            context={
+                **self.get_serializer_context(),
+                "get_pw_link": True,
+                "forcedToFrame": forcedToFrame,
+            },
         )
         return Response(serializer.data)
 
@@ -801,18 +807,21 @@ class ProjectViewSet(BaseViewSet):
             order = "new"
 
         if len(projectGroup) > 0:
-            groups = ProjectGroup.objects.filter(name__in=projectGroup).select_related("classRelation")
+            groups = ProjectGroup.objects.filter(name__in=projectGroup).select_related(
+                "classRelation__parent__parent",
+                "locationRelation__parent__parent",
+            )
 
         if len(masterClass) > 0 or len(_class) > 0 or len(subClass) > 0:
             projectClasses = ProjectClass.objects.filter(
                 id__in=queryset.values_list("projectClass", flat=True).distinct(),
                 forCoordinatorOnly=False,
-            )
+            ).select_related("parent__parent")
         if len(district) > 0 or len(division) > 0 or len(subDivision) > 0:
             projectLocations = ProjectLocation.objects.filter(
                 id__in=queryset.values_list("projectLocation", flat=True).distinct(),
                 forCoordinatorOnly=False,
-            )
+            ).select_related("parent__parent", "parentClass__parent__parent")
 
         if order == "new":
             combinedQuerysets = sorted(
@@ -872,7 +881,9 @@ class ProjectViewSet(BaseViewSet):
         """
         Overriden ModelViewSet class method to get appropriate serializer depending on the request action
         """
-        if self.action in ["list", "retrieve"]:
+        if self.action == "retrieve":
+            return ProjectDetailSerializer
+        if self.action == "list":
             return ProjectGetSerializer
         if self.action in ["create", "update", "partial_update"]:
             return ProjectCreateSerializer
@@ -1095,6 +1106,26 @@ class ProjectViewSet(BaseViewSet):
                 .prefetch_related(
                     "favPersons",
                     "hashTags",
+                )
+            )
+        if self.action == "retrieve":
+            qs = qs.select_related(
+                "projectClass__parent__parent",
+                "projectLocation__parent__parent",
+                "projectGroup__classRelation__parent__parent",
+                "projectGroup__locationRelation__parent__parent",
+            )
+        elif self.action == "get_search_results":
+            qs = qs.select_related(
+                "projectClass__parent__parent",
+                "projectLocation__parent__parent",
+            ).prefetch_related(
+                Prefetch(
+                    "projectGroup",
+                    queryset=ProjectGroup.objects.select_related(
+                        "classRelation__parent__parent",
+                        "locationRelation__parent__parent",
+                    ),
                 )
             )
         masterClass = self.request.query_params.getlist("masterClass", [])
@@ -1894,7 +1925,6 @@ class ProjectViewSet(BaseViewSet):
             has_parent_parent_parent_parent,
             for_coordinator,
         )
-
         if model_class.__name__ == "ProjectLocation":
             return qs.filter(projectLocation__in=ids)
         if model_class.__name__ == "ProjectClass":
