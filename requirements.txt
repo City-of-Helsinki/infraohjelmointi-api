@@ -10,7 +10,7 @@ django-environ==0.14.0                          # environment variables utility
 pyyaml==6.0.3                                  # yml parser
 whitenoise==6.12.0                              # enabling Django to serve its own static files
 django-storages[azure]==1.14.6                 # IO-812: Azure Blob backend for uploaded files (active only when AZURE_BLOB_STORAGE_* env vars are set)
-coverage==7.17.2                                # for test coverage
+coverage==7.17.3                                # for test coverage
 django-simple-history==3.13.0                  # To maintain history of table data
 overrides                                      # Decorators to assert function overrides
 openpyxl                                       # dependency for reading excel files through pandas
