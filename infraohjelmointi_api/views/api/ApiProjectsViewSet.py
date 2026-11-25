@@ -1,11 +1,13 @@
 import json
 from collections import defaultdict
 from datetime import date
+from django.db.models import Prefetch
 from ..BaseViewSet import BaseViewSet
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import serializers
 from infraohjelmointi_api.models import (
-    Project, ProjectFinancial
+    Project, ProjectFinancial, TalpaProjectOpening
 )
 from infraohjelmointi_api.serializers import (
     ProjectGetSerializer, ProjectFinancialSerializer
@@ -27,6 +29,16 @@ class_parameter = openapi.Parameter(
     description="Get all projects by class ID",
     type=openapi.TYPE_STRING,
 )
+
+
+class ApiProjectGetSerializer(ProjectGetSerializer):
+    holdingTime = serializers.SerializerMethodField()
+
+    def get_holdingTime(self, project: Project):
+        talpa_opening = getattr(project, "talpaProjectOpening", None)
+        if talpa_opening is None or talpa_opening.assetClass is None:
+            return None
+        return talpa_opening.assetClass.holdingPeriodYears or None
 
 
 class ApiProjectsViewSet(BaseViewSet):
@@ -51,7 +63,13 @@ class ApiProjectsViewSet(BaseViewSet):
         .prefetch_related("favPersons", "hashTags", "finances")
     )
 
-    serializer_class = ProjectGetSerializer
+    serializer_class = ApiProjectGetSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == "retrieve":
+            return queryset.select_related("talpaProjectOpening__assetClass")
+        return queryset
 
     @swagger_auto_schema(
         operation_description="""
@@ -100,6 +118,14 @@ class ApiProjectsViewSet(BaseViewSet):
                 return StreamingHttpResponse(json.dumps({"error":"Invalid UUID"}),status=400, content_type = "application/json")
         else:
             queryset = Project.objects.all()
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                "talpaProjectOpening",
+                queryset=TalpaProjectOpening.objects.select_related("assetClass").only(
+                    "id", "project_id", "assetClass_id", "assetClass__holdingPeriodYears"
+                ),
+            )
+        )
         self.queryset = queryset
 
         year = date.today().year

@@ -4826,6 +4826,7 @@ class ProjectTestCase(CacheClearingMixin, TestCase):
             return projects
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("holdingTime", response.json()["results"][0])
         self.assertEqual(
             normalize(response.json()["results"]),
             normalize(json.loads(JSONRenderer().render(expected))),

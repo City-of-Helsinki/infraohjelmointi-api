@@ -2,17 +2,19 @@ import datetime
 import json
 from unittest.mock import patch
 import uuid
+from asgiref.sync import async_to_sync, sync_to_async
+from django.db import connection
 from django.test import TestCase, AsyncClient
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, User
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, TalpaAssetClass, TalpaProjectOpening, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer, ProjectHashtagSerializer
 from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
-from asgiref.sync import sync_to_async
 
 
 def perform_shared_api_setup(cls):
@@ -130,12 +132,107 @@ class ApiTestCase(CacheClearingMixin, TestCase):
 
     def test_api_GET_project_detail_sync(self):
         setup_sync_client(self)
+        asset_class = TalpaAssetClass.objects.create(
+            componentClass="8103000",
+            account="103000",
+            name="Test asset class",
+            holdingPeriodYears=20,
+        )
+        TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            assetClass=asset_class,
+        )
         response_project = self.client.get(f"/api/projects/{self.project_id}/")
 
         self.assertEqual(response_project.status_code, 200)
+        self.assertEqual(response_project.json()["holdingTime"], 20)
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
         self.assertEqual(response_project.json()["id"], project_data["id"])
+
+    def test_api_GET_project_holding_time_is_null_when_unavailable(self):
+        setup_sync_client(self)
+        response_project = self.client.get(f"/api/projects/{self.project_id}/")
+
+        self.assertEqual(response_project.status_code, 200)
+        self.assertIsNone(response_project.json()["holdingTime"])
+
+    def test_api_GET_project_holding_time_is_null_when_zero(self):
+        setup_sync_client(self)
+        asset_class = TalpaAssetClass.objects.create(
+            componentClass="8103000",
+            account="103000",
+            name="Test asset class",
+            holdingPeriodYears=0,
+        )
+        TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            assetClass=asset_class,
+        )
+
+        response_project = self.client.get(f"/api/projects/{self.project_id}/")
+
+        self.assertEqual(response_project.status_code, 200)
+        self.assertIsNone(response_project.json()["holdingTime"])
+
+    def test_api_project_list_holding_time_queries_do_not_grow_with_project_count(self):
+        setup_sync_client(self)
+        asset_class = TalpaAssetClass.objects.create(
+            componentClass="8103000",
+            account="103000",
+            name="Test asset class",
+            holdingPeriodYears=20,
+        )
+        TalpaProjectOpening.objects.create(
+            project=self.project,
+            subject="Uusi",
+            assetClass=asset_class,
+        )
+
+        async def consume_stream(stream):
+            return b"".join([chunk async for chunk in stream])
+
+        def get_projects_and_talpa_query_count():
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get("/api/projects/")
+                content = async_to_sync(consume_stream)(response.streaming_content)
+
+            self.assertEqual(response.status_code, 200)
+            talpa_tables = (
+                TalpaProjectOpening._meta.db_table.lower(),
+                TalpaAssetClass._meta.db_table.lower(),
+            )
+            talpa_queries = [
+                query for query in queries.captured_queries
+                if any(table in query["sql"].lower() for table in talpa_tables)
+            ]
+            return json.loads(content), len(talpa_queries)
+
+        few_projects, few_talpa_queries = get_projects_and_talpa_query_count()
+        self.assertEqual(few_projects[0]["holdingTime"], 20)
+
+        for index in range(2, 6):
+            project = Project.objects.create(
+                name=f"Test project {index}",
+                description="description of the test project",
+                projectClass=self.project_class,
+                projectDistrict=self.project_district,
+                projectLocation=self.project_location,
+            )
+            TalpaProjectOpening.objects.create(
+                project=project,
+                subject="Uusi",
+                assetClass=asset_class,
+            )
+
+        many_projects, many_talpa_queries = get_projects_and_talpa_query_count()
+
+        self.assertEqual(len(many_projects), 5)
+        self.assertTrue(all(project["holdingTime"] == 20 for project in many_projects))
+        self.assertEqual(few_talpa_queries, 1)
+        self.assertEqual(many_talpa_queries, few_talpa_queries)
 
 
     def test_api_GET_groups(self):
@@ -247,6 +344,18 @@ class AsyncApiTestCase(CacheClearingMixin, TestCase):
         token = getattr(AsyncApiTestCase, 'token', None)
         auth_header = f"Bearer {token.key}"
 
+        asset_class = await sync_to_async(TalpaAssetClass.objects.create)(
+            componentClass="8103000",
+            account="103000",
+            name="Test asset class",
+            holdingPeriodYears=20,
+        )
+        await sync_to_async(TalpaProjectOpening.objects.create)(
+            project=await sync_to_async(Project.objects.get)(id=ApiTestCase.project_id),
+            subject="Uusi",
+            assetClass=asset_class,
+        )
+
         projects_url = "/api/projects/"
         projects_by_class_url = f"/api/projects/?class={ApiTestCase.class_id}"
 
@@ -286,8 +395,12 @@ class AsyncApiTestCase(CacheClearingMixin, TestCase):
         expected_projects_by_class_json_str = json.dumps(expected_projects_by_class_data_raw, default=str)
         comparable_expected_projects_by_class = json.loads(expected_projects_by_class_json_str)
 
+        actual_holding_times = [project.pop("holdingTime") for project in actual_projects_list]
+        actual_holding_times_by_class = [project.pop("holdingTime") for project in actual_projects_by_class_list]
         self.assertListEqual(actual_projects_list, comparable_expected_projects, msg="Data mismatch for streaming /api/projects/")
         self.assertListEqual(actual_projects_by_class_list, comparable_expected_projects_by_class, msg="Data mismatch for streaming /api/projects/?class=...")
+        self.assertEqual(actual_holding_times[0], 20)
+        self.assertEqual(actual_holding_times_by_class[0], 20)
 
 
 def setup_sync_client(self):
