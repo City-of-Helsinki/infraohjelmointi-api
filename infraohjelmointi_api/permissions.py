@@ -719,9 +719,12 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
                     return True
         return False
 
+ADMIN_AD_GROUP = "sg_kymp_sso_io_admin"
+
+
 class IsAdmin(permissions.BasePermission):
     def user_in_test_group(self, request):
-        if "sg_kymp_sso_io_admin" in request.user.ad_groups.all().values_list(
+        if ADMIN_AD_GROUP in request.user.ad_groups.all().values_list(
             "name", flat=True
         ):
             return True
@@ -761,6 +764,19 @@ class IsAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         _type = obj._meta.model.__name__
         return True
+
+
+class IsPersonalDataRetentionAdmin(permissions.BasePermission):
+    """
+    Admins only, for every HTTP method. IsAdmin is read-only, but confirming
+    a personal data removal is a write.
+    """
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user.is_authenticated
+            and request.user.ad_groups.filter(name=ADMIN_AD_GROUP).exists()
+        )
 
 
 class IsClassProgrammer(permissions.BasePermission):
