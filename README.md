@@ -394,6 +394,21 @@ ProjectWise integration provides document management and project folder synchron
    - Only projects with a valid `hkrId` will be synchronized
    - The sync follows overwrite rules to protect certain fields and avoid overwriting existing data
 
+The third-party `GET /api/projects/{id}/` response includes `pwFolderLink` when
+a ProjectWise folder identifier is cached for the project's current `hkrId`;
+otherwise, the field is `null`. In list responses, `pwFolderLink` is `null`.
+Populate and refresh the cached identifiers outside API requests with:
+
+```bash
+python manage.py refresh_pw_folder_links
+```
+
+Run the command after deployment and schedule it periodically to pick up new or
+changed links. A confirmed missing project clears its cached link; temporary
+errors retain it and cause the command to exit with an error. The command does
+not write to ProjectWise. Third-party API requests use the local cache and do
+not look up the link in ProjectWise.
+
 Scripts were used when dev and prod environments were setup for the first time.
 
 More documentation on [Confluence](https://helsinkisolutionoffice.atlassian.net/wiki/spaces/IO/pages/8131444804/Infraohjelmointi+API+-sovellus#Project-Wise--integraatio).

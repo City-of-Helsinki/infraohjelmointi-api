@@ -1,17 +1,18 @@
 import json
 from collections import defaultdict
 from datetime import date
-from django.db.models import Prefetch
+from django.db.models import OuterRef, Prefetch, Subquery
 from ..BaseViewSet import BaseViewSet
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
 from infraohjelmointi_api.models import (
-    Project, ProjectFinancial, TalpaProjectOpening
+    Project, ProjectFinancial, ProjectWiseFolder, TalpaProjectOpening
 )
 from infraohjelmointi_api.serializers import (
     ProjectGetSerializer, ProjectFinancialSerializer
 )
+from infraohjelmointi_api.serializers.serializer_utils import env
 import uuid
 from django.http import StreamingHttpResponse
 from .utils import generate_response, generate_streaming_response, send_logger_api_generate_data_start
@@ -33,6 +34,10 @@ class_parameter = openapi.Parameter(
 
 class ApiProjectGetSerializer(ProjectGetSerializer):
     holdingTime = serializers.SerializerMethodField()
+
+    def get_pw_folder_link(self, project: Project):
+        instance_id = getattr(project, "pw_folder_instance_id", None)
+        return env("PW_PROJECT_FOLDER_LINK").format(instance_id) if instance_id else None
 
     def get_holdingTime(self, project: Project):
         talpa_opening = getattr(project, "talpaProjectOpening", None)
@@ -68,14 +73,20 @@ class ApiProjectsViewSet(BaseViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action == "retrieve":
-            return queryset.select_related("talpaProjectOpening__assetClass")
+            return queryset.select_related("talpaProjectOpening__assetClass").annotate(
+                pw_folder_instance_id=Subquery(
+                    ProjectWiseFolder.objects.filter(hkrId=OuterRef("hkrId")).values("instanceId")[:1]
+                )
+            )
         return queryset
 
     @swagger_auto_schema(
         operation_description="""
         `GET /api/projects/{id}`
 
-        Get specific project data.
+        Get specific project data. `pwFolderLink` is available when a
+        ProjectWise folder identifier is cached for the project's current hkrId;
+        otherwise, it is null.
         """,
     )
     def retrieve(self, request, pk=None):
