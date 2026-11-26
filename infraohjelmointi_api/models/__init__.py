@@ -1,6 +1,6 @@
 from .Person import Person
 from .ProjectSet import ProjectSet
-from .Project import Project
+from .Project import Project, ProjectWiseFolder
 from .BudgetItem import BudgetItem
 from .ProjectType import ProjectType
 from .ProjectTypeQualifier import ProjectTypeQualifier

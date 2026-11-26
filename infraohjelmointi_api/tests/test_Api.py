@@ -4,14 +4,17 @@ from unittest.mock import patch
 import uuid
 from asgiref.sync import async_to_sync, sync_to_async
 from django.db import connection
+from django.core.management import call_command
 from django.test import TestCase, AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from overrides import override
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
-from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, TalpaAssetClass, TalpaProjectOpening, User
+from infraohjelmointi_api.models import Project, ProjectClass, ProjectDistrict, ProjectFinancial, ProjectGroup, ProjectLocation, ProjectHashTag, ProjectWiseFolder, TalpaAssetClass, TalpaProjectOpening, User
 from infraohjelmointi_api.serializers import ProjectClassSerializer, ProjectDistrictSerializer, ProjectGetSerializer, ProjectGroupSerializer, ProjectLocationSerializer, ProjectHashtagSerializer
+from infraohjelmointi_api.serializers.ProjectCreateSerializer import ProjectCreateSerializer
+from infraohjelmointi_api.serializers.ProjectWithFinancesSerializer import ProjectWithFinancesSerializer
 from infraohjelmointi_api.tests.helpers import CacheClearingMixin
 from infraohjelmointi_api.views import BaseViewSet
 from project.extensions.CustomTokenAuth import CustomTokenAuth
@@ -130,8 +133,12 @@ class ApiTestCase(CacheClearingMixin, TestCase):
         self.assertEqual(CustomTokenAuth.keyword, "Bearer")
 
 
-    def test_api_GET_project_detail_sync(self):
+    @patch("infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw")
+    @patch.dict("os.environ", {"PW_PROJECT_FOLDER_LINK": "https://example.test/?fld={}"})
+    def test_api_GET_project_detail_sync(self, mock_pw):
         setup_sync_client(self)
+        Project.objects.filter(id=self.project_id).update(hkrId=123)
+        ProjectWiseFolder.objects.create(hkrId=123, instanceId="folder-123")
         asset_class = TalpaAssetClass.objects.create(
             componentClass="8103000",
             account="103000",
@@ -147,6 +154,8 @@ class ApiTestCase(CacheClearingMixin, TestCase):
 
         self.assertEqual(response_project.status_code, 200)
         self.assertEqual(response_project.json()["holdingTime"], 20)
+        self.assertEqual(response_project.json()["pwFolderLink"], "https://example.test/?fld=folder-123")
+        mock_pw.assert_not_called()
 
         project_data = ProjectGetSerializer(Project.objects.get(id=self.project_id)).data
         self.assertEqual(response_project.json()["id"], project_data["id"])
@@ -233,6 +242,57 @@ class ApiTestCase(CacheClearingMixin, TestCase):
         self.assertTrue(all(project["holdingTime"] == 20 for project in many_projects))
         self.assertEqual(few_talpa_queries, 1)
         self.assertEqual(many_talpa_queries, few_talpa_queries)
+
+    @patch("infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw")
+    @patch.dict("os.environ", {"PW_PROJECT_FOLDER_LINK": "https://example.test/?fld={}"})
+    def test_api_project_detail_uses_cached_folder_without_extra_queries(self, mock_pw):
+        setup_sync_client(self)
+        Project.objects.filter(id=self.project_id).update(hkrId=123)
+        with CaptureQueriesContext(connection) as without_cache:
+            empty_response = self.client.get(f"/api/projects/{self.project_id}/")
+        self.assertIsNone(empty_response.json()["pwFolderLink"])
+
+        ProjectWiseFolder.objects.create(hkrId=123, instanceId="folder-123")
+        with CaptureQueriesContext(connection) as with_cache:
+            response = self.client.get(f"/api/projects/{self.project_id}/")
+        self.assertEqual(response.json()["pwFolderLink"], "https://example.test/?fld=folder-123")
+        self.assertNotIn("pwFolderCache", response.json())
+        self.assertEqual(len(with_cache), len(without_cache))
+        mock_pw.assert_not_called()
+
+        Project.objects.filter(id=self.project_id).update(hkrId=456)
+        response = self.client.get(f"/api/projects/{self.project_id}/")
+        self.assertIsNone(response.json()["pwFolderLink"])
+        mock_pw.assert_not_called()
+
+    @patch("infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw")
+    @patch.dict("os.environ", {"PW_PROJECT_FOLDER_LINK": "https://example.test/?fld={}"})
+    def test_api_project_detail_uses_refreshed_folder(self, mock_pw):
+        setup_sync_client(self)
+        Project.objects.filter(id=self.project_id).update(hkrId=123)
+        mock_pw.return_value = {"instanceId": "folder-123"}
+        call_command("refresh_pw_folder_links")
+        mock_pw.reset_mock()
+
+        response = self.client.get(f"/api/projects/{self.project_id}/")
+        self.assertEqual(response.json()["pwFolderLink"], "https://example.test/?fld=folder-123")
+        mock_pw.assert_not_called()
+
+    def test_project_save_does_not_overwrite_folder_cache(self):
+        Project.objects.filter(id=self.project_id).update(hkrId=123)
+        project = Project.objects.get(id=self.project_id)
+        ProjectWiseFolder.objects.create(hkrId=123, instanceId="folder-123")
+        project.name = "Updated project"
+        project.save()
+        self.assertEqual(ProjectWiseFolder.objects.get(hkrId=123).instanceId, "folder-123")
+        project.hkrId = 456
+        project.save(update_fields=["hkrId"])
+        self.assertEqual(ProjectWiseFolder.objects.get(hkrId=123).instanceId, "folder-123")
+
+    def test_folder_cache_is_internal_to_project_serializers(self):
+        for serializer_class in (ProjectGetSerializer, ProjectCreateSerializer, ProjectWithFinancesSerializer):
+            with self.subTest(serializer=serializer_class.__name__):
+                self.assertNotIn("pwFolderCache", serializer_class().fields)
 
 
     def test_api_GET_groups(self):
@@ -340,7 +400,10 @@ class AsyncApiTestCase(CacheClearingMixin, TestCase):
     def setUpTestData(cls):
         perform_shared_api_setup(cls)
 
-    async def test_api_GET_streaming_projects(self):
+    @patch("infraohjelmointi_api.services.ProjectWiseService.ProjectWiseService.get_project_from_pw")
+    async def test_api_GET_streaming_projects(self, mock_pw):
+        await sync_to_async(Project.objects.filter(id=ApiTestCase.project_id).update)(hkrId=123)
+        await sync_to_async(ProjectWiseFolder.objects.create)(hkrId=123, instanceId="folder-123")
         token = getattr(AsyncApiTestCase, 'token', None)
         auth_header = f"Bearer {token.key}"
 
@@ -388,6 +451,10 @@ class AsyncApiTestCase(CacheClearingMixin, TestCase):
 
         streamed_content_str_class = b"".join(streamed_chunks_class).decode('utf-8')
         actual_projects_by_class_list = json.loads(streamed_content_str_class)
+        self.assertIsNone(actual_projects_list[0]["pwFolderLink"])
+        self.assertIsNone(actual_projects_by_class_list[0]["pwFolderLink"])
+        self.assertNotIn("pwFolderCache", actual_projects_list[0])
+        mock_pw.assert_not_called()
 
         expected_projects_json_str = json.dumps(expected_projects_data_raw, default=str)
         comparable_expected_projects = json.loads(expected_projects_json_str)

@@ -326,3 +326,8 @@ class Project(models.Model):
             models.Index(fields=['projectClass'], name='idx_project_class'),
         ]
         ordering = ["-id"]
+
+
+class ProjectWiseFolder(models.Model):
+    hkrId = models.PositiveBigIntegerField(primary_key=True)
+    instanceId = models.CharField(max_length=256)
