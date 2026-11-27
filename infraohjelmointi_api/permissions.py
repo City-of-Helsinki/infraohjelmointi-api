@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from infraohjelmointi_api.utils.hierarchy_utils import get_self_and_descendant_ids
 import uuid
 
-
 def parse_name_from_email(email):
     """Return lowercase first and last names from a firstname.lastname email."""
     if not email or "@" not in email:
@@ -649,6 +648,11 @@ class BaseProjectAreaPermissions(permissions.BasePermission):
 
         return groupClassRelation.path.startswith("8 08")
 
+    def project_programme_belongs_to_808_main_class(self, obj):
+        project = getattr(obj, "project", None)
+        project_class = getattr(project, "projectClass", None)
+        return bool(project_class and (project_class.path or "").startswith("8 08"))
+
 class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
     def user_in_project_area_planner_group(self, request):
         if (
@@ -691,6 +695,11 @@ class IsPlannerOfProjectAreas(BaseProjectAreaPermissions):
         if user_in_restricted_programmer_group(request):
             return False
         _type = obj._meta.model.__name__
+
+        if _type == "ProjectProgramme":
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            return self.project_programme_belongs_to_808_main_class(obj)
 
         if view.action in [
             *DJANGO_BASE_READ_ONLY_ACTIONS,

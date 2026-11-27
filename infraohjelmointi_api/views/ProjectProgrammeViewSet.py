@@ -29,7 +29,6 @@ from infraohjelmointi_api.models import (
 from infraohjelmointi_api.permissions import (
     get_planner_group_name,
     get_transport_landscape_planning_group_name,
-    get_restricted_programmer_group_name,
     class_id_in_scope,
     get_restricted_user_class_scope_ids,
     is_restricted_programmer,
@@ -121,6 +120,8 @@ class ProjectProgrammeViewSet(BaseViewSet):
     }
     COMMISSIONING_MANAGER_GROUP = "sg_kymp_sso_io_projektipaallikot"
     ADMIN_GROUP = "sg_kymp_sso_io_admin"
+    COORDINATOR_GROUP = "sg_kymp_sso_io_koordinaattorit"
+    PROJECT_AREA_PLANNER_GROUP = "sg_kymp_sso_io_projektialueiden_ohjelmoijat"
 
     @override
     def get_queryset(self):
@@ -175,13 +176,17 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     def _handle_section(self, request, related_name, update_serializer_class, get_serializer_class):
         programme = self.get_object()
+        existing_section = getattr(programme, related_name, None)
         if programme.is_locked:
             return Response(
                 {"detail": "Only sections of project programmes in DRAFT status can be edited."},
                 status=status.HTTP_409_CONFLICT,
             )
-
-        existing_section = getattr(programme, related_name, None)
+        if existing_section is not None and existing_section.is_locked:
+            return Response(
+                {"detail": "Only sections of project programmes in DRAFT status can be edited."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         if request.method == "POST":
             if existing_section is not None:
@@ -239,6 +244,41 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return set()
         return set(user.ad_groups.all().values_list("name", flat=True))
 
+    @override
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+
+        user = self._get_authenticated_user(request)
+        group_names = self._get_user_group_names(user)
+        if (
+            obj._meta.model.__name__ != "ProjectProgramme"
+            or request.method in ("GET", "HEAD", "OPTIONS")
+        ):
+            return
+
+        if is_restricted_programmer(user) and not self._restricted_programmer_matches_project(
+            user, obj.project
+        ):
+            raise PermissionDenied(
+                "Restricted programmers can only modify programmes in their assigned project classes."
+            )
+
+        if (
+            self.PROJECT_AREA_PLANNER_GROUP not in group_names
+            or group_names.intersection({self.ADMIN_GROUP, self.COORDINATOR_GROUP})
+        ):
+            return
+
+        if not self._project_is_in_project_area(obj.project):
+            raise PermissionDenied(
+                "Project-area planners can only modify programmes for project-area projects."
+            )
+
+    @staticmethod
+    def _project_is_in_project_area(project):
+        project_class = getattr(project, "projectClass", None)
+        return bool(project_class and (project_class.path or "").startswith("8 08"))
+
     def _matches_programmer_name_from_email(self, user_email, project_programmer):
         first_name, last_name = parse_name_from_email(user_email)
         if not first_name or not project_programmer:
@@ -275,16 +315,34 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
         return False
 
-    def _assert_can_create_programme(self, request):
+    def _assert_can_create_programme(self, request, project):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
-        if self.ADMIN_GROUP in group_names:
+        if self.ADMIN_GROUP in group_names or self.COORDINATOR_GROUP in group_names:
             return
 
-        # IO-756: restricted programmers can't create programmes, even if they
-        # are also in the planner or transport and landscape planning group.
+        # IO-756: restricted programmers can create programmes only within their
+        # assigned class scope, even if they have broader planner memberships.
         if is_restricted_programmer(user):
-            raise PermissionDenied("Restricted programmers can't create a project programme.")
+            if self._restricted_programmer_matches_project(user, project):
+                if (
+                    self.PROJECT_AREA_PLANNER_GROUP in group_names
+                    and not self._project_is_in_project_area(project)
+                ):
+                    raise PermissionDenied(
+                        "Project-area planners can only create programmes for project-area projects."
+                    )
+                return
+            raise PermissionDenied(
+                "Restricted programmers can only create programmes in their assigned project classes."
+            )
+
+        if self.PROJECT_AREA_PLANNER_GROUP in group_names:
+            if self._project_is_in_project_area(project):
+                return
+            raise PermissionDenied(
+                "Project-area planners can only create programmes for project-area projects."
+            )
 
         if get_planner_group_name() in group_names:
             return
@@ -293,7 +351,7 @@ class ProjectProgrammeViewSet(BaseViewSet):
             return
 
         raise PermissionDenied(
-            "Only planners or transport and landscape planning users can create a project programme."
+            "You do not have permission to create a project programme for this project."
         )
 
     def _restricted_programmer_matches_project(self, user, project):
@@ -304,27 +362,36 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
         return class_id_in_scope(class_id, get_restricted_user_class_scope_ids(user))
 
-    def _assert_can_edit_or_complete(self, request, project):
+    def _assert_can_edit_or_complete(
+        self,
+        request,
+        project,
+        allow_project_manager_draft_edit=False,
+        allow_project_manager_mark_ready=False,
+    ):
         user = self._get_authenticated_user(request)
         group_names = self._get_user_group_names(user)
         if self.ADMIN_GROUP in group_names:
             return
 
+        if is_restricted_programmer(user):
+            if self._restricted_programmer_matches_project(user, project):
+                return
+            raise PermissionDenied(
+                "Restricted programmers can only edit programmes in their assigned project classes."
+            )
+
         if get_transport_landscape_planning_group_name() in group_names:
             return
 
         if self.COMMISSIONING_MANAGER_GROUP in group_names:
+            if allow_project_manager_draft_edit or allow_project_manager_mark_ready:
+                return
             raise PermissionDenied(
                 "Commissioning managers can only return a project programme to DRAFT."
             )
 
         if group_names.intersection(self.REVIEWER_GROUPS):
-            return
-
-        if (
-            get_restricted_programmer_group_name() in group_names
-            and self._restricted_programmer_matches_project(user, project)
-        ):
             return
 
         if self._is_responsible_for_project_programme(user, project):
@@ -340,20 +407,21 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if self.ADMIN_GROUP in group_names:
             return
 
+        if is_restricted_programmer(user):
+            if self._restricted_programmer_matches_project(user, project):
+                return
+            raise PermissionDenied(
+                "Restricted programmers can only modify programmes in their assigned project classes."
+            )
+
+        if get_transport_landscape_planning_group_name() in group_names:
+            return
+
         if group_names.intersection(self.REVIEWER_GROUPS):
             return
 
-        if (
-            get_restricted_programmer_group_name() in group_names
-            and self._restricted_programmer_matches_project(user, project)
-        ):
-            return
-
-        if self.COMMISSIONING_MANAGER_GROUP in group_names:
-            return
-
         raise PermissionDenied(
-            "Only reviewers or commissioning managers can return a project programme to DRAFT."
+            "You do not have permission to return this project programme to DRAFT."
         )
 
     def _validate_for_complete(self, instance, entity_name):
@@ -370,7 +438,6 @@ class ProjectProgrammeViewSet(BaseViewSet):
     def _validate_programme_and_draft_sections_for_complete(self, programme):
         self._validate_required_fields_for_complete(programme)
         self._validate_for_complete(programme, "project programme")
-
         draft_sections = []
         for relation_name in self.SECTION_RELATIONS.values():
             if not hasattr(programme, relation_name):
@@ -438,7 +505,10 @@ class ProjectProgrammeViewSet(BaseViewSet):
 
     @override
     def perform_create(self, serializer):
-        self._assert_can_create_programme(self.request)
+        self._assert_can_create_programme(
+            self.request,
+            serializer.validated_data.get("project"),
+        )
 
         user = self._get_authenticated_user(self.request)
         if user:
@@ -449,7 +519,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
     @override
     def perform_update(self, serializer):
         project = getattr(serializer.instance, "project", None)
-        self._assert_can_edit_or_complete(self.request, project)
+        self._assert_can_edit_or_complete(
+            self.request,
+            project,
+            allow_project_manager_draft_edit=serializer.instance.status == "DRAFT",
+        )
 
         user = self._get_authenticated_user(self.request)
         if user:
@@ -514,7 +588,11 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if requested_status == "DRAFT":
             self._assert_can_return_to_draft(request, instance.project)
         else:
-            self._assert_can_edit_or_complete(request, instance.project)
+            self._assert_can_edit_or_complete(
+                request,
+                instance.project,
+                allow_project_manager_mark_ready=requested_status == "COMPLETE",
+            )
 
         user = self._get_authenticated_user(request)
         with transaction.atomic():
@@ -667,12 +745,15 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if request.method == "DELETE":
             section_instance = link.sectionObject
             if (
-                section_instance is not None
-                and (
+                programme.is_locked
+                or (
+                    section_instance is not None
+                    and (
                     getattr(section_instance, "is_locked", False)
                     or (
                         hasattr(section_instance, "status")
                         and section_instance.status != "DRAFT"
+                    )
                     )
                 )
             ):
@@ -738,17 +819,22 @@ class ProjectProgrammeViewSet(BaseViewSet):
         if requested_status == "DRAFT":
             self._assert_can_return_to_draft(request, programme.project)
         else:
-            self._assert_can_edit_or_complete(request, programme.project)
+            self._assert_can_edit_or_complete(
+                request,
+                programme.project,
+                allow_project_manager_mark_ready=requested_status == "COMPLETE",
+            )
 
         if requested_status == "COMPLETE":
             self._validate_required_fields_for_complete(programme, relation_name)
             self._validate_for_complete(section_instance, f"section '{relation_name}'")
 
         user = self._get_authenticated_user(request)
-        section_instance.status = requested_status
-        if user:
-            section_instance.updatedBy = user
-        section_instance.save()
+        with transaction.atomic():
+            section_instance.status = requested_status
+            if user:
+                section_instance.updatedBy = user
+            section_instance.save()
 
         return Response(
             {
