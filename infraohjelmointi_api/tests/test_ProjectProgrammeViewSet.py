@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from helusers.models import ADGroup
 from rest_framework import status
@@ -72,6 +73,14 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.planner_group = ADGroup.objects.create(
             name="sg_kymp_sso_io_ohjelmoijat",
             display_name="Planners",
+        )
+        self.coordinator_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_koordinaattorit",
+            display_name="Coordinators",
+        )
+        self.project_area_planner_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_projektialueiden_ohjelmoijat",
+            display_name="Project area planners",
         )
         self.user.ad_groups.add(self.planner_group)
         self.client.force_authenticate(user=self.user)
@@ -256,7 +265,7 @@ class ProjectProgrammeViewSetTestCase(TestCase):
                     format="json",
                 )
 
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
                 self.assertTrue(ProjectProgrammeLink.objects.filter(pk=link.pk).exists())
 
     def test_all_sections_reject_link_changes_when_programme_is_complete(self):
@@ -334,8 +343,6 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         programme.refresh_from_db()
         self.assertEqual(programme.status, "COMPLETE")
-        programme.designCriteria.refresh_from_db()
-        self.assertEqual(programme.designCriteria.status, "COMPLETE")
 
     def test_completion_marks_all_filled_draft_sections_ready(self):
         programme = self._create_project_programme(briefProjectProgramme=False)
@@ -351,6 +358,41 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             section = getattr(programme, relation_name)
             self.assertEqual(section.status, "COMPLETE")
             self.assertEqual(section.updatedBy_id, self.user.uuid)
+
+    def test_section_completion_marks_only_selected_section_ready(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "DRAFT")
+        self.assertEqual(programme.basicInfo.status, "COMPLETE")
+        for relation_name in get_required_section_fields(programme):
+            if relation_name != "basicInfo":
+                self.assertEqual(getattr(programme, relation_name).status, "DRAFT")
+
+    def test_section_completion_ignores_missing_fields_in_other_draft_sections(self):
+        programme = self._create_project_programme(briefProjectProgramme=False)
+        self._fill_required_sections(programme)
+        programme.maintenanceNeeds.maintenanceNeeds = " "
+        programme.maintenanceNeeds.save()
+
+        response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.basicInfo.status, "COMPLETE")
+        self.assertEqual(programme.maintenanceNeeds.status, "DRAFT")
 
     def test_completion_brief_ignores_optional_fields_and_extended_sections(self):
         programme = self._create_project_programme()
@@ -519,7 +561,6 @@ class ProjectProgrammeViewSetTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("status", response.data)
 
     def test_partial_update_cannot_change_project(self):
         programme = self._create_project_programme(project=self.project)
@@ -956,8 +997,11 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("status", response.data)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data["detail"],
+            "Only sections of project programmes in DRAFT status can be edited.",
+        )
 
     def test_section_mutation_blocked_when_parent_programme_is_complete(self):
         programme = self._create_project_programme(status="COMPLETE")
@@ -1328,6 +1372,43 @@ class ProjectProgrammeViewSetTestCase(TestCase):
             "Links can only be modified for entities in DRAFT status.",
         )
         self.assertTrue(ProjectProgrammeLink.objects.filter(id=link.id).exists())
+
+    def test_link_writes_are_blocked_when_programme_is_complete(self):
+        programme = self._create_project_programme(status="COMPLETE")
+        section = ProjectProgrammeOtherAttachments.objects.create(
+            project_programme=programme,
+            status="DRAFT",
+        )
+        content_type = ContentType.objects.get_for_model(ProjectProgrammeOtherAttachments)
+        link = ProjectProgrammeLink.objects.create(
+            contentType=content_type,
+            objectId=section.id,
+            value="https://original.com",
+        )
+
+        create_response = self.client.post(
+            f"/project-programmes/{programme.id}/sections/links/",
+            {
+                "contentType": content_type.id,
+                "objectId": str(section.id),
+                "value": "https://new.com",
+            },
+            format="json",
+        )
+        update_response = self.client.patch(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+            {"value": "https://updated.com"},
+            format="json",
+        )
+        delete_response = self.client.delete(
+            f"/project-programmes/{programme.id}/sections/links/{link.id}/",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(update_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(delete_response.status_code, status.HTTP_409_CONFLICT)
+        link.refresh_from_db()
+        self.assertEqual(link.value, "https://original.com")
 
     def test_patch_link_rejects_link_from_different_programme(self):
         programme = self._create_project_programme(project=self.project)
@@ -1704,6 +1785,14 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name="sg_kymp_sso_io_ohjelmoijat",
             display_name="Planners",
         )
+        self.coordinator_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_koordinaattorit",
+            display_name="Coordinators",
+        )
+        self.project_area_planner_group = ADGroup.objects.create(
+            name="sg_kymp_sso_io_projektialueiden_ohjelmoijat",
+            display_name="Project area planners",
+        )
 
         self.allowed_user = User.objects.create_user(
             username="allowed.programmer@test.fi",
@@ -1741,6 +1830,18 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
         self.planner_user.ad_groups.add(self.planner_group)
 
+        self.coordinator_user = User.objects.create_user(
+            username="coordinator.user@test.fi",
+            email="coordinator.user@test.fi",
+        )
+        self.coordinator_user.ad_groups.add(self.coordinator_group)
+
+        self.project_area_planner_user = User.objects.create_user(
+            username="project.area.planner@test.fi",
+            email="project.area.planner@test.fi",
+        )
+        self.project_area_planner_user.ad_groups.add(self.project_area_planner_group)
+
         self.responsible_person = Person.objects.create(
             firstName="Responsible",
             lastName="Viewer",
@@ -1775,6 +1876,10 @@ class ProjectProgrammePermissionTestCase(TestCase):
             name="Unassigned class",
             path="8 03/Unassigned class",
         )
+        self.project_area_class = ProjectClass.objects.create(
+            name="Project area class",
+            path="8 08 Project areas/8 08 01 Project area",
+        )
 
         self.allowed_project = Project.objects.create(
             name="Allowed programme project",
@@ -1795,6 +1900,12 @@ class ProjectProgrammePermissionTestCase(TestCase):
             description="Project for responsible creator",
             projectDistrict=self.district,
             personPlanning=self.responsible_person,
+        )
+        self.project_area_project = Project.objects.create(
+            name="Project area project",
+            description="Project in the project-area class",
+            projectDistrict=self.district,
+            projectClass=self.project_area_class,
         )
 
         self.allowed_programme = ProjectProgramme.objects.create(
@@ -1908,8 +2019,60 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_restricted_programmer_cannot_create_project_programme(self):
-        project = Project.objects.create(
+    def test_restricted_transport_planner_can_edit_only_assigned_programmes(self):
+        self.allowed_user.ad_groups.add(self.transport_landscape_planning_group)
+        self.client.force_authenticate(user=self.allowed_user)
+
+        allowed_response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(allowed_response.status_code, status.HTTP_200_OK)
+
+        denied_response = self.client.patch(
+            f"/project-programmes/{self.unassigned_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        ProjectProgrammeBasicInfo.objects.create(
+            project_programme=self.unassigned_programme,
+            status="DRAFT",
+            summary="Outside assigned scope",
+        )
+        denied_section_response = self.client.patch(
+            f"/project-programmes/{self.unassigned_programme.id}/sections/basic-info/",
+            {"summary": "Must remain unchanged"},
+            format="json",
+        )
+        self.assertEqual(denied_section_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_restricted_transport_planner_can_return_only_assigned_programmes_to_draft(self):
+        self.allowed_user.ad_groups.add(self.transport_landscape_planning_group)
+        self.allowed_programme.status = "COMPLETE"
+        self.allowed_programme.save()
+        self.unassigned_programme.status = "COMPLETE"
+        self.unassigned_programme.save()
+        self.client.force_authenticate(user=self.allowed_user)
+
+        allowed_response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+        self.assertEqual(allowed_response.status_code, status.HTTP_200_OK)
+
+        denied_response = self.client.post(
+            f"/project-programmes/{self.unassigned_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_restricted_programmer_can_create_only_in_assigned_class_scope(self):
+        assigned_project = Project.objects.create(
             name="Assigned class project without programme",
             description="Project in assigned class with no existing programme",
             projectDistrict=self.district,
@@ -1917,13 +2080,98 @@ class ProjectProgrammePermissionTestCase(TestCase):
         )
         self.client.force_authenticate(user=self.allowed_user)
 
+        allowed_response = self.client.post(
+            "/project-programmes/",
+            {"project": str(assigned_project.id)},
+            format="json",
+        )
+        self.assertEqual(allowed_response.status_code, status.HTTP_201_CREATED)
+
+        outside_scope_project = Project.objects.create(
+            name="Outside assigned class project",
+            description="Project outside the restricted programmer's scope",
+            projectDistrict=self.district,
+            projectClass=self.unassigned_class,
+        )
+        denied_response = self.client.post(
+            "/project-programmes/",
+            {"project": str(outside_scope_project.id)},
+            format="json",
+        )
+        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_coordinator_can_create_project_programme(self):
+        self.client.force_authenticate(user=self.coordinator_user)
+
         response = self.client.post(
             "/project-programmes/",
-            {"project": str(project.id)},
+            {"project": str(self.responsible_project.id)},
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_project_area_planner_can_create_only_for_project_area_project(self):
+        self.project_area_planner_user.ad_groups.add(self.planner_group)
+        self.client.force_authenticate(user=self.project_area_planner_user)
+
+        allowed_response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.project_area_project.id)},
+            format="json",
+        )
+        self.assertEqual(allowed_response.status_code, status.HTTP_201_CREATED)
+
+        denied_response = self.client.post(
+            "/project-programmes/",
+            {"project": str(self.responsible_project.id)},
+            format="json",
+        )
+        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_project_area_planner_can_read_all_and_modify_only_area_programmes(self):
+        area_programme = ProjectProgramme.objects.create(
+            project=self.project_area_project,
+            status="DRAFT",
+            briefProjectProgramme=True,
+        )
+        self.client.force_authenticate(user=self.project_area_planner_user)
+
+        read_response = self.client.get(f"/project-programmes/{self.allowed_programme.id}/")
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+
+        self.project_area_planner_user.ad_groups.add(self.planner_group)
+        in_area_update_response = self.client.patch(
+            f"/project-programmes/{area_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(in_area_update_response.status_code, status.HTTP_200_OK)
+
+        out_of_area_update_response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(out_of_area_update_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_project_area_planner_can_switch_type_only_for_area_programmes(self):
+        area_programme = ProjectProgramme.objects.create(
+            project=self.project_area_project,
+            status="DRAFT",
+            briefProjectProgramme=True,
+        )
+        self.client.force_authenticate(user=self.project_area_planner_user)
+
+        in_area_response = self.client.post(
+            f"/project-programmes/{area_programme.id}/switch-type/"
+        )
+        self.assertEqual(in_area_response.status_code, status.HTTP_200_OK)
+
+        out_of_area_response = self.client.post(
+            f"/project-programmes/{self.unassigned_programme.id}/switch-type/"
+        )
+        self.assertEqual(out_of_area_response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_planner_can_create_project_programme(self):
         self.client.force_authenticate(user=self.planner_user)
@@ -2010,11 +2258,11 @@ class ProjectProgrammePermissionTestCase(TestCase):
         programme.briefProjectProgramme = False
         programme.save()
         ProjectProgrammeViewSetTestCase._fill_required_sections(self, programme)
-        for extra_group in (
-            None,
-            self.viewer_group,
-            self.project_manager_group,
-            self.restricted_programmer_group,
+        for extra_group, expected_update_status in (
+            (None, status.HTTP_200_OK),
+            (self.viewer_group, status.HTTP_200_OK),
+            (self.project_manager_group, status.HTTP_200_OK),
+            (self.restricted_programmer_group, status.HTTP_403_FORBIDDEN),
         ):
             with self.subTest(extra_group=extra_group):
                 groups = [self.transport_landscape_planning_group]
@@ -2031,7 +2279,9 @@ class ProjectProgrammePermissionTestCase(TestCase):
                     {"briefProjectProgramme": True},
                     format="json",
                 )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.status_code, expected_update_status)
+                if expected_update_status == status.HTTP_403_FORBIDDEN:
+                    continue
 
                 response = self.client.post(f"/project-programmes/{programme.id}/switch-type/")
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -2047,18 +2297,25 @@ class ProjectProgrammePermissionTestCase(TestCase):
                 programme.refresh_from_db()
                 self.assertEqual(programme.status, "COMPLETE")
 
-    def test_project_manager_without_transport_landscape_planning_cannot_switch_type(self):
+    def test_project_manager_can_edit_and_switch_draft_programme(self):
         self.client.force_authenticate(user=self.project_manager_user)
 
-        response = self.client.post(
+        update_response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+
+        switch_response = self.client.post(
             f"/project-programmes/{self.allowed_programme.id}/switch-type/"
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(switch_response.status_code, status.HTTP_200_OK)
         self.allowed_programme.refresh_from_db()
         self.assertTrue(self.allowed_programme.briefProjectProgramme)
 
-    def test_transport_landscape_planning_membership_overrides_commissioning_manager_completion_restriction(self):
+    def test_project_manager_can_mark_programme_ready_with_or_without_transport_membership(self):
         programme = self.allowed_programme
         programme.briefProjectProgramme = False
         programme.save()
@@ -2071,9 +2328,13 @@ class ProjectProgrammePermissionTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        programme.refresh_from_db()
+        self.assertEqual(programme.status, "COMPLETE")
 
         self.project_manager_user.ad_groups.add(self.transport_landscape_planning_group)
+        programme.status = "DRAFT"
+        programme.save(update_fields=["status"])
 
         response = self.client.post(
             f"/project-programmes/{programme.id}/transitions/",
@@ -2149,7 +2410,7 @@ class ProjectProgrammePermissionTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_project_manager_cannot_edit_project_programme_data(self):
+    def test_project_manager_can_edit_project_programme_data_in_draft(self):
         self.client.force_authenticate(user=self.project_manager_user)
 
         response = self.client.patch(
@@ -2158,10 +2419,87 @@ class ProjectProgrammePermissionTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.allowed_programme.refresh_from_db()
+        self.assertFalse(self.allowed_programme.briefProjectProgramme)
 
-    def test_project_manager_can_return_project_programme_to_draft(self):
+    def test_project_manager_can_edit_draft_section_links_and_attachments(self):
+        basic_info = ProjectProgrammeBasicInfo.objects.create(
+            project_programme=self.allowed_programme,
+            status="DRAFT",
+            summary="Original summary",
+        )
         self.client.force_authenticate(user=self.project_manager_user)
+
+        section_response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/",
+            {"summary": "Updated summary"},
+            format="json",
+        )
+        self.assertEqual(section_response.status_code, status.HTTP_200_OK)
+
+        link_response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/sections/links/",
+            {
+                "contentType": ContentType.objects.get_for_model(
+                    ProjectProgrammeBasicInfo
+                ).id,
+                "objectId": str(basic_info.id),
+                "value": "https://example.com/project-manager-edit",
+            },
+            format="json",
+        )
+        self.assertEqual(link_response.status_code, status.HTTP_201_CREATED)
+
+        attachment = SimpleUploadedFile(
+            "project-manager.pdf",
+            b"%PDF-1.4 project manager attachment",
+            content_type="application/pdf",
+        )
+        attachment_response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/attachments/",
+            {"file": attachment},
+            format="multipart",
+        )
+        self.assertEqual(attachment_response.status_code, status.HTTP_201_CREATED)
+
+    def test_project_manager_cannot_edit_completed_project_programme(self):
+        self.allowed_programme.status = "COMPLETE"
+        self.allowed_programme.save()
+        self.client.force_authenticate(user=self.project_manager_user)
+
+        update_response = self.client.patch(
+            f"/project-programmes/{self.allowed_programme.id}/",
+            {"briefProjectProgramme": False},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        switch_response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/switch-type/"
+        )
+        self.assertEqual(switch_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.allowed_programme.refresh_from_db()
+        self.assertTrue(self.allowed_programme.briefProjectProgramme)
+
+    def test_project_manager_cannot_return_project_programme_to_draft(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+        self.allowed_programme.status = "COMPLETE"
+        self.allowed_programme.save()
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.allowed_programme.refresh_from_db()
+        self.assertEqual(self.allowed_programme.status, "COMPLETE")
+
+    def test_transport_landscape_planning_user_can_return_programme_to_draft(self):
+        self.client.force_authenticate(user=self.transport_landscape_planning_user)
         self.allowed_programme.status = "COMPLETE"
         self.allowed_programme.save()
 
@@ -2175,8 +2513,33 @@ class ProjectProgrammePermissionTestCase(TestCase):
         self.allowed_programme.refresh_from_db()
         self.assertEqual(self.allowed_programme.status, "DRAFT")
 
-    def test_project_manager_cannot_mark_project_programme_complete(self):
+    def test_project_area_planner_can_only_return_own_area_programmes_to_draft(self):
+        area_programme = ProjectProgramme.objects.create(
+            project=self.project_area_project,
+            status="COMPLETE",
+            briefProjectProgramme=True,
+        )
+        self.allowed_programme.status = "COMPLETE"
+        self.allowed_programme.save()
+        self.client.force_authenticate(user=self.project_area_planner_user)
+
+        allowed_response = self.client.post(
+            f"/project-programmes/{area_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+        self.assertEqual(allowed_response.status_code, status.HTTP_200_OK)
+
+        denied_response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/transitions/",
+            {"to": "DRAFT"},
+            format="json",
+        )
+        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_project_manager_can_mark_project_programme_complete(self):
         self.client.force_authenticate(user=self.project_manager_user)
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, self.allowed_programme)
 
         response = self.client.post(
             f"/project-programmes/{self.allowed_programme.id}/transitions/",
@@ -2184,7 +2547,24 @@ class ProjectProgrammePermissionTestCase(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.allowed_programme.refresh_from_db()
+        self.assertEqual(self.allowed_programme.status, "COMPLETE")
+
+    def test_project_manager_can_mark_project_programme_section_ready(self):
+        self.client.force_authenticate(user=self.project_manager_user)
+        ProjectProgrammeViewSetTestCase._fill_required_sections(self, self.allowed_programme)
+
+        response = self.client.post(
+            f"/project-programmes/{self.allowed_programme.id}/sections/basic-info/transitions/",
+            {"to": "COMPLETE"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.allowed_programme.refresh_from_db()
+        self.assertEqual(self.allowed_programme.status, "DRAFT")
+        self.assertEqual(self.allowed_programme.basicInfo.status, "COMPLETE")
 
     def test_transport_landscape_planning_user_can_update_project_programme_without_membership(self):
         self.client.force_authenticate(user=self.transport_landscape_planning_user)

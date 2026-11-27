@@ -83,9 +83,12 @@ class ProjectProgrammeLinkUpdateSerializer(serializers.ModelSerializer):
             model_class = content_type.model_class()
             if model_class is not None:
                 section_instance = model_class.objects.filter(pk=object_id).first()
+                programme = getattr(section_instance, "project_programme", None)
                 if (
                     section_instance
                     and (
+                        getattr(programme, "is_locked", False)
+                        or
                         getattr(section_instance, "is_locked", False)
                         or (
                             hasattr(section_instance, "status")
