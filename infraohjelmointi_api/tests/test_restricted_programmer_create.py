@@ -225,6 +225,29 @@ class RestrictedProgrammerCreateTestCase(TestCase):
         self.other_project.refresh_from_db()
         self.assertIsNone(self.other_project.projectGroup)
 
+    def test_can_edit_own_group_and_add_own_project(self, _pw):
+        """The group edit dialog is the only way to move a project into a group,
+        so restricted programmers may edit (not delete) groups of their classes."""
+        group = ProjectGroup.objects.create(name="Group", classRelation=self.own_class)
+        response = self.client.patch(
+            f"/project-groups/{group.id}/",
+            {
+                "name": "Renamed",
+                "classRelation": str(self.own_class.id),
+                "location": "",
+                "locationRelation": None,
+                "projects": [str(self.own_project.id)],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.content)
+        self.own_project.refresh_from_db()
+        self.assertEqual(self.own_project.projectGroup, group)
+
+        response = self.client.delete(f"/project-groups/{group.id}/")
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ProjectGroup.objects.filter(id=group.id).exists())
+
     def test_json_array_body_is_denied_not_a_server_error(self, _pw):
         response = self.client.post("/projects/", [{"name": "x"}], format="json")
         self.assertEqual(response.status_code, 403)
